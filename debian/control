@@ -1,0 +1,62 @@
+Source: spice
+Section: misc
+Priority: optional 
+Maintainer: Liang Guo <bluestonechina@gmail.com>
+Build-Depends: debhelper (>= 7.0.50~),
+ autotools-dev,
+ libcegui-mk2-dev (>= 0.6.0~),
+ libspice-protocol-dev (>= 0.7.0~),
+ libpixman-1-dev (>= 0.17.7~),
+ libxrandr-dev (>= 1.2~),
+ pkg-config,
+ libasound2-dev,
+ libssl-dev,
+ libxfixes-dev,
+ libglu1-mesa-dev,
+ libgl1-mesa-dev,
+ libogg-dev
+Standards-Version: 3.9.2
+Homepage: http://spice-space.org/
+Vcs-Git: git://git.debian.org/collab-maint/spice.git
+Vcs-Browser: http://git.debian.org/?p=collab-maint/spice.git;a=summary
+
+Package: spice-client
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Implements the client side of the SPICE protocol
+ The Simple Protocol for Independent Computing Environments (SPICE) is
+ a remote display system built for virtual environments which allows
+ you to view a computing 'desktop' environment not only on the machine
+ where it is running, but from anywhere on the Internet and from a wide
+ variety of machine architectures.
+ .
+ This package contains the SPICE client application.
+
+Package: libspice-server1
+Section: libs
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Implements the server side of the SPICE protocol
+ The Simple Protocol for Independent Computing Environments (SPICE) is
+ a remote display system built for virtual environments which allows
+ you to view a computing 'desktop' environment not only on the machine
+ where it is running, but from anywhere on the Internet and from a wide
+ variety of machine architectures.
+ .
+ This package contains the run-time libraries for any application that 
+ wishes to be a SPICE server.
+
+Package: libspice-server-dev
+Section: libdevel
+Architecture: i386 amd64
+Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}
+Suggests: pkg-config
+Description: Header files and development documentation for spice-server
+ The Simple Protocol for Independent Computing Environments (SPICE) is
+ a remote display system built for virtual environments which allows
+ you to view a computing 'desktop' environment not only on the machine
+ where it is running, but from anywhere on the Internet and from a wide
+ variety of machine architectures.
+ .
+ This package contains the header files, static libraries and development
+ documentation for spice-server. 

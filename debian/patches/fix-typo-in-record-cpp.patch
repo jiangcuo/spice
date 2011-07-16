@@ -1,0 +1,13 @@
+Fix typo in client/x11/record.cpp:
+	seperator -> separator
+--- a/client/x11/record.cpp
++++ b/client/x11/record.cpp
+@@ -179,7 +179,7 @@
+     }
+ 
+     if ((err = snd_pcm_sw_params_set_start_threshold(_pcm, _sw_params, frame_size)) < 0) {
+-        LOG_ERROR("cannot set start treshold %s", snd_strerror(err));
++        LOG_ERROR("cannot set start threshold %s", snd_strerror(err));
+         return false;
+     }
+ 

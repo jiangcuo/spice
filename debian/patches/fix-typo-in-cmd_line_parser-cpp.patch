@@ -1,0 +1,13 @@
+Fix typo in client/cmd_line_parser.cpp
+	seperator -> separator
+--- a/client/cmd_line_parser.cpp
++++ b/client/cmd_line_parser.cpp
+@@ -140,7 +140,7 @@
+     }
+ 
+     if (!ispunct(seperator)) {
+-        THROW("invalid seperator");
++        THROW("invalid separator");
+     }
+ 
+     Option* opt = find(id);

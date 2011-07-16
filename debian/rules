@@ -1,0 +1,82 @@
+#!/usr/bin/make -f
+# spice debian/rules using debhelper
+# Copyright (C) 2010 Liang Guo <bluestonechina@gmail.com>
+
+ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
+  CXXFLAGS += -g
+endif
+
+ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
+	CFLAGS += -O0
+else
+	CFLAGS += -O2
+endif
+ifeq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	MAKEFLAGS += -j$(NUMJOBS)
+endif
+
+build-arch: build
+build-indep: build
+
+build: build-stamp
+build-stamp: build-celt-stamp
+	CELT051_CFLAGS="-I$(CURDIR)" CELT051_LIBS="-L$(CURDIR)/celt051/.libs -lcelt051 -lm" ./configure --prefix=/usr --enable-gui
+	$(MAKE) 
+	touch build-stamp
+
+build-celt-stamp:
+	cd celt && ./configure --prefix=/usr && cd ..
+	$(MAKE) -C celt
+	[ -L celt051 ] || ln -s celt/libcelt celt051
+	touch build-celt-stamp
+
+clean: clean-patched 
+clean-patched: 
+	dh_testdir
+	dh_testroot
+	[ ! -f Makefile ] || $(MAKE) distclean
+	[ ! -f celt/Makefile ] || $(MAKE) -C celt distclean
+	-rm celt051 celt/celt051.pc
+	dh_clean 
+
+clean-spice:
+	[ ! -f Makefile ] || $(MAKE) distclean
+	rm build-stamp
+
+install: install-stamp
+install-stamp: build-stamp
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	$(MAKE) -C celt install DESTDIR=$(CURDIR)/debian/tmp
+	$(MAKE)  install DESTDIR=$(CURDIR)/debian/tmp
+	dh_install --sourcedir=debian/tmp
+	touch install-stamp
+
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs 
+	dh_installexamples
+	dh_installman
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_makeshlibs
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture-independent files here.
+binary-indep: build install
+# We have nothing to do by default.
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install
+

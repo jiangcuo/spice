@@ -1,0 +1,12 @@
+spice for Debian
+---------------------
+
+spice_<spice version>.orig.tar.bz2 was downloaded from:
+
+    <http://www.spice-space.org/download/releases/spice-<spice version>.tar.bz2>
+
+spice_<spice version>.orig-celt.tar.gz was downloaded from:
+
+    <http://downloads.us.xiph.org/releases/celt/celt-0.5.1.3.tar.gz>
+
+

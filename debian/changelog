@@ -1,0 +1,6 @@
+spice (0.8.1-1) unstable; urgency=low
+
+  * Initial release (Closes: #560721)
+
+ -- Liang Guo <bluestonechina@gmail.com>  Mon, 27 Jun 2011 00:27:43 +0800
+

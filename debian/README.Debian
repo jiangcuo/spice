@@ -1,0 +1,8 @@
+spice for Debian
+-----------------
+     
+   As discussed in Debian Bug: 602143 and Bug: 603699, we decide to embede 
+celt version 0.5.1 to spice package, to minimize the impact to Debian, and
+keep compatible with official spice release.
+     
+   -- Liang Guo <bluestonechina@gmail.com> Wed, 01 Dec 2010 01:09:01 +0800
