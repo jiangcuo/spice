@@ -5,7 +5,7 @@ Maintainer: Liang Guo <bluestonechina@gmail.com>
 Build-Depends: debhelper (>= 7.0.50~),
  autotools-dev,
  libcegui-mk2-dev (>= 0.6.0~),
- libspice-protocol-dev (>= 0.7.0~),
+ libspice-protocol-dev (>= 0.8.1~),
  libpixman-1-dev (>= 0.17.7~),
  libxrandr-dev (>= 1.2~),
  pkg-config,
@@ -14,6 +14,7 @@ Build-Depends: debhelper (>= 7.0.50~),
  libxfixes-dev,
  libglu1-mesa-dev,
  libgl1-mesa-dev,
+ libsasl2-dev,
  libogg-dev
 Standards-Version: 3.9.2
 Homepage: http://spice-space.org/
