@@ -15,6 +15,9 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* whether Cyrus SASL is available for authentication */
+#undef HAVE_SASL
+
 /* Define if we have slirp */
 #undef HAVE_SLIRP
 

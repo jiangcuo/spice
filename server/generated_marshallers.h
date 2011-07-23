@@ -29,19 +29,17 @@ void spice_marshall_msg_display_stream_data(SpiceMarshaller *m, SpiceMsgDisplayS
 void spice_marshall_msg_display_stream_clip(SpiceMarshaller *m, SpiceMsgDisplayStreamClip *msg);
 void spice_marshall_msg_display_stream_destroy(SpiceMarshaller *m, SpiceMsgDisplayStreamDestroy *msg);
 void spice_marshall_msg_display_draw_fill(SpiceMarshaller *m, SpiceMsgDisplayDrawFill *msg, SpiceMarshaller **brush_pat_out, SpiceMarshaller **mask_bitmap_out);
-void spice_marshall_Image(SpiceMarshaller *m, SpiceImage *msg, SpiceMarshaller **bitmap_palette_out, SpiceMarshaller **lzplt_palette_out);
-void spice_marshall_Palette(SpiceMarshaller *m, SpicePalette *msg);
 void spice_marshall_msg_display_draw_opaque(SpiceMarshaller *m, SpiceMsgDisplayDrawOpaque *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **pat_out, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_msg_display_draw_copy(SpiceMarshaller *m, SpiceMsgDisplayDrawCopy *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out);
+void spice_marshall_Image(SpiceMarshaller *m, SpiceImage *msg, SpiceMarshaller **bitmap_palette_out, SpiceMarshaller **lzplt_palette_out);
+void spice_marshall_Palette(SpiceMarshaller *m, SpicePalette *msg);
 void spice_marshall_msg_display_draw_blend(SpiceMarshaller *m, SpiceMsgDisplayDrawBlend *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_msg_display_draw_blackness(SpiceMarshaller *m, SpiceMsgDisplayDrawBlackness *msg, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_msg_display_draw_whiteness(SpiceMarshaller *m, SpiceMsgDisplayDrawWhiteness *msg, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_msg_display_draw_invers(SpiceMarshaller *m, SpiceMsgDisplayDrawInvers *msg, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_msg_display_draw_rop3(SpiceMarshaller *m, SpiceMsgDisplayDrawRop3 *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **pat_out, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_msg_display_draw_stroke(SpiceMarshaller *m, SpiceMsgDisplayDrawStroke *msg, SpiceMarshaller **style_out, SpiceMarshaller **pat_out);
-void spice_marshall_Path(SpiceMarshaller *m, SpicePath *msg);
 void spice_marshall_msg_display_draw_text(SpiceMarshaller *m, SpiceMsgDisplayDrawText *msg, SpiceMarshaller **fore_brush_pat_out, SpiceMarshaller **back_brush_pat_out);
-void spice_marshall_String(SpiceMarshaller *m, SpiceString *msg);
 void spice_marshall_msg_display_draw_transparent(SpiceMarshaller *m, SpiceMsgDisplayDrawTransparent *msg, SpiceMarshaller **src_bitmap_out);
 void spice_marshall_msg_display_draw_alpha_blend(SpiceMarshaller *m, SpiceMsgDisplayDrawAlphaBlend *msg, SpiceMarshaller **src_bitmap_out);
 void spice_marshall_msg_display_surface_create(SpiceMarshaller *m, SpiceMsgSurfaceCreate *msg);
@@ -65,6 +63,7 @@ void spice_marshall_msg_tunnel_socket_close(SpiceMarshaller *m, SpiceMsgTunnelSo
 void spice_marshall_msg_tunnel_socket_data(SpiceMarshaller *m, SpiceMsgTunnelSocketData *msg);
 void spice_marshall_msg_tunnel_socket_closed_ack(SpiceMarshaller *m, SpiceMsgTunnelSocketClosedAck *msg);
 void spice_marshall_msg_tunnel_socket_token(SpiceMarshaller *m, SpiceMsgTunnelSocketTokens *msg);
+void spice_marshall_String(SpiceMarshaller *m, SpiceString *msg);
 void spice_marshall_Rect(SpiceMarshaller *m, SpiceRect *msg);
 void spice_marshall_Point(SpiceMarshaller *m, SpicePoint *msg);
 void spice_marshall_DisplayBase(SpiceMarshaller *m, SpiceMsgDisplayBase *msg);
@@ -77,6 +76,7 @@ void spice_marshall_Whiteness(SpiceMarshaller *m, SpiceWhiteness *msg, SpiceMars
 void spice_marshall_Invers(SpiceMarshaller *m, SpiceInvers *msg, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_Rop3(SpiceMarshaller *m, SpiceRop3 *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **pat_out, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_Stroke(SpiceMarshaller *m, SpiceStroke *msg, SpiceMarshaller **style_out, SpiceMarshaller **pat_out);
+void spice_marshall_Path(SpiceMarshaller *m, SpicePath *msg);
 void spice_marshall_Text(SpiceMarshaller *m, SpiceText *msg, SpiceMarshaller **fore_brush_pat_out, SpiceMarshaller **back_brush_pat_out);
 void spice_marshall_Transparent(SpiceMarshaller *m, SpiceTransparent *msg, SpiceMarshaller **src_bitmap_out);
 void spice_marshall_AlphaBlend(SpiceMarshaller *m, SpiceAlphaBlend *msg, SpiceMarshaller **src_bitmap_out);

@@ -1,8 +1,25 @@
+/* -*- Mode: C; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/*
+   Copyright (C) 2010 Red Hat, Inc.
+
+   This library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
+
+   This library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with this library; if not, see <http://www.gnu.org/licenses/>.
+*/
 #include <arpa/inet.h>
 
-#include "server/char_device.h"
-#include "server/red_channel.h"
-#include "server/smartcard.h"
+#include "char_device.h"
+#include "red_channel.h"
+#include "smartcard.h"
 #include "vscard_common.h"
 
 #define SMARTCARD_MAX_READERS 10
@@ -60,6 +77,7 @@ static void smartcard_on_message_from_device(
     SmartCardChannel *smartcard_channel, VSCMsgHeader *vheader);
 static SmartCardDeviceState* smartcard_device_state_new();
 static void smartcard_device_state_free(SmartCardDeviceState* st);
+static void smartcard_register_channel(void);
 
 void smartcard_char_device_wakeup(SpiceCharDeviceInstance *sin)
 {
@@ -145,6 +163,7 @@ static int smartcard_char_device_add_to_readers(SpiceCharDeviceInstance *char_de
     }
     state->reader_id = g_smartcard_readers.num;
     g_smartcard_readers.sin[g_smartcard_readers.num++] = char_device;
+    smartcard_register_channel();
     return 0;
 }
 
@@ -322,10 +341,10 @@ static void smartcard_channel_send_item(RedChannel *channel, PipeItem *item)
 
 static void smartcard_channel_release_pipe_item(RedChannel *channel, PipeItem *item, int item_pushed)
 {
-    free(item);
     if (item->type == PIPE_ITEM_TYPE_MSG) {
         free(((MsgItem*)item)->vheader);
     }
+    free(item);
 }
 
 static void smartcard_channel_disconnect(RedChannel *channel)
@@ -432,6 +451,11 @@ static int smartcard_channel_handle_message(RedChannel *channel, SpiceDataHeader
     VSCMsgHeader* vheader = (VSCMsgHeader*)msg;
     SmartCardChannel* smartcard_channel = (SmartCardChannel*)channel;
 
+    if (header->type != SPICE_MSGC_SMARTCARD_DATA) {
+        /* handle ack's, spicy sends them while spicec does not */
+        return red_channel_handle_message(channel, header, msg);
+    }
+
     ASSERT(header->size == vheader->length + sizeof(VSCMsgHeader));
     switch (vheader->type) {
         case VSC_ReaderAdd:
@@ -465,7 +489,7 @@ static int smartcard_channel_handle_message(RedChannel *channel, SpiceDataHeader
     return TRUE;
 }
 
-static void smartcard_link(Channel *channel, RedsStreamContext *peer,
+static void smartcard_link(Channel *channel, RedsStream *stream,
                         int migration, int num_common_caps,
                         uint32_t *common_caps, int num_caps,
                         uint32_t *caps)
@@ -475,7 +499,7 @@ static void smartcard_link(Channel *channel, RedsStreamContext *peer,
     }
     g_smartcard_channel =
         (SmartCardChannel *)red_channel_create(sizeof(*g_smartcard_channel),
-                                        peer, core,
+                                        stream, core,
                                         migration, FALSE /* handle_acks */,
                                         smartcard_channel_config_socket,
                                         smartcard_channel_disconnect,
@@ -498,10 +522,16 @@ static void smartcard_migrate(Channel *channel)
 {
 }
 
-void smartcard_channel_init()
+static void smartcard_register_channel(void)
 {
     Channel *channel;
+    static int registered = 0;
 
+    if (registered) {
+        return;
+    }
+    red_printf("registering smartcard channel");
+    registered = 1;
     channel = spice_new0(Channel, 1);
     channel->type = SPICE_CHANNEL_SMARTCARD;
     channel->link = smartcard_link;
@@ -509,4 +539,3 @@ void smartcard_channel_init()
     channel->migrate = smartcard_migrate;
     reds_register_channel(channel);
 }
-

@@ -21,6 +21,10 @@
 
 #include "quic_config.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
     QUIC_IMAGE_TYPE_INVALID,
     QUIC_IMAGE_TYPE_GRAY,
@@ -59,7 +63,11 @@ int quic_decode(QuicContext *quic, QuicImageType type, uint8_t *buf, int stride)
 QuicContext *quic_create(QuicUsrContext *usr);
 void quic_destroy(QuicContext *quic);
 
-void quic_init();
+void quic_init(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

@@ -18,16 +18,17 @@
 #ifndef _H_RED_DISPATCHER
 #define _H_RED_DISPATCHER
 
-
 struct RedDispatcher *red_dispatcher_init(QXLInstance *qxl);
 
 void red_dispatcher_set_mm_time(uint32_t);
-void red_dispatcher_on_ic_change();
-void red_dispatcher_on_sv_change();
+void red_dispatcher_on_ic_change(void);
+void red_dispatcher_on_sv_change(void);
 void red_dispatcher_set_mouse_mode(uint32_t mode);
-int red_dispatcher_count();
+int red_dispatcher_count(void);
 int red_dispatcher_add_renderer(const char *name);
-uint32_t red_dispatcher_qxl_ram_size();
-int red_dispatcher_qxl_count();
+uint32_t red_dispatcher_qxl_ram_size(void);
+int red_dispatcher_qxl_count(void);
+void red_dispatcher_async_complete(struct RedDispatcher*, uint64_t);
+
 #endif
 

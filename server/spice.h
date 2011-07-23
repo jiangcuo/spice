@@ -20,8 +20,9 @@
 
 #include <stdint.h>
 #include <sys/socket.h>
+#include <spice/qxl_dev.h>
 
-#define SPICE_SERVER_VERSION 0x000801 /* release 0.8.1 */
+#define SPICE_SERVER_VERSION 0x000802 /* release 0.8.2 */
 
 /* interface base type */
 
@@ -89,7 +90,7 @@ struct SpiceCoreInterface {
 
 #define SPICE_INTERFACE_QXL "qxl"
 #define SPICE_INTERFACE_QXL_MAJOR 3
-#define SPICE_INTERFACE_QXL_MINOR 0
+#define SPICE_INTERFACE_QXL_MINOR 1
 typedef struct QXLInterface QXLInterface;
 typedef struct QXLInstance QXLInstance;
 typedef struct QXLState QXLState;
@@ -104,6 +105,7 @@ struct QXLRect;
 struct QXLWorker {
     uint32_t minor_version;
     uint32_t major_version;
+    /* These calls are deprecated. Pleaes use the spice_qxl_* calls instead */
     void (*wakeup)(QXLWorker *worker);
     void (*oom)(QXLWorker *worker);
     void (*start)(QXLWorker *worker);
@@ -123,6 +125,36 @@ struct QXLWorker {
     void (*destroy_surface_wait)(QXLWorker *worker, uint32_t surface_id);
     void (*loadvm_commands)(QXLWorker *worker, struct QXLCommandExt *ext, uint32_t count);
 };
+
+void spice_qxl_wakeup(QXLInstance *instance);
+void spice_qxl_oom(QXLInstance *instance);
+void spice_qxl_start(QXLInstance *instance);
+void spice_qxl_stop(QXLInstance *instance);
+void spice_qxl_update_area(QXLInstance *instance, uint32_t surface_id,
+                   struct QXLRect *area, struct QXLRect *dirty_rects,
+                   uint32_t num_dirty_rects, uint32_t clear_dirty_region);
+void spice_qxl_add_memslot(QXLInstance *instance, QXLDevMemSlot *slot);
+void spice_qxl_del_memslot(QXLInstance *instance, uint32_t slot_group_id, uint32_t slot_id);
+void spice_qxl_reset_memslots(QXLInstance *instance);
+void spice_qxl_destroy_surfaces(QXLInstance *instance);
+void spice_qxl_destroy_primary_surface(QXLInstance *instance, uint32_t surface_id);
+void spice_qxl_create_primary_surface(QXLInstance *instance, uint32_t surface_id,
+                               QXLDevSurfaceCreate *surface);
+void spice_qxl_reset_image_cache(QXLInstance *instance);
+void spice_qxl_reset_cursor(QXLInstance *instance);
+void spice_qxl_destroy_surface_wait(QXLInstance *instance, uint32_t surface_id);
+void spice_qxl_loadvm_commands(QXLInstance *instance, struct QXLCommandExt *ext, uint32_t count);
+/* async versions of commands. when complete spice calls async_complete */
+void spice_qxl_update_area_async(QXLInstance *instance, uint32_t surface_id, QXLRect *qxl_area,
+                                 uint32_t clear_dirty_region, uint64_t cookie);
+void spice_qxl_add_memslot_async(QXLInstance *instance, QXLDevMemSlot *slot, uint64_t cookie);
+void spice_qxl_destroy_surfaces_async(QXLInstance *instance, uint64_t cookie);
+void spice_qxl_destroy_primary_surface_async(QXLInstance *instance, uint32_t surface_id, uint64_t cookie);
+void spice_qxl_create_primary_surface_async(QXLInstance *instance, uint32_t surface_id,
+                                QXLDevSurfaceCreate *surface, uint64_t cookie);
+void spice_qxl_destroy_surface_async(QXLInstance *instance, uint32_t surface_id, uint64_t cookie);
+/* suspend and resolution change on windows drivers */
+void spice_qxl_flush_surfaces_async(QXLInstance *instance, uint64_t cookie);
 
 typedef struct QXLDrawArea {
     uint8_t *buf;
@@ -192,6 +224,10 @@ struct QXLInterface {
     int (*req_cursor_notification)(QXLInstance *qin);
     void (*notify_update)(QXLInstance *qin, uint32_t update_id);
     int (*flush_resources)(QXLInstance *qin);
+    void (*async_complete)(QXLInstance *qin, uint64_t cookie);
+    void (*update_area_complete)(QXLInstance *qin, uint32_t surface_id,
+                                 struct QXLRect *updated_rects,
+                                 uint32_t num_updated_rects);
 };
 
 struct QXLInstance {
@@ -374,6 +410,8 @@ int spice_server_set_compat_version(SpiceServer *s,
 int spice_server_set_port(SpiceServer *s, int port);
 void spice_server_set_addr(SpiceServer *s, const char *addr, int flags);
 int spice_server_set_noauth(SpiceServer *s);
+int spice_server_set_sasl(SpiceServer *s, int enabled);
+int spice_server_set_sasl_appname(SpiceServer *s, const char *appname);
 int spice_server_set_ticket(SpiceServer *s, const char *passwd, int lifetime,
                             int fail_if_connected, int disconnect_if_connected);
 int spice_server_set_tls(SpiceServer *s, int port,

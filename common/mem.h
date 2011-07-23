@@ -22,6 +22,10 @@
 #include <stdlib.h>
 #include <spice/macros.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct SpiceChunk {
     uint8_t *data;
     uint32_t len;
@@ -38,6 +42,13 @@ typedef struct SpiceChunks {
     uint32_t     flags;
     SpiceChunk   chunk[0];
 } SpiceChunks;
+
+typedef struct SpiceBuffer
+{
+    size_t capacity;
+    size_t offset;
+    uint8_t *buffer;
+} SpiceBuffer;
 
 char *spice_strdup(const char *str) SPICE_GNUC_MALLOC;
 char *spice_strndup(const char *str, size_t n_bytes) SPICE_GNUC_MALLOC;
@@ -102,5 +113,19 @@ size_t spice_strnlen(const char *str, size_t max_len);
 #define spice_new(struct_type, n_structs) _SPICE_NEW(struct_type, n_structs, malloc)
 #define spice_new0(struct_type, n_structs) _SPICE_NEW(struct_type, n_structs, malloc0)
 #define spice_renew(struct_type, mem, n_structs) _SPICE_RENEW(struct_type, mem, n_structs, realloc)
+
+/* Buffer management */
+void spice_buffer_reserve(SpiceBuffer *buffer, size_t len);
+int spice_buffer_empty(SpiceBuffer *buffer);
+uint8_t *spice_buffer_end(SpiceBuffer *buffer);
+void spice_buffer_reset(SpiceBuffer *buffer);
+void spice_buffer_free(SpiceBuffer *buffer);
+void spice_buffer_append(SpiceBuffer *buffer, const void *data, size_t len);
+size_t spice_buffer_copy(SpiceBuffer *buffer, void *dest, size_t len);
+size_t spice_buffer_remove(SpiceBuffer *buffer, size_t len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
