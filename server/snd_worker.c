@@ -73,7 +73,7 @@ typedef void (*cleanup_channel_proc)(SndChannel *channel);
 typedef struct SndWorker SndWorker;
 
 struct SndChannel {
-    RedsStreamContext *peer;
+    RedsStream *stream;
     SndWorker *worker;
     spice_parse_channel_func_t parser;
 
@@ -186,9 +186,9 @@ static void snd_disconnect_channel(SndChannel *channel)
     channel->cleanup(channel);
     worker = channel->worker;
     worker->connection = NULL;
-    core->watch_remove(channel->peer->watch);
-    channel->peer->watch = NULL;
-    channel->peer->cb_free(channel->peer);
+    core->watch_remove(channel->stream->watch);
+    channel->stream->watch = NULL;
+    reds_stream_free(channel->stream);
     spice_marshaller_destroy(channel->send_data.marshaller);
     free(channel);
 }
@@ -236,18 +236,19 @@ static int snd_send_data(SndChannel *channel)
 
             if (channel->blocked) {
                 channel->blocked = FALSE;
-                core->watch_update_mask(channel->peer->watch, SPICE_WATCH_EVENT_READ);
+                core->watch_update_mask(channel->stream->watch, SPICE_WATCH_EVENT_READ);
             }
             break;
         }
 
         vec_size = spice_marshaller_fill_iovec(channel->send_data.marshaller,
                                                vec, MAX_SEND_VEC, channel->send_data.pos);
-        if ((n = channel->peer->cb_writev(channel->peer->ctx, vec, vec_size)) == -1) {
+        n = reds_stream_writev(channel->stream, vec, vec_size);
+        if (n == -1) {
             switch (errno) {
             case EAGAIN:
                 channel->blocked = TRUE;
-                core->watch_update_mask(channel->peer->watch, SPICE_WATCH_EVENT_READ |
+                core->watch_update_mask(channel->stream->watch, SPICE_WATCH_EVENT_READ |
                                         SPICE_WATCH_EVENT_WRITE);
                 return FALSE;
             case EINTR:
@@ -389,7 +390,8 @@ static void snd_receive(void* data)
         ssize_t n;
         n = channel->recive_data.end - channel->recive_data.now;
         ASSERT(n);
-        if ((n = channel->peer->cb_read(channel->peer->ctx, channel->recive_data.now, n)) <= 0) {
+        n = reds_stream_read(channel->stream, channel->recive_data.now, n);
+        if (n <= 0) {
             if (n == 0) {
                 snd_disconnect_channel(channel);
                 return;
@@ -734,7 +736,7 @@ static void snd_record_send(void* data)
 }
 
 static SndChannel *__new_channel(SndWorker *worker, int size, uint32_t channel_id,
-                                 RedsStreamContext *peer,
+                                 RedsStream *stream,
                                  int migrate, send_messages_proc send_messages,
                                  handle_message_proc handle_message,
                                  on_message_done_proc on_message_done,
@@ -746,28 +748,28 @@ static SndChannel *__new_channel(SndWorker *worker, int size, uint32_t channel_i
     int priority;
     int tos;
 
-    if ((flags = fcntl(peer->socket, F_GETFL)) == -1) {
+    if ((flags = fcntl(stream->socket, F_GETFL)) == -1) {
         red_printf("accept failed, %s", strerror(errno));
         goto error1;
     }
 
     priority = 6;
-    if (setsockopt(peer->socket, SOL_SOCKET, SO_PRIORITY, (void*)&priority,
+    if (setsockopt(stream->socket, SOL_SOCKET, SO_PRIORITY, (void*)&priority,
                    sizeof(priority)) == -1) {
         red_printf("setsockopt failed, %s", strerror(errno));
     }
 
     tos = IPTOS_LOWDELAY;
-    if (setsockopt(peer->socket, IPPROTO_IP, IP_TOS, (void*)&tos, sizeof(tos)) == -1) {
+    if (setsockopt(stream->socket, IPPROTO_IP, IP_TOS, (void*)&tos, sizeof(tos)) == -1) {
         red_printf("setsockopt failed, %s", strerror(errno));
     }
 
     delay_val = IS_LOW_BANDWIDTH() ? 0 : 1;
-    if (setsockopt(peer->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val, sizeof(delay_val)) == -1) {
+    if (setsockopt(stream->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val, sizeof(delay_val)) == -1) {
         red_printf("setsockopt failed, %s", strerror(errno));
     }
 
-    if (fcntl(peer->socket, F_SETFL, flags | O_NONBLOCK) == -1) {
+    if (fcntl(stream->socket, F_SETFL, flags | O_NONBLOCK) == -1) {
         red_printf("accept failed, %s", strerror(errno));
         goto error1;
     }
@@ -775,16 +777,16 @@ static SndChannel *__new_channel(SndWorker *worker, int size, uint32_t channel_i
     ASSERT(size >= sizeof(*channel));
     channel = spice_malloc0(size);
     channel->parser = spice_get_client_channel_parser(channel_id, NULL);
-    channel->peer = peer;
+    channel->stream = stream;
     channel->worker = worker;
     channel->recive_data.message = (SpiceDataHeader *)channel->recive_data.buf;
     channel->recive_data.now = channel->recive_data.buf;
     channel->recive_data.end = channel->recive_data.buf + sizeof(channel->recive_data.buf);
     channel->send_data.marshaller = spice_marshaller_new();
 
-    peer->watch = core->watch_add(peer->socket, SPICE_WATCH_EVENT_READ,
+    stream->watch = core->watch_add(stream->socket, SPICE_WATCH_EVENT_READ,
                                   snd_event, channel);
-    if (peer->watch == NULL) {
+    if (stream->watch == NULL) {
         red_printf("watch_add failed, %s", strerror(errno));
         goto error2;
     }
@@ -800,7 +802,7 @@ error2:
     free(channel);
 
 error1:
-    peer->cb_free(peer);
+    reds_stream_free(stream);
     return NULL;
 }
 
@@ -818,7 +820,7 @@ static void snd_set_command(SndChannel *channel, uint32_t command)
     channel->command |= command;
 }
 
-__visible__ void spice_server_playback_start(SpicePlaybackInstance *sin)
+SPICE_GNUC_VISIBLE void spice_server_playback_start(SpicePlaybackInstance *sin)
 {
     SndChannel *channel = sin->st->worker.connection;
     PlaybackChannel *playback_channel = SPICE_CONTAINEROF(channel, PlaybackChannel, base);
@@ -837,7 +839,7 @@ __visible__ void spice_server_playback_start(SpicePlaybackInstance *sin)
     }
 }
 
-__visible__ void spice_server_playback_stop(SpicePlaybackInstance *sin)
+SPICE_GNUC_VISIBLE void spice_server_playback_stop(SpicePlaybackInstance *sin)
 {
     SndChannel *channel = sin->st->worker.connection;
     PlaybackChannel *playback_channel = SPICE_CONTAINEROF(channel, PlaybackChannel, base);
@@ -864,8 +866,8 @@ __visible__ void spice_server_playback_stop(SpicePlaybackInstance *sin)
     }
 }
 
-__visible__ void spice_server_playback_get_buffer(SpicePlaybackInstance *sin,
-                                                  uint32_t **frame, uint32_t *num_samples)
+SPICE_GNUC_VISIBLE void spice_server_playback_get_buffer(SpicePlaybackInstance *sin,
+                                                         uint32_t **frame, uint32_t *num_samples)
 {
     SndChannel *channel = sin->st->worker.connection;
     PlaybackChannel *playback_channel = SPICE_CONTAINEROF(channel, PlaybackChannel, base);
@@ -882,7 +884,7 @@ __visible__ void spice_server_playback_get_buffer(SpicePlaybackInstance *sin,
     *num_samples = FRAME_SIZE;
 }
 
-__visible__ void spice_server_playback_put_samples(SpicePlaybackInstance *sin, uint32_t *samples)
+SPICE_GNUC_VISIBLE void spice_server_playback_put_samples(SpicePlaybackInstance *sin, uint32_t *samples)
 {
     SndChannel *channel = sin->st->worker.connection;
     PlaybackChannel *playback_channel = SPICE_CONTAINEROF(channel, PlaybackChannel, base);
@@ -931,7 +933,7 @@ static void snd_playback_cleanup(SndChannel *channel)
     celt051_mode_destroy(playback_channel->celt_mode);
 }
 
-static void snd_set_playback_peer(Channel *channel, RedsStreamContext *peer, int migration,
+static void snd_set_playback_peer(Channel *channel, RedsStream *stream, int migration,
                                   int num_common_caps, uint32_t *common_caps, int num_caps,
                                   uint32_t *caps)
 {
@@ -959,7 +961,7 @@ static void snd_set_playback_peer(Channel *channel, RedsStreamContext *peer, int
     if (!(playback_channel = (PlaybackChannel *)__new_channel(worker,
                                                               sizeof(*playback_channel),
                                                               SPICE_CHANNEL_PLAYBACK,
-                                                              peer,
+                                                              stream,
                                                               migration,
                                                               snd_playback_send,
                                                               snd_playback_handle_message,
@@ -1001,7 +1003,7 @@ static void snd_record_migrate(Channel *channel)
     }
 }
 
-__visible__ void spice_server_record_start(SpiceRecordInstance *sin)
+SPICE_GNUC_VISIBLE void spice_server_record_start(SpiceRecordInstance *sin)
 {
     SndChannel *channel = sin->st->worker.connection;
     RecordChannel *record_channel = SPICE_CONTAINEROF(channel, RecordChannel, base);
@@ -1021,7 +1023,7 @@ __visible__ void spice_server_record_start(SpiceRecordInstance *sin)
     }
 }
 
-__visible__ void spice_server_record_stop(SpiceRecordInstance *sin)
+SPICE_GNUC_VISIBLE void spice_server_record_stop(SpiceRecordInstance *sin)
 {
     SndChannel *channel = sin->st->worker.connection;
     RecordChannel *record_channel = SPICE_CONTAINEROF(channel, RecordChannel, base);
@@ -1039,8 +1041,8 @@ __visible__ void spice_server_record_stop(SpiceRecordInstance *sin)
     }
 }
 
-__visible__ uint32_t spice_server_record_get_samples(SpiceRecordInstance *sin,
-                                                     uint32_t *samples, uint32_t bufsize)
+SPICE_GNUC_VISIBLE uint32_t spice_server_record_get_samples(SpiceRecordInstance *sin,
+                                                            uint32_t *samples, uint32_t bufsize)
 {
     SndChannel *channel = sin->st->worker.connection;
     RecordChannel *record_channel = SPICE_CONTAINEROF(channel, RecordChannel, base);
@@ -1097,7 +1099,7 @@ static void snd_record_cleanup(SndChannel *channel)
     celt051_mode_destroy(record_channel->celt_mode);
 }
 
-static void snd_set_record_peer(Channel *channel, RedsStreamContext *peer, int migration,
+static void snd_set_record_peer(Channel *channel, RedsStream *stream, int migration,
                                 int num_common_caps, uint32_t *common_caps, int num_caps,
                                 uint32_t *caps)
 {
@@ -1125,7 +1127,7 @@ static void snd_set_record_peer(Channel *channel, RedsStreamContext *peer, int m
     if (!(record_channel = (RecordChannel *)__new_channel(worker,
                                                           sizeof(*record_channel),
                                                           SPICE_CHANNEL_RECORD,
-                                                          peer,
+                                                          stream,
                                                           migration,
                                                           snd_record_send,
                                                           snd_record_handle_message,
@@ -1234,8 +1236,7 @@ static void snd_detach_common(SndWorker *worker)
     snd_disconnect_channel(worker->connection);
     reds_unregister_channel(&worker->base);
 
-    free(worker->base.common_caps);
-    free(worker->base.caps);
+    reds_channel_dispose(&worker->base);
 }
 
 void snd_detach_playback(SpicePlaybackInstance *sin)
@@ -1270,7 +1271,7 @@ void snd_set_playback_compression(int on)
     }
 }
 
-int snd_get_playback_compression()
+int snd_get_playback_compression(void)
 {
     return (playback_compression == SPICE_AUDIO_DATA_MODE_RAW) ? FALSE : TRUE;
 }

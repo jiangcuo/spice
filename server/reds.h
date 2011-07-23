@@ -18,15 +18,50 @@
 #ifndef _H_REDS
 #define _H_REDS
 
+#include "mem.h"
+
 #include <stdint.h>
 #include <openssl/ssl.h>
 #include <sys/uio.h>
 
-#define __visible__ __attribute__ ((visibility ("default")))
+#if HAVE_SASL
+#include <sasl/sasl.h>
+#endif
 
-typedef struct RedsStreamContext {
-    void *ctx;
+#define SPICE_GNUC_VISIBLE __attribute__ ((visibility ("default")))
 
+typedef struct RedsStream RedsStream;
+
+#if HAVE_SASL
+typedef struct RedsSASL {
+    sasl_conn_t *conn;
+
+    /* If we want to negotiate an SSF layer with client */
+    int wantSSF :1;
+    /* If we are now running the SSF layer */
+    int runSSF :1;
+
+    /*
+     * Buffering encoded data to allow more clear data
+     * to be stuffed onto the output buffer
+     */
+    const uint8_t *encoded;
+    unsigned int encodedLength;
+    unsigned int encodedOffset;
+
+    SpiceBuffer inbuffer;
+
+    char *username;
+    char *mechlist;
+    char *mechname;
+
+    /* temporary data during authentication */
+    unsigned int len;
+    char *data;
+} RedsSASL;
+#endif
+
+struct RedsStream {
     int socket;
     SpiceWatch *watch;
 
@@ -35,15 +70,17 @@ typedef struct RedsStreamContext {
     int shutdown;
     SSL *ssl;
 
+#if HAVE_SASL
+    RedsSASL sasl;
+#endif
+
     SpiceChannelEventInfo info;
 
-    int (*cb_write)(void *, void *, int);
-    int (*cb_read)(void *, void *, int);
-
-    int (*cb_readv)(void *, const struct iovec *vector, int count);
-    int (*cb_writev)(void *, const struct iovec *vector, int count);
-    int (*cb_free)(struct RedsStreamContext *);
-} RedsStreamContext;
+    /* private */
+    ssize_t (*read)(RedsStream *s, void *buf, size_t nbyte);
+    ssize_t (*write)(RedsStream *s, const void *buf, size_t nbyte);
+    ssize_t (*writev)(RedsStream *s, const struct iovec *iov, int iovcnt);
+};
 
 typedef struct Channel {
     struct Channel *next;
@@ -53,7 +90,7 @@ typedef struct Channel {
     uint32_t *common_caps;
     int num_caps;
     uint32_t *caps;
-    void (*link)(struct Channel *, RedsStreamContext *peer, int migration, int num_common_caps,
+    void (*link)(struct Channel *, RedsStream *peer, int migration, int num_common_caps,
                  uint32_t *common_caps, int num_caps, uint32_t *caps);
     void (*shutdown)(struct Channel *);
     void (*migrate)(struct Channel *);
@@ -82,10 +119,17 @@ struct SpiceNetWireState {
     struct TunnelWorker *worker;
 };
 
-void reds_desable_mm_timer();
-void reds_enable_mm_timer();
+void reds_channel_dispose(Channel *channel);
+
+ssize_t reds_stream_read(RedsStream *s, void *buf, size_t nbyte);
+ssize_t reds_stream_write(RedsStream *s, const void *buf, size_t nbyte);
+ssize_t reds_stream_writev(RedsStream *s, const struct iovec *iov, int iovcnt);
+void reds_stream_free(RedsStream *s);
+
+void reds_desable_mm_timer(void);
+void reds_enable_mm_timer(void);
 void reds_update_mm_timer(uint32_t mm_time);
-uint32_t reds_get_mm_time();
+uint32_t reds_get_mm_time(void);
 void reds_set_client_mouse_allowed(int is_client_mouse_allowed,
                                    int x_res, int y_res);
 void reds_register_channel(Channel *channel);

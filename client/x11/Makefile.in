@@ -162,31 +162,54 @@ spicec_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
-spicec_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
-	--mode=link $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) \
-	$(spicec_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_lt = $(am__v_lt_$(V))
+am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
+am__v_lt_0 = --silent
+spicec_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(spicec_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
-LTCXXCOMPILE = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
-	--mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
-	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
+LTCXXCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CXXFLAGS) $(CXXFLAGS)
+AM_V_CXX = $(am__v_CXX_$(V))
+am__v_CXX_ = $(am__v_CXX_$(AM_DEFAULT_VERBOSITY))
+am__v_CXX_0 = @echo "  CXX   " $@;
+AM_V_at = $(am__v_at_$(V))
+am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
+am__v_at_0 = @
 CXXLD = $(CXX)
-CXXLINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
-	--mode=link $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) \
-	$(LDFLAGS) -o $@
+CXXLINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CXXLD = $(am__v_CXXLD_$(V))
+am__v_CXXLD_ = $(am__v_CXXLD_$(AM_DEFAULT_VERBOSITY))
+am__v_CXXLD_0 = @echo "  CXXLD " $@;
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
-LTCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
-	--mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
-	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_$(V))
+am__v_CC_ = $(am__v_CC_$(AM_DEFAULT_VERBOSITY))
+am__v_CC_0 = @echo "  CC    " $@;
 CCLD = $(CC)
-LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
-	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
-	$(LDFLAGS) -o $@
+LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_$(V))
+am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
+am__v_CCLD_0 = @echo "  CCLD  " $@;
+AM_V_GEN = $(am__v_GEN_$(V))
+am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
+am__v_GEN_0 = @echo "  GEN   " $@;
 SOURCES = $(spicec_SOURCES)
 DIST_SOURCES = $(am__spicec_SOURCES_DIST)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
@@ -234,6 +257,7 @@ ACLOCAL = @ACLOCAL@
 ALSA_CFLAGS = @ALSA_CFLAGS@
 ALSA_LIBS = @ALSA_LIBS@
 AMTAR = @AMTAR@
+AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -318,6 +342,8 @@ PROTOCOL_CFLAGS = @PROTOCOL_CFLAGS@
 PROTOCOL_LIBS = @PROTOCOL_LIBS@
 PYTHON = @PYTHON@
 RANLIB = @RANLIB@
+SASL_CFLAGS = @SASL_CFLAGS@
+SASL_LIBS = @SASL_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -325,7 +351,6 @@ SLIRP_CFLAGS = @SLIRP_CFLAGS@
 SLIRP_LIBS = @SLIRP_LIBS@
 SMARTCARD_CFLAGS = @SMARTCARD_CFLAGS@
 SMARTCARD_LIBS = @SMARTCARD_LIBS@
-SPICEC_STATIC_LINKAGE_BDYNAMIC = @SPICEC_STATIC_LINKAGE_BDYNAMIC@
 SPICEC_STATIC_LINKAGE_BSTATIC = @SPICEC_STATIC_LINKAGE_BSTATIC@
 SPICE_COMMON_SRCDIR = @SPICE_COMMON_SRCDIR@
 SPICE_LT_VERSION = @SPICE_LT_VERSION@
@@ -682,7 +707,7 @@ clean-binPROGRAMS:
 	rm -f $$list
 spicec$(EXEEXT): $(spicec_OBJECTS) $(spicec_DEPENDENCIES) 
 	@rm -f spicec$(EXEEXT)
-	$(spicec_LINK) $(spicec_OBJECTS) $(spicec_LDADD) $(LIBS)
+	$(AM_V_CXXLD)$(spicec_LINK) $(spicec_OBJECTS) $(spicec_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -759,750 +784,857 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zlib_decoder.Po@am__quote@
 
 .cpp.o:
-@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .cpp.lo:
-@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
 
 application.o: $(CLIENT_DIR)/application.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT application.o -MD -MP -MF $(DEPDIR)/application.Tpo -c -o application.o `test -f '$(CLIENT_DIR)/application.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/application.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/application.Tpo $(DEPDIR)/application.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT application.o -MD -MP -MF $(DEPDIR)/application.Tpo -c -o application.o `test -f '$(CLIENT_DIR)/application.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/application.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/application.Tpo $(DEPDIR)/application.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/application.cpp' object='application.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o application.o `test -f '$(CLIENT_DIR)/application.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/application.cpp
 
 application.obj: $(CLIENT_DIR)/application.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT application.obj -MD -MP -MF $(DEPDIR)/application.Tpo -c -o application.obj `if test -f '$(CLIENT_DIR)/application.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/application.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/application.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/application.Tpo $(DEPDIR)/application.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT application.obj -MD -MP -MF $(DEPDIR)/application.Tpo -c -o application.obj `if test -f '$(CLIENT_DIR)/application.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/application.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/application.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/application.Tpo $(DEPDIR)/application.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/application.cpp' object='application.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o application.obj `if test -f '$(CLIENT_DIR)/application.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/application.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/application.cpp'; fi`
 
 generated_demarshallers.o: $(CLIENT_DIR)/generated_demarshallers.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_demarshallers.o -MD -MP -MF $(DEPDIR)/generated_demarshallers.Tpo -c -o generated_demarshallers.o `test -f '$(CLIENT_DIR)/generated_demarshallers.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_demarshallers.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/generated_demarshallers.Tpo $(DEPDIR)/generated_demarshallers.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_demarshallers.o -MD -MP -MF $(DEPDIR)/generated_demarshallers.Tpo -c -o generated_demarshallers.o `test -f '$(CLIENT_DIR)/generated_demarshallers.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_demarshallers.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/generated_demarshallers.Tpo $(DEPDIR)/generated_demarshallers.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/generated_demarshallers.cpp' object='generated_demarshallers.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o generated_demarshallers.o `test -f '$(CLIENT_DIR)/generated_demarshallers.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_demarshallers.cpp
 
 generated_demarshallers.obj: $(CLIENT_DIR)/generated_demarshallers.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_demarshallers.obj -MD -MP -MF $(DEPDIR)/generated_demarshallers.Tpo -c -o generated_demarshallers.obj `if test -f '$(CLIENT_DIR)/generated_demarshallers.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_demarshallers.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_demarshallers.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/generated_demarshallers.Tpo $(DEPDIR)/generated_demarshallers.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_demarshallers.obj -MD -MP -MF $(DEPDIR)/generated_demarshallers.Tpo -c -o generated_demarshallers.obj `if test -f '$(CLIENT_DIR)/generated_demarshallers.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_demarshallers.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_demarshallers.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/generated_demarshallers.Tpo $(DEPDIR)/generated_demarshallers.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/generated_demarshallers.cpp' object='generated_demarshallers.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o generated_demarshallers.obj `if test -f '$(CLIENT_DIR)/generated_demarshallers.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_demarshallers.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_demarshallers.cpp'; fi`
 
 generated_demarshallers1.o: $(CLIENT_DIR)/generated_demarshallers1.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_demarshallers1.o -MD -MP -MF $(DEPDIR)/generated_demarshallers1.Tpo -c -o generated_demarshallers1.o `test -f '$(CLIENT_DIR)/generated_demarshallers1.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_demarshallers1.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/generated_demarshallers1.Tpo $(DEPDIR)/generated_demarshallers1.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_demarshallers1.o -MD -MP -MF $(DEPDIR)/generated_demarshallers1.Tpo -c -o generated_demarshallers1.o `test -f '$(CLIENT_DIR)/generated_demarshallers1.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_demarshallers1.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/generated_demarshallers1.Tpo $(DEPDIR)/generated_demarshallers1.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/generated_demarshallers1.cpp' object='generated_demarshallers1.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o generated_demarshallers1.o `test -f '$(CLIENT_DIR)/generated_demarshallers1.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_demarshallers1.cpp
 
 generated_demarshallers1.obj: $(CLIENT_DIR)/generated_demarshallers1.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_demarshallers1.obj -MD -MP -MF $(DEPDIR)/generated_demarshallers1.Tpo -c -o generated_demarshallers1.obj `if test -f '$(CLIENT_DIR)/generated_demarshallers1.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_demarshallers1.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_demarshallers1.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/generated_demarshallers1.Tpo $(DEPDIR)/generated_demarshallers1.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_demarshallers1.obj -MD -MP -MF $(DEPDIR)/generated_demarshallers1.Tpo -c -o generated_demarshallers1.obj `if test -f '$(CLIENT_DIR)/generated_demarshallers1.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_demarshallers1.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_demarshallers1.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/generated_demarshallers1.Tpo $(DEPDIR)/generated_demarshallers1.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/generated_demarshallers1.cpp' object='generated_demarshallers1.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o generated_demarshallers1.obj `if test -f '$(CLIENT_DIR)/generated_demarshallers1.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_demarshallers1.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_demarshallers1.cpp'; fi`
 
 marshaller.o: $(CLIENT_DIR)/marshaller.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT marshaller.o -MD -MP -MF $(DEPDIR)/marshaller.Tpo -c -o marshaller.o `test -f '$(CLIENT_DIR)/marshaller.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/marshaller.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/marshaller.Tpo $(DEPDIR)/marshaller.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT marshaller.o -MD -MP -MF $(DEPDIR)/marshaller.Tpo -c -o marshaller.o `test -f '$(CLIENT_DIR)/marshaller.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/marshaller.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/marshaller.Tpo $(DEPDIR)/marshaller.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/marshaller.cpp' object='marshaller.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o marshaller.o `test -f '$(CLIENT_DIR)/marshaller.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/marshaller.cpp
 
 marshaller.obj: $(CLIENT_DIR)/marshaller.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT marshaller.obj -MD -MP -MF $(DEPDIR)/marshaller.Tpo -c -o marshaller.obj `if test -f '$(CLIENT_DIR)/marshaller.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/marshaller.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/marshaller.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/marshaller.Tpo $(DEPDIR)/marshaller.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT marshaller.obj -MD -MP -MF $(DEPDIR)/marshaller.Tpo -c -o marshaller.obj `if test -f '$(CLIENT_DIR)/marshaller.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/marshaller.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/marshaller.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/marshaller.Tpo $(DEPDIR)/marshaller.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/marshaller.cpp' object='marshaller.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o marshaller.obj `if test -f '$(CLIENT_DIR)/marshaller.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/marshaller.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/marshaller.cpp'; fi`
 
 generated_marshallers.o: $(CLIENT_DIR)/generated_marshallers.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_marshallers.o -MD -MP -MF $(DEPDIR)/generated_marshallers.Tpo -c -o generated_marshallers.o `test -f '$(CLIENT_DIR)/generated_marshallers.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_marshallers.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/generated_marshallers.Tpo $(DEPDIR)/generated_marshallers.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_marshallers.o -MD -MP -MF $(DEPDIR)/generated_marshallers.Tpo -c -o generated_marshallers.o `test -f '$(CLIENT_DIR)/generated_marshallers.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_marshallers.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/generated_marshallers.Tpo $(DEPDIR)/generated_marshallers.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/generated_marshallers.cpp' object='generated_marshallers.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o generated_marshallers.o `test -f '$(CLIENT_DIR)/generated_marshallers.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_marshallers.cpp
 
 generated_marshallers.obj: $(CLIENT_DIR)/generated_marshallers.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_marshallers.obj -MD -MP -MF $(DEPDIR)/generated_marshallers.Tpo -c -o generated_marshallers.obj `if test -f '$(CLIENT_DIR)/generated_marshallers.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_marshallers.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_marshallers.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/generated_marshallers.Tpo $(DEPDIR)/generated_marshallers.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_marshallers.obj -MD -MP -MF $(DEPDIR)/generated_marshallers.Tpo -c -o generated_marshallers.obj `if test -f '$(CLIENT_DIR)/generated_marshallers.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_marshallers.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_marshallers.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/generated_marshallers.Tpo $(DEPDIR)/generated_marshallers.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/generated_marshallers.cpp' object='generated_marshallers.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o generated_marshallers.obj `if test -f '$(CLIENT_DIR)/generated_marshallers.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_marshallers.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_marshallers.cpp'; fi`
 
 generated_marshallers1.o: $(CLIENT_DIR)/generated_marshallers1.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_marshallers1.o -MD -MP -MF $(DEPDIR)/generated_marshallers1.Tpo -c -o generated_marshallers1.o `test -f '$(CLIENT_DIR)/generated_marshallers1.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_marshallers1.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/generated_marshallers1.Tpo $(DEPDIR)/generated_marshallers1.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_marshallers1.o -MD -MP -MF $(DEPDIR)/generated_marshallers1.Tpo -c -o generated_marshallers1.o `test -f '$(CLIENT_DIR)/generated_marshallers1.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_marshallers1.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/generated_marshallers1.Tpo $(DEPDIR)/generated_marshallers1.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/generated_marshallers1.cpp' object='generated_marshallers1.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o generated_marshallers1.o `test -f '$(CLIENT_DIR)/generated_marshallers1.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/generated_marshallers1.cpp
 
 generated_marshallers1.obj: $(CLIENT_DIR)/generated_marshallers1.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_marshallers1.obj -MD -MP -MF $(DEPDIR)/generated_marshallers1.Tpo -c -o generated_marshallers1.obj `if test -f '$(CLIENT_DIR)/generated_marshallers1.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_marshallers1.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_marshallers1.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/generated_marshallers1.Tpo $(DEPDIR)/generated_marshallers1.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT generated_marshallers1.obj -MD -MP -MF $(DEPDIR)/generated_marshallers1.Tpo -c -o generated_marshallers1.obj `if test -f '$(CLIENT_DIR)/generated_marshallers1.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_marshallers1.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_marshallers1.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/generated_marshallers1.Tpo $(DEPDIR)/generated_marshallers1.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/generated_marshallers1.cpp' object='generated_marshallers1.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o generated_marshallers1.obj `if test -f '$(CLIENT_DIR)/generated_marshallers1.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/generated_marshallers1.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/generated_marshallers1.cpp'; fi`
 
 sw_canvas.o: $(CLIENT_DIR)/sw_canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT sw_canvas.o -MD -MP -MF $(DEPDIR)/sw_canvas.Tpo -c -o sw_canvas.o `test -f '$(CLIENT_DIR)/sw_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/sw_canvas.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/sw_canvas.Tpo $(DEPDIR)/sw_canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT sw_canvas.o -MD -MP -MF $(DEPDIR)/sw_canvas.Tpo -c -o sw_canvas.o `test -f '$(CLIENT_DIR)/sw_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/sw_canvas.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sw_canvas.Tpo $(DEPDIR)/sw_canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/sw_canvas.cpp' object='sw_canvas.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o sw_canvas.o `test -f '$(CLIENT_DIR)/sw_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/sw_canvas.cpp
 
 sw_canvas.obj: $(CLIENT_DIR)/sw_canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT sw_canvas.obj -MD -MP -MF $(DEPDIR)/sw_canvas.Tpo -c -o sw_canvas.obj `if test -f '$(CLIENT_DIR)/sw_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/sw_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/sw_canvas.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/sw_canvas.Tpo $(DEPDIR)/sw_canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT sw_canvas.obj -MD -MP -MF $(DEPDIR)/sw_canvas.Tpo -c -o sw_canvas.obj `if test -f '$(CLIENT_DIR)/sw_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/sw_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/sw_canvas.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sw_canvas.Tpo $(DEPDIR)/sw_canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/sw_canvas.cpp' object='sw_canvas.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o sw_canvas.obj `if test -f '$(CLIENT_DIR)/sw_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/sw_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/sw_canvas.cpp'; fi`
 
 canvas.o: $(CLIENT_DIR)/canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT canvas.o -MD -MP -MF $(DEPDIR)/canvas.Tpo -c -o canvas.o `test -f '$(CLIENT_DIR)/canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/canvas.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/canvas.Tpo $(DEPDIR)/canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT canvas.o -MD -MP -MF $(DEPDIR)/canvas.Tpo -c -o canvas.o `test -f '$(CLIENT_DIR)/canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/canvas.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/canvas.Tpo $(DEPDIR)/canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/canvas.cpp' object='canvas.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o canvas.o `test -f '$(CLIENT_DIR)/canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/canvas.cpp
 
 canvas.obj: $(CLIENT_DIR)/canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT canvas.obj -MD -MP -MF $(DEPDIR)/canvas.Tpo -c -o canvas.obj `if test -f '$(CLIENT_DIR)/canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/canvas.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/canvas.Tpo $(DEPDIR)/canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT canvas.obj -MD -MP -MF $(DEPDIR)/canvas.Tpo -c -o canvas.obj `if test -f '$(CLIENT_DIR)/canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/canvas.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/canvas.Tpo $(DEPDIR)/canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/canvas.cpp' object='canvas.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o canvas.obj `if test -f '$(CLIENT_DIR)/canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/canvas.cpp'; fi`
 
 canvas_utils.o: $(CLIENT_DIR)/canvas_utils.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT canvas_utils.o -MD -MP -MF $(DEPDIR)/canvas_utils.Tpo -c -o canvas_utils.o `test -f '$(CLIENT_DIR)/canvas_utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/canvas_utils.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/canvas_utils.Tpo $(DEPDIR)/canvas_utils.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT canvas_utils.o -MD -MP -MF $(DEPDIR)/canvas_utils.Tpo -c -o canvas_utils.o `test -f '$(CLIENT_DIR)/canvas_utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/canvas_utils.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/canvas_utils.Tpo $(DEPDIR)/canvas_utils.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/canvas_utils.cpp' object='canvas_utils.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o canvas_utils.o `test -f '$(CLIENT_DIR)/canvas_utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/canvas_utils.cpp
 
 canvas_utils.obj: $(CLIENT_DIR)/canvas_utils.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT canvas_utils.obj -MD -MP -MF $(DEPDIR)/canvas_utils.Tpo -c -o canvas_utils.obj `if test -f '$(CLIENT_DIR)/canvas_utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/canvas_utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/canvas_utils.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/canvas_utils.Tpo $(DEPDIR)/canvas_utils.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT canvas_utils.obj -MD -MP -MF $(DEPDIR)/canvas_utils.Tpo -c -o canvas_utils.obj `if test -f '$(CLIENT_DIR)/canvas_utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/canvas_utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/canvas_utils.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/canvas_utils.Tpo $(DEPDIR)/canvas_utils.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/canvas_utils.cpp' object='canvas_utils.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o canvas_utils.obj `if test -f '$(CLIENT_DIR)/canvas_utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/canvas_utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/canvas_utils.cpp'; fi`
 
 red_sw_canvas.o: $(CLIENT_DIR)/red_sw_canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_sw_canvas.o -MD -MP -MF $(DEPDIR)/red_sw_canvas.Tpo -c -o red_sw_canvas.o `test -f '$(CLIENT_DIR)/red_sw_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_sw_canvas.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_sw_canvas.Tpo $(DEPDIR)/red_sw_canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_sw_canvas.o -MD -MP -MF $(DEPDIR)/red_sw_canvas.Tpo -c -o red_sw_canvas.o `test -f '$(CLIENT_DIR)/red_sw_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_sw_canvas.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_sw_canvas.Tpo $(DEPDIR)/red_sw_canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_sw_canvas.cpp' object='red_sw_canvas.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_sw_canvas.o `test -f '$(CLIENT_DIR)/red_sw_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_sw_canvas.cpp
 
 red_sw_canvas.obj: $(CLIENT_DIR)/red_sw_canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_sw_canvas.obj -MD -MP -MF $(DEPDIR)/red_sw_canvas.Tpo -c -o red_sw_canvas.obj `if test -f '$(CLIENT_DIR)/red_sw_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_sw_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_sw_canvas.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_sw_canvas.Tpo $(DEPDIR)/red_sw_canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_sw_canvas.obj -MD -MP -MF $(DEPDIR)/red_sw_canvas.Tpo -c -o red_sw_canvas.obj `if test -f '$(CLIENT_DIR)/red_sw_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_sw_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_sw_canvas.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_sw_canvas.Tpo $(DEPDIR)/red_sw_canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_sw_canvas.cpp' object='red_sw_canvas.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_sw_canvas.obj `if test -f '$(CLIENT_DIR)/red_sw_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_sw_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_sw_canvas.cpp'; fi`
 
 cmd_line_parser.o: $(CLIENT_DIR)/cmd_line_parser.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cmd_line_parser.o -MD -MP -MF $(DEPDIR)/cmd_line_parser.Tpo -c -o cmd_line_parser.o `test -f '$(CLIENT_DIR)/cmd_line_parser.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cmd_line_parser.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/cmd_line_parser.Tpo $(DEPDIR)/cmd_line_parser.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cmd_line_parser.o -MD -MP -MF $(DEPDIR)/cmd_line_parser.Tpo -c -o cmd_line_parser.o `test -f '$(CLIENT_DIR)/cmd_line_parser.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cmd_line_parser.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/cmd_line_parser.Tpo $(DEPDIR)/cmd_line_parser.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/cmd_line_parser.cpp' object='cmd_line_parser.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cmd_line_parser.o `test -f '$(CLIENT_DIR)/cmd_line_parser.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cmd_line_parser.cpp
 
 cmd_line_parser.obj: $(CLIENT_DIR)/cmd_line_parser.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cmd_line_parser.obj -MD -MP -MF $(DEPDIR)/cmd_line_parser.Tpo -c -o cmd_line_parser.obj `if test -f '$(CLIENT_DIR)/cmd_line_parser.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cmd_line_parser.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cmd_line_parser.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/cmd_line_parser.Tpo $(DEPDIR)/cmd_line_parser.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cmd_line_parser.obj -MD -MP -MF $(DEPDIR)/cmd_line_parser.Tpo -c -o cmd_line_parser.obj `if test -f '$(CLIENT_DIR)/cmd_line_parser.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cmd_line_parser.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cmd_line_parser.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/cmd_line_parser.Tpo $(DEPDIR)/cmd_line_parser.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/cmd_line_parser.cpp' object='cmd_line_parser.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cmd_line_parser.obj `if test -f '$(CLIENT_DIR)/cmd_line_parser.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cmd_line_parser.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cmd_line_parser.cpp'; fi`
 
 client_net_socket.o: $(CLIENT_DIR)/client_net_socket.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT client_net_socket.o -MD -MP -MF $(DEPDIR)/client_net_socket.Tpo -c -o client_net_socket.o `test -f '$(CLIENT_DIR)/client_net_socket.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/client_net_socket.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/client_net_socket.Tpo $(DEPDIR)/client_net_socket.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT client_net_socket.o -MD -MP -MF $(DEPDIR)/client_net_socket.Tpo -c -o client_net_socket.o `test -f '$(CLIENT_DIR)/client_net_socket.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/client_net_socket.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/client_net_socket.Tpo $(DEPDIR)/client_net_socket.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/client_net_socket.cpp' object='client_net_socket.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o client_net_socket.o `test -f '$(CLIENT_DIR)/client_net_socket.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/client_net_socket.cpp
 
 client_net_socket.obj: $(CLIENT_DIR)/client_net_socket.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT client_net_socket.obj -MD -MP -MF $(DEPDIR)/client_net_socket.Tpo -c -o client_net_socket.obj `if test -f '$(CLIENT_DIR)/client_net_socket.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/client_net_socket.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/client_net_socket.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/client_net_socket.Tpo $(DEPDIR)/client_net_socket.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT client_net_socket.obj -MD -MP -MF $(DEPDIR)/client_net_socket.Tpo -c -o client_net_socket.obj `if test -f '$(CLIENT_DIR)/client_net_socket.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/client_net_socket.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/client_net_socket.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/client_net_socket.Tpo $(DEPDIR)/client_net_socket.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/client_net_socket.cpp' object='client_net_socket.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o client_net_socket.obj `if test -f '$(CLIENT_DIR)/client_net_socket.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/client_net_socket.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/client_net_socket.cpp'; fi`
 
 controller.o: $(CLIENT_DIR)/controller.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT controller.o -MD -MP -MF $(DEPDIR)/controller.Tpo -c -o controller.o `test -f '$(CLIENT_DIR)/controller.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/controller.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/controller.Tpo $(DEPDIR)/controller.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT controller.o -MD -MP -MF $(DEPDIR)/controller.Tpo -c -o controller.o `test -f '$(CLIENT_DIR)/controller.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/controller.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/controller.Tpo $(DEPDIR)/controller.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/controller.cpp' object='controller.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o controller.o `test -f '$(CLIENT_DIR)/controller.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/controller.cpp
 
 controller.obj: $(CLIENT_DIR)/controller.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT controller.obj -MD -MP -MF $(DEPDIR)/controller.Tpo -c -o controller.obj `if test -f '$(CLIENT_DIR)/controller.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/controller.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/controller.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/controller.Tpo $(DEPDIR)/controller.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT controller.obj -MD -MP -MF $(DEPDIR)/controller.Tpo -c -o controller.obj `if test -f '$(CLIENT_DIR)/controller.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/controller.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/controller.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/controller.Tpo $(DEPDIR)/controller.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/controller.cpp' object='controller.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o controller.obj `if test -f '$(CLIENT_DIR)/controller.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/controller.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/controller.cpp'; fi`
 
 cursor_channel.o: $(CLIENT_DIR)/cursor_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cursor_channel.o -MD -MP -MF $(DEPDIR)/cursor_channel.Tpo -c -o cursor_channel.o `test -f '$(CLIENT_DIR)/cursor_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cursor_channel.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/cursor_channel.Tpo $(DEPDIR)/cursor_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cursor_channel.o -MD -MP -MF $(DEPDIR)/cursor_channel.Tpo -c -o cursor_channel.o `test -f '$(CLIENT_DIR)/cursor_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cursor_channel.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/cursor_channel.Tpo $(DEPDIR)/cursor_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/cursor_channel.cpp' object='cursor_channel.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cursor_channel.o `test -f '$(CLIENT_DIR)/cursor_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cursor_channel.cpp
 
 cursor_channel.obj: $(CLIENT_DIR)/cursor_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cursor_channel.obj -MD -MP -MF $(DEPDIR)/cursor_channel.Tpo -c -o cursor_channel.obj `if test -f '$(CLIENT_DIR)/cursor_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cursor_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cursor_channel.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/cursor_channel.Tpo $(DEPDIR)/cursor_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cursor_channel.obj -MD -MP -MF $(DEPDIR)/cursor_channel.Tpo -c -o cursor_channel.obj `if test -f '$(CLIENT_DIR)/cursor_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cursor_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cursor_channel.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/cursor_channel.Tpo $(DEPDIR)/cursor_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/cursor_channel.cpp' object='cursor_channel.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cursor_channel.obj `if test -f '$(CLIENT_DIR)/cursor_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cursor_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cursor_channel.cpp'; fi`
 
 cursor.o: $(CLIENT_DIR)/cursor.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cursor.o -MD -MP -MF $(DEPDIR)/cursor.Tpo -c -o cursor.o `test -f '$(CLIENT_DIR)/cursor.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cursor.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/cursor.Tpo $(DEPDIR)/cursor.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cursor.o -MD -MP -MF $(DEPDIR)/cursor.Tpo -c -o cursor.o `test -f '$(CLIENT_DIR)/cursor.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cursor.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/cursor.Tpo $(DEPDIR)/cursor.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/cursor.cpp' object='cursor.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cursor.o `test -f '$(CLIENT_DIR)/cursor.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/cursor.cpp
 
 cursor.obj: $(CLIENT_DIR)/cursor.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cursor.obj -MD -MP -MF $(DEPDIR)/cursor.Tpo -c -o cursor.obj `if test -f '$(CLIENT_DIR)/cursor.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cursor.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cursor.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/cursor.Tpo $(DEPDIR)/cursor.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT cursor.obj -MD -MP -MF $(DEPDIR)/cursor.Tpo -c -o cursor.obj `if test -f '$(CLIENT_DIR)/cursor.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cursor.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cursor.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/cursor.Tpo $(DEPDIR)/cursor.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/cursor.cpp' object='cursor.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o cursor.obj `if test -f '$(CLIENT_DIR)/cursor.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/cursor.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/cursor.cpp'; fi`
 
 display_channel.o: $(CLIENT_DIR)/display_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT display_channel.o -MD -MP -MF $(DEPDIR)/display_channel.Tpo -c -o display_channel.o `test -f '$(CLIENT_DIR)/display_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/display_channel.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/display_channel.Tpo $(DEPDIR)/display_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT display_channel.o -MD -MP -MF $(DEPDIR)/display_channel.Tpo -c -o display_channel.o `test -f '$(CLIENT_DIR)/display_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/display_channel.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/display_channel.Tpo $(DEPDIR)/display_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/display_channel.cpp' object='display_channel.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o display_channel.o `test -f '$(CLIENT_DIR)/display_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/display_channel.cpp
 
 display_channel.obj: $(CLIENT_DIR)/display_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT display_channel.obj -MD -MP -MF $(DEPDIR)/display_channel.Tpo -c -o display_channel.obj `if test -f '$(CLIENT_DIR)/display_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/display_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/display_channel.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/display_channel.Tpo $(DEPDIR)/display_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT display_channel.obj -MD -MP -MF $(DEPDIR)/display_channel.Tpo -c -o display_channel.obj `if test -f '$(CLIENT_DIR)/display_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/display_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/display_channel.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/display_channel.Tpo $(DEPDIR)/display_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/display_channel.cpp' object='display_channel.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o display_channel.obj `if test -f '$(CLIENT_DIR)/display_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/display_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/display_channel.cpp'; fi`
 
 foreign_menu.o: $(CLIENT_DIR)/foreign_menu.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT foreign_menu.o -MD -MP -MF $(DEPDIR)/foreign_menu.Tpo -c -o foreign_menu.o `test -f '$(CLIENT_DIR)/foreign_menu.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/foreign_menu.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/foreign_menu.Tpo $(DEPDIR)/foreign_menu.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT foreign_menu.o -MD -MP -MF $(DEPDIR)/foreign_menu.Tpo -c -o foreign_menu.o `test -f '$(CLIENT_DIR)/foreign_menu.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/foreign_menu.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/foreign_menu.Tpo $(DEPDIR)/foreign_menu.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/foreign_menu.cpp' object='foreign_menu.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o foreign_menu.o `test -f '$(CLIENT_DIR)/foreign_menu.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/foreign_menu.cpp
 
 foreign_menu.obj: $(CLIENT_DIR)/foreign_menu.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT foreign_menu.obj -MD -MP -MF $(DEPDIR)/foreign_menu.Tpo -c -o foreign_menu.obj `if test -f '$(CLIENT_DIR)/foreign_menu.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/foreign_menu.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/foreign_menu.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/foreign_menu.Tpo $(DEPDIR)/foreign_menu.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT foreign_menu.obj -MD -MP -MF $(DEPDIR)/foreign_menu.Tpo -c -o foreign_menu.obj `if test -f '$(CLIENT_DIR)/foreign_menu.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/foreign_menu.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/foreign_menu.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/foreign_menu.Tpo $(DEPDIR)/foreign_menu.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/foreign_menu.cpp' object='foreign_menu.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o foreign_menu.obj `if test -f '$(CLIENT_DIR)/foreign_menu.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/foreign_menu.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/foreign_menu.cpp'; fi`
 
 glz_decoder.o: $(CLIENT_DIR)/glz_decoder.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glz_decoder.o -MD -MP -MF $(DEPDIR)/glz_decoder.Tpo -c -o glz_decoder.o `test -f '$(CLIENT_DIR)/glz_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glz_decoder.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/glz_decoder.Tpo $(DEPDIR)/glz_decoder.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glz_decoder.o -MD -MP -MF $(DEPDIR)/glz_decoder.Tpo -c -o glz_decoder.o `test -f '$(CLIENT_DIR)/glz_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glz_decoder.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/glz_decoder.Tpo $(DEPDIR)/glz_decoder.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/glz_decoder.cpp' object='glz_decoder.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o glz_decoder.o `test -f '$(CLIENT_DIR)/glz_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glz_decoder.cpp
 
 glz_decoder.obj: $(CLIENT_DIR)/glz_decoder.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glz_decoder.obj -MD -MP -MF $(DEPDIR)/glz_decoder.Tpo -c -o glz_decoder.obj `if test -f '$(CLIENT_DIR)/glz_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glz_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glz_decoder.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/glz_decoder.Tpo $(DEPDIR)/glz_decoder.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glz_decoder.obj -MD -MP -MF $(DEPDIR)/glz_decoder.Tpo -c -o glz_decoder.obj `if test -f '$(CLIENT_DIR)/glz_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glz_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glz_decoder.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/glz_decoder.Tpo $(DEPDIR)/glz_decoder.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/glz_decoder.cpp' object='glz_decoder.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o glz_decoder.obj `if test -f '$(CLIENT_DIR)/glz_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glz_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glz_decoder.cpp'; fi`
 
 glz_decoder_window.o: $(CLIENT_DIR)/glz_decoder_window.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glz_decoder_window.o -MD -MP -MF $(DEPDIR)/glz_decoder_window.Tpo -c -o glz_decoder_window.o `test -f '$(CLIENT_DIR)/glz_decoder_window.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glz_decoder_window.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/glz_decoder_window.Tpo $(DEPDIR)/glz_decoder_window.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glz_decoder_window.o -MD -MP -MF $(DEPDIR)/glz_decoder_window.Tpo -c -o glz_decoder_window.o `test -f '$(CLIENT_DIR)/glz_decoder_window.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glz_decoder_window.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/glz_decoder_window.Tpo $(DEPDIR)/glz_decoder_window.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/glz_decoder_window.cpp' object='glz_decoder_window.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o glz_decoder_window.o `test -f '$(CLIENT_DIR)/glz_decoder_window.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glz_decoder_window.cpp
 
 glz_decoder_window.obj: $(CLIENT_DIR)/glz_decoder_window.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glz_decoder_window.obj -MD -MP -MF $(DEPDIR)/glz_decoder_window.Tpo -c -o glz_decoder_window.obj `if test -f '$(CLIENT_DIR)/glz_decoder_window.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glz_decoder_window.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glz_decoder_window.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/glz_decoder_window.Tpo $(DEPDIR)/glz_decoder_window.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glz_decoder_window.obj -MD -MP -MF $(DEPDIR)/glz_decoder_window.Tpo -c -o glz_decoder_window.obj `if test -f '$(CLIENT_DIR)/glz_decoder_window.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glz_decoder_window.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glz_decoder_window.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/glz_decoder_window.Tpo $(DEPDIR)/glz_decoder_window.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/glz_decoder_window.cpp' object='glz_decoder_window.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o glz_decoder_window.obj `if test -f '$(CLIENT_DIR)/glz_decoder_window.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glz_decoder_window.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glz_decoder_window.cpp'; fi`
 
 inputs_channel.o: $(CLIENT_DIR)/inputs_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT inputs_channel.o -MD -MP -MF $(DEPDIR)/inputs_channel.Tpo -c -o inputs_channel.o `test -f '$(CLIENT_DIR)/inputs_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/inputs_channel.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/inputs_channel.Tpo $(DEPDIR)/inputs_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT inputs_channel.o -MD -MP -MF $(DEPDIR)/inputs_channel.Tpo -c -o inputs_channel.o `test -f '$(CLIENT_DIR)/inputs_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/inputs_channel.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/inputs_channel.Tpo $(DEPDIR)/inputs_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/inputs_channel.cpp' object='inputs_channel.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o inputs_channel.o `test -f '$(CLIENT_DIR)/inputs_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/inputs_channel.cpp
 
 inputs_channel.obj: $(CLIENT_DIR)/inputs_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT inputs_channel.obj -MD -MP -MF $(DEPDIR)/inputs_channel.Tpo -c -o inputs_channel.obj `if test -f '$(CLIENT_DIR)/inputs_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/inputs_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/inputs_channel.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/inputs_channel.Tpo $(DEPDIR)/inputs_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT inputs_channel.obj -MD -MP -MF $(DEPDIR)/inputs_channel.Tpo -c -o inputs_channel.obj `if test -f '$(CLIENT_DIR)/inputs_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/inputs_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/inputs_channel.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/inputs_channel.Tpo $(DEPDIR)/inputs_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/inputs_channel.cpp' object='inputs_channel.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o inputs_channel.obj `if test -f '$(CLIENT_DIR)/inputs_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/inputs_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/inputs_channel.cpp'; fi`
 
 jpeg_decoder.o: $(CLIENT_DIR)/jpeg_decoder.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT jpeg_decoder.o -MD -MP -MF $(DEPDIR)/jpeg_decoder.Tpo -c -o jpeg_decoder.o `test -f '$(CLIENT_DIR)/jpeg_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/jpeg_decoder.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/jpeg_decoder.Tpo $(DEPDIR)/jpeg_decoder.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT jpeg_decoder.o -MD -MP -MF $(DEPDIR)/jpeg_decoder.Tpo -c -o jpeg_decoder.o `test -f '$(CLIENT_DIR)/jpeg_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/jpeg_decoder.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/jpeg_decoder.Tpo $(DEPDIR)/jpeg_decoder.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/jpeg_decoder.cpp' object='jpeg_decoder.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o jpeg_decoder.o `test -f '$(CLIENT_DIR)/jpeg_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/jpeg_decoder.cpp
 
 jpeg_decoder.obj: $(CLIENT_DIR)/jpeg_decoder.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT jpeg_decoder.obj -MD -MP -MF $(DEPDIR)/jpeg_decoder.Tpo -c -o jpeg_decoder.obj `if test -f '$(CLIENT_DIR)/jpeg_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/jpeg_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/jpeg_decoder.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/jpeg_decoder.Tpo $(DEPDIR)/jpeg_decoder.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT jpeg_decoder.obj -MD -MP -MF $(DEPDIR)/jpeg_decoder.Tpo -c -o jpeg_decoder.obj `if test -f '$(CLIENT_DIR)/jpeg_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/jpeg_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/jpeg_decoder.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/jpeg_decoder.Tpo $(DEPDIR)/jpeg_decoder.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/jpeg_decoder.cpp' object='jpeg_decoder.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o jpeg_decoder.obj `if test -f '$(CLIENT_DIR)/jpeg_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/jpeg_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/jpeg_decoder.cpp'; fi`
 
 lz.o: $(CLIENT_DIR)/lz.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT lz.o -MD -MP -MF $(DEPDIR)/lz.Tpo -c -o lz.o `test -f '$(CLIENT_DIR)/lz.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/lz.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/lz.Tpo $(DEPDIR)/lz.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT lz.o -MD -MP -MF $(DEPDIR)/lz.Tpo -c -o lz.o `test -f '$(CLIENT_DIR)/lz.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/lz.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/lz.Tpo $(DEPDIR)/lz.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/lz.cpp' object='lz.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o lz.o `test -f '$(CLIENT_DIR)/lz.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/lz.cpp
 
 lz.obj: $(CLIENT_DIR)/lz.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT lz.obj -MD -MP -MF $(DEPDIR)/lz.Tpo -c -o lz.obj `if test -f '$(CLIENT_DIR)/lz.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/lz.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/lz.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/lz.Tpo $(DEPDIR)/lz.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT lz.obj -MD -MP -MF $(DEPDIR)/lz.Tpo -c -o lz.obj `if test -f '$(CLIENT_DIR)/lz.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/lz.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/lz.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/lz.Tpo $(DEPDIR)/lz.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/lz.cpp' object='lz.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o lz.obj `if test -f '$(CLIENT_DIR)/lz.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/lz.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/lz.cpp'; fi`
 
 lines.o: $(CLIENT_DIR)/lines.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT lines.o -MD -MP -MF $(DEPDIR)/lines.Tpo -c -o lines.o `test -f '$(CLIENT_DIR)/lines.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/lines.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/lines.Tpo $(DEPDIR)/lines.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT lines.o -MD -MP -MF $(DEPDIR)/lines.Tpo -c -o lines.o `test -f '$(CLIENT_DIR)/lines.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/lines.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/lines.Tpo $(DEPDIR)/lines.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/lines.cpp' object='lines.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o lines.o `test -f '$(CLIENT_DIR)/lines.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/lines.cpp
 
 lines.obj: $(CLIENT_DIR)/lines.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT lines.obj -MD -MP -MF $(DEPDIR)/lines.Tpo -c -o lines.obj `if test -f '$(CLIENT_DIR)/lines.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/lines.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/lines.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/lines.Tpo $(DEPDIR)/lines.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT lines.obj -MD -MP -MF $(DEPDIR)/lines.Tpo -c -o lines.obj `if test -f '$(CLIENT_DIR)/lines.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/lines.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/lines.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/lines.Tpo $(DEPDIR)/lines.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/lines.cpp' object='lines.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o lines.obj `if test -f '$(CLIENT_DIR)/lines.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/lines.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/lines.cpp'; fi`
 
 monitor.o: $(CLIENT_DIR)/monitor.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT monitor.o -MD -MP -MF $(DEPDIR)/monitor.Tpo -c -o monitor.o `test -f '$(CLIENT_DIR)/monitor.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/monitor.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/monitor.Tpo $(DEPDIR)/monitor.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT monitor.o -MD -MP -MF $(DEPDIR)/monitor.Tpo -c -o monitor.o `test -f '$(CLIENT_DIR)/monitor.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/monitor.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/monitor.Tpo $(DEPDIR)/monitor.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/monitor.cpp' object='monitor.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o monitor.o `test -f '$(CLIENT_DIR)/monitor.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/monitor.cpp
 
 monitor.obj: $(CLIENT_DIR)/monitor.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT monitor.obj -MD -MP -MF $(DEPDIR)/monitor.Tpo -c -o monitor.obj `if test -f '$(CLIENT_DIR)/monitor.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/monitor.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/monitor.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/monitor.Tpo $(DEPDIR)/monitor.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT monitor.obj -MD -MP -MF $(DEPDIR)/monitor.Tpo -c -o monitor.obj `if test -f '$(CLIENT_DIR)/monitor.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/monitor.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/monitor.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/monitor.Tpo $(DEPDIR)/monitor.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/monitor.cpp' object='monitor.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o monitor.obj `if test -f '$(CLIENT_DIR)/monitor.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/monitor.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/monitor.cpp'; fi`
 
 mem.o: $(CLIENT_DIR)/mem.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mem.o -MD -MP -MF $(DEPDIR)/mem.Tpo -c -o mem.o `test -f '$(CLIENT_DIR)/mem.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/mem.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/mem.Tpo $(DEPDIR)/mem.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mem.o -MD -MP -MF $(DEPDIR)/mem.Tpo -c -o mem.o `test -f '$(CLIENT_DIR)/mem.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/mem.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mem.Tpo $(DEPDIR)/mem.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/mem.cpp' object='mem.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o mem.o `test -f '$(CLIENT_DIR)/mem.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/mem.cpp
 
 mem.obj: $(CLIENT_DIR)/mem.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mem.obj -MD -MP -MF $(DEPDIR)/mem.Tpo -c -o mem.obj `if test -f '$(CLIENT_DIR)/mem.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/mem.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/mem.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/mem.Tpo $(DEPDIR)/mem.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mem.obj -MD -MP -MF $(DEPDIR)/mem.Tpo -c -o mem.obj `if test -f '$(CLIENT_DIR)/mem.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/mem.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/mem.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mem.Tpo $(DEPDIR)/mem.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/mem.cpp' object='mem.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o mem.obj `if test -f '$(CLIENT_DIR)/mem.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/mem.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/mem.cpp'; fi`
 
 menu.o: $(CLIENT_DIR)/menu.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT menu.o -MD -MP -MF $(DEPDIR)/menu.Tpo -c -o menu.o `test -f '$(CLIENT_DIR)/menu.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/menu.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/menu.Tpo $(DEPDIR)/menu.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT menu.o -MD -MP -MF $(DEPDIR)/menu.Tpo -c -o menu.o `test -f '$(CLIENT_DIR)/menu.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/menu.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/menu.Tpo $(DEPDIR)/menu.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/menu.cpp' object='menu.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o menu.o `test -f '$(CLIENT_DIR)/menu.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/menu.cpp
 
 menu.obj: $(CLIENT_DIR)/menu.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT menu.obj -MD -MP -MF $(DEPDIR)/menu.Tpo -c -o menu.obj `if test -f '$(CLIENT_DIR)/menu.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/menu.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/menu.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/menu.Tpo $(DEPDIR)/menu.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT menu.obj -MD -MP -MF $(DEPDIR)/menu.Tpo -c -o menu.obj `if test -f '$(CLIENT_DIR)/menu.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/menu.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/menu.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/menu.Tpo $(DEPDIR)/menu.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/menu.cpp' object='menu.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o menu.obj `if test -f '$(CLIENT_DIR)/menu.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/menu.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/menu.cpp'; fi`
 
 mjpeg_decoder.o: $(CLIENT_DIR)/mjpeg_decoder.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mjpeg_decoder.o -MD -MP -MF $(DEPDIR)/mjpeg_decoder.Tpo -c -o mjpeg_decoder.o `test -f '$(CLIENT_DIR)/mjpeg_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/mjpeg_decoder.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/mjpeg_decoder.Tpo $(DEPDIR)/mjpeg_decoder.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mjpeg_decoder.o -MD -MP -MF $(DEPDIR)/mjpeg_decoder.Tpo -c -o mjpeg_decoder.o `test -f '$(CLIENT_DIR)/mjpeg_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/mjpeg_decoder.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mjpeg_decoder.Tpo $(DEPDIR)/mjpeg_decoder.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/mjpeg_decoder.cpp' object='mjpeg_decoder.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o mjpeg_decoder.o `test -f '$(CLIENT_DIR)/mjpeg_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/mjpeg_decoder.cpp
 
 mjpeg_decoder.obj: $(CLIENT_DIR)/mjpeg_decoder.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mjpeg_decoder.obj -MD -MP -MF $(DEPDIR)/mjpeg_decoder.Tpo -c -o mjpeg_decoder.obj `if test -f '$(CLIENT_DIR)/mjpeg_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/mjpeg_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/mjpeg_decoder.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/mjpeg_decoder.Tpo $(DEPDIR)/mjpeg_decoder.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT mjpeg_decoder.obj -MD -MP -MF $(DEPDIR)/mjpeg_decoder.Tpo -c -o mjpeg_decoder.obj `if test -f '$(CLIENT_DIR)/mjpeg_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/mjpeg_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/mjpeg_decoder.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mjpeg_decoder.Tpo $(DEPDIR)/mjpeg_decoder.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/mjpeg_decoder.cpp' object='mjpeg_decoder.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o mjpeg_decoder.obj `if test -f '$(CLIENT_DIR)/mjpeg_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/mjpeg_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/mjpeg_decoder.cpp'; fi`
 
 pixman_utils.o: $(CLIENT_DIR)/pixman_utils.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pixman_utils.o -MD -MP -MF $(DEPDIR)/pixman_utils.Tpo -c -o pixman_utils.o `test -f '$(CLIENT_DIR)/pixman_utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/pixman_utils.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/pixman_utils.Tpo $(DEPDIR)/pixman_utils.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pixman_utils.o -MD -MP -MF $(DEPDIR)/pixman_utils.Tpo -c -o pixman_utils.o `test -f '$(CLIENT_DIR)/pixman_utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/pixman_utils.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pixman_utils.Tpo $(DEPDIR)/pixman_utils.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/pixman_utils.cpp' object='pixman_utils.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o pixman_utils.o `test -f '$(CLIENT_DIR)/pixman_utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/pixman_utils.cpp
 
 pixman_utils.obj: $(CLIENT_DIR)/pixman_utils.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pixman_utils.obj -MD -MP -MF $(DEPDIR)/pixman_utils.Tpo -c -o pixman_utils.obj `if test -f '$(CLIENT_DIR)/pixman_utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/pixman_utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/pixman_utils.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/pixman_utils.Tpo $(DEPDIR)/pixman_utils.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pixman_utils.obj -MD -MP -MF $(DEPDIR)/pixman_utils.Tpo -c -o pixman_utils.obj `if test -f '$(CLIENT_DIR)/pixman_utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/pixman_utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/pixman_utils.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pixman_utils.Tpo $(DEPDIR)/pixman_utils.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/pixman_utils.cpp' object='pixman_utils.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o pixman_utils.obj `if test -f '$(CLIENT_DIR)/pixman_utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/pixman_utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/pixman_utils.cpp'; fi`
 
 playback_channel.o: $(CLIENT_DIR)/playback_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT playback_channel.o -MD -MP -MF $(DEPDIR)/playback_channel.Tpo -c -o playback_channel.o `test -f '$(CLIENT_DIR)/playback_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/playback_channel.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/playback_channel.Tpo $(DEPDIR)/playback_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT playback_channel.o -MD -MP -MF $(DEPDIR)/playback_channel.Tpo -c -o playback_channel.o `test -f '$(CLIENT_DIR)/playback_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/playback_channel.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/playback_channel.Tpo $(DEPDIR)/playback_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/playback_channel.cpp' object='playback_channel.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o playback_channel.o `test -f '$(CLIENT_DIR)/playback_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/playback_channel.cpp
 
 playback_channel.obj: $(CLIENT_DIR)/playback_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT playback_channel.obj -MD -MP -MF $(DEPDIR)/playback_channel.Tpo -c -o playback_channel.obj `if test -f '$(CLIENT_DIR)/playback_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/playback_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/playback_channel.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/playback_channel.Tpo $(DEPDIR)/playback_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT playback_channel.obj -MD -MP -MF $(DEPDIR)/playback_channel.Tpo -c -o playback_channel.obj `if test -f '$(CLIENT_DIR)/playback_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/playback_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/playback_channel.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/playback_channel.Tpo $(DEPDIR)/playback_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/playback_channel.cpp' object='playback_channel.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o playback_channel.obj `if test -f '$(CLIENT_DIR)/playback_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/playback_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/playback_channel.cpp'; fi`
 
 process_loop.o: $(CLIENT_DIR)/process_loop.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT process_loop.o -MD -MP -MF $(DEPDIR)/process_loop.Tpo -c -o process_loop.o `test -f '$(CLIENT_DIR)/process_loop.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/process_loop.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/process_loop.Tpo $(DEPDIR)/process_loop.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT process_loop.o -MD -MP -MF $(DEPDIR)/process_loop.Tpo -c -o process_loop.o `test -f '$(CLIENT_DIR)/process_loop.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/process_loop.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/process_loop.Tpo $(DEPDIR)/process_loop.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/process_loop.cpp' object='process_loop.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o process_loop.o `test -f '$(CLIENT_DIR)/process_loop.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/process_loop.cpp
 
 process_loop.obj: $(CLIENT_DIR)/process_loop.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT process_loop.obj -MD -MP -MF $(DEPDIR)/process_loop.Tpo -c -o process_loop.obj `if test -f '$(CLIENT_DIR)/process_loop.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/process_loop.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/process_loop.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/process_loop.Tpo $(DEPDIR)/process_loop.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT process_loop.obj -MD -MP -MF $(DEPDIR)/process_loop.Tpo -c -o process_loop.obj `if test -f '$(CLIENT_DIR)/process_loop.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/process_loop.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/process_loop.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/process_loop.Tpo $(DEPDIR)/process_loop.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/process_loop.cpp' object='process_loop.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o process_loop.obj `if test -f '$(CLIENT_DIR)/process_loop.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/process_loop.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/process_loop.cpp'; fi`
 
 quic.o: $(CLIENT_DIR)/quic.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT quic.o -MD -MP -MF $(DEPDIR)/quic.Tpo -c -o quic.o `test -f '$(CLIENT_DIR)/quic.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/quic.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/quic.Tpo $(DEPDIR)/quic.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT quic.o -MD -MP -MF $(DEPDIR)/quic.Tpo -c -o quic.o `test -f '$(CLIENT_DIR)/quic.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/quic.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/quic.Tpo $(DEPDIR)/quic.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/quic.cpp' object='quic.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o quic.o `test -f '$(CLIENT_DIR)/quic.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/quic.cpp
 
 quic.obj: $(CLIENT_DIR)/quic.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT quic.obj -MD -MP -MF $(DEPDIR)/quic.Tpo -c -o quic.obj `if test -f '$(CLIENT_DIR)/quic.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/quic.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/quic.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/quic.Tpo $(DEPDIR)/quic.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT quic.obj -MD -MP -MF $(DEPDIR)/quic.Tpo -c -o quic.obj `if test -f '$(CLIENT_DIR)/quic.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/quic.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/quic.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/quic.Tpo $(DEPDIR)/quic.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/quic.cpp' object='quic.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o quic.obj `if test -f '$(CLIENT_DIR)/quic.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/quic.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/quic.cpp'; fi`
 
 record_channel.o: $(CLIENT_DIR)/record_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT record_channel.o -MD -MP -MF $(DEPDIR)/record_channel.Tpo -c -o record_channel.o `test -f '$(CLIENT_DIR)/record_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/record_channel.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/record_channel.Tpo $(DEPDIR)/record_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT record_channel.o -MD -MP -MF $(DEPDIR)/record_channel.Tpo -c -o record_channel.o `test -f '$(CLIENT_DIR)/record_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/record_channel.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/record_channel.Tpo $(DEPDIR)/record_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/record_channel.cpp' object='record_channel.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o record_channel.o `test -f '$(CLIENT_DIR)/record_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/record_channel.cpp
 
 record_channel.obj: $(CLIENT_DIR)/record_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT record_channel.obj -MD -MP -MF $(DEPDIR)/record_channel.Tpo -c -o record_channel.obj `if test -f '$(CLIENT_DIR)/record_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/record_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/record_channel.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/record_channel.Tpo $(DEPDIR)/record_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT record_channel.obj -MD -MP -MF $(DEPDIR)/record_channel.Tpo -c -o record_channel.obj `if test -f '$(CLIENT_DIR)/record_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/record_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/record_channel.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/record_channel.Tpo $(DEPDIR)/record_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/record_channel.cpp' object='record_channel.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o record_channel.obj `if test -f '$(CLIENT_DIR)/record_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/record_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/record_channel.cpp'; fi`
 
 red_channel.o: $(CLIENT_DIR)/red_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_channel.o -MD -MP -MF $(DEPDIR)/red_channel.Tpo -c -o red_channel.o `test -f '$(CLIENT_DIR)/red_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_channel.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_channel.Tpo $(DEPDIR)/red_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_channel.o -MD -MP -MF $(DEPDIR)/red_channel.Tpo -c -o red_channel.o `test -f '$(CLIENT_DIR)/red_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_channel.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_channel.Tpo $(DEPDIR)/red_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_channel.cpp' object='red_channel.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_channel.o `test -f '$(CLIENT_DIR)/red_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_channel.cpp
 
 red_channel.obj: $(CLIENT_DIR)/red_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_channel.obj -MD -MP -MF $(DEPDIR)/red_channel.Tpo -c -o red_channel.obj `if test -f '$(CLIENT_DIR)/red_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_channel.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_channel.Tpo $(DEPDIR)/red_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_channel.obj -MD -MP -MF $(DEPDIR)/red_channel.Tpo -c -o red_channel.obj `if test -f '$(CLIENT_DIR)/red_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_channel.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_channel.Tpo $(DEPDIR)/red_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_channel.cpp' object='red_channel.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_channel.obj `if test -f '$(CLIENT_DIR)/red_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_channel.cpp'; fi`
 
 red_client.o: $(CLIENT_DIR)/red_client.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_client.o -MD -MP -MF $(DEPDIR)/red_client.Tpo -c -o red_client.o `test -f '$(CLIENT_DIR)/red_client.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_client.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_client.Tpo $(DEPDIR)/red_client.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_client.o -MD -MP -MF $(DEPDIR)/red_client.Tpo -c -o red_client.o `test -f '$(CLIENT_DIR)/red_client.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_client.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_client.Tpo $(DEPDIR)/red_client.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_client.cpp' object='red_client.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_client.o `test -f '$(CLIENT_DIR)/red_client.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_client.cpp
 
 red_client.obj: $(CLIENT_DIR)/red_client.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_client.obj -MD -MP -MF $(DEPDIR)/red_client.Tpo -c -o red_client.obj `if test -f '$(CLIENT_DIR)/red_client.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_client.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_client.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_client.Tpo $(DEPDIR)/red_client.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_client.obj -MD -MP -MF $(DEPDIR)/red_client.Tpo -c -o red_client.obj `if test -f '$(CLIENT_DIR)/red_client.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_client.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_client.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_client.Tpo $(DEPDIR)/red_client.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_client.cpp' object='red_client.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_client.obj `if test -f '$(CLIENT_DIR)/red_client.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_client.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_client.cpp'; fi`
 
 red_peer.o: $(CLIENT_DIR)/red_peer.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_peer.o -MD -MP -MF $(DEPDIR)/red_peer.Tpo -c -o red_peer.o `test -f '$(CLIENT_DIR)/red_peer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_peer.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_peer.Tpo $(DEPDIR)/red_peer.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_peer.o -MD -MP -MF $(DEPDIR)/red_peer.Tpo -c -o red_peer.o `test -f '$(CLIENT_DIR)/red_peer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_peer.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_peer.Tpo $(DEPDIR)/red_peer.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_peer.cpp' object='red_peer.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_peer.o `test -f '$(CLIENT_DIR)/red_peer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_peer.cpp
 
 red_peer.obj: $(CLIENT_DIR)/red_peer.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_peer.obj -MD -MP -MF $(DEPDIR)/red_peer.Tpo -c -o red_peer.obj `if test -f '$(CLIENT_DIR)/red_peer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_peer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_peer.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_peer.Tpo $(DEPDIR)/red_peer.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_peer.obj -MD -MP -MF $(DEPDIR)/red_peer.Tpo -c -o red_peer.obj `if test -f '$(CLIENT_DIR)/red_peer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_peer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_peer.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_peer.Tpo $(DEPDIR)/red_peer.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_peer.cpp' object='red_peer.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_peer.obj `if test -f '$(CLIENT_DIR)/red_peer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_peer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_peer.cpp'; fi`
 
 region.o: $(CLIENT_DIR)/region.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT region.o -MD -MP -MF $(DEPDIR)/region.Tpo -c -o region.o `test -f '$(CLIENT_DIR)/region.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/region.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/region.Tpo $(DEPDIR)/region.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT region.o -MD -MP -MF $(DEPDIR)/region.Tpo -c -o region.o `test -f '$(CLIENT_DIR)/region.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/region.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/region.Tpo $(DEPDIR)/region.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/region.cpp' object='region.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o region.o `test -f '$(CLIENT_DIR)/region.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/region.cpp
 
 region.obj: $(CLIENT_DIR)/region.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT region.obj -MD -MP -MF $(DEPDIR)/region.Tpo -c -o region.obj `if test -f '$(CLIENT_DIR)/region.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/region.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/region.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/region.Tpo $(DEPDIR)/region.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT region.obj -MD -MP -MF $(DEPDIR)/region.Tpo -c -o region.obj `if test -f '$(CLIENT_DIR)/region.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/region.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/region.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/region.Tpo $(DEPDIR)/region.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/region.cpp' object='region.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o region.obj `if test -f '$(CLIENT_DIR)/region.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/region.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/region.cpp'; fi`
 
 rop3.o: $(CLIENT_DIR)/rop3.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT rop3.o -MD -MP -MF $(DEPDIR)/rop3.Tpo -c -o rop3.o `test -f '$(CLIENT_DIR)/rop3.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/rop3.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/rop3.Tpo $(DEPDIR)/rop3.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT rop3.o -MD -MP -MF $(DEPDIR)/rop3.Tpo -c -o rop3.o `test -f '$(CLIENT_DIR)/rop3.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/rop3.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rop3.Tpo $(DEPDIR)/rop3.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/rop3.cpp' object='rop3.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o rop3.o `test -f '$(CLIENT_DIR)/rop3.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/rop3.cpp
 
 rop3.obj: $(CLIENT_DIR)/rop3.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT rop3.obj -MD -MP -MF $(DEPDIR)/rop3.Tpo -c -o rop3.obj `if test -f '$(CLIENT_DIR)/rop3.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/rop3.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/rop3.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/rop3.Tpo $(DEPDIR)/rop3.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT rop3.obj -MD -MP -MF $(DEPDIR)/rop3.Tpo -c -o rop3.obj `if test -f '$(CLIENT_DIR)/rop3.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/rop3.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/rop3.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rop3.Tpo $(DEPDIR)/rop3.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/rop3.cpp' object='rop3.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o rop3.obj `if test -f '$(CLIENT_DIR)/rop3.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/rop3.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/rop3.cpp'; fi`
 
 screen.o: $(CLIENT_DIR)/screen.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT screen.o -MD -MP -MF $(DEPDIR)/screen.Tpo -c -o screen.o `test -f '$(CLIENT_DIR)/screen.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/screen.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/screen.Tpo $(DEPDIR)/screen.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT screen.o -MD -MP -MF $(DEPDIR)/screen.Tpo -c -o screen.o `test -f '$(CLIENT_DIR)/screen.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/screen.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/screen.Tpo $(DEPDIR)/screen.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/screen.cpp' object='screen.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o screen.o `test -f '$(CLIENT_DIR)/screen.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/screen.cpp
 
 screen.obj: $(CLIENT_DIR)/screen.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT screen.obj -MD -MP -MF $(DEPDIR)/screen.Tpo -c -o screen.obj `if test -f '$(CLIENT_DIR)/screen.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/screen.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/screen.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/screen.Tpo $(DEPDIR)/screen.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT screen.obj -MD -MP -MF $(DEPDIR)/screen.Tpo -c -o screen.obj `if test -f '$(CLIENT_DIR)/screen.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/screen.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/screen.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/screen.Tpo $(DEPDIR)/screen.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/screen.cpp' object='screen.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o screen.obj `if test -f '$(CLIENT_DIR)/screen.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/screen.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/screen.cpp'; fi`
 
 screen_layer.o: $(CLIENT_DIR)/screen_layer.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT screen_layer.o -MD -MP -MF $(DEPDIR)/screen_layer.Tpo -c -o screen_layer.o `test -f '$(CLIENT_DIR)/screen_layer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/screen_layer.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/screen_layer.Tpo $(DEPDIR)/screen_layer.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT screen_layer.o -MD -MP -MF $(DEPDIR)/screen_layer.Tpo -c -o screen_layer.o `test -f '$(CLIENT_DIR)/screen_layer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/screen_layer.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/screen_layer.Tpo $(DEPDIR)/screen_layer.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/screen_layer.cpp' object='screen_layer.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o screen_layer.o `test -f '$(CLIENT_DIR)/screen_layer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/screen_layer.cpp
 
 screen_layer.obj: $(CLIENT_DIR)/screen_layer.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT screen_layer.obj -MD -MP -MF $(DEPDIR)/screen_layer.Tpo -c -o screen_layer.obj `if test -f '$(CLIENT_DIR)/screen_layer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/screen_layer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/screen_layer.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/screen_layer.Tpo $(DEPDIR)/screen_layer.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT screen_layer.obj -MD -MP -MF $(DEPDIR)/screen_layer.Tpo -c -o screen_layer.obj `if test -f '$(CLIENT_DIR)/screen_layer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/screen_layer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/screen_layer.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/screen_layer.Tpo $(DEPDIR)/screen_layer.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/screen_layer.cpp' object='screen_layer.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o screen_layer.obj `if test -f '$(CLIENT_DIR)/screen_layer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/screen_layer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/screen_layer.cpp'; fi`
 
 hot_keys.o: $(CLIENT_DIR)/hot_keys.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT hot_keys.o -MD -MP -MF $(DEPDIR)/hot_keys.Tpo -c -o hot_keys.o `test -f '$(CLIENT_DIR)/hot_keys.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/hot_keys.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/hot_keys.Tpo $(DEPDIR)/hot_keys.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT hot_keys.o -MD -MP -MF $(DEPDIR)/hot_keys.Tpo -c -o hot_keys.o `test -f '$(CLIENT_DIR)/hot_keys.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/hot_keys.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hot_keys.Tpo $(DEPDIR)/hot_keys.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/hot_keys.cpp' object='hot_keys.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o hot_keys.o `test -f '$(CLIENT_DIR)/hot_keys.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/hot_keys.cpp
 
 hot_keys.obj: $(CLIENT_DIR)/hot_keys.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT hot_keys.obj -MD -MP -MF $(DEPDIR)/hot_keys.Tpo -c -o hot_keys.obj `if test -f '$(CLIENT_DIR)/hot_keys.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/hot_keys.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/hot_keys.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/hot_keys.Tpo $(DEPDIR)/hot_keys.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT hot_keys.obj -MD -MP -MF $(DEPDIR)/hot_keys.Tpo -c -o hot_keys.obj `if test -f '$(CLIENT_DIR)/hot_keys.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/hot_keys.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/hot_keys.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hot_keys.Tpo $(DEPDIR)/hot_keys.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/hot_keys.cpp' object='hot_keys.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o hot_keys.obj `if test -f '$(CLIENT_DIR)/hot_keys.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/hot_keys.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/hot_keys.cpp'; fi`
 
 threads.o: $(CLIENT_DIR)/threads.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT threads.o -MD -MP -MF $(DEPDIR)/threads.Tpo -c -o threads.o `test -f '$(CLIENT_DIR)/threads.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/threads.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/threads.Tpo $(DEPDIR)/threads.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT threads.o -MD -MP -MF $(DEPDIR)/threads.Tpo -c -o threads.o `test -f '$(CLIENT_DIR)/threads.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/threads.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/threads.Tpo $(DEPDIR)/threads.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/threads.cpp' object='threads.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o threads.o `test -f '$(CLIENT_DIR)/threads.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/threads.cpp
 
 threads.obj: $(CLIENT_DIR)/threads.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT threads.obj -MD -MP -MF $(DEPDIR)/threads.Tpo -c -o threads.obj `if test -f '$(CLIENT_DIR)/threads.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/threads.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/threads.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/threads.Tpo $(DEPDIR)/threads.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT threads.obj -MD -MP -MF $(DEPDIR)/threads.Tpo -c -o threads.obj `if test -f '$(CLIENT_DIR)/threads.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/threads.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/threads.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/threads.Tpo $(DEPDIR)/threads.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/threads.cpp' object='threads.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o threads.obj `if test -f '$(CLIENT_DIR)/threads.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/threads.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/threads.cpp'; fi`
 
 utils.o: $(CLIENT_DIR)/utils.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT utils.o -MD -MP -MF $(DEPDIR)/utils.Tpo -c -o utils.o `test -f '$(CLIENT_DIR)/utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/utils.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/utils.Tpo $(DEPDIR)/utils.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT utils.o -MD -MP -MF $(DEPDIR)/utils.Tpo -c -o utils.o `test -f '$(CLIENT_DIR)/utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/utils.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utils.Tpo $(DEPDIR)/utils.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/utils.cpp' object='utils.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o utils.o `test -f '$(CLIENT_DIR)/utils.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/utils.cpp
 
 utils.obj: $(CLIENT_DIR)/utils.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT utils.obj -MD -MP -MF $(DEPDIR)/utils.Tpo -c -o utils.obj `if test -f '$(CLIENT_DIR)/utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/utils.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/utils.Tpo $(DEPDIR)/utils.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT utils.obj -MD -MP -MF $(DEPDIR)/utils.Tpo -c -o utils.obj `if test -f '$(CLIENT_DIR)/utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/utils.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utils.Tpo $(DEPDIR)/utils.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/utils.cpp' object='utils.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o utils.obj `if test -f '$(CLIENT_DIR)/utils.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/utils.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/utils.cpp'; fi`
 
 zlib_decoder.o: $(CLIENT_DIR)/zlib_decoder.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT zlib_decoder.o -MD -MP -MF $(DEPDIR)/zlib_decoder.Tpo -c -o zlib_decoder.o `test -f '$(CLIENT_DIR)/zlib_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/zlib_decoder.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/zlib_decoder.Tpo $(DEPDIR)/zlib_decoder.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT zlib_decoder.o -MD -MP -MF $(DEPDIR)/zlib_decoder.Tpo -c -o zlib_decoder.o `test -f '$(CLIENT_DIR)/zlib_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/zlib_decoder.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/zlib_decoder.Tpo $(DEPDIR)/zlib_decoder.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/zlib_decoder.cpp' object='zlib_decoder.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o zlib_decoder.o `test -f '$(CLIENT_DIR)/zlib_decoder.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/zlib_decoder.cpp
 
 zlib_decoder.obj: $(CLIENT_DIR)/zlib_decoder.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT zlib_decoder.obj -MD -MP -MF $(DEPDIR)/zlib_decoder.Tpo -c -o zlib_decoder.obj `if test -f '$(CLIENT_DIR)/zlib_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/zlib_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/zlib_decoder.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/zlib_decoder.Tpo $(DEPDIR)/zlib_decoder.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT zlib_decoder.obj -MD -MP -MF $(DEPDIR)/zlib_decoder.Tpo -c -o zlib_decoder.obj `if test -f '$(CLIENT_DIR)/zlib_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/zlib_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/zlib_decoder.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/zlib_decoder.Tpo $(DEPDIR)/zlib_decoder.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/zlib_decoder.cpp' object='zlib_decoder.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o zlib_decoder.obj `if test -f '$(CLIENT_DIR)/zlib_decoder.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/zlib_decoder.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/zlib_decoder.cpp'; fi`
 
 softrenderer.o: $(CLIENT_DIR)/gui/softrenderer.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT softrenderer.o -MD -MP -MF $(DEPDIR)/softrenderer.Tpo -c -o softrenderer.o `test -f '$(CLIENT_DIR)/gui/softrenderer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/softrenderer.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/softrenderer.Tpo $(DEPDIR)/softrenderer.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT softrenderer.o -MD -MP -MF $(DEPDIR)/softrenderer.Tpo -c -o softrenderer.o `test -f '$(CLIENT_DIR)/gui/softrenderer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/softrenderer.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/softrenderer.Tpo $(DEPDIR)/softrenderer.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gui/softrenderer.cpp' object='softrenderer.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o softrenderer.o `test -f '$(CLIENT_DIR)/gui/softrenderer.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/softrenderer.cpp
 
 softrenderer.obj: $(CLIENT_DIR)/gui/softrenderer.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT softrenderer.obj -MD -MP -MF $(DEPDIR)/softrenderer.Tpo -c -o softrenderer.obj `if test -f '$(CLIENT_DIR)/gui/softrenderer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/softrenderer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/softrenderer.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/softrenderer.Tpo $(DEPDIR)/softrenderer.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT softrenderer.obj -MD -MP -MF $(DEPDIR)/softrenderer.Tpo -c -o softrenderer.obj `if test -f '$(CLIENT_DIR)/gui/softrenderer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/softrenderer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/softrenderer.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/softrenderer.Tpo $(DEPDIR)/softrenderer.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gui/softrenderer.cpp' object='softrenderer.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o softrenderer.obj `if test -f '$(CLIENT_DIR)/gui/softrenderer.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/softrenderer.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/softrenderer.cpp'; fi`
 
 softtexture.o: $(CLIENT_DIR)/gui/softtexture.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT softtexture.o -MD -MP -MF $(DEPDIR)/softtexture.Tpo -c -o softtexture.o `test -f '$(CLIENT_DIR)/gui/softtexture.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/softtexture.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/softtexture.Tpo $(DEPDIR)/softtexture.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT softtexture.o -MD -MP -MF $(DEPDIR)/softtexture.Tpo -c -o softtexture.o `test -f '$(CLIENT_DIR)/gui/softtexture.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/softtexture.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/softtexture.Tpo $(DEPDIR)/softtexture.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gui/softtexture.cpp' object='softtexture.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o softtexture.o `test -f '$(CLIENT_DIR)/gui/softtexture.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/softtexture.cpp
 
 softtexture.obj: $(CLIENT_DIR)/gui/softtexture.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT softtexture.obj -MD -MP -MF $(DEPDIR)/softtexture.Tpo -c -o softtexture.obj `if test -f '$(CLIENT_DIR)/gui/softtexture.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/softtexture.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/softtexture.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/softtexture.Tpo $(DEPDIR)/softtexture.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT softtexture.obj -MD -MP -MF $(DEPDIR)/softtexture.Tpo -c -o softtexture.obj `if test -f '$(CLIENT_DIR)/gui/softtexture.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/softtexture.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/softtexture.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/softtexture.Tpo $(DEPDIR)/softtexture.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gui/softtexture.cpp' object='softtexture.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o softtexture.obj `if test -f '$(CLIENT_DIR)/gui/softtexture.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/softtexture.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/softtexture.cpp'; fi`
 
 resource_provider.o: $(CLIENT_DIR)/gui/resource_provider.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT resource_provider.o -MD -MP -MF $(DEPDIR)/resource_provider.Tpo -c -o resource_provider.o `test -f '$(CLIENT_DIR)/gui/resource_provider.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/resource_provider.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/resource_provider.Tpo $(DEPDIR)/resource_provider.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT resource_provider.o -MD -MP -MF $(DEPDIR)/resource_provider.Tpo -c -o resource_provider.o `test -f '$(CLIENT_DIR)/gui/resource_provider.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/resource_provider.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/resource_provider.Tpo $(DEPDIR)/resource_provider.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gui/resource_provider.cpp' object='resource_provider.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o resource_provider.o `test -f '$(CLIENT_DIR)/gui/resource_provider.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/resource_provider.cpp
 
 resource_provider.obj: $(CLIENT_DIR)/gui/resource_provider.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT resource_provider.obj -MD -MP -MF $(DEPDIR)/resource_provider.Tpo -c -o resource_provider.obj `if test -f '$(CLIENT_DIR)/gui/resource_provider.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/resource_provider.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/resource_provider.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/resource_provider.Tpo $(DEPDIR)/resource_provider.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT resource_provider.obj -MD -MP -MF $(DEPDIR)/resource_provider.Tpo -c -o resource_provider.obj `if test -f '$(CLIENT_DIR)/gui/resource_provider.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/resource_provider.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/resource_provider.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/resource_provider.Tpo $(DEPDIR)/resource_provider.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gui/resource_provider.cpp' object='resource_provider.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o resource_provider.obj `if test -f '$(CLIENT_DIR)/gui/resource_provider.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/resource_provider.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/resource_provider.cpp'; fi`
 
 gui.o: $(CLIENT_DIR)/gui/gui.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT gui.o -MD -MP -MF $(DEPDIR)/gui.Tpo -c -o gui.o `test -f '$(CLIENT_DIR)/gui/gui.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/gui.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/gui.Tpo $(DEPDIR)/gui.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT gui.o -MD -MP -MF $(DEPDIR)/gui.Tpo -c -o gui.o `test -f '$(CLIENT_DIR)/gui/gui.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/gui.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/gui.Tpo $(DEPDIR)/gui.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gui/gui.cpp' object='gui.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o gui.o `test -f '$(CLIENT_DIR)/gui/gui.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gui/gui.cpp
 
 gui.obj: $(CLIENT_DIR)/gui/gui.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT gui.obj -MD -MP -MF $(DEPDIR)/gui.Tpo -c -o gui.obj `if test -f '$(CLIENT_DIR)/gui/gui.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/gui.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/gui.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/gui.Tpo $(DEPDIR)/gui.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT gui.obj -MD -MP -MF $(DEPDIR)/gui.Tpo -c -o gui.obj `if test -f '$(CLIENT_DIR)/gui/gui.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/gui.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/gui.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/gui.Tpo $(DEPDIR)/gui.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gui/gui.cpp' object='gui.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o gui.obj `if test -f '$(CLIENT_DIR)/gui/gui.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gui/gui.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gui/gui.cpp'; fi`
 
 tunnel_channel.o: $(CLIENT_DIR)/tunnel_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT tunnel_channel.o -MD -MP -MF $(DEPDIR)/tunnel_channel.Tpo -c -o tunnel_channel.o `test -f '$(CLIENT_DIR)/tunnel_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/tunnel_channel.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/tunnel_channel.Tpo $(DEPDIR)/tunnel_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT tunnel_channel.o -MD -MP -MF $(DEPDIR)/tunnel_channel.Tpo -c -o tunnel_channel.o `test -f '$(CLIENT_DIR)/tunnel_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/tunnel_channel.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tunnel_channel.Tpo $(DEPDIR)/tunnel_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/tunnel_channel.cpp' object='tunnel_channel.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o tunnel_channel.o `test -f '$(CLIENT_DIR)/tunnel_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/tunnel_channel.cpp
 
 tunnel_channel.obj: $(CLIENT_DIR)/tunnel_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT tunnel_channel.obj -MD -MP -MF $(DEPDIR)/tunnel_channel.Tpo -c -o tunnel_channel.obj `if test -f '$(CLIENT_DIR)/tunnel_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/tunnel_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/tunnel_channel.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/tunnel_channel.Tpo $(DEPDIR)/tunnel_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT tunnel_channel.obj -MD -MP -MF $(DEPDIR)/tunnel_channel.Tpo -c -o tunnel_channel.obj `if test -f '$(CLIENT_DIR)/tunnel_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/tunnel_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/tunnel_channel.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tunnel_channel.Tpo $(DEPDIR)/tunnel_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/tunnel_channel.cpp' object='tunnel_channel.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o tunnel_channel.obj `if test -f '$(CLIENT_DIR)/tunnel_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/tunnel_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/tunnel_channel.cpp'; fi`
 
 gl_canvas.o: $(CLIENT_DIR)/gl_canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT gl_canvas.o -MD -MP -MF $(DEPDIR)/gl_canvas.Tpo -c -o gl_canvas.o `test -f '$(CLIENT_DIR)/gl_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gl_canvas.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/gl_canvas.Tpo $(DEPDIR)/gl_canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT gl_canvas.o -MD -MP -MF $(DEPDIR)/gl_canvas.Tpo -c -o gl_canvas.o `test -f '$(CLIENT_DIR)/gl_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gl_canvas.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/gl_canvas.Tpo $(DEPDIR)/gl_canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gl_canvas.cpp' object='gl_canvas.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o gl_canvas.o `test -f '$(CLIENT_DIR)/gl_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/gl_canvas.cpp
 
 gl_canvas.obj: $(CLIENT_DIR)/gl_canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT gl_canvas.obj -MD -MP -MF $(DEPDIR)/gl_canvas.Tpo -c -o gl_canvas.obj `if test -f '$(CLIENT_DIR)/gl_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gl_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gl_canvas.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/gl_canvas.Tpo $(DEPDIR)/gl_canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT gl_canvas.obj -MD -MP -MF $(DEPDIR)/gl_canvas.Tpo -c -o gl_canvas.obj `if test -f '$(CLIENT_DIR)/gl_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gl_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gl_canvas.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/gl_canvas.Tpo $(DEPDIR)/gl_canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/gl_canvas.cpp' object='gl_canvas.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o gl_canvas.obj `if test -f '$(CLIENT_DIR)/gl_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/gl_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/gl_canvas.cpp'; fi`
 
 glc.o: $(CLIENT_DIR)/glc.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glc.o -MD -MP -MF $(DEPDIR)/glc.Tpo -c -o glc.o `test -f '$(CLIENT_DIR)/glc.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glc.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/glc.Tpo $(DEPDIR)/glc.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glc.o -MD -MP -MF $(DEPDIR)/glc.Tpo -c -o glc.o `test -f '$(CLIENT_DIR)/glc.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glc.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/glc.Tpo $(DEPDIR)/glc.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/glc.cpp' object='glc.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o glc.o `test -f '$(CLIENT_DIR)/glc.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/glc.cpp
 
 glc.obj: $(CLIENT_DIR)/glc.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glc.obj -MD -MP -MF $(DEPDIR)/glc.Tpo -c -o glc.obj `if test -f '$(CLIENT_DIR)/glc.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glc.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glc.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/glc.Tpo $(DEPDIR)/glc.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT glc.obj -MD -MP -MF $(DEPDIR)/glc.Tpo -c -o glc.obj `if test -f '$(CLIENT_DIR)/glc.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glc.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glc.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/glc.Tpo $(DEPDIR)/glc.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/glc.cpp' object='glc.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o glc.obj `if test -f '$(CLIENT_DIR)/glc.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/glc.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/glc.cpp'; fi`
 
 red_gl_canvas.o: $(CLIENT_DIR)/red_gl_canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_gl_canvas.o -MD -MP -MF $(DEPDIR)/red_gl_canvas.Tpo -c -o red_gl_canvas.o `test -f '$(CLIENT_DIR)/red_gl_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_gl_canvas.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_gl_canvas.Tpo $(DEPDIR)/red_gl_canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_gl_canvas.o -MD -MP -MF $(DEPDIR)/red_gl_canvas.Tpo -c -o red_gl_canvas.o `test -f '$(CLIENT_DIR)/red_gl_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_gl_canvas.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_gl_canvas.Tpo $(DEPDIR)/red_gl_canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_gl_canvas.cpp' object='red_gl_canvas.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_gl_canvas.o `test -f '$(CLIENT_DIR)/red_gl_canvas.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/red_gl_canvas.cpp
 
 red_gl_canvas.obj: $(CLIENT_DIR)/red_gl_canvas.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_gl_canvas.obj -MD -MP -MF $(DEPDIR)/red_gl_canvas.Tpo -c -o red_gl_canvas.obj `if test -f '$(CLIENT_DIR)/red_gl_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_gl_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_gl_canvas.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/red_gl_canvas.Tpo $(DEPDIR)/red_gl_canvas.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT red_gl_canvas.obj -MD -MP -MF $(DEPDIR)/red_gl_canvas.Tpo -c -o red_gl_canvas.obj `if test -f '$(CLIENT_DIR)/red_gl_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_gl_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_gl_canvas.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/red_gl_canvas.Tpo $(DEPDIR)/red_gl_canvas.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/red_gl_canvas.cpp' object='red_gl_canvas.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o red_gl_canvas.obj `if test -f '$(CLIENT_DIR)/red_gl_canvas.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/red_gl_canvas.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/red_gl_canvas.cpp'; fi`
 
 smartcard_channel.o: $(CLIENT_DIR)/smartcard_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT smartcard_channel.o -MD -MP -MF $(DEPDIR)/smartcard_channel.Tpo -c -o smartcard_channel.o `test -f '$(CLIENT_DIR)/smartcard_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/smartcard_channel.cpp
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/smartcard_channel.Tpo $(DEPDIR)/smartcard_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT smartcard_channel.o -MD -MP -MF $(DEPDIR)/smartcard_channel.Tpo -c -o smartcard_channel.o `test -f '$(CLIENT_DIR)/smartcard_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/smartcard_channel.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/smartcard_channel.Tpo $(DEPDIR)/smartcard_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/smartcard_channel.cpp' object='smartcard_channel.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o smartcard_channel.o `test -f '$(CLIENT_DIR)/smartcard_channel.cpp' || echo '$(srcdir)/'`$(CLIENT_DIR)/smartcard_channel.cpp
 
 smartcard_channel.obj: $(CLIENT_DIR)/smartcard_channel.cpp
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT smartcard_channel.obj -MD -MP -MF $(DEPDIR)/smartcard_channel.Tpo -c -o smartcard_channel.obj `if test -f '$(CLIENT_DIR)/smartcard_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/smartcard_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/smartcard_channel.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/smartcard_channel.Tpo $(DEPDIR)/smartcard_channel.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT smartcard_channel.obj -MD -MP -MF $(DEPDIR)/smartcard_channel.Tpo -c -o smartcard_channel.obj `if test -f '$(CLIENT_DIR)/smartcard_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/smartcard_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/smartcard_channel.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/smartcard_channel.Tpo $(DEPDIR)/smartcard_channel.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$(CLIENT_DIR)/smartcard_channel.cpp' object='smartcard_channel.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o smartcard_channel.obj `if test -f '$(CLIENT_DIR)/smartcard_channel.cpp'; then $(CYGPATH_W) '$(CLIENT_DIR)/smartcard_channel.cpp'; else $(CYGPATH_W) '$(srcdir)/$(CLIENT_DIR)/smartcard_channel.cpp'; fi`

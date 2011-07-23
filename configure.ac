@@ -2,7 +2,7 @@ AC_PREREQ([2.57])
 
 m4_define([SPICE_MAJOR], 0)
 m4_define([SPICE_MINOR], 8)
-m4_define([SPICE_MICRO], 1)
+m4_define([SPICE_MICRO], 2)
 
 AC_INIT(spice, [SPICE_MAJOR.SPICE_MINOR.SPICE_MICRO], [], spice)
 
@@ -93,40 +93,40 @@ AM_CONDITIONAL(OS_LINUX, test "$os_linux" = "yes")
 
 dnl =========================================================================
 dnl Chek optional features
-have_tunnel=no
 AC_ARG_ENABLE(tunnel,
-[  --enable-tunnel         Enable network redirection],
-[  have_tunnel=yes])
-AM_CONDITIONAL(SUPPORT_TUNNEL, test "x$have_tunnel" = "xyes")
-if test "x$have_tunnel" = "xyes"; then
+[  --enable-tunnel         Enable network redirection],,
+[enable_tunnel="no"])
+AS_IF([test x"$enable_tunnel" != "xno"], [enable_tunnel="yes"])
+AM_CONDITIONAL(SUPPORT_TUNNEL, test "x$enable_tunnel" != "xno")
+if test "x$enable_tunnel" != "xno"; then
    AC_DEFINE(USE_TUNNEL, [1], [Define if supporting tunnel proxying])
 fi
 
-use_gui=no
 AC_ARG_ENABLE(gui,
-[  --enable-gui         Enable start dialog with CEGUI],
-[  use_gui=yes])
-AM_CONDITIONAL(SUPPORT_GUI, test "x$use_gui" = "xyes")
+[  --enable-gui         Enable start dialog with CEGUI],,
+[enable_gui="no"])
+AS_IF([test x"$enable_gui" != "xno"], [enable_gui="yes"])
+AM_CONDITIONAL(SUPPORT_GUI, test "x$enable_gui" != "xno")
 
-have_opengl=no
 AC_ARG_ENABLE(opengl,
-[  --enable-opengl         Enable opengl requirement / support (not recommended)],
-[  have_opengl=yes])
-AM_CONDITIONAL(SUPPORT_GL, test "x$have_opengl" = "xyes")
+[  --enable-opengl         Enable opengl requirement / support (not recommended)],,
+[enable_opengl="no"])
+AS_IF([test x"$enable_opengl" != "xno"], [enable_opengl="yes"])
+AM_CONDITIONAL(SUPPORT_GL, test "x$enable_opengl" = "xyes")
 
-have_smartcard=no
 AC_ARG_ENABLE(smartcard,
-[  --enable-smartcard         Enable network redirection],
-[  have_smartcard=yes])
-AM_CONDITIONAL(SUPPORT_SMARTCARD, test "x$have_smartcard" = "xyes")
-if test "x$have_smartcard" = "xyes"; then
+[  --enable-smartcard         Enable network redirection],,
+[enable_smartcard="no"])
+AS_IF([test x"$enable_smartcard" != "xno"], [enable_smartcard="yes"])
+AM_CONDITIONAL(SUPPORT_SMARTCARD, test "x$enable_smartcard" != "xno")
+if test "x$enable_smartcard" = "xyes"; then
    AC_DEFINE(USE_SMARTCARD, [1], [Define if supporting smartcard proxying])
 fi
 
 dnl =========================================================================
 dnl Check deps
 
-PKG_CHECK_MODULES(PROTOCOL, spice-protocol >= 0.7.0)
+PKG_CHECK_MODULES(PROTOCOL, spice-protocol >= 0.8.1)
 AC_SUBST(PROTOCOL_CFLAGS)
 
 AC_CHECK_LIBM
@@ -162,7 +162,7 @@ AC_DEFINE_UNQUOTED(POSIX_YIELD_FUNC,$posix_yield_func,[The POSIX RT yield functi
 
 SPICE_REQUIRES=""
 
-if test "x$use_gui" = "xyes"; then
+if test "x$enable_gui" = "xyes"; then
     PKG_CHECK_MODULES(CEGUI06, CEGUI-0.6 >= 0.6.0 CEGUI-0.6 < 0.7.0,
     [
         AC_SUBST(CEGUI06_CFLAGS)
@@ -177,7 +177,7 @@ if test "x$use_gui" = "xyes"; then
     ])
 fi
 
-if test "x$have_tunnel" = "xyes"; then
+if test "x$enable_tunnel" = "xyes"; then
 	PKG_CHECK_MODULES(SLIRP, slirp)
 	AC_SUBST(SLIRP_CFLAGS)
 	AC_SUBST(SLIRP_LIBS)
@@ -185,7 +185,7 @@ if test "x$have_tunnel" = "xyes"; then
 	AC_DEFINE([HAVE_SLIRP], [], [Define if we have slirp])
 fi
 
-if test "x$have_smartcard" = "xyes"; then
+if test "x$enable_smartcard" = "xyes"; then
     PKG_CHECK_MODULES(CAC_CARD, libcacard >= 0.1.2)
     SMARTCARD_LIBS="$CAC_CARD_LIBS"
     SMARTCARD_CFLAGS="$CAC_CARD_CFLAGS"
@@ -205,9 +205,22 @@ AC_SUBST(CELT051_LIBS)
 AC_SUBST(CELT051_LIBDIR)
 SPICE_REQUIRES+=" celt051 >= 0.5.1.1"
 
-PKG_CHECK_MODULES(ALSA, alsa)
-AC_SUBST(ALSA_CFLAGS)
-AC_SUBST(ALSA_LIBS)
+if test ! -e client/generated_marshallers.cpp; then
+AC_MSG_CHECKING([for pyparsing python module])
+echo "import pyparsing" | python - >/dev/null 2>&1
+if test $? -ne 0 ; then
+    AC_MSG_RESULT([not found])
+    AC_MSG_ERROR([pyparsing python module is required to compile this package])
+fi
+AC_MSG_RESULT([found])
+fi
+
+if test "$os_linux" = yes; then
+	PKG_CHECK_MODULES(ALSA, alsa)
+	AC_SUBST(ALSA_CFLAGS)
+	AC_SUBST(ALSA_LIBS)
+	SPICE_REQUIRES+=" alsa"
+fi
 
 PKG_CHECK_MODULES(SSL, openssl)
 AC_SUBST(SSL_CFLAGS)
@@ -221,12 +234,12 @@ SPICE_REQUIRES+=" openssl"
 # AC_SUBST(GL_LIBS)
 # SPICE_REQUIRES+=" gl glu"
 
-if test "x$have_opengl" = "xyes"; then
-   AC_CHECK_LIB(GL, glBlendFunc, GL_LIBS="$GL_LIBS -lGL", have_opengl=no)
-   AC_CHECK_LIB(GLU, gluSphere, GL_LIBS="$GL_LIBS -lGLU", have_opengl=no)
+if test "x$enable_opengl" = "xyes"; then
+   AC_CHECK_LIB(GL, glBlendFunc, GL_LIBS="$GL_LIBS -lGL", enable_opengl=no)
+   AC_CHECK_LIB(GLU, gluSphere, GL_LIBS="$GL_LIBS -lGLU", enable_opengl=no)
    GL_CFLAGS="-DGL_GLEXT_PROTOTYPES -DUSE_OGL"
 
-   if test "x$have_opengl" = "xno"; then
+   if test "x$enable_opengl" = "xno"; then
       AC_MSG_ERROR([GL libraries not available])
    fi
 fi
@@ -235,31 +248,40 @@ AC_SUBST(GL_CFLAGS)
 AC_SUBST(GL_LIBS)
 SPICE_NONPKGCONFIG_LIBS+=" $GL_LIBS"
 
-PKG_CHECK_MODULES(XRANDR, xrandr)
-PKG_CHECK_MODULES(XFIXES, xfixes)
-AC_SUBST(XRANDR_CFLAGS)
-AC_SUBST(XRANDR_LIBS)
+if test "$red_target" = "x11"; then
+	PKG_CHECK_MODULES(XRANDR, xrandr)
+	PKG_CHECK_MODULES(XFIXES, xfixes)
+	AC_SUBST(XRANDR_CFLAGS)
+	AC_SUBST(XRANDR_LIBS)
+	SPICE_REQUIRES+=" xrandr xfixes"
 
-PKG_CHECK_MODULES(XRANDR12,
-        xrandr >= 1.2,
-        have_xrandr12=yes,
-        have_xrandr12=no)
+	PKG_CHECK_MODULES(XRANDR12,
+	        xrandr >= 1.2,
+	        have_xrandr12=yes,
+	        have_xrandr12=no)
+else
+	have_xrandr12=no
+fi
 
 AM_CONDITIONAL([HAVE_XRANDR12], [test "x$have_xrandr12" = "xyes"])
 if test "x$have_xrandr12" = "xyes" ; then
   AC_DEFINE([HAVE_XRANDR12], [], [Define if we have XRANDR 12])
 fi
 
-PKG_CHECK_MODULES(MISC_X, x11 xext xrender)
-AC_SUBST(MISC_X_CFLAGS)
-AC_SUBST(MISC_X_LIBS)
+if test "$red_target" = "x11"; then
+	PKG_CHECK_MODULES(MISC_X, x11 xext xrender)
+	AC_SUBST(MISC_X_CFLAGS)
+	AC_SUBST(MISC_X_LIBS)
+	SPICE_REQUIRES+=" x11 xext xrender"
+fi
 
 # Add parameter for (partial) static linkage of spice client.
 # this is used to achive single binary package for all (?) distros.
-AC_ARG_ENABLE(static-linkage, 
-	[  --enable-static-linkage will generate spice client binary with static linkage to external libraries ],
-	[SPICEC_STATIC_LINKAGE_BSTATIC=["-Wl,-Bstatic"];
-	SPICEC_STATIC_LINKAGE_BDYNAMIC=["-Wl,-Bdynamic"]])
+AC_ARG_ENABLE(static-linkage,
+[  --enable-static-linkage will generate spice client binary with static linkage to external libraries ],,
+[enable_static_linkage="no"])
+AS_IF([test x"$enable_static_linkage" != "xno"],
+[SPICEC_STATIC_LINKAGE_BSTATIC=["-Wl,-Bstatic"]])
 
 
 AS_IF([test "$_cflags_is_set" = "yes"], [], [
@@ -287,6 +309,57 @@ AC_SUBST(JPEG_LIBS)
 
 AC_CHECK_LIB(z, deflate, Z_LIBS='-lz', AC_MSG_ERROR([zlib not found]))
 AC_SUBST(Z_LIBS)
+
+dnl Cyrus SASL, check from gtk-vnc
+AC_ARG_WITH([sasl],
+  [AS_HELP_STRING([--with-sasl],
+    [use cyrus SASL for authentication @<:@default=check@:>@])],
+  [],
+  [with_sasl=check])
+
+SASL_CFLAGS=
+SASL_LIBS=
+enable_sasl=no
+if test "x$with_sasl" != "xno"; then
+  if test "x$with_sasl" != "xyes" -a "x$with_sasl" != "xcheck"; then
+    SASL_CFLAGS="-I$with_sasl"
+    SASL_LIBS="-L$with_sasl"
+  fi
+  fail=0
+  old_cflags="$CFLAGS"
+  old_libs="$LIBS"
+  CFLAGS="$CFLAGS $SASL_CFLAGS"
+  LIBS="$LIBS $SASL_LIBS"
+  AC_CHECK_HEADER([sasl/sasl.h],[],[
+    if test "x$with_sasl" != "xcheck" ; then
+        with_sasl=no
+    else
+        fail=1
+    fi])
+  if test "x$with_sasl" != "xno" ; then
+    AC_CHECK_LIB([sasl2], [sasl_client_init],[with_sasl2=yes],[with_sasl2=no])
+  fi
+  if test "x$with_sasl2" = "xno" -a "x$with_sasl" != "xno" ; then
+    AC_CHECK_LIB([sasl], [sasl_client_init],[with_sasl=yes],[with_sasl=no])
+  fi
+  if test "x$with_sasl2" = "xyes"; then
+    SASL_LIBS="$SASL_LIBS -lsasl2"
+  elif test "x$with_sasl" = "xyes"; then
+    SASL_LIBS="$SASL_LIBS -lsasl"
+  else
+    AC_MSG_ERROR([You must install the Cyrus SASL development package in order to compile GTK-VNC])
+  fi
+  CFLAGS="$old_cflags"
+  LIBS="$old_libs"
+  if test "x$with_sasl2" = "xyes" -o "x$with_sasl" = "xyes" ; then
+    AC_DEFINE_UNQUOTED([HAVE_SASL], 1,
+      [whether Cyrus SASL is available for authentication])
+    enable_sasl=yes
+  fi
+fi
+AM_CONDITIONAL([HAVE_SASL], [test "x$with_sasl2" = "xyes" -o "x$with_sasl" = "xyes"])
+AC_SUBST([SASL_CFLAGS])
+AC_SUBST([SASL_LIBS])
 
 dnl ===========================================================================
 dnl check compiler flags
@@ -407,7 +480,8 @@ AC_SUBST(SPICE_NONPKGCONFIG_CFLAGS)
 AC_SUBST(SPICE_NONPKGCONFIG_LIBS)
 
 AC_SUBST([SPICEC_STATIC_LINKAGE_BSTATIC])
-AC_SUBST([SPICEC_STATIC_LINKAGE_BDYNAMIC])
+
+m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_OUTPUT([
 Makefile
@@ -433,19 +507,21 @@ echo "
 
         prefix:                   ${prefix}
         c compiler:               ${CC}
-        c++ compiler:	          ${CXX}
+        c++ compiler:             ${CXX}
 
         Have XRANDR 1.2:          ${have_xrandr12}
 
-        Support tunneling:        ${have_tunnel}
+        Support tunneling:        ${enable_tunnel}
 
         Red target:               ${red_target}
 
-        OpenGL:                   ${have_opengl}
+        OpenGL:                   ${enable_opengl}
 
-        GUI:                      ${use_gui}
+        GUI:                      ${enable_gui}
 
-        Smartcard:                ${have_smartcard}
+        Smartcard:                ${enable_smartcard}
+
+        SASL support:             ${enable_sasl}
 
         Now type 'make' to build $PACKAGE
 "

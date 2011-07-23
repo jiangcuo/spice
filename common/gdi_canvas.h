@@ -21,6 +21,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "pixman_utils.h"
 #include "canvas_base.h"
 #include "region.h"
@@ -34,6 +38,10 @@ SpiceCanvas *gdi_canvas_create(int width, int height,
                                SpiceJpegDecoder *jpeg_decoder,
                                SpiceZlibDecoder *zlib_decoder);
 
-void gdi_canvas_init();
+void gdi_canvas_init(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

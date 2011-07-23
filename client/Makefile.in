@@ -43,6 +43,12 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
+AM_V_GEN = $(am__v_GEN_$(V))
+am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
+am__v_GEN_0 = @echo "  GEN   " $@;
+AM_V_at = $(am__v_at_$(V))
+am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
+am__v_at_0 = @
 SOURCES =
 DIST_SOURCES =
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
@@ -89,6 +95,7 @@ ACLOCAL = @ACLOCAL@
 ALSA_CFLAGS = @ALSA_CFLAGS@
 ALSA_LIBS = @ALSA_LIBS@
 AMTAR = @AMTAR@
+AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -173,6 +180,8 @@ PROTOCOL_CFLAGS = @PROTOCOL_CFLAGS@
 PROTOCOL_LIBS = @PROTOCOL_LIBS@
 PYTHON = @PYTHON@
 RANLIB = @RANLIB@
+SASL_CFLAGS = @SASL_CFLAGS@
+SASL_LIBS = @SASL_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -180,7 +189,6 @@ SLIRP_CFLAGS = @SLIRP_CFLAGS@
 SLIRP_LIBS = @SLIRP_LIBS@
 SMARTCARD_CFLAGS = @SMARTCARD_CFLAGS@
 SMARTCARD_LIBS = @SMARTCARD_LIBS@
-SPICEC_STATIC_LINKAGE_BDYNAMIC = @SPICEC_STATIC_LINKAGE_BDYNAMIC@
 SPICEC_STATIC_LINKAGE_BSTATIC = @SPICEC_STATIC_LINKAGE_BSTATIC@
 SPICE_COMMON_SRCDIR = @SPICE_COMMON_SRCDIR@
 SPICE_LT_VERSION = @SPICE_LT_VERSION@
@@ -730,16 +738,16 @@ uninstall-am:
 
 
 generated_demarshallers.cpp: $(top_srcdir)/spice.proto
-	$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-demarshallers --client --include common.h --include messages.h $(top_srcdir)/spice.proto generated_demarshallers.cpp
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-demarshallers --client --include common.h --include messages.h $(top_srcdir)/spice.proto generated_demarshallers.cpp
 
 generated_demarshallers1.cpp: $(top_srcdir)/spice1.proto
-	$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-demarshallers --client --include common.h --include messages.h --prefix 1 --ptrsize 8 $(top_srcdir)/spice1.proto generated_demarshallers1.cpp
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-demarshallers --client --include common.h --include messages.h --prefix 1 --ptrsize 8 $(top_srcdir)/spice1.proto generated_demarshallers1.cpp
 
 generated_marshallers.cpp: $(top_srcdir)/spice.proto
-	$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P  --include "common.h" --include messages.h --include marshallers.h --client $(top_srcdir)/spice.proto generated_marshallers.cpp
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P  --include "common.h" --include messages.h --include marshallers.h --client $(top_srcdir)/spice.proto generated_marshallers.cpp
 
 generated_marshallers1.cpp: $(top_srcdir)/spice1.proto
-	$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P  --include "common.h" --include messages.h --include marshallers.h --client --prefix 1 --ptrsize 8 $(top_srcdir)/spice1.proto generated_marshallers1.cpp
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P  --include "common.h" --include messages.h --include marshallers.h --client --prefix 1 --ptrsize 8 $(top_srcdir)/spice1.proto generated_marshallers1.cpp
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -57,6 +57,7 @@
 #include "demarshallers.h"
 #include "generated_marshallers.h"
 #include "zlib_encoder.h"
+#include "red_dispatcher.h"
 
 //#define COMPRESS_STAT
 //#define DUMP_BITMAP
@@ -232,7 +233,6 @@ enum {
     PIPE_ITEM_TYPE_INVAL_ONE,
     PIPE_ITEM_TYPE_CURSOR,
     PIPE_ITEM_TYPE_MIGRATE,
-    PIPE_ITEM_TYPE_LOCAL_CURSOR,
     PIPE_ITEM_TYPE_SET_ACK,
     PIPE_ITEM_TYPE_CURSOR_INIT,
     PIPE_ITEM_TYPE_IMAGE,
@@ -299,17 +299,10 @@ typedef struct SurfaceDestroyItem {
     PipeItem pipe_item;
 } SurfaceDestroyItem;
 
-enum {
-    CURSOR_TYPE_INVALID,
-    CURSOR_TYPE_DEV,
-    CURSOR_TYPE_LOCAL,
-};
-
 typedef struct CursorItem {
     PipeItem pipe_data;
     uint32_t group_id;
     int refs;
-    int type;
     RedCursorCmd *red_cursor;
 } CursorItem;
 
@@ -356,7 +349,7 @@ struct RedChannel {
     uint32_t id;
     spice_parse_channel_func_t parser;
     struct RedWorker *worker;
-    RedsStreamContext *peer;
+    RedsStream *stream;
     int migrate;
 
     Ring pipe;
@@ -851,6 +844,7 @@ typedef struct RedWorker {
     DisplayChannel *display_channel;
     CursorChannel *cursor_channel;
     QXLInstance *qxl;
+    RedDispatcher *dispatcher;
     int id;
     int channel;
     int running;
@@ -1266,6 +1260,7 @@ static inline void red_pipe_add_drawable_to_tail(RedWorker *worker, Drawable *dr
     if (!worker->display_channel) {
         return;
     }
+    red_handle_drawable_surfaces_client_synced(worker, drawable);
     drawable->refs++;
     red_pipe_add_tail(&worker->display_channel->base, &drawable->pipe_item);
 }
@@ -1281,6 +1276,7 @@ static inline void red_pipe_add_drawable_after(RedWorker *worker, Drawable *draw
         red_pipe_add_drawable(worker, drawable);
         return;
     }
+    red_handle_drawable_surfaces_client_synced(worker, drawable);
     drawable->refs++;
     red_pipe_add_after(&worker->display_channel->base, &drawable->pipe_item, &pos_after->pipe_item);
 }
@@ -2823,22 +2819,29 @@ static inline int red_current_add_equal(RedWorker *worker, DrawItem *item, TreeI
         int add_after = !!other_drawable->stream && is_drawable_independent_from_surfaces(drawable);
         red_stream_maintenance(worker, drawable, other_drawable);
         __current_add_drawable(worker, drawable, &other->siblings_link);
+        other_drawable->refs++;
+        current_remove_drawable(worker, other_drawable);
         if (add_after) {
             red_pipe_add_drawable_after(worker, drawable, other_drawable);
         } else {
             red_pipe_add_drawable(worker, drawable);
         }
-        remove_drawable(worker, other_drawable);
+        red_pipe_remove_drawable(worker, other_drawable);
+        release_drawable(worker, other_drawable);
         return TRUE;
     }
 
     switch (item->effect) {
     case QXL_EFFECT_REVERT_ON_DUP:
         if (is_same_drawable(worker, drawable, other_drawable)) {
+            other_drawable->refs++;
+            current_remove_drawable(worker, other_drawable);
             if (!ring_item_is_linked(&other_drawable->pipe_item.link)) {
                 red_pipe_add_drawable(worker, drawable);
+            } else {
+                red_pipe_remove_drawable(worker, other_drawable);
             }
-            remove_drawable(worker, other_drawable);
+            release_drawable(worker, other_drawable);
             return TRUE;
         }
         break;
@@ -3515,9 +3518,9 @@ static inline void red_process_drawable(RedWorker *worker, RedDrawable *drawable
 
 static inline void red_create_surface(RedWorker *worker, uint32_t surface_id,uint32_t width,
                                       uint32_t height, int32_t stride, uint32_t format,
-                                      void *line_0, int data_is_valid);
+                                      void *line_0, int data_is_valid, int send_client);
 
-static inline void red_process_surface(RedWorker *worker, RedSurfaceCmd *surface, uint32_t group_id, int data_is_valid)
+static inline void red_process_surface(RedWorker *worker, RedSurfaceCmd *surface, uint32_t group_id, int loadvm)
 {
     int surface_id;
     RedSurface *red_surface;
@@ -3532,6 +3535,7 @@ static inline void red_process_surface(RedWorker *worker, RedSurfaceCmd *surface
     case QXL_SURFACE_CMD_CREATE: {
         uint32_t height = surface->u.surface_create.height;
         int32_t stride = surface->u.surface_create.stride;
+        int reloaded_surface = loadvm || (surface->flags & QXL_SURF_FLAG_KEEP_DATA);
 
         data = surface->u.surface_create.data;
         if (stride < 0) {
@@ -3539,7 +3543,9 @@ static inline void red_process_surface(RedWorker *worker, RedSurfaceCmd *surface
         }
         red_create_surface(worker, surface_id, surface->u.surface_create.width,
                            height, stride, surface->u.surface_create.format, data,
-                           data_is_valid);
+                           reloaded_surface,
+                           // reloaded surfaces will be sent on demand
+                           !reloaded_surface);
         set_surface_release_info(worker, surface_id, 1, surface->release_info, group_id);
         break;
     }
@@ -4182,11 +4188,6 @@ static void red_release_cursor(RedWorker *worker, CursorItem *cursor)
         QXLReleaseInfoExt release_info_ext;
         RedCursorCmd *cursor_cmd;
 
-        if (cursor->type == CURSOR_TYPE_LOCAL) {
-            free(cursor);
-            return;
-        }
-
         cursor_cmd = cursor->red_cursor;
         release_info_ext.group_id = cursor->group_id;
         release_info_ext.info = cursor_cmd->release_info;
@@ -4241,7 +4242,6 @@ static CursorItem *get_cursor_item(RedWorker *worker, RedCursorCmd *cmd, uint32_
 
     cursor_item->refs = 1;
     red_pipe_item_init(&cursor_item->pipe_data, PIPE_ITEM_TYPE_CURSOR);
-    cursor_item->type = CURSOR_TYPE_INVALID;
     cursor_item->group_id = group_id;
     cursor_item->red_cursor = cmd;
 
@@ -4256,7 +4256,6 @@ void qxl_process_cursor(RedWorker *worker, RedCursorCmd *cursor_cmd, uint32_t gr
     switch (cursor_cmd->type) {
     case QXL_CURSOR_SET:
         worker->cursor_visible = cursor_cmd->u.set.visible;
-        item->type = CURSOR_TYPE_DEV;
         red_set_cursor(worker, item);
         break;
     case QXL_CURSOR_MOVE:
@@ -4400,7 +4399,7 @@ static int red_process_commands(RedWorker *worker, uint32_t max_pipe_size, int *
 
             red_get_surface_cmd(&worker->mem_slots, ext_cmd.group_id,
                                 surface, ext_cmd.cmd.data);
-            red_process_surface(worker, surface, ext_cmd.group_id, 0);
+            red_process_surface(worker, surface, ext_cmd.group_id, FALSE);
             break;
         }
         default:
@@ -6000,6 +5999,7 @@ static void fill_attr(DisplayChannel *display_channel, SpiceMarshaller *m, Spice
 
 static void fill_cursor(CursorChannel *cursor_channel, SpiceCursor *red_cursor, CursorItem *cursor, AddBufInfo *addbuf)
 {
+    RedCursorCmd *cursor_cmd;
     addbuf->data = NULL;
 
     if (!cursor) {
@@ -6007,35 +6007,23 @@ static void fill_cursor(CursorChannel *cursor_channel, SpiceCursor *red_cursor, 
         return;
     }
 
-    if (cursor->type == CURSOR_TYPE_DEV) {
-        RedCursorCmd *cursor_cmd;
+    cursor_cmd = cursor->red_cursor;
+    *red_cursor = cursor_cmd->u.set.shape;
 
-        cursor_cmd = cursor->red_cursor;
-        *red_cursor = cursor_cmd->u.set.shape;
-
-        if (red_cursor->header.unique) {
-            if (red_cursor_cache_find(cursor_channel, red_cursor->header.unique)) {
-                red_cursor->flags |= SPICE_CURSOR_FLAGS_FROM_CACHE;
-                return;
-            }
-            if (red_cursor_cache_add(cursor_channel, red_cursor->header.unique, 1)) {
-                red_cursor->flags |= SPICE_CURSOR_FLAGS_CACHE_ME;
-            }
+    if (red_cursor->header.unique) {
+        if (red_cursor_cache_find(cursor_channel, red_cursor->header.unique)) {
+            red_cursor->flags |= SPICE_CURSOR_FLAGS_FROM_CACHE;
+            return;
         }
-
-        if (red_cursor->data_size) {
-            addbuf->type = BUF_TYPE_RAW;
-            addbuf->data = red_cursor->data;
-            addbuf->size = red_cursor->data_size;
+        if (red_cursor_cache_add(cursor_channel, red_cursor->header.unique, 1)) {
+            red_cursor->flags |= SPICE_CURSOR_FLAGS_CACHE_ME;
         }
-    } else {
-        LocalCursor *local_cursor;
-        ASSERT(cursor->type == CURSOR_TYPE_LOCAL);
-        local_cursor = (LocalCursor *)cursor;
-        *red_cursor = local_cursor->red_cursor;
+    }
+
+    if (red_cursor->data_size) {
         addbuf->type = BUF_TYPE_RAW;
-        addbuf->data = local_cursor->red_cursor.data;
-        addbuf->size = local_cursor->data_size;
+        addbuf->data = red_cursor->data;
+        addbuf->size = red_cursor->data_size;
     }
 }
 
@@ -7316,9 +7304,9 @@ static void inline channel_release_res(RedChannel *channel)
 static void red_send_data(RedChannel *channel, void *item)
 {
     for (;;) {
-        uint32_t n = channel->send_data.size - channel->send_data.pos;
+        ssize_t n = channel->send_data.size - channel->send_data.pos;
         struct iovec vec[MAX_SEND_VEC];
-        int vec_size;
+        size_t vec_size;
 
         if (!n) {
             channel->send_data.blocked = FALSE;
@@ -7330,8 +7318,9 @@ static void red_send_data(RedChannel *channel, void *item)
         }
         vec_size = spice_marshaller_fill_iovec(channel->send_data.marshaller,
                                                vec, MAX_SEND_VEC, channel->send_data.pos);
-        ASSERT(channel->peer);
-        if ((n = channel->peer->cb_writev(channel->peer->ctx, vec, vec_size)) == -1) {
+        ASSERT(channel->stream);
+        n = reds_stream_writev(channel->stream, vec, vec_size);
+        if (n == -1) {
             switch (errno) {
             case EAGAIN:
                 channel->send_data.blocked = TRUE;
@@ -8143,28 +8132,6 @@ static void red_send_cursor_init(CursorChannel *channel)
     red_begin_send_message(&channel->base, worker->cursor);
 }
 
-static void red_send_local_cursor(CursorChannel *cursor_channel, LocalCursor *cursor)
-{
-    RedChannel *channel;
-    SpiceMsgCursorSet cursor_set;
-    AddBufInfo info;
-
-    ASSERT(cursor_channel);
-
-    channel = &cursor_channel->base;
-    channel->send_data.header->type = SPICE_MSG_CURSOR_SET;
-    cursor_set.position = cursor->position;
-    cursor_set.visible = channel->worker->cursor_visible;
-
-    fill_cursor(cursor_channel, &cursor_set.cursor, &cursor->base, &info);
-    spice_marshall_msg_cursor_set(channel->send_data.marshaller, &cursor_set);
-    add_buf_from_info(channel, channel->send_data.marshaller, &info);
-
-    red_begin_send_message(channel, cursor);
-
-    red_release_cursor(channel->worker, (CursorItem *)cursor);
-}
-
 static void cursor_channel_send_migrate(CursorChannel *cursor_channel)
 {
     SpiceMsgMigrate migrate;
@@ -8393,9 +8360,6 @@ static void cursor_channel_push(RedWorker *worker)
         case PIPE_ITEM_TYPE_CURSOR:
             red_send_cursor(cursor_channel, (CursorItem *)pipe_item);
             break;
-        case PIPE_ITEM_TYPE_LOCAL_CURSOR:
-            red_send_local_cursor(cursor_channel, (LocalCursor *)pipe_item);
-            break;
         case PIPE_ITEM_TYPE_INVAL_ONE:
             red_cursor_send_inval(cursor_channel, (CacheItem *)pipe_item);
             free(pipe_item);
@@ -8505,17 +8469,15 @@ void red_show_tree(RedWorker *worker)
 
 static inline int channel_is_connected(RedChannel *channel)
 {
-    return !!channel->peer;
+    return !!channel->stream;
 }
 
 static void red_disconnect_channel(RedChannel *channel)
 {
     channel_release_res(channel);
     red_pipe_clear(channel);
-
-    channel->peer->cb_free(channel->peer);
-
-    channel->peer = NULL;
+    reds_stream_free(channel->stream);
+    channel->stream = NULL;
     channel->send_data.blocked = FALSE;
     channel->send_data.size = channel->send_data.pos = 0;
     spice_marshaller_reset(channel->send_data.marshaller);
@@ -8526,7 +8488,7 @@ static void red_disconnect_display(RedChannel *channel)
 {
     DisplayChannel *display_channel;
 
-    if (!channel || !channel->peer) {
+    if (!channel || !channel->stream) {
         return;
     }
 
@@ -8696,7 +8658,7 @@ static inline void red_create_surface_item(RedWorker *worker, int surface_id)
 
 static inline void red_create_surface(RedWorker *worker, uint32_t surface_id, uint32_t width,
                                       uint32_t height, int32_t stride, uint32_t format,
-                                      void *line_0, int data_is_valid)
+                                      void *line_0, int data_is_valid, int send_client)
 {
     uint32_t i;
     RedSurface *surface = &worker->surfaces[surface_id];
@@ -8729,7 +8691,12 @@ static inline void red_create_surface(RedWorker *worker, uint32_t surface_id, ui
             PANIC("drawing canvas creating failed - can`t create same type canvas");
         }
 
-        red_create_surface_item(worker, surface_id);
+        if (send_client) {
+            red_create_surface_item(worker, surface_id);
+            if (data_is_valid) {
+                red_add_surface_image(worker, surface_id);
+            }
+        }
         return;
     }
 
@@ -8739,7 +8706,12 @@ static inline void red_create_surface(RedWorker *worker, uint32_t surface_id, ui
                                                             surface->context.format, line_0);
         if (surface->context.canvas) { //no need canvas check
             worker->renderer = worker->renderers[i];
-            red_create_surface_item(worker, surface_id);
+            if (send_client) {
+                red_create_surface_item(worker, surface_id);
+                if (data_is_valid) {
+                    red_add_surface_image(worker, surface_id);
+                }
+            }
             return;
         }
     }
@@ -8858,7 +8830,7 @@ static int display_channel_wait_for_init(DisplayChannel *display_channel)
     uint64_t end_time = red_now() + DISPLAY_CLIENT_TIMEOUT;
     for (;;) {
         red_receive((RedChannel *)display_channel);
-        if (!display_channel->base.peer) {
+        if (!display_channel->base.stream) {
             break;
         }
         if (display_channel->pixmap_cache && display_channel->glz_dict) {
@@ -9240,8 +9212,9 @@ static void red_receive(RedChannel *channel)
         ssize_t n;
         n = channel->recive_data.end - channel->recive_data.now;
         ASSERT(n);
-        ASSERT(channel->peer);
-        if ((n = channel->peer->cb_read(channel->peer->ctx, channel->recive_data.now, n)) <= 0) {
+        ASSERT(channel->stream);
+        n = reds_stream_read(channel->stream, channel->recive_data.now, n);
+        if (n <= 0) {
             if (n == 0) {
                 channel->disconnect(channel);
                 return;
@@ -9307,7 +9280,7 @@ static void red_receive(RedChannel *channel)
 }
 
 static RedChannel *__new_channel(RedWorker *worker, int size, uint32_t channel_id,
-                                 RedsStreamContext *peer, int migrate,
+                                 RedsStream *stream, int migrate,
                                  event_listener_action_proc handler,
                                  disconnect_channel_proc disconnect,
                                  hold_item_proc hold_item,
@@ -9319,18 +9292,18 @@ static RedChannel *__new_channel(RedWorker *worker, int size, uint32_t channel_i
     int flags;
     int delay_val;
 
-    if ((flags = fcntl(peer->socket, F_GETFL)) == -1) {
+    if ((flags = fcntl(stream->socket, F_GETFL)) == -1) {
         red_printf("accept failed, %s", strerror(errno));
         goto error1;
     }
 
-    if (fcntl(peer->socket, F_SETFL, flags | O_NONBLOCK) == -1) {
+    if (fcntl(stream->socket, F_SETFL, flags | O_NONBLOCK) == -1) {
         red_printf("accept failed, %s", strerror(errno));
         goto error1;
     }
 
     delay_val = IS_LOW_BANDWIDTH() ? 0 : 1;
-    if (setsockopt(peer->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val, sizeof(delay_val)) == -1) {
+    if (setsockopt(stream->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val, sizeof(delay_val)) == -1) {
         red_printf("setsockopt failed, %s", strerror(errno));
     }
 
@@ -9344,7 +9317,7 @@ static RedChannel *__new_channel(RedWorker *worker, int size, uint32_t channel_i
     channel->hold_item = hold_item;
     channel->release_item = release_item;
     channel->handle_message = handle_message;
-    channel->peer = peer;
+    channel->stream = stream;
     channel->worker = worker;
     channel->messages_window = ~0;  // blocks send message (maybe use send_data.blocked +
                                     // block flags)
@@ -9359,7 +9332,7 @@ static RedChannel *__new_channel(RedWorker *worker, int size, uint32_t channel_i
 
     event.events = EPOLLIN | EPOLLOUT | EPOLLET;
     event.data.ptr = channel;
-    if (epoll_ctl(worker->epoll, EPOLL_CTL_ADD, peer->socket, &event) == -1) {
+    if (epoll_ctl(worker->epoll, EPOLL_CTL_ADD, stream->socket, &event) == -1) {
         red_printf("epoll_ctl failed, %s", strerror(errno));
         goto error2;
     }
@@ -9371,7 +9344,7 @@ static RedChannel *__new_channel(RedWorker *worker, int size, uint32_t channel_i
 error2:
     free(channel);
 error1:
-    peer->cb_free(peer);
+    reds_stream_free(stream);
 
     return NULL;
 }
@@ -9433,7 +9406,7 @@ static void display_channel_release_item(RedChannel *channel, void *item)
     }
 }
 
-static void handle_new_display_channel(RedWorker *worker, RedsStreamContext *peer, int migrate)
+static void handle_new_display_channel(RedWorker *worker, RedsStream *stream, int migrate)
 {
     DisplayChannel *display_channel;
     size_t stream_buf_size;
@@ -9441,7 +9414,7 @@ static void handle_new_display_channel(RedWorker *worker, RedsStreamContext *pee
     red_disconnect_display((RedChannel *)worker->display_channel);
 
     if (!(display_channel = (DisplayChannel *)__new_channel(worker, sizeof(*display_channel),
-                                                            SPICE_CHANNEL_DISPLAY, peer,
+                                                            SPICE_CHANNEL_DISPLAY, stream,
                                                             migrate, handle_channel_events,
                                                             red_disconnect_display,
                                                             display_channel_hold_item,
@@ -9513,7 +9486,7 @@ static void handle_new_display_channel(RedWorker *worker, RedsStreamContext *pee
 
 static void red_disconnect_cursor(RedChannel *channel)
 {
-    if (!channel || !channel->peer) {
+    if (!channel || !channel->stream) {
         return;
     }
 
@@ -9556,14 +9529,14 @@ static void cursor_channel_release_item(RedChannel *channel, void *item)
     red_release_cursor(channel->worker, item);
 }
 
-static void red_connect_cursor(RedWorker *worker, RedsStreamContext *peer, int migrate)
+static void red_connect_cursor(RedWorker *worker, RedsStream *stream, int migrate)
 {
     CursorChannel *channel;
 
     red_disconnect_cursor((RedChannel *)worker->cursor_channel);
 
     if (!(channel = (CursorChannel *)__new_channel(worker, sizeof(*channel),
-                                                   SPICE_CHANNEL_CURSOR, peer, migrate,
+                                                   SPICE_CHANNEL_CURSOR, stream, migrate,
                                                    handle_channel_events,
                                                    red_disconnect_cursor,
                                                    cursor_channel_hold_item,
@@ -9589,52 +9562,6 @@ typedef struct __attribute__ ((__packed__)) CursorData {
     uint32_t data_size;
     SpiceCursor _cursor;
 } CursorData;
-
-static LocalCursor *_new_local_cursor(SpiceCursorHeader *header, int data_size, SpicePoint16 position)
-{
-    LocalCursor *local;
-
-    local = (LocalCursor *)spice_malloc0(sizeof(LocalCursor) + data_size);
-
-    red_pipe_item_init(&local->base.pipe_data, PIPE_ITEM_TYPE_LOCAL_CURSOR);
-    local->base.refs = 1;
-    local->base.type = CURSOR_TYPE_LOCAL;
-
-    local->red_cursor.header = *header;
-    local->red_cursor.header.unique = 0;
-
-    local->red_cursor.flags = 0;
-    local->red_cursor.data = (uint8_t*)(local+1);
-
-    local->position = position;
-    local->data_size = data_size;
-    return local;
-}
-
-static void red_cursor_flush(RedWorker *worker)
-{
-    RedCursorCmd *cursor_cmd;
-    SpiceCursor *cursor;
-    LocalCursor *local;
-
-    if (!worker->cursor || worker->cursor->type == CURSOR_TYPE_LOCAL) {
-        return;
-    }
-
-    ASSERT(worker->cursor->type == CURSOR_TYPE_DEV);
-
-    cursor_cmd = worker->cursor->red_cursor;
-    ASSERT(cursor_cmd->type == QXL_CURSOR_SET);
-    cursor = &cursor_cmd->u.set.shape;
-
-    local = _new_local_cursor(&cursor->header, cursor->data_size,
-                              worker->cursor_position);
-    ASSERT(local);
-    memcpy(local->red_cursor.data, cursor->data, local->data_size);
-
-    red_set_cursor(worker, &local->base);
-    red_release_cursor(worker, &local->base);
-}
 
 static void red_wait_outgoing_item(RedChannel *channel)
 {
@@ -9704,44 +9631,99 @@ static void red_wait_pipe_item_sent(RedChannel *channel, PipeItem *item)
     red_unref_channel(channel);
 }
 
+static void surface_dirty_region_to_rects(RedSurface *surface,
+                                          QXLRect *qxl_dirty_rects,
+                                          uint32_t num_dirty_rects,
+                                          int clear_dirty_region)
+{
+    QRegion *surface_dirty_region;
+    SpiceRect *dirty_rects;
+    int i;
+
+    surface_dirty_region = &surface->draw_dirty_region;
+    dirty_rects = spice_new0(SpiceRect, num_dirty_rects);
+    region_ret_rects(surface_dirty_region, dirty_rects, num_dirty_rects);
+    if (clear_dirty_region) {
+        region_clear(surface_dirty_region);
+    }
+    for (i = 0; i < num_dirty_rects; i++) {
+        qxl_dirty_rects[i].top    = dirty_rects[i].top;
+        qxl_dirty_rects[i].left   = dirty_rects[i].left;
+        qxl_dirty_rects[i].bottom = dirty_rects[i].bottom;
+        qxl_dirty_rects[i].right  = dirty_rects[i].right;
+    }
+    free(dirty_rects);
+}
+
+static inline void handle_dev_update_async(RedWorker *worker)
+{
+    QXLRect qxl_rect;
+    SpiceRect rect;
+    uint32_t surface_id;
+    uint32_t clear_dirty_region;
+    QXLRect *qxl_dirty_rects;
+    uint32_t num_dirty_rects;
+    RedSurface *surface;
+
+    receive_data(worker->channel, &surface_id, sizeof(uint32_t));
+    receive_data(worker->channel, &qxl_rect, sizeof(QXLRect));
+    receive_data(worker->channel, &clear_dirty_region, sizeof(uint32_t));
+
+    red_get_rect_ptr(&rect, &qxl_rect);
+    flush_display_commands(worker);
+
+    ASSERT(worker->running);
+
+    validate_surface(worker, surface_id);
+    red_update_area(worker, &rect, surface_id);
+    if (!worker->qxl->st->qif->update_area_complete) {
+        return;
+    }
+    surface = &worker->surfaces[surface_id];
+    num_dirty_rects = pixman_region32_n_rects(&surface->draw_dirty_region);
+    if (num_dirty_rects == 0) {
+        return;
+    }
+    qxl_dirty_rects = spice_new0(QXLRect, num_dirty_rects);
+    surface_dirty_region_to_rects(surface, qxl_dirty_rects, num_dirty_rects,
+                                  clear_dirty_region);
+    worker->qxl->st->qif->update_area_complete(worker->qxl, surface_id,
+                                          qxl_dirty_rects, num_dirty_rects);
+    free(qxl_dirty_rects);
+}
+
 static inline void handle_dev_update(RedWorker *worker)
 {
-    RedWorkerMessage message;
-    const SpiceRect *rect;
-    SpiceRect *dirty_rects;
+    const QXLRect *qxl_rect;
+    SpiceRect *rect = spice_new0(SpiceRect, 1);
+    QXLRect *qxl_dirty_rects;
     RedSurface *surface;
     uint32_t num_dirty_rects;
     uint32_t surface_id;
     uint32_t clear_dirty_region;
 
     receive_data(worker->channel, &surface_id, sizeof(uint32_t));
-    receive_data(worker->channel, &rect, sizeof(SpiceRect *));
-    receive_data(worker->channel, &dirty_rects, sizeof(SpiceRect *));
+    receive_data(worker->channel, &qxl_rect, sizeof(QXLRect *));
+    receive_data(worker->channel, &qxl_dirty_rects, sizeof(QXLRect *));
     receive_data(worker->channel, &num_dirty_rects, sizeof(uint32_t));
     receive_data(worker->channel, &clear_dirty_region, sizeof(uint32_t));
 
+    surface = &worker->surfaces[surface_id];
+    red_get_rect_ptr(rect, qxl_rect);
     flush_display_commands(worker);
 
     ASSERT(worker->running);
 
     validate_surface(worker, surface_id);
     red_update_area(worker, rect, surface_id);
+    free(rect);
 
-    surface = &worker->surfaces[surface_id];
-    region_ret_rects(&surface->draw_dirty_region, dirty_rects, num_dirty_rects);
-
-    if (clear_dirty_region) {
-        region_clear(&surface->draw_dirty_region);
-    }
-
-    message = RED_WORKER_MESSAGE_READY;
-    write_message(worker->channel, &message);
+    surface_dirty_region_to_rects(surface, qxl_dirty_rects, num_dirty_rects,
+                                  clear_dirty_region);
 }
-
 
 static inline void handle_dev_add_memslot(RedWorker *worker)
 {
-    RedWorkerMessage message;
     QXLDevMemSlot dev_slot;
 
     receive_data(worker->channel, &dev_slot, sizeof(QXLDevMemSlot));
@@ -9749,9 +9731,6 @@ static inline void handle_dev_add_memslot(RedWorker *worker)
     red_memslot_info_add_slot(&worker->mem_slots, dev_slot.slot_group_id, dev_slot.slot_id,
                               dev_slot.addr_delta, dev_slot.virt_start, dev_slot.virt_end,
                               dev_slot.generation);
-
-    message = RED_WORKER_MESSAGE_READY;
-    write_message(worker->channel, &message);
 }
 
 static inline void handle_dev_del_memslot(RedWorker *worker)
@@ -9787,7 +9766,6 @@ static inline void destroy_surface_wait(RedWorker *worker, int surface_id)
 
 static inline void handle_dev_destroy_surface_wait(RedWorker *worker)
 {
-    RedWorkerMessage message;
     uint32_t surface_id;
 
     receive_data(worker->channel, &surface_id, sizeof(uint32_t));
@@ -9799,17 +9777,34 @@ static inline void handle_dev_destroy_surface_wait(RedWorker *worker)
     if (worker->surfaces[0].context.canvas) {
         destroy_surface_wait(worker, 0);
     }
+}
 
-    message = RED_WORKER_MESSAGE_READY;
-    write_message(worker->channel, &message);
+static inline void red_cursor_reset(RedWorker *worker)
+{
+    if (worker->cursor) {
+        red_release_cursor(worker, worker->cursor);
+        worker->cursor = NULL;
+    }
+
+    worker->cursor_visible = TRUE;
+    worker->cursor_position.x = worker->cursor_position.y = 0;
+    worker->cursor_trail_length = worker->cursor_trail_frequency = 0;
+
+    if (worker->cursor_channel) {
+        red_pipe_add_type(&worker->cursor_channel->base, PIPE_ITEM_TYPE_INVAL_CURSOR_CACHE);
+        if (!worker->cursor_channel->base.migrate) {
+            red_pipe_add_verb(&worker->cursor_channel->base, SPICE_MSG_CURSOR_RESET);
+        }
+        red_wait_outgoing_item((RedChannel *)worker->cursor_channel);
+        ASSERT(!worker->cursor_channel->base.send_data.item);
+    }
 }
 
 /* called upon device reset */
 static inline void handle_dev_destroy_surfaces(RedWorker *worker)
 {
     int i;
-    RedWorkerMessage message;
-    red_printf("");
+
     flush_all_qxl_commands(worker);
     //to handle better
     for (i = 0; i < NUM_SURFACES; ++i) {
@@ -9823,15 +9818,6 @@ static inline void handle_dev_destroy_surfaces(RedWorker *worker)
     }
     ASSERT(ring_is_empty(&worker->streams));
 
-    red_wait_outgoing_item((RedChannel *)worker->cursor_channel);
-    if (worker->cursor_channel) {
-        red_pipe_add_type(&worker->cursor_channel->base, PIPE_ITEM_TYPE_INVAL_CURSOR_CACHE);
-        if (!worker->cursor_channel->base.migrate) {
-            red_pipe_add_verb(&worker->cursor_channel->base, SPICE_MSG_CURSOR_RESET);
-        }
-        ASSERT(!worker->cursor_channel->base.send_data.item);
-    }
-
     if (worker->display_channel) {
         red_pipe_add_type(&worker->display_channel->base, PIPE_ITEM_TYPE_INVAL_PALLET_CACHE);
         red_pipe_add_verb(&worker->display_channel->base, SPICE_MSG_DISPLAY_STREAM_DESTROY_ALL);
@@ -9839,17 +9825,11 @@ static inline void handle_dev_destroy_surfaces(RedWorker *worker)
 
     red_display_clear_glz_drawables(worker->display_channel);
 
-    worker->cursor_visible = TRUE;
-    worker->cursor_position.x = worker->cursor_position.y = 0;
-    worker->cursor_trail_length = worker->cursor_trail_frequency = 0;
-
-    message = RED_WORKER_MESSAGE_READY;
-    write_message(worker->channel, &message);
+    red_cursor_reset(worker);
 }
 
 static inline void handle_dev_create_primary_surface(RedWorker *worker)
 {
-    RedWorkerMessage message;
     uint32_t surface_id;
     QXLDevSurfaceCreate surface;
     uint8_t *line_0;
@@ -9869,7 +9849,7 @@ static inline void handle_dev_create_primary_surface(RedWorker *worker)
     }
 
     red_create_surface(worker, 0, surface.width, surface.height, surface.stride, surface.format,
-                       line_0, surface.flags & QXL_SURF_FLAG_KEEP_DATA);
+                       line_0, surface.flags & QXL_SURF_FLAG_KEEP_DATA, TRUE);
 
     if (worker->display_channel) {
         red_pipe_add_verb(&worker->display_channel->base, SPICE_MSG_DISPLAY_MARK);
@@ -9879,34 +9859,16 @@ static inline void handle_dev_create_primary_surface(RedWorker *worker)
     if (worker->cursor_channel) {
         red_pipe_add_type(&worker->cursor_channel->base, PIPE_ITEM_TYPE_CURSOR_INIT);
     }
-
-    message = RED_WORKER_MESSAGE_READY;
-    write_message(worker->channel, &message);
 }
 
 static inline void handle_dev_destroy_primary_surface(RedWorker *worker)
 {
-    RedWorkerMessage message;
     uint32_t surface_id;
 
     receive_data(worker->channel, &surface_id, sizeof(uint32_t));
 
     PANIC_ON(surface_id != 0);
     PANIC_ON(!worker->surfaces[surface_id].context.canvas);
-
-    if (worker->cursor) {
-        red_release_cursor(worker, worker->cursor);
-        worker->cursor = NULL;
-    }
-
-    red_wait_outgoing_item((RedChannel *)worker->cursor_channel);
-    if (worker->cursor_channel) {
-        red_pipe_add_type(&worker->cursor_channel->base, PIPE_ITEM_TYPE_INVAL_CURSOR_CACHE);
-        if (!worker->cursor_channel->base.migrate) {
-            red_pipe_add_verb(&worker->cursor_channel->base, SPICE_MSG_CURSOR_RESET);
-        }
-        ASSERT(!worker->cursor_channel->base.send_data.item);
-    }
 
     flush_all_qxl_commands(worker);
     destroy_surface_wait(worker, 0);
@@ -9915,23 +9877,97 @@ static inline void handle_dev_destroy_primary_surface(RedWorker *worker)
 
     ASSERT(!worker->surfaces[surface_id].context.canvas);
 
-    worker->cursor_visible = TRUE;
-    worker->cursor_position.x = worker->cursor_position.y = 0;
-    worker->cursor_trail_length = worker->cursor_trail_frequency = 0;
+    red_cursor_reset(worker);
+}
 
-    message = RED_WORKER_MESSAGE_READY;
-    write_message(worker->channel, &message);
+static void flush_all_surfaces(RedWorker *worker)
+{
+    int x;
+
+    for (x = 0; x < NUM_SURFACES; ++x) {
+        if (worker->surfaces[x].context.canvas) {
+            red_current_flush(worker, x);
+        }
+    }
+}
+
+static void handle_dev_flush_surfaces(RedWorker *worker)
+{
+    flush_all_qxl_commands(worker);
+    flush_all_surfaces(worker);
+    red_wait_outgoing_item((RedChannel *)worker->display_channel);
+    red_wait_outgoing_item((RedChannel *)worker->cursor_channel);
+}
+
+static void handle_dev_stop(RedWorker *worker)
+{
+    ASSERT(worker->running);
+    worker->running = FALSE;
+    red_display_clear_glz_drawables(worker->display_channel);
+    flush_all_surfaces(worker);
+    red_wait_outgoing_item((RedChannel *)worker->display_channel);
+    red_wait_outgoing_item((RedChannel *)worker->cursor_channel);
+}
+
+static void handle_dev_start(RedWorker *worker)
+{
+    RedChannel *cursor_red_channel = &worker->cursor_channel->base;
+    RedChannel *display_red_channel = &worker->display_channel->base;
+
+    ASSERT(!worker->running);
+    if (worker->cursor_channel) {
+        cursor_red_channel->migrate = FALSE;
+    }
+    if (worker->display_channel) {
+        display_red_channel->migrate = FALSE;
+    }
+    worker->running = TRUE;
 }
 
 static void handle_dev_input(EventListener *listener, uint32_t events)
 {
     RedWorker *worker = SPICE_CONTAINEROF(listener, RedWorker, dev_listener);
     RedWorkerMessage message;
+
     int ring_is_empty;
+    int call_async_complete = 0;
+    int write_ready = 0;
+    uint64_t cookie;
 
     read_message(worker->channel, &message);
 
+    /* for async messages we do the common work in the handler, and
+     * send a ready or call async_complete from here, hence the added switch. */
     switch (message) {
+    case RED_WORKER_MESSAGE_UPDATE_ASYNC:
+    case RED_WORKER_MESSAGE_ADD_MEMSLOT_ASYNC:
+    case RED_WORKER_MESSAGE_DESTROY_SURFACES_ASYNC:
+    case RED_WORKER_MESSAGE_CREATE_PRIMARY_SURFACE_ASYNC:
+    case RED_WORKER_MESSAGE_DESTROY_PRIMARY_SURFACE_ASYNC:
+    case RED_WORKER_MESSAGE_DESTROY_SURFACE_WAIT_ASYNC:
+    case RED_WORKER_MESSAGE_FLUSH_SURFACES_ASYNC:
+        call_async_complete = 1;
+        receive_data(worker->channel, &cookie, sizeof(cookie));
+        break;
+    case RED_WORKER_MESSAGE_UPDATE:
+    case RED_WORKER_MESSAGE_ADD_MEMSLOT:
+    case RED_WORKER_MESSAGE_DESTROY_SURFACES:
+    case RED_WORKER_MESSAGE_CREATE_PRIMARY_SURFACE:
+    case RED_WORKER_MESSAGE_DESTROY_PRIMARY_SURFACE:
+    case RED_WORKER_MESSAGE_DESTROY_SURFACE_WAIT:
+    case RED_WORKER_MESSAGE_RESET_CURSOR:
+    case RED_WORKER_MESSAGE_RESET_IMAGE_CACHE:
+    case RED_WORKER_MESSAGE_STOP:
+    case RED_WORKER_MESSAGE_LOADVM_COMMANDS:
+        write_ready = 1;
+    default:
+        break;
+    }
+
+    switch (message) {
+    case RED_WORKER_MESSAGE_UPDATE_ASYNC:
+        handle_dev_update_async(worker);
+        break;
     case RED_WORKER_MESSAGE_UPDATE:
         handle_dev_update(worker);
         break;
@@ -9953,52 +9989,35 @@ static void handle_dev_input(EventListener *listener, uint32_t events)
         clear_bit(RED_WORKER_PENDING_OOM, worker->pending);
         break;
     case RED_WORKER_MESSAGE_RESET_CURSOR:
-        if (worker->cursor) {
-            red_release_cursor(worker, worker->cursor);
-            worker->cursor = NULL;
-        }
-
-        red_wait_outgoing_item((RedChannel *)worker->cursor_channel);
-        if (worker->cursor_channel) {
-            red_pipe_add_type(&worker->cursor_channel->base, PIPE_ITEM_TYPE_INVAL_CURSOR_CACHE);
-            if (!worker->cursor_channel->base.migrate) {
-                red_pipe_add_verb(&worker->cursor_channel->base, SPICE_MSG_CURSOR_RESET);
-            }
-            ASSERT(!worker->cursor_channel->base.send_data.item);
-
-            worker->cursor_visible = TRUE;
-            worker->cursor_position.x = worker->cursor_position.y = 0;
-            worker->cursor_trail_length = worker->cursor_trail_frequency = 0;
-        }
-
-        message = RED_WORKER_MESSAGE_READY;
-        write_message(worker->channel, &message);
+        red_cursor_reset(worker);
         break;
     case RED_WORKER_MESSAGE_RESET_IMAGE_CACHE:
         image_cache_reset(&worker->image_cache);
-        message = RED_WORKER_MESSAGE_READY;
-        write_message(worker->channel, &message);
         break;
+    case RED_WORKER_MESSAGE_DESTROY_SURFACE_WAIT_ASYNC:
     case RED_WORKER_MESSAGE_DESTROY_SURFACE_WAIT:
         handle_dev_destroy_surface_wait(worker);
         break;
+    case RED_WORKER_MESSAGE_DESTROY_SURFACES_ASYNC:
     case RED_WORKER_MESSAGE_DESTROY_SURFACES:
         handle_dev_destroy_surfaces(worker);
         break;
+    case RED_WORKER_MESSAGE_CREATE_PRIMARY_SURFACE_ASYNC:
     case RED_WORKER_MESSAGE_CREATE_PRIMARY_SURFACE:
         handle_dev_create_primary_surface(worker);
         break;
+    case RED_WORKER_MESSAGE_DESTROY_PRIMARY_SURFACE_ASYNC:
     case RED_WORKER_MESSAGE_DESTROY_PRIMARY_SURFACE:
         handle_dev_destroy_primary_surface(worker);
         break;
     case RED_WORKER_MESSAGE_DISPLAY_CONNECT: {
-        RedsStreamContext *peer;
+        RedsStream *stream;
         int migrate;
         red_printf("connect");
 
-        receive_data(worker->channel, &peer, sizeof(RedsStreamContext *));
+        receive_data(worker->channel, &stream, sizeof(RedsStream *));
         receive_data(worker->channel, &migrate, sizeof(int));
-        handle_new_display_channel(worker, peer, migrate);
+        handle_new_display_channel(worker, stream, migrate);
         break;
     }
     case RED_WORKER_MESSAGE_DISPLAY_DISCONNECT:
@@ -10006,47 +10025,26 @@ static void handle_dev_input(EventListener *listener, uint32_t events)
         red_disconnect_display((RedChannel *)worker->display_channel);
         break;
     case RED_WORKER_MESSAGE_STOP: {
-        int x;
-
         red_printf("stop");
-        ASSERT(worker->running);
-        worker->running = FALSE;
-        red_display_clear_glz_drawables(worker->display_channel);
-        for (x = 0; x < NUM_SURFACES; ++x) {
-            if (worker->surfaces[x].context.canvas) {
-                red_current_flush(worker, x);
-            }
-        }
-        red_cursor_flush(worker);
-        red_wait_outgoing_item((RedChannel *)worker->display_channel);
-        red_wait_outgoing_item((RedChannel *)worker->cursor_channel);
-        message = RED_WORKER_MESSAGE_READY;
-        write_message(worker->channel, &message);
+        handle_dev_stop(worker);
         break;
     }
     case RED_WORKER_MESSAGE_START:
         red_printf("start");
-        ASSERT(!worker->running);
-        if (worker->cursor_channel) {
-            worker->cursor_channel->base.migrate = FALSE;
-        }
-        if (worker->display_channel) {
-            worker->display_channel->base.migrate = FALSE;
-        }
-        worker->running = TRUE;
+        handle_dev_start(worker);
         break;
     case RED_WORKER_MESSAGE_DISPLAY_MIGRATE:
         red_printf("migrate");
         red_migrate_display(worker);
         break;
     case RED_WORKER_MESSAGE_CURSOR_CONNECT: {
-        RedsStreamContext *peer;
+        RedsStream *stream;
         int migrate;
 
         red_printf("cursor connect");
-        receive_data(worker->channel, &peer, sizeof(RedsStreamContext *));
+        receive_data(worker->channel, &stream, sizeof(RedsStream *));
         receive_data(worker->channel, &migrate, sizeof(int));
-        red_connect_cursor(worker, peer, migrate);
+        red_connect_cursor(worker, stream, migrate);
         break;
     }
     case RED_WORKER_MESSAGE_CURSOR_DISCONNECT:
@@ -10115,6 +10113,7 @@ static void handle_dev_input(EventListener *listener, uint32_t events)
         receive_data(worker->channel, &worker->mouse_mode, sizeof(uint32_t));
         red_printf("mouse mode %u", worker->mouse_mode);
         break;
+    case RED_WORKER_MESSAGE_ADD_MEMSLOT_ASYNC:
     case RED_WORKER_MESSAGE_ADD_MEMSLOT:
         handle_dev_add_memslot(worker);
         break;
@@ -10145,7 +10144,7 @@ static void handle_dev_input(EventListener *listener, uint32_t events)
                 surface_cmd = spice_new0(RedSurfaceCmd, 1);
                 red_get_surface_cmd(&worker->mem_slots, ext.group_id,
                                     surface_cmd, ext.cmd.data);
-                red_process_surface(worker, surface_cmd, ext.group_id, 1);
+                red_process_surface(worker, surface_cmd, ext.group_id, TRUE);
                 break;
             default:
                 red_printf("unhandled loadvm command type (%d)", ext.cmd.type);
@@ -10153,12 +10152,20 @@ static void handle_dev_input(EventListener *listener, uint32_t events)
             }
             count--;
         }
-        message = RED_WORKER_MESSAGE_READY;
-        write_message(worker->channel, &message);
         break;
     }
+    case RED_WORKER_MESSAGE_FLUSH_SURFACES_ASYNC:
+        handle_dev_flush_surfaces(worker);
+        break;
     default:
         red_error("message error");
+    }
+    if (call_async_complete) {
+        red_dispatcher_async_complete(worker->dispatcher, cookie);
+    }
+    if (write_ready) {
+        message = RED_WORKER_MESSAGE_READY;
+        write_message(worker->channel, &message);
     }
 }
 
@@ -10171,6 +10178,7 @@ static void red_init(RedWorker *worker, WorkerInitData *init_data)
     ASSERT(sizeof(CursorItem) <= QXL_CURSUR_DEVICE_DATA_SIZE);
 
     memset(worker, 0, sizeof(RedWorker));
+    worker->dispatcher = init_data->dispatcher;
     worker->qxl = init_data->qxl;
     worker->id = init_data->id;
     worker->channel = init_data->channel;

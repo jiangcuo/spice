@@ -16,6 +16,8 @@
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -38,6 +40,9 @@
 #include <openssl/rsa.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#if HAVE_SASL
+#include <sasl/sasl.h>
+#endif
 
 #include "spice.h"
 #include "spice-experimental.h"
@@ -52,11 +57,10 @@
 #include <spice/stats.h>
 #include "stat.h"
 #include "ring.h"
-#include "config.h"
 #include "demarshallers.h"
 #include "marshaller.h"
 #include "generated_marshallers.h"
-#include "server/char_device.h"
+#include "char_device.h"
 #ifdef USE_TUNNEL
 #include "red_tunnel_worker.h"
 #endif
@@ -91,6 +95,10 @@ static int spice_secure_port = -1;
 static char spice_addr[256];
 static int spice_family = PF_UNSPEC;
 static char *default_renderer = "sw";
+static int sasl_enabled = 0; // sasl disabled by default
+#if HAVE_SASL
+static char *sasl_appname = NULL; // default to "spice" if NULL
+#endif
 
 static int ticketing_enabled = 1; //Ticketing is enabled by default
 static pthread_mutex_t *lock_cs;
@@ -209,7 +217,7 @@ typedef struct VDIPortState {
 
 typedef struct InputsState {
     Channel *channel;
-    RedsStreamContext *peer;
+    RedsStream *stream;
     IncomingHandler in_handler;
     OutgoingHandler out_handler;
     VDAgentMouseState mouse_state;
@@ -255,7 +263,7 @@ typedef struct RedsState {
     int secure_listen_socket;
     SpiceWatch *listen_watch;
     SpiceWatch *secure_listen_watch;
-    RedsStreamContext *peer;
+    RedsStream *stream;
     int disconnecting;
     uint32_t link_id;
     uint64_t serial; //migrate me
@@ -304,7 +312,7 @@ static uint64_t latency = 0;
 static RedsState *reds = NULL;
 
 typedef struct AsyncRead {
-    RedsStreamContext *peer;
+    RedsStream *stream;
     void *opaque;
     uint8_t *now;
     uint8_t *end;
@@ -313,12 +321,13 @@ typedef struct AsyncRead {
 } AsyncRead;
 
 typedef struct RedLinkInfo {
-    RedsStreamContext *peer;
+    RedsStream *stream;
     AsyncRead asyc_read;
     SpiceLinkHeader link_header;
     SpiceLinkMess *link_mess;
     int mess_pos;
     TicketInfo tiTicketing;
+    SpiceLinkAuthMechanism auth_mechanism;
 } RedLinkInfo;
 
 typedef struct VDIPortBuf VDIPortBuf;
@@ -384,130 +393,81 @@ static ChannelSecurityOptions *find_channel_security(int id)
     return now;
 }
 
-static void reds_channel_event(RedsStreamContext *peer, int event)
+static void reds_channel_event(RedsStream *stream, int event)
 {
     if (core->base.minor_version < 3 || core->channel_event == NULL)
         return;
-    core->channel_event(event, &peer->info);
+    core->channel_event(event, &stream->info);
 }
 
-static int reds_write(void *ctx, void *buf, size_t size)
+static ssize_t stream_write_cb(RedsStream *s, const void *buf, size_t size)
+{
+    return write(s->socket, buf, size);
+}
+
+static ssize_t stream_writev_cb(RedsStream *s, const struct iovec *iov, int iovcnt)
+{
+    return writev(s->socket, iov, iovcnt);
+}
+
+static ssize_t stream_read_cb(RedsStream *s, void *buf, size_t size)
+{
+    return read(s->socket, buf, size);
+}
+
+static ssize_t stream_ssl_write_cb(RedsStream *s, const void *buf, size_t size)
 {
     int return_code;
-    int sock = (long)ctx;
-    size_t count = size;
+    SPICE_GNUC_UNUSED int ssl_error;
 
-    return_code = write(sock, buf, count);
-
-    return (return_code);
-}
-
-static int reds_read(void *ctx, void *buf, size_t size)
-{
-    int return_code;
-    int sock = (long)ctx;
-    size_t count = size;
-
-    return_code = read(sock, buf, count);
-
-    return (return_code);
-}
-
-static int reds_free(RedsStreamContext *peer)
-{
-    reds_channel_event(peer, SPICE_CHANNEL_EVENT_DISCONNECTED);
-    close(peer->socket);
-    free(peer);
-    return 0;
-}
-
-static int reds_ssl_write(void *ctx, void *buf, size_t size)
-{
-    int return_code;
-    int ssl_error;
-    SSL *ssl = ctx;
-
-    return_code = SSL_write(ssl, buf, size);
+    return_code = SSL_write(s->ssl, buf, size);
 
     if (return_code < 0) {
-        ssl_error = SSL_get_error(ssl, return_code);
-        (void)ssl_error;
-    }
-
-    return (return_code);
-}
-
-static int reds_ssl_read(void *ctx, void *buf, size_t size)
-{
-    int return_code;
-    int ssl_error;
-    SSL *ssl = ctx;
-
-    return_code = SSL_read(ssl, buf, size);
-
-    if (return_code < 0) {
-        ssl_error = SSL_get_error(ssl, return_code);
-        (void)ssl_error;
-    }
-
-    return (return_code);
-}
-
-static int reds_ssl_writev(void *ctx, const struct iovec *vector, int count)
-{
-    int i;
-    int n;
-    int return_code = 0;
-    int ssl_error;
-    SSL *ssl = ctx;
-
-    for (i = 0; i < count; ++i) {
-        n = SSL_write(ssl, vector[i].iov_base, vector[i].iov_len);
-        if (n <= 0) {
-            ssl_error = SSL_get_error(ssl, n);
-            (void)ssl_error;
-            if (return_code <= 0) {
-                return n;
-            } else {
-                break;
-            }
-        } else {
-            return_code += n;
-        }
+        ssl_error = SSL_get_error(s->ssl, return_code);
     }
 
     return return_code;
 }
 
-static int reds_ssl_free(RedsStreamContext *peer)
+static ssize_t stream_ssl_read_cb(RedsStream *s, void *buf, size_t size)
 {
-    reds_channel_event(peer, SPICE_CHANNEL_EVENT_DISCONNECTED);
-    SSL_free(peer->ssl);
-    close(peer->socket);
-    free(peer);
-    return 0;
+    int return_code;
+    SPICE_GNUC_UNUSED int ssl_error;
+
+    return_code = SSL_read(s->ssl, buf, size);
+
+    if (return_code < 0) {
+        ssl_error = SSL_get_error(s->ssl, return_code);
+    }
+
+    return return_code;
 }
 
-static void __reds_release_link(RedLinkInfo *link)
+static void reds_stream_remove_watch(RedsStream* s)
 {
-    ASSERT(link->peer);
-    if (link->peer->watch) {
-        core->watch_remove(link->peer->watch);
-        link->peer->watch = NULL;
+    if (s->watch) {
+        core->watch_remove(s->watch);
+        s->watch = NULL;
     }
+}
+
+static void reds_link_free(RedLinkInfo *link)
+{
+    reds_stream_free(link->stream);
+    link->stream = NULL;
+
     free(link->link_mess);
+    link->link_mess = NULL;
+
     BN_free(link->tiTicketing.bn);
+    link->tiTicketing.bn = NULL;
+
     if (link->tiTicketing.rsa) {
         RSA_free(link->tiTicketing.rsa);
+        link->tiTicketing.rsa = NULL;
     }
-    free(link);
-}
 
-static inline void reds_release_link(RedLinkInfo *link)
-{
-    RedsStreamContext *peer = link->peer;
-    __reds_release_link(link);
-    peer->cb_free(peer);
+    free(link);
 }
 
 static struct iovec *reds_iovec_skip(struct iovec vec[], int skip, int *vec_size)
@@ -739,7 +699,7 @@ static void reds_reset_outgoing()
 
 static void reds_disconnect()
 {
-    if (!reds->peer || reds->disconnecting) {
+    if (!reds->stream || reds->disconnecting) {
         return;
     }
 
@@ -764,10 +724,8 @@ static void reds_disconnect()
     }
 
     reds_shatdown_channels();
-    core->watch_remove(reds->peer->watch);
-    reds->peer->watch = NULL;
-    reds->peer->cb_free(reds->peer);
-    reds->peer = NULL;
+    reds_stream_free(reds->stream);
+    reds->stream = NULL;
     reds->in_handler.shut = TRUE;
     reds->link_id = 0;
     reds->serial = 0;
@@ -785,14 +743,14 @@ static void reds_disconnect()
 
 static void reds_mig_disconnect()
 {
-    if (reds->peer) {
+    if (reds->stream) {
         reds_disconnect();
     } else {
         reds_mig_cleanup();
     }
 }
 
-static int handle_incoming(RedsStreamContext *peer, IncomingHandler *handler)
+static int handle_incoming(RedsStream *stream, IncomingHandler *handler)
 {
     for (;;) {
         uint8_t *buf = handler->buf;
@@ -800,7 +758,7 @@ static int handle_incoming(RedsStreamContext *peer, IncomingHandler *handler)
         uint8_t *end = buf + pos;
         SpiceDataHeader *header;
         int n;
-        n = peer->cb_read(peer->ctx, buf + pos, RECIVE_BUF_SIZE - pos);
+        n = reds_stream_read(stream, buf + pos, RECIVE_BUF_SIZE - pos);
         if (n <= 0) {
             if (n == 0) {
                 return -1;
@@ -845,7 +803,7 @@ static int handle_incoming(RedsStreamContext *peer, IncomingHandler *handler)
     }
 }
 
-static int handle_outgoing(RedsStreamContext *peer, OutgoingHandler *handler)
+static int handle_outgoing(RedsStream *stream, OutgoingHandler *handler)
 {
     if (!handler->length) {
         return 0;
@@ -854,7 +812,7 @@ static int handle_outgoing(RedsStreamContext *peer, OutgoingHandler *handler)
     while (handler->length) {
         int n;
 
-        n = peer->cb_write(peer->ctx, handler->now, handler->length);
+        n = reds_stream_write(stream, handler->now, handler->length);
         if (n <= 0) {
             if (n == 0) {
                 return -1;
@@ -884,7 +842,7 @@ static int handle_outgoing(RedsStreamContext *peer, OutgoingHandler *handler)
 #define OUTGOING_FAILED -1
 #define OUTGOING_BLOCKED 1
 
-static int outgoing_write(RedsStreamContext *peer, OutgoingHandler *handler, void *in_data,
+static int outgoing_write(RedsStream *stream, OutgoingHandler *handler, void *in_data,
                           int length)
 {
     uint8_t *data = in_data;
@@ -894,7 +852,7 @@ static int outgoing_write(RedsStreamContext *peer, OutgoingHandler *handler, voi
     }
 
     while (length) {
-        int n = peer->cb_write(peer->ctx, data, length);
+        int n = reds_stream_write(stream, data, length);
         if (n < 0) {
             switch (errno) {
             case EAGAIN:
@@ -978,7 +936,7 @@ static int send_ping(int size)
     RedsOutItem *item;
     SpiceMsgPing ping;
 
-    if (!reds->peer) {
+    if (!reds->stream) {
         return FALSE;
     }
     item = new_out_item(SPICE_MSG_PING);
@@ -1002,8 +960,8 @@ static int send_ping(int size)
 
 static void do_ping_client(const char *opt, int has_interval, int interval)
 {
-    if (!reds->peer) {
-        red_printf("not connected to peer");
+    if (!reds->stream) {
+        red_printf("not connected to stream");
         return;
     }
 
@@ -1023,8 +981,8 @@ static void do_ping_client(const char *opt, int has_interval, int interval)
 
 static void ping_timer_cb()
 {
-    if (!reds->peer) {
-        red_printf("not connected to peer, ping off");
+    if (!reds->stream) {
+        red_printf("not connected to stream, ping off");
         core->timer_cancel(reds->ping_timer);
         return;
     }
@@ -1039,7 +997,7 @@ static void reds_send_mouse_mode()
     SpiceMsgMainMouseMode mouse_mode;
     RedsOutItem *item;
 
-    if (!reds->peer) {
+    if (!reds->stream) {
         return;
     }
 
@@ -1115,7 +1073,7 @@ static void reds_agent_remove()
     reds->agent_state.connected = 0;
     vdagent = NULL;
     reds_update_mouse_mode();
-    if (!reds->peer || !sin) {
+    if (!reds->stream || !sin) {
         return;
     }
     sif = SPICE_CONTAINEROF(sin->base.sif, SpiceCharDeviceInterface, base);
@@ -1134,7 +1092,7 @@ static void reds_send_tokens()
     SpiceMsgMainAgentTokens tokens;
     RedsOutItem *item;
 
-    if (!reds->peer) {
+    if (!reds->stream) {
         return;
     }
 
@@ -1691,7 +1649,7 @@ static void reds_main_handle_message(void *opaque, size_t size, uint32_t type, v
     switch (type) {
     case SPICE_MSGC_MAIN_AGENT_START:
         red_printf("agent start");
-        if (!reds->peer || !vdagent) {
+        if (!reds->stream || !vdagent) {
             return;
         }
         reds->agent_state.write_filter.discard_all = FALSE;
@@ -1845,10 +1803,10 @@ static int reds_send_data()
 
     ASSERT(outgoing->vec_size);
     for (;;) {
-        if ((n = reds->peer->cb_writev(reds->peer->ctx, outgoing->vec, outgoing->vec_size)) == -1) {
+        if ((n = reds_stream_writev(reds->stream, outgoing->vec, outgoing->vec_size)) == -1) {
             switch (errno) {
             case EAGAIN:
-                core->watch_update_mask(reds->peer->watch,
+                core->watch_update_mask(reds->stream->watch,
                                         SPICE_WATCH_EVENT_READ | SPICE_WATCH_EVENT_WRITE);
                 return FALSE;
             case EINTR:
@@ -1880,7 +1838,7 @@ static void reds_push()
     RedsOutItem *item;
 
     for (;;) {
-        if (!reds->peer || outgoing->item || !(ring_item = ring_get_tail(&outgoing->pipe))) {
+        if (!reds->stream || outgoing->item || !(ring_item = ring_get_tail(&outgoing->pipe))) {
             return;
         }
         ring_remove(ring_item);
@@ -1899,7 +1857,7 @@ static void reds_push()
 static void reds_main_event(int fd, int event, void *data)
 {
     if (event & SPICE_WATCH_EVENT_READ) {
-        if (handle_incoming(reds->peer, &reds->in_handler)) {
+        if (handle_incoming(reds->stream, &reds->in_handler)) {
             reds_disconnect();
         }
     }
@@ -1907,19 +1865,19 @@ static void reds_main_event(int fd, int event, void *data)
         RedsOutgoingData *outgoing = &reds->outgoing;
         if (reds_send_data()) {
             reds_push();
-            if (!outgoing->item && reds->peer) {
-                core->watch_update_mask(reds->peer->watch,
+            if (!outgoing->item && reds->stream) {
+                core->watch_update_mask(reds->stream->watch,
                                         SPICE_WATCH_EVENT_READ);
             }
         }
     }
 }
 
-static int sync_write(RedsStreamContext *peer, void *in_buf, size_t n)
+static int sync_write(RedsStream *stream, const void *in_buf, size_t n)
 {
-    uint8_t *buf = (uint8_t *)in_buf;
+    const uint8_t *buf = (uint8_t *)in_buf;
     while (n) {
-        int now = peer->cb_write(peer->ctx, buf, n);
+        int now = reds_stream_write(stream, buf, n);
         if (now <= 0) {
             if (now == -1 && (errno == EINTR || errno == EAGAIN)) {
                 continue;
@@ -1932,14 +1890,53 @@ static int sync_write(RedsStreamContext *peer, void *in_buf, size_t n)
     return TRUE;
 }
 
+static void reds_channel_set_common_caps(Channel *channel, int cap, int active)
+{
+    int nbefore, n;
+
+    nbefore = channel->num_common_caps;
+    n = cap / 32;
+    channel->num_common_caps = MAX(channel->num_common_caps, n + 1);
+    channel->common_caps = spice_renew(uint32_t, channel->common_caps, channel->num_common_caps);
+    memset(channel->common_caps + nbefore, 0,
+           (channel->num_common_caps - nbefore) * sizeof(uint32_t));
+    if (active) {
+        channel->common_caps[n] |= (1 << cap);
+    } else {
+        channel->common_caps[n] &= ~(1 << cap);
+    }
+}
+
+void reds_channel_init_auth_caps(Channel *channel)
+{
+    if (sasl_enabled) {
+        reds_channel_set_common_caps(channel, SPICE_COMMON_CAP_AUTH_SASL, TRUE);
+    } else {
+        reds_channel_set_common_caps(channel, SPICE_COMMON_CAP_AUTH_SPICE, TRUE);
+    }
+    reds_channel_set_common_caps(channel, SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION, TRUE);
+}
+
+void reds_channel_dispose(Channel *channel)
+{
+    free(channel->caps);
+    channel->caps = NULL;
+    channel->num_caps = 0;
+
+    free(channel->common_caps);
+    channel->common_caps = NULL;
+    channel->num_common_caps = 0;
+}
+
 static int reds_send_link_ack(RedLinkInfo *link)
 {
     SpiceLinkHeader header;
     SpiceLinkReply ack;
+    Channel caps = { 0, };
     Channel *channel;
     BUF_MEM *bmBuf;
     BIO *bio;
-    int ret;
+    int ret = FALSE;
 
     header.magic = SPICE_MAGIC;
     header.size = sizeof(ack);
@@ -1948,14 +1945,16 @@ static int reds_send_link_ack(RedLinkInfo *link)
 
     ack.error = SPICE_LINK_ERR_OK;
 
-    if ((channel = reds_find_channel(link->link_mess->channel_type, 0))) {
-        ack.num_common_caps = channel->num_common_caps;
-        ack.num_channel_caps = channel->num_caps;
-        header.size += (ack.num_common_caps + ack.num_channel_caps) * sizeof(uint32_t);
-    } else {
-        ack.num_common_caps = 0;
-        ack.num_channel_caps = 0;
+    channel = reds_find_channel(link->link_mess->channel_type, 0);
+    if (!channel) {
+        channel = &caps;
     }
+
+    reds_channel_init_auth_caps(channel); /* make sure common caps are set */
+
+    ack.num_common_caps = channel->num_common_caps;
+    ack.num_channel_caps = channel->num_caps;
+    header.size += (ack.num_common_caps + ack.num_channel_caps) * sizeof(uint32_t);
     ack.caps_offset = sizeof(SpiceLinkReply);
 
     if (!(link->tiTicketing.rsa = RSA_new())) {
@@ -1976,13 +1975,20 @@ static int reds_send_link_ack(RedLinkInfo *link)
     BIO_get_mem_ptr(bio, &bmBuf);
     memcpy(ack.pub_key, bmBuf->data, sizeof(ack.pub_key));
 
-    ret = sync_write(link->peer, &header, sizeof(header)) && sync_write(link->peer, &ack,
-                                                                        sizeof(ack));
-    if (channel) {
-        ret = ret && sync_write(link->peer, channel->common_caps,
-                                channel->num_common_caps * sizeof(uint32_t)) &&
-              sync_write(link->peer, channel->caps, channel->num_caps * sizeof(uint32_t));
-    }
+
+    if (!sync_write(link->stream, &header, sizeof(header)))
+        goto end;
+    if (!sync_write(link->stream, &ack, sizeof(ack)))
+        goto end;
+    if (!sync_write(link->stream, channel->common_caps, channel->num_common_caps * sizeof(uint32_t)))
+        goto end;
+    if (!sync_write(link->stream, channel->caps, channel->num_caps * sizeof(uint32_t)))
+        goto end;
+
+    ret = TRUE;
+
+end:
+    reds_channel_dispose(&caps);
     BIO_free(bio);
     return ret;
 }
@@ -1998,8 +2004,8 @@ static int reds_send_link_error(RedLinkInfo *link, uint32_t error)
     header.minor_version = SPICE_VERSION_MINOR;
     memset(&reply, 0, sizeof(reply));
     reply.error = error;
-    return sync_write(link->peer, &header, sizeof(header)) && sync_write(link->peer, &reply,
-                                                                         sizeof(reply));
+    return sync_write(link->stream, &header, sizeof(header)) && sync_write(link->stream, &reply,
+                                                                           sizeof(reply));
 }
 
 static void reds_show_new_channel(RedLinkInfo *link, int connection_id)
@@ -2007,25 +2013,25 @@ static void reds_show_new_channel(RedLinkInfo *link, int connection_id)
     red_printf("channel %d:%d, connected successfully, over %s link",
                link->link_mess->channel_type,
                link->link_mess->channel_id,
-               link->peer->ssl == NULL ? "Non Secure" : "Secure");
+               link->stream->ssl == NULL ? "Non Secure" : "Secure");
     /* add info + send event */
-    if (link->peer->ssl) {
-        link->peer->info.flags |= SPICE_CHANNEL_EVENT_FLAG_TLS;
+    if (link->stream->ssl) {
+        link->stream->info.flags |= SPICE_CHANNEL_EVENT_FLAG_TLS;
     }
-    link->peer->info.connection_id = connection_id;
-    link->peer->info.type = link->link_mess->channel_type;
-    link->peer->info.id   = link->link_mess->channel_id;
-    reds_channel_event(link->peer, SPICE_CHANNEL_EVENT_INITIALIZED);
+    link->stream->info.connection_id = connection_id;
+    link->stream->info.type = link->link_mess->channel_type;
+    link->stream->info.id   = link->link_mess->channel_id;
+    reds_channel_event(link->stream, SPICE_CHANNEL_EVENT_INITIALIZED);
 }
 
 static void reds_send_link_result(RedLinkInfo *link, uint32_t error)
 {
-    sync_write(link->peer, &error, sizeof(error));
+    sync_write(link->stream, &error, sizeof(error));
 }
 
 static void reds_start_net_test()
 {
-    if (!reds->peer || reds->net_test_id) {
+    if (!reds->stream || reds->net_test_id) {
         return;
     }
 
@@ -2052,7 +2058,7 @@ static void reds_handle_main_link(RedLinkInfo *link)
     } else {
         if (link->link_mess->connection_id != reds->link_id) {
             reds_send_link_result(link, SPICE_LINK_ERR_BAD_CONNECTION_ID);
-            reds_release_link(link);
+            reds_link_free(link);
             return;
         }
         reds_send_link_result(link, SPICE_LINK_ERR_OK);
@@ -2064,11 +2070,14 @@ static void reds_handle_main_link(RedLinkInfo *link)
     reds->mig_inprogress = FALSE;
     reds->mig_wait_connect = FALSE;
     reds->mig_wait_disconnect = FALSE;
-    reds->peer = link->peer;
+    reds->stream = link->stream;
     reds->in_handler.shut = FALSE;
 
     reds_show_new_channel(link, connection_id);
-    __reds_release_link(link);
+    reds_stream_remove_watch(link->stream);
+    link->stream = NULL;
+    link->link_mess = NULL;
+    reds_link_free(link);
     if (vdagent) {
         SpiceCharDeviceInterface *sif;
         sif = SPICE_CONTAINEROF(vdagent->base.sif, SpiceCharDeviceInterface, base);
@@ -2079,7 +2088,7 @@ static void reds_handle_main_link(RedLinkInfo *link)
         }
         reds->agent_state.plug_generation++;
     }
-    reds->peer->watch = core->watch_add(reds->peer->socket,
+    reds->stream->watch = core->watch_add(reds->stream->socket,
                                         SPICE_WATCH_EVENT_READ,
                                         reds_main_event, NULL);
 
@@ -2175,7 +2184,7 @@ static int marshaller_outgoing_write(SpiceMarshaller *m,
 
     data = spice_marshaller_linearize(m, 0, &len, &free_data);
 
-    if (outgoing_write(state->peer, &state->out_handler, data, len) != OUTGOING_OK) {
+    if (outgoing_write(state->stream, &state->out_handler, data, len) != OUTGOING_OK) {
         return FALSE;
     }
 
@@ -2368,20 +2377,18 @@ static void inputs_event(int fd, int event, void *data)
     InputsState *inputs_state = data;
 
     if (event & SPICE_WATCH_EVENT_READ) {
-        if (handle_incoming(inputs_state->peer, &inputs_state->in_handler)) {
+        if (handle_incoming(inputs_state->stream, &inputs_state->in_handler)) {
             inputs_relase_keys();
-            core->watch_remove(inputs_state->peer->watch);
-            inputs_state->peer->watch = NULL;
             if (inputs_state->channel) {
                 inputs_state->channel->data = NULL;
                 reds->inputs_state = NULL;
             }
-            inputs_state->peer->cb_free(inputs_state->peer);
+            reds_stream_free(inputs_state->stream);
             free(inputs_state);
         }
     }
     if (event & SPICE_WATCH_EVENT_WRITE) {
-        if (handle_outgoing(inputs_state->peer, &inputs_state->out_handler)) {
+        if (handle_outgoing(inputs_state->stream, &inputs_state->out_handler)) {
             reds_disconnect();
         }
     }
@@ -2393,7 +2400,7 @@ static void inputs_shutdown(Channel *channel)
     InputsState *state = (InputsState *)channel->data;
     if (state) {
         state->in_handler.shut = TRUE;
-        shutdown(state->peer->socket, SHUT_RDWR);
+        shutdown(state->stream->socket, SHUT_RDWR);
         channel->data = NULL;
         state->channel = NULL;
         reds->inputs_state = NULL;
@@ -2427,7 +2434,7 @@ static void inputs_select(void *opaque, int select)
     if (select) {
         eventmask |= SPICE_WATCH_EVENT_WRITE;
     }
-    core->watch_update_mask(inputs_state->peer->watch, eventmask);
+    core->watch_update_mask(inputs_state->stream->watch, eventmask);
 }
 
 static void inputs_may_write(void *opaque)
@@ -2435,7 +2442,7 @@ static void inputs_may_write(void *opaque)
     red_printf("");
 }
 
-static void inputs_link(Channel *channel, RedsStreamContext *peer, int migration,
+static void inputs_link(Channel *channel, RedsStream *stream, int migration,
                         int num_common_caps, uint32_t *common_caps, int num_caps,
                         uint32_t *caps)
 {
@@ -2449,16 +2456,16 @@ static void inputs_link(Channel *channel, RedsStreamContext *peer, int migration
     inputs_state = spice_new0(InputsState, 1);
 
     delay_val = 1;
-    if (setsockopt(peer->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val, sizeof(delay_val)) == -1) {
+    if (setsockopt(stream->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val, sizeof(delay_val)) == -1) {
         red_printf("setsockopt failed, %s", strerror(errno));
     }
 
-    if ((flags = fcntl(peer->socket, F_GETFL)) == -1 ||
-                                            fcntl(peer->socket, F_SETFL, flags | O_ASYNC) == -1) {
+    if ((flags = fcntl(stream->socket, F_GETFL)) == -1 ||
+                                            fcntl(stream->socket, F_SETFL, flags | O_ASYNC) == -1) {
         red_printf("fcntl failed, %s", strerror(errno));
     }
 
-    inputs_state->peer = peer;
+    inputs_state->stream = stream;
     inputs_state->channel = channel;
     inputs_state->in_handler.parser = spice_get_client_channel_parser(SPICE_CHANNEL_INPUTS, NULL);
     inputs_state->in_handler.opaque = inputs_state;
@@ -2470,7 +2477,7 @@ static void inputs_link(Channel *channel, RedsStreamContext *peer, int migration
     inputs_state->pending_mouse_event = FALSE;
     channel->data = inputs_state;
     reds->inputs_state = inputs_state;
-    peer->watch = core->watch_add(peer->socket, SPICE_WATCH_EVENT_READ,
+    stream->watch = core->watch_add(stream->socket, SPICE_WATCH_EVENT_READ,
                                   inputs_event, inputs_state);
 
     SpiceMarshaller *m;
@@ -2495,7 +2502,7 @@ static void reds_send_keyboard_modifiers(uint8_t modifiers)
     if (!channel || !(state = (InputsState *)channel->data)) {
         return;
     }
-    ASSERT(state->peer);
+    ASSERT(state->stream);
 
     m = marshaller_new_for_outgoing(state, SPICE_MSG_INPUTS_KEY_MODIFIERS);
 
@@ -2541,7 +2548,7 @@ static void inputs_init()
 static void reds_handle_other_links(RedLinkInfo *link)
 {
     Channel *channel;
-    RedsStreamContext *peer;
+    RedsStream *stream;
     SpiceLinkMess *link_mess;
     uint32_t *caps;
 
@@ -2549,20 +2556,20 @@ static void reds_handle_other_links(RedLinkInfo *link)
 
     if (!reds->link_id || reds->link_id != link_mess->connection_id) {
         reds_send_link_result(link, SPICE_LINK_ERR_BAD_CONNECTION_ID);
-        reds_release_link(link);
+        reds_link_free(link);
         return;
     }
 
     if (!(channel = reds_find_channel(link_mess->channel_type,
                                       link_mess->channel_id))) {
         reds_send_link_result(link, SPICE_LINK_ERR_CHANNEL_NOT_AVAILABLE);
-        reds_release_link(link);
+        reds_link_free(link);
         return;
     }
 
     reds_send_link_result(link, SPICE_LINK_ERR_OK);
     reds_show_new_channel(link, reds->link_id);
-    if (link_mess->channel_type == SPICE_CHANNEL_INPUTS && !link->peer->ssl) {
+    if (link_mess->channel_type == SPICE_CHANNEL_INPUTS && !link->stream->ssl) {
         RedsOutItem *item;
         SpiceMsgNotify notify;
         char *mess = "keyboard channel is insecure";
@@ -2581,14 +2588,25 @@ static void reds_handle_other_links(RedLinkInfo *link)
 
         reds_push_pipe_item(item);
     }
-    peer = link->peer;
+    stream = link->stream;
+    reds_stream_remove_watch(stream);
+    link->stream = NULL;
     link->link_mess = NULL;
-    __reds_release_link(link);
+    reds_link_free(link);
     caps = (uint32_t *)((uint8_t *)link_mess + link_mess->caps_offset);
-    channel->link(channel, peer, reds->mig_target, link_mess->num_common_caps,
+    channel->link(channel, stream, reds->mig_target, link_mess->num_common_caps,
                   link_mess->num_common_caps ? caps : NULL, link_mess->num_channel_caps,
                   link_mess->num_channel_caps ? caps + link_mess->num_common_caps : NULL);
     free(link_mess);
+}
+
+static void reds_handle_link(RedLinkInfo *link)
+{
+    if (link->link_mess->channel_type == SPICE_CHANNEL_MAIN) {
+        reds_handle_main_link(link);
+    } else {
+        reds_handle_other_links(link);
+    }
 }
 
 static void reds_handle_ticket(void *opaque)
@@ -2611,31 +2629,125 @@ static void reds_handle_ticket(void *opaque)
             reds_send_link_result(link, SPICE_LINK_ERR_PERMISSION_DENIED);
             red_printf("Ticketing is enabled, but no password is set. "
                        "please set a ticket first");
-            reds_release_link(link);
+            reds_link_free(link);
             return;
         }
 
         if (expired || strncmp(password, actual_sever_pass, SPICE_MAX_PASSWORD_LENGTH) != 0) {
             reds_send_link_result(link, SPICE_LINK_ERR_PERMISSION_DENIED);
-            reds_release_link(link);
+            reds_link_free(link);
             return;
         }
     }
-    if (link->link_mess->channel_type == SPICE_CHANNEL_MAIN) {
-        reds_handle_main_link(link);
-    } else {
-        reds_handle_other_links(link);
-    }
+
+    reds_handle_link(link);
 }
 
 static inline void async_read_clear_handlers(AsyncRead *obj)
 {
-    if (!obj->peer->watch) {
+    if (!obj->stream->watch) {
         return;
     }
-    core->watch_remove(obj->peer->watch);
-    obj->peer->watch = NULL;
+    reds_stream_remove_watch(obj->stream);
 }
+
+#if HAVE_SASL
+static int sync_write_u8(RedsStream *s, uint8_t n)
+{
+    return sync_write(s, &n, sizeof(uint8_t));
+}
+
+static int sync_write_u32(RedsStream *s, uint32_t n)
+{
+    return sync_write(s, &n, sizeof(uint32_t));
+}
+
+ssize_t reds_stream_sasl_write(RedsStream *s, const void *buf, size_t nbyte)
+{
+    ssize_t ret;
+
+    if (!s->sasl.encoded) {
+        int err;
+        err = sasl_encode(s->sasl.conn, (char *)buf, nbyte,
+                          (const char **)&s->sasl.encoded,
+                          &s->sasl.encodedLength);
+        if (err != SASL_OK) {
+            red_printf("sasl_encode error: %d", err);
+            return -1;
+        }
+
+        if (s->sasl.encodedLength == 0) {
+            return 0;
+        }
+
+        if (!s->sasl.encoded) {
+            red_printf("sasl_encode didn't return a buffer!");
+            return 0;
+        }
+
+        s->sasl.encodedOffset = 0;
+    }
+
+    ret = s->write(s, s->sasl.encoded + s->sasl.encodedOffset,
+                   s->sasl.encodedLength - s->sasl.encodedOffset);
+
+    if (ret <= 0) {
+        return ret;
+    }
+
+    s->sasl.encodedOffset += ret;
+    if (s->sasl.encodedOffset == s->sasl.encodedLength) {
+        s->sasl.encoded = NULL;
+        s->sasl.encodedOffset = s->sasl.encodedLength = 0;
+        return nbyte;
+    }
+
+    /* we didn't flush the encoded buffer */
+    errno = EAGAIN;
+    return -1;
+}
+
+static ssize_t reds_stream_sasl_read(RedsStream *s, void *buf, size_t nbyte)
+{
+    uint8_t encoded[4096];
+    const char *decoded;
+    unsigned int decodedlen;
+    int err;
+    int n;
+
+    n = spice_buffer_copy(&s->sasl.inbuffer, buf, nbyte);
+    if (n > 0) {
+        spice_buffer_remove(&s->sasl.inbuffer, n);
+        if (n == nbyte)
+            return n;
+        nbyte -= n;
+        buf += n;
+    }
+
+    n = s->read(s, encoded, sizeof(encoded));
+    if (n <= 0) {
+        return n;
+    }
+
+    err = sasl_decode(s->sasl.conn,
+                      (char *)encoded, n,
+                      &decoded, &decodedlen);
+    if (err != SASL_OK) {
+        red_printf("sasl_decode error: %d", err);
+        return -1;
+    }
+
+    if (decodedlen == 0) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    n = MIN(nbyte, decodedlen);
+    memcpy(buf, decoded, n);
+    spice_buffer_append(&s->sasl.inbuffer, decoded + n, decodedlen - n);
+    return n;
+}
+#endif
 
 static void async_read_handler(int fd, int event, void *data)
 {
@@ -2645,14 +2757,15 @@ static void async_read_handler(int fd, int event, void *data)
         int n = obj->end - obj->now;
 
         ASSERT(n > 0);
-        if ((n = obj->peer->cb_read(obj->peer->ctx, obj->now, n)) <= 0) {
+        n = reds_stream_read(obj->stream, obj->now, n);
+        if (n <= 0) {
             if (n < 0) {
                 switch (errno) {
                 case EAGAIN:
-                    if (!obj->peer->watch) {
-                        obj->peer->watch = core->watch_add(obj->peer->socket,
-                                                           SPICE_WATCH_EVENT_READ,
-                                                           async_read_handler, obj);
+                    if (!obj->stream->watch) {
+                        obj->stream->watch = core->watch_add(obj->stream->socket,
+                                                             SPICE_WATCH_EVENT_READ,
+                                                             async_read_handler, obj);
                     }
                     return;
                 case EINTR:
@@ -2678,12 +2791,558 @@ static void async_read_handler(int fd, int event, void *data)
     }
 }
 
+static void reds_get_spice_ticket(RedLinkInfo *link)
+{
+    AsyncRead *obj = &link->asyc_read;
+
+    obj->now = (uint8_t *)&link->tiTicketing.encrypted_ticket.encrypted_data;
+    obj->end = obj->now + link->tiTicketing.rsa_size;
+    obj->done = reds_handle_ticket;
+    async_read_handler(0, 0, &link->asyc_read);
+}
+
+#if HAVE_SASL
+static char *addr_to_string(const char *format,
+                            struct sockaddr *sa,
+                            socklen_t salen) {
+    char *addr;
+    char host[NI_MAXHOST];
+    char serv[NI_MAXSERV];
+    int err;
+    size_t addrlen;
+
+    if ((err = getnameinfo(sa, salen,
+                           host, sizeof(host),
+                           serv, sizeof(serv),
+                           NI_NUMERICHOST | NI_NUMERICSERV)) != 0) {
+        red_printf("Cannot resolve address %d: %s",
+                   err, gai_strerror(err));
+        return NULL;
+    }
+
+    /* Enough for the existing format + the 2 vars we're
+     * substituting in. */
+    addrlen = strlen(format) + strlen(host) + strlen(serv);
+    addr = spice_malloc(addrlen + 1);
+    snprintf(addr, addrlen, format, host, serv);
+    addr[addrlen] = '\0';
+
+    return addr;
+}
+
+static int auth_sasl_check_ssf(RedsSASL *sasl, int *runSSF)
+{
+    const void *val;
+    int err, ssf;
+
+    *runSSF = 0;
+    if (!sasl->wantSSF) {
+        return 1;
+    }
+
+    err = sasl_getprop(sasl->conn, SASL_SSF, &val);
+    if (err != SASL_OK) {
+        return 0;
+    }
+
+    ssf = *(const int *)val;
+    red_printf("negotiated an SSF of %d", ssf);
+    if (ssf < 56) {
+        return 0; /* 56 is good for Kerberos */
+    }
+
+    *runSSF = 1;
+
+    /* We have a SSF that's good enough */
+    return 1;
+}
+
+/*
+ * Step Msg
+ *
+ * Input from client:
+ *
+ * u32 clientin-length
+ * u8-array clientin-string
+ *
+ * Output to client:
+ *
+ * u32 serverout-length
+ * u8-array serverout-strin
+ * u8 continue
+ */
+#define SASL_DATA_MAX_LEN (1024 * 1024)
+
+static void reds_handle_auth_sasl_steplen(void *opaque);
+
+static void reds_handle_auth_sasl_step(void *opaque)
+{
+    const char *serverout;
+    unsigned int serveroutlen;
+    int err;
+    char *clientdata = NULL;
+    RedLinkInfo *link = (RedLinkInfo *)opaque;
+    RedsSASL *sasl = &link->stream->sasl;
+    uint32_t datalen = sasl->len;
+    AsyncRead *obj = &link->asyc_read;
+
+    /* NB, distinction of NULL vs "" is *critical* in SASL */
+    if (datalen) {
+        clientdata = sasl->data;
+        clientdata[datalen - 1] = '\0'; /* Wire includes '\0', but make sure */
+        datalen--; /* Don't count NULL byte when passing to _start() */
+    }
+
+    red_printf("Step using SASL Data %p (%d bytes)",
+               clientdata, datalen);
+    err = sasl_server_step(sasl->conn,
+                           clientdata,
+                           datalen,
+                           &serverout,
+                           &serveroutlen);
+    if (err != SASL_OK &&
+        err != SASL_CONTINUE) {
+        red_printf("sasl step failed %d (%s)",
+                   err, sasl_errdetail(sasl->conn));
+        goto authabort;
+    }
+
+    if (serveroutlen > SASL_DATA_MAX_LEN) {
+        red_printf("sasl step reply data too long %d",
+                   serveroutlen);
+        goto authabort;
+    }
+
+    red_printf("SASL return data %d bytes, %p", serveroutlen, serverout);
+
+    if (serveroutlen) {
+        serveroutlen += 1;
+        sync_write(link->stream, &serveroutlen, sizeof(uint32_t));
+        sync_write(link->stream, serverout, serveroutlen);
+    } else {
+        sync_write(link->stream, &serveroutlen, sizeof(uint32_t));
+    }
+
+    /* Whether auth is complete */
+    sync_write_u8(link->stream, err == SASL_CONTINUE ? 0 : 1);
+
+    if (err == SASL_CONTINUE) {
+        red_printf("%s", "Authentication must continue (step)");
+        /* Wait for step length */
+        obj->now = (uint8_t *)&sasl->len;
+        obj->end = obj->now + sizeof(uint32_t);
+        obj->done = reds_handle_auth_sasl_steplen;
+        async_read_handler(0, 0, &link->asyc_read);
+    } else {
+        int ssf;
+
+        if (auth_sasl_check_ssf(sasl, &ssf) == 0) {
+            red_printf("Authentication rejected for weak SSF");
+            goto authreject;
+        }
+
+        red_printf("Authentication successful");
+        sync_write_u32(link->stream, SPICE_LINK_ERR_OK); /* Accept auth */
+
+        /*
+         * Delay writing in SSF encoded until now
+         */
+        sasl->runSSF = ssf;
+        link->stream->writev = NULL; /* make sure writev isn't called directly anymore */
+
+        reds_handle_link(link);
+    }
+
+    return;
+
+authreject:
+    sync_write_u32(link->stream, 1); /* Reject auth */
+    sync_write_u32(link->stream, sizeof("Authentication failed"));
+    sync_write(link->stream, "Authentication failed", sizeof("Authentication failed"));
+
+authabort:
+    reds_link_free(link);
+    return;
+}
+
+static void reds_handle_auth_sasl_steplen(void *opaque)
+{
+    RedLinkInfo *link = (RedLinkInfo *)opaque;
+    AsyncRead *obj = &link->asyc_read;
+    RedsSASL *sasl = &link->stream->sasl;
+
+    red_printf("Got steplen %d", sasl->len);
+    if (sasl->len > SASL_DATA_MAX_LEN) {
+        red_printf("Too much SASL data %d", sasl->len);
+        reds_link_free(link);
+        return;
+    }
+
+    if (sasl->len == 0) {
+        return reds_handle_auth_sasl_step(opaque);
+    } else {
+        sasl->data = spice_realloc(sasl->data, sasl->len);
+        obj->now = (uint8_t *)sasl->data;
+        obj->end = obj->now + sasl->len;
+        obj->done = reds_handle_auth_sasl_step;
+        async_read_handler(0, 0, &link->asyc_read);
+    }
+}
+
+/*
+ * Start Msg
+ *
+ * Input from client:
+ *
+ * u32 clientin-length
+ * u8-array clientin-string
+ *
+ * Output to client:
+ *
+ * u32 serverout-length
+ * u8-array serverout-strin
+ * u8 continue
+ */
+
+
+static void reds_handle_auth_sasl_start(void *opaque)
+{
+    RedLinkInfo *link = (RedLinkInfo *)opaque;
+    AsyncRead *obj = &link->asyc_read;
+    const char *serverout;
+    unsigned int serveroutlen;
+    int err;
+    char *clientdata = NULL;
+    RedsSASL *sasl = &link->stream->sasl;
+    uint32_t datalen = sasl->len;
+
+    /* NB, distinction of NULL vs "" is *critical* in SASL */
+    if (datalen) {
+        clientdata = sasl->data;
+        clientdata[datalen - 1] = '\0'; /* Should be on wire, but make sure */
+        datalen--; /* Don't count NULL byte when passing to _start() */
+    }
+
+    red_printf("Start SASL auth with mechanism %s. Data %p (%d bytes)",
+              sasl->mechlist, clientdata, datalen);
+    err = sasl_server_start(sasl->conn,
+                            sasl->mechlist,
+                            clientdata,
+                            datalen,
+                            &serverout,
+                            &serveroutlen);
+    if (err != SASL_OK &&
+        err != SASL_CONTINUE) {
+        red_printf("sasl start failed %d (%s)",
+                   err, sasl_errdetail(sasl->conn));
+        goto authabort;
+    }
+
+    if (serveroutlen > SASL_DATA_MAX_LEN) {
+        red_printf("sasl start reply data too long %d",
+                   serveroutlen);
+        goto authabort;
+    }
+
+    red_printf("SASL return data %d bytes, %p", serveroutlen, serverout);
+
+    if (serveroutlen) {
+        serveroutlen += 1;
+        sync_write(link->stream, &serveroutlen, sizeof(uint32_t));
+        sync_write(link->stream, serverout, serveroutlen);
+    } else {
+        sync_write(link->stream, &serveroutlen, sizeof(uint32_t));
+    }
+
+    /* Whether auth is complete */
+    sync_write_u8(link->stream, err == SASL_CONTINUE ? 0 : 1);
+
+    if (err == SASL_CONTINUE) {
+        red_printf("%s", "Authentication must continue (start)");
+        /* Wait for step length */
+        obj->now = (uint8_t *)&sasl->len;
+        obj->end = obj->now + sizeof(uint32_t);
+        obj->done = reds_handle_auth_sasl_steplen;
+        async_read_handler(0, 0, &link->asyc_read);
+    } else {
+        int ssf;
+
+        if (auth_sasl_check_ssf(sasl, &ssf) == 0) {
+            red_printf("Authentication rejected for weak SSF");
+            goto authreject;
+        }
+
+        red_printf("Authentication successful");
+        sync_write_u32(link->stream, SPICE_LINK_ERR_OK); /* Accept auth */
+
+        /*
+         * Delay writing in SSF encoded until now
+         */
+        sasl->runSSF = ssf;
+        link->stream->writev = NULL; /* make sure writev isn't called directly anymore */
+
+        reds_handle_link(link);
+    }
+
+    return;
+
+authreject:
+    sync_write_u32(link->stream, 1); /* Reject auth */
+    sync_write_u32(link->stream, sizeof("Authentication failed"));
+    sync_write(link->stream, "Authentication failed", sizeof("Authentication failed"));
+
+authabort:
+    reds_link_free(link);
+    return;
+}
+
+static void reds_handle_auth_startlen(void *opaque)
+{
+    RedLinkInfo *link = (RedLinkInfo *)opaque;
+    AsyncRead *obj = &link->asyc_read;
+    RedsSASL *sasl = &link->stream->sasl;
+
+    red_printf("Got client start len %d", sasl->len);
+    if (sasl->len > SASL_DATA_MAX_LEN) {
+        red_printf("Too much SASL data %d", sasl->len);
+        reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
+        reds_link_free(link);
+        return;
+    }
+
+    if (sasl->len == 0) {
+        reds_handle_auth_sasl_start(opaque);
+        return;
+    }
+
+    sasl->data = spice_realloc(sasl->data, sasl->len);
+    obj->now = (uint8_t *)sasl->data;
+    obj->end = obj->now + sasl->len;
+    obj->done = reds_handle_auth_sasl_start;
+    async_read_handler(0, 0, &link->asyc_read);
+}
+
+static void reds_handle_auth_mechname(void *opaque)
+{
+    RedLinkInfo *link = (RedLinkInfo *)opaque;
+    AsyncRead *obj = &link->asyc_read;
+    RedsSASL *sasl = &link->stream->sasl;
+
+    sasl->mechname[sasl->len] = '\0';
+    red_printf("Got client mechname '%s' check against '%s'",
+               sasl->mechname, sasl->mechlist);
+
+    if (strncmp(sasl->mechlist, sasl->mechname, sasl->len) == 0) {
+        if (sasl->mechlist[sasl->len] != '\0' &&
+            sasl->mechlist[sasl->len] != ',') {
+            red_printf("One %d", sasl->mechlist[sasl->len]);
+            reds_link_free(link);
+            return;
+        }
+    } else {
+        char *offset = strstr(sasl->mechlist, sasl->mechname);
+        red_printf("Two %p", offset);
+        if (!offset) {
+            reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
+            return;
+        }
+        red_printf("Two '%s'", offset);
+        if (offset[-1] != ',' ||
+            (offset[sasl->len] != '\0'&&
+             offset[sasl->len] != ',')) {
+            reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
+            return;
+        }
+    }
+
+    free(sasl->mechlist);
+    sasl->mechlist = strdup(sasl->mechname);
+
+    red_printf("Validated mechname '%s'", sasl->mechname);
+
+    obj->now = (uint8_t *)&sasl->len;
+    obj->end = obj->now + sizeof(uint32_t);
+    obj->done = reds_handle_auth_startlen;
+    async_read_handler(0, 0, &link->asyc_read);
+
+    return;
+}
+
+static void reds_handle_auth_mechlen(void *opaque)
+{
+    RedLinkInfo *link = (RedLinkInfo *)opaque;
+    AsyncRead *obj = &link->asyc_read;
+    RedsSASL *sasl = &link->stream->sasl;
+
+    if (sasl->len < 1 || sasl->len > 100) {
+        red_printf("Got bad client mechname len %d", sasl->len);
+        reds_link_free(link);
+        return;
+    }
+
+    sasl->mechname = spice_malloc(sasl->len + 1);
+
+    red_printf("Wait for client mechname");
+    obj->now = (uint8_t *)sasl->mechname;
+    obj->end = obj->now + sasl->len;
+    obj->done = reds_handle_auth_mechname;
+    async_read_handler(0, 0, &link->asyc_read);
+}
+
+static void reds_start_auth_sasl(RedLinkInfo *link)
+{
+    const char *mechlist = NULL;
+    sasl_security_properties_t secprops;
+    int err;
+    char *localAddr, *remoteAddr;
+    int mechlistlen;
+    AsyncRead *obj = &link->asyc_read;
+    RedsSASL *sasl = &link->stream->sasl;
+
+    /* Get local & remote client addresses in form  IPADDR;PORT */
+    if (!(localAddr = addr_to_string("%s;%s", &link->stream->info.laddr, link->stream->info.llen))) {
+        goto error;
+    }
+
+    if (!(remoteAddr = addr_to_string("%s;%s", &link->stream->info.paddr, link->stream->info.plen))) {
+        free(localAddr);
+        goto error;
+    }
+
+    err = sasl_server_new("spice",
+                          NULL, /* FQDN - just delegates to gethostname */
+                          NULL, /* User realm */
+                          localAddr,
+                          remoteAddr,
+                          NULL, /* Callbacks, not needed */
+                          SASL_SUCCESS_DATA,
+                          &sasl->conn);
+    free(localAddr);
+    free(remoteAddr);
+    localAddr = remoteAddr = NULL;
+
+    if (err != SASL_OK) {
+        red_printf("sasl context setup failed %d (%s)",
+                   err, sasl_errstring(err, NULL, NULL));
+        sasl->conn = NULL;
+        goto error;
+    }
+
+    /* Inform SASL that we've got an external SSF layer from TLS */
+    if (link->stream->ssl) {
+        sasl_ssf_t ssf;
+
+        ssf = SSL_get_cipher_bits(link->stream->ssl, NULL);
+        err = sasl_setprop(sasl->conn, SASL_SSF_EXTERNAL, &ssf);
+        if (err != SASL_OK) {
+            red_printf("cannot set SASL external SSF %d (%s)",
+                       err, sasl_errstring(err, NULL, NULL));
+            sasl_dispose(&sasl->conn);
+            sasl->conn = NULL;
+            goto error;
+        }
+    } else {
+        sasl->wantSSF = 1;
+    }
+
+    memset(&secprops, 0, sizeof secprops);
+    /* Inform SASL that we've got an external SSF layer from TLS */
+    if (link->stream->ssl) {
+        /* If we've got TLS (or UNIX domain sock), we don't care about SSF */
+        secprops.min_ssf = 0;
+        secprops.max_ssf = 0;
+        secprops.maxbufsize = 8192;
+        secprops.security_flags = 0;
+    } else {
+        /* Plain TCP, better get an SSF layer */
+        secprops.min_ssf = 56; /* Good enough to require kerberos */
+        secprops.max_ssf = 100000; /* Arbitrary big number */
+        secprops.maxbufsize = 8192;
+        /* Forbid any anonymous or trivially crackable auth */
+        secprops.security_flags =
+            SASL_SEC_NOANONYMOUS | SASL_SEC_NOPLAINTEXT;
+    }
+
+    err = sasl_setprop(sasl->conn, SASL_SEC_PROPS, &secprops);
+    if (err != SASL_OK) {
+        red_printf("cannot set SASL security props %d (%s)",
+                   err, sasl_errstring(err, NULL, NULL));
+        sasl_dispose(&sasl->conn);
+        sasl->conn = NULL;
+        goto error;
+    }
+
+    err = sasl_listmech(sasl->conn,
+                        NULL, /* Don't need to set user */
+                        "", /* Prefix */
+                        ",", /* Separator */
+                        "", /* Suffix */
+                        &mechlist,
+                        NULL,
+                        NULL);
+    if (err != SASL_OK) {
+        red_printf("cannot list SASL mechanisms %d (%s)",
+                   err, sasl_errdetail(sasl->conn));
+        sasl_dispose(&sasl->conn);
+        sasl->conn = NULL;
+        goto error;
+    }
+    red_printf("Available mechanisms for client: '%s'", mechlist);
+
+    sasl->mechlist = strdup(mechlist);
+
+    mechlistlen = strlen(mechlist);
+    if (!sync_write(link->stream, &mechlistlen, sizeof(uint32_t))
+        || !sync_write(link->stream, sasl->mechlist, mechlistlen)) {
+        red_printf("SASL mechanisms write error");
+        goto error;
+    }
+
+    red_printf("Wait for client mechname length");
+    obj->now = (uint8_t *)&sasl->len;
+    obj->end = obj->now + sizeof(uint32_t);
+    obj->done = reds_handle_auth_mechlen;
+    async_read_handler(0, 0, &link->asyc_read);
+
+    return;
+
+error:
+    reds_link_free(link);
+    return;
+}
+#endif
+
+static void reds_handle_auth_mechanism(void *opaque)
+{
+    RedLinkInfo *link = (RedLinkInfo *)opaque;
+
+    red_printf("Auth method: %d", link->auth_mechanism.auth_mechanism);
+
+    if (link->auth_mechanism.auth_mechanism == SPICE_COMMON_CAP_AUTH_SPICE
+        && !sasl_enabled
+        ) {
+        reds_get_spice_ticket(link);
+#if HAVE_SASL
+    } else if (link->auth_mechanism.auth_mechanism == SPICE_COMMON_CAP_AUTH_SASL) {
+        red_printf("Starting SASL");
+        reds_start_auth_sasl(link);
+#endif
+    } else {
+        red_printf("Unknown auth method, disconnecting");
+        if (sasl_enabled) {
+            red_printf("Your client doesn't handle SASL?");
+        }
+        reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
+        reds_link_free(link);
+    }
+}
+
 static int reds_security_check(RedLinkInfo *link)
 {
     ChannelSecurityOptions *security_option = find_channel_security(link->link_mess->channel_type);
     uint32_t security = security_option ? security_option->options : default_channel_security;
-    return (link->peer->ssl && (security & SPICE_CHANNEL_SECURITY_SSL)) ||
-        (!link->peer->ssl && (security & SPICE_CHANNEL_SECURITY_NONE));
+    return (link->stream->ssl && (security & SPICE_CHANNEL_SECURITY_SSL)) ||
+        (!link->stream->ssl && (security & SPICE_CHANNEL_SECURITY_NONE));
 }
 
 static void reds_handle_read_link_done(void *opaque)
@@ -2692,36 +3351,51 @@ static void reds_handle_read_link_done(void *opaque)
     SpiceLinkMess *link_mess = link->link_mess;
     AsyncRead *obj = &link->asyc_read;
     uint32_t num_caps = link_mess->num_common_caps + link_mess->num_channel_caps;
+    uint32_t *caps = (uint32_t *)((uint8_t *)link_mess + link_mess->caps_offset);
+    int auth_selection;
 
     if (num_caps && (num_caps * sizeof(uint32_t) + link_mess->caps_offset >
-                                                   link->link_header.size ||
-                                                     link_mess->caps_offset < sizeof(*link_mess))) {
+                     link->link_header.size ||
+                     link_mess->caps_offset < sizeof(*link_mess))) {
         reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
-        reds_release_link(link);
+        reds_link_free(link);
         return;
     }
 
+    auth_selection = link_mess->num_common_caps > 0 &&
+        (caps[0] & (1 << SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION));;
+
     if (!reds_security_check(link)) {
-        if (link->peer->ssl) {
+        if (link->stream->ssl) {
             red_printf("spice channels %d should not be encrypted", link_mess->channel_type);
             reds_send_link_error(link, SPICE_LINK_ERR_NEED_UNSECURED);
         } else {
             red_printf("spice channels %d should be encrypted", link_mess->channel_type);
             reds_send_link_error(link, SPICE_LINK_ERR_NEED_SECURED);
         }
-        reds_release_link(link);
+        reds_link_free(link);
         return;
     }
 
     if (!reds_send_link_ack(link)) {
-        reds_release_link(link);
+        reds_link_free(link);
         return;
     }
 
-    obj->now = (uint8_t *)&link->tiTicketing.encrypted_ticket.encrypted_data;
-    obj->end = obj->now + link->tiTicketing.rsa_size;
-    obj->done = reds_handle_ticket;
-    async_read_handler(0, 0, &link->asyc_read);
+    if (!auth_selection) {
+        if (sasl_enabled) {
+            red_printf("SASL enabled, but peer supports only spice authentication");
+            reds_send_link_error(link, SPICE_LINK_ERR_VERSION_MISMATCH);
+            return;
+        }
+        red_printf("Peer doesn't support AUTH selection");
+        reds_get_spice_ticket(link);
+    } else {
+        obj->now = (uint8_t *)&link->auth_mechanism;
+        obj->end = obj->now + sizeof(SpiceLinkAuthMechanism);
+        obj->done = reds_handle_auth_mechanism;
+        async_read_handler(0, 0, &link->asyc_read);
+    }
 }
 
 static void reds_handle_link_error(void *opaque, int err)
@@ -2735,7 +3409,7 @@ static void reds_handle_link_error(void *opaque, int err)
         red_printf("%s", strerror(errno));
         break;
     }
-    reds_release_link(link);
+    reds_link_free(link);
 }
 
 static void reds_handle_read_header_done(void *opaque)
@@ -2746,7 +3420,7 @@ static void reds_handle_read_header_done(void *opaque)
 
     if (header->magic != SPICE_MAGIC) {
         reds_send_link_error(link, SPICE_LINK_ERR_INVALID_MAGIC);
-        reds_release_link(link);
+        reds_link_free(link);
         return;
     }
 
@@ -2756,7 +3430,7 @@ static void reds_handle_read_header_done(void *opaque)
         }
 
         red_printf("version mismatch");
-        reds_release_link(link);
+        reds_link_free(link);
         return;
     }
 
@@ -2765,7 +3439,7 @@ static void reds_handle_read_header_done(void *opaque)
     if (header->size < sizeof(SpiceLinkMess)) {
         reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
         red_printf("bad size %u", header->size);
-        reds_release_link(link);
+        reds_link_free(link);
         return;
     }
 
@@ -2781,7 +3455,7 @@ static void reds_handle_new_link(RedLinkInfo *link)
 {
     AsyncRead *obj = &link->asyc_read;
     obj->opaque = link;
-    obj->peer = link->peer;
+    obj->stream = link->stream;
     obj->now = (uint8_t *)&link->link_header;
     obj->end = (uint8_t *)((SpiceLinkHeader *)&link->link_header + 1);
     obj->done = reds_handle_read_header_done;
@@ -2794,29 +3468,28 @@ static void reds_handle_ssl_accept(int fd, int event, void *data)
     RedLinkInfo *link = (RedLinkInfo *)data;
     int return_code;
 
-    if ((return_code = SSL_accept(link->peer->ssl)) != 1) {
-        int ssl_error = SSL_get_error(link->peer->ssl, return_code);
+    if ((return_code = SSL_accept(link->stream->ssl)) != 1) {
+        int ssl_error = SSL_get_error(link->stream->ssl, return_code);
         if (ssl_error != SSL_ERROR_WANT_READ && ssl_error != SSL_ERROR_WANT_WRITE) {
             red_printf("SSL_accept failed, error=%d", ssl_error);
-            reds_release_link(link);
+            reds_link_free(link);
         } else {
             if (ssl_error == SSL_ERROR_WANT_READ) {
-                core->watch_update_mask(link->peer->watch, SPICE_WATCH_EVENT_READ);
+                core->watch_update_mask(link->stream->watch, SPICE_WATCH_EVENT_READ);
             } else {
-                core->watch_update_mask(link->peer->watch, SPICE_WATCH_EVENT_WRITE);
+                core->watch_update_mask(link->stream->watch, SPICE_WATCH_EVENT_WRITE);
             }
         }
         return;
     }
-    core->watch_remove(link->peer->watch);
-    link->peer->watch = NULL;
+    reds_stream_remove_watch(link->stream);
     reds_handle_new_link(link);
 }
 
 static RedLinkInfo *__reds_accept_connection(int listen_socket)
 {
     RedLinkInfo *link;
-    RedsStreamContext *peer;
+    RedsStream *stream;
     int delay_val = 1;
     int flags;
     int socket;
@@ -2841,16 +3514,16 @@ static RedLinkInfo *__reds_accept_connection(int listen_socket)
     }
 
     link = spice_new0(RedLinkInfo, 1);
-    peer = spice_new0(RedsStreamContext, 1);
-    link->peer = peer;
-    peer->socket = socket;
+    stream = spice_new0(RedsStream, 1);
+    link->stream = stream;
+    stream->socket = socket;
 
     /* gather info + send event */
-    peer->info.llen = sizeof(peer->info.laddr);
-    peer->info.plen = sizeof(peer->info.paddr);
-    getsockname(peer->socket, (struct sockaddr*)(&peer->info.laddr), &peer->info.llen);
-    getpeername(peer->socket, (struct sockaddr*)(&peer->info.paddr), &peer->info.plen);
-    reds_channel_event(peer, SPICE_CHANNEL_EVENT_CONNECTED);
+    stream->info.llen = sizeof(stream->info.laddr);
+    stream->info.plen = sizeof(stream->info.paddr);
+    getsockname(stream->socket, (struct sockaddr*)(&stream->info.laddr), &stream->info.llen);
+    getpeername(stream->socket, (struct sockaddr*)(&stream->info.paddr), &stream->info.plen);
+    reds_channel_event(stream, SPICE_CHANNEL_EVENT_CONNECTED);
 
     openssl_init(link);
 
@@ -2865,18 +3538,16 @@ error:
 static RedLinkInfo *reds_accept_connection(int listen_socket)
 {
     RedLinkInfo *link;
-    RedsStreamContext *peer;
+    RedsStream *stream;
 
     if (!(link = __reds_accept_connection(listen_socket))) {
         return NULL;
     }
-    peer = link->peer;
-    peer->ctx = (void *)((unsigned long)link->peer->socket);
-    peer->cb_read = (int (*)(void *, void *, int))reds_read;
-    peer->cb_write = (int (*)(void *, void *, int))reds_write;
-    peer->cb_readv = (int (*)(void *, const struct iovec *vector, int count))readv;
-    peer->cb_writev = (int (*)(void *, const struct iovec *vector, int count))writev;
-    peer->cb_free = (int (*)(RedsStreamContext *))reds_free;
+
+    stream = link->stream;
+    stream->read = stream_read_cb;
+    stream->write = stream_write_cb;
+    stream->writev = stream_writev_cb;
 
     return link;
 }
@@ -2894,50 +3565,47 @@ static void reds_accept_ssl_connection(int fd, int event, void *data)
     }
 
     // Handle SSL handshaking
-    if (!(sbio = BIO_new_socket(link->peer->socket, BIO_NOCLOSE))) {
+    if (!(sbio = BIO_new_socket(link->stream->socket, BIO_NOCLOSE))) {
         red_printf("could not allocate ssl bio socket");
         goto error;
     }
 
-    link->peer->ssl = SSL_new(reds->ctx);
-    if (!link->peer->ssl) {
+    link->stream->ssl = SSL_new(reds->ctx);
+    if (!link->stream->ssl) {
         red_printf("could not allocate ssl context");
         BIO_free(sbio);
         goto error;
     }
 
-    SSL_set_bio(link->peer->ssl, sbio, sbio);
+    SSL_set_bio(link->stream->ssl, sbio, sbio);
 
-    link->peer->ctx = (void *)(link->peer->ssl);
-    link->peer->cb_write = (int (*)(void *, void *, int))reds_ssl_write;
-    link->peer->cb_read = (int (*)(void *, void *, int))reds_ssl_read;
-    link->peer->cb_readv = NULL;
-    link->peer->cb_writev = reds_ssl_writev;
-    link->peer->cb_free = (int (*)(RedsStreamContext *))reds_ssl_free;
+    link->stream->write = stream_ssl_write_cb;
+    link->stream->read = stream_ssl_read_cb;
+    link->stream->writev = NULL;
 
-    return_code = SSL_accept(link->peer->ssl);
+    return_code = SSL_accept(link->stream->ssl);
     if (return_code == 1) {
         reds_handle_new_link(link);
         return;
     }
 
-    ssl_error = SSL_get_error(link->peer->ssl, return_code);
+    ssl_error = SSL_get_error(link->stream->ssl, return_code);
     if (return_code == -1 && (ssl_error == SSL_ERROR_WANT_READ ||
                               ssl_error == SSL_ERROR_WANT_WRITE)) {
         int eventmask = ssl_error == SSL_ERROR_WANT_READ ?
             SPICE_WATCH_EVENT_READ : SPICE_WATCH_EVENT_WRITE;
-        link->peer->watch = core->watch_add(link->peer->socket, eventmask,
+        link->stream->watch = core->watch_add(link->stream->socket, eventmask,
                                             reds_handle_ssl_accept, link);
         return;
     }
 
     ERR_print_errors_fp(stderr);
     red_printf("SSL_accept failed, error=%d", ssl_error);
-    SSL_free(link->peer->ssl);
+    SSL_free(link->stream->ssl);
 
 error:
-    close(link->peer->socket);
-    free(link->peer);
+    close(link->stream->socket);
+    free(link->stream);
     BN_free(link->tiTicketing.bn);
     free(link);
 }
@@ -2971,7 +3639,7 @@ static int reds_init_socket(const char *addr, int portnr, int family)
     snprintf(port, sizeof(port), "%d", portnr);
     rc = getaddrinfo(strlen(addr) ? addr : NULL, port, &ai, &res);
     if (rc != 0) {
-        red_error("getaddrinfo(%s,%s): %s\n", addr, port,
+        red_error("getaddrinfo(%s,%s): %s", addr, port,
                   gai_strerror(rc));
     }
 
@@ -2997,7 +3665,7 @@ static int reds_init_socket(const char *addr, int portnr, int family)
         }
         close(slisten);
     }
-    red_printf("%s: binding socket to %s:%d failed\n", __FUNCTION__,
+    red_printf("%s: binding socket to %s:%d failed", __FUNCTION__,
                addr, portnr);
     freeaddrinfo(res);
     return -1;
@@ -3180,8 +3848,8 @@ static void reds_init_ssl()
 
 static void reds_exit()
 {
-    if (reds->peer) {
-        close(reds->peer->socket);
+    if (reds->stream) {
+        close(reds->stream->socket);
     }
 #ifdef RED_STATISTICS
     shm_unlink(reds->stat_shm_name);
@@ -3224,7 +3892,7 @@ enum {
 
 static inline void on_activating_ticketing()
 {
-    if (!ticketing_enabled && reds->peer) {
+    if (!ticketing_enabled && reds->stream) {
         red_printf("disconnecting");
         reds_disconnect();
     }
@@ -3327,8 +3995,8 @@ static void reds_mig_started(void)
         core->watch_update_mask(reds->secure_listen_watch, 0);
     }
 
-    if (reds->peer == NULL) {
-        red_printf("not connected to peer");
+    if (reds->stream == NULL) {
+        red_printf("not connected to stream");
         goto error;
     }
 
@@ -3359,8 +4027,8 @@ static void reds_mig_finished(int completed)
         core->watch_update_mask(reds->secure_listen_watch, SPICE_WATCH_EVENT_READ);
     }
 
-    if (reds->peer == NULL) {
-        red_printf("no peer connected");
+    if (reds->stream == NULL) {
+        red_printf("no stream connected");
         return;
     }
     reds->mig_inprogress = TRUE;
@@ -3432,7 +4100,7 @@ static void key_modifiers_sender(void *opaque)
     reds_send_keyboard_modifiers(kbd_get_leds(keyboard));
 }
 
-uint32_t reds_get_mm_time()
+uint32_t reds_get_mm_time(void)
 {
     struct timespec time_space;
     clock_gettime(CLOCK_MONOTONIC, &time_space);
@@ -3444,13 +4112,13 @@ void reds_update_mm_timer(uint32_t mm_time)
     red_dispatcher_set_mm_time(mm_time);
 }
 
-void reds_enable_mm_timer()
+void reds_enable_mm_timer(void)
 {
     SpiceMsgMainMultiMediaTime time_mes;
     RedsOutItem *item;
 
     core->timer_start(reds->mm_timer, MM_TIMER_GRANULARITY_MS);
-    if (!reds->peer) {
+    if (!reds->stream) {
         return;
     }
 
@@ -3460,7 +4128,7 @@ void reds_enable_mm_timer()
     reds_push_pipe_item(item);
 }
 
-void reds_desable_mm_timer()
+void reds_desable_mm_timer(void)
 {
     core->timer_cancel(reds->mm_timer);
 }
@@ -3478,7 +4146,7 @@ static void attach_to_red_agent(SpiceCharDeviceInstance *sin)
 
     vdagent = sin;
     reds_update_mouse_mode();
-    if (!reds->peer) {
+    if (!reds->stream) {
         return;
     }
     sif = SPICE_CONTAINEROF(vdagent->base.sif, SpiceCharDeviceInterface, base);
@@ -3496,7 +4164,7 @@ static void attach_to_red_agent(SpiceCharDeviceInstance *sin)
     reds_send_agent_connected();
 }
 
-__visible__ void spice_server_char_device_wakeup(SpiceCharDeviceInstance* sin)
+SPICE_GNUC_VISIBLE void spice_server_char_device_wakeup(SpiceCharDeviceInstance* sin)
 {
     (*sin->st->wakeup)(sin);
 }
@@ -3512,7 +4180,7 @@ const char *spice_server_char_device_recognized_subtypes_list[] = {
     NULL,
 };
 
-__visible__ const char** spice_server_char_device_recognized_subtypes()
+SPICE_GNUC_VISIBLE const char** spice_server_char_device_recognized_subtypes()
 {
     return spice_server_char_device_recognized_subtypes_list;
 }
@@ -3560,8 +4228,8 @@ static void spice_server_char_device_remove_interface(SpiceBaseInstance *sin)
 #endif
 }
 
-__visible__ int spice_server_add_interface(SpiceServer *s,
-                                           SpiceBaseInstance *sin)
+SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *s,
+                                                  SpiceBaseInstance *sin)
 {
     const SpiceBaseInterface *interface = sin->sif;
 
@@ -3574,7 +4242,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
             return -1;
         }
         if (interface->major_version != SPICE_INTERFACE_KEYBOARD_MAJOR ||
-            interface->minor_version < SPICE_INTERFACE_KEYBOARD_MINOR) {
+            interface->minor_version > SPICE_INTERFACE_KEYBOARD_MINOR) {
             red_printf("unsupported keyboard interface");
             return -1;
         }
@@ -3588,7 +4256,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
             return -1;
         }
         if (interface->major_version != SPICE_INTERFACE_MOUSE_MAJOR ||
-            interface->minor_version < SPICE_INTERFACE_MOUSE_MINOR) {
+            interface->minor_version > SPICE_INTERFACE_MOUSE_MINOR) {
             red_printf("unsupported mouse interface");
             return -1;
         }
@@ -3600,7 +4268,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
 
         red_printf("SPICE_INTERFACE_QXL");
         if (interface->major_version != SPICE_INTERFACE_QXL_MAJOR ||
-            interface->minor_version < SPICE_INTERFACE_QXL_MINOR) {
+            interface->minor_version > SPICE_INTERFACE_QXL_MINOR) {
             red_printf("unsupported qxl interface");
             return -1;
         }
@@ -3617,7 +4285,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
             return -1;
         }
         if (interface->major_version != SPICE_INTERFACE_TABLET_MAJOR ||
-            interface->minor_version < SPICE_INTERFACE_TABLET_MINOR) {
+            interface->minor_version > SPICE_INTERFACE_TABLET_MINOR) {
             red_printf("unsupported tablet interface");
             return -1;
         }
@@ -3634,7 +4302,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
     } else if (strcmp(interface->type, SPICE_INTERFACE_PLAYBACK) == 0) {
         red_printf("SPICE_INTERFACE_PLAYBACK");
         if (interface->major_version != SPICE_INTERFACE_PLAYBACK_MAJOR ||
-            interface->minor_version < SPICE_INTERFACE_PLAYBACK_MINOR) {
+            interface->minor_version > SPICE_INTERFACE_PLAYBACK_MINOR) {
             red_printf("unsupported playback interface");
             return -1;
         }
@@ -3643,7 +4311,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
     } else if (strcmp(interface->type, SPICE_INTERFACE_RECORD) == 0) {
         red_printf("SPICE_INTERFACE_RECORD");
         if (interface->major_version != SPICE_INTERFACE_RECORD_MAJOR ||
-            interface->minor_version < SPICE_INTERFACE_RECORD_MINOR) {
+            interface->minor_version > SPICE_INTERFACE_RECORD_MINOR) {
             red_printf("unsupported record interface");
             return -1;
         }
@@ -3651,7 +4319,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
 
     } else if (strcmp(interface->type, SPICE_INTERFACE_CHAR_DEVICE) == 0) {
         if (interface->major_version != SPICE_INTERFACE_CHAR_DEVICE_MAJOR ||
-            interface->minor_version < SPICE_INTERFACE_CHAR_DEVICE_MINOR) {
+            interface->minor_version > SPICE_INTERFACE_CHAR_DEVICE_MINOR) {
             red_printf("unsupported char device interface");
             return -1;
         }
@@ -3666,7 +4334,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
             return -1;
         }
         if (interface->major_version != SPICE_INTERFACE_NET_WIRE_MAJOR ||
-            interface->minor_version < SPICE_INTERFACE_NET_WIRE_MINOR) {
+            interface->minor_version > SPICE_INTERFACE_NET_WIRE_MINOR) {
             red_printf("unsupported net wire interface");
             return -1;
         }
@@ -3682,7 +4350,7 @@ __visible__ int spice_server_add_interface(SpiceServer *s,
     return 0;
 }
 
-__visible__ int spice_server_remove_interface(SpiceBaseInstance *sin)
+SPICE_GNUC_VISIBLE int spice_server_remove_interface(SpiceBaseInstance *sin)
 {
     const SpiceBaseInterface *interface = sin->sif;
 
@@ -3786,7 +4454,7 @@ static int do_spice_init(SpiceCoreInterface *core_interface)
     core = core_interface;
     reds->listen_socket = -1;
     reds->secure_listen_socket = -1;
-    reds->peer = NULL;
+    reds->stream = NULL;
     reds->in_handler.parser = spice_get_client_channel_parser(SPICE_CHANNEL_MAIN, NULL);
     reds->in_handler.handle_message = reds_main_handle_message;
     ring_init(&reds->outgoing.pipe);
@@ -3846,11 +4514,18 @@ static int do_spice_init(SpiceCoreInterface *core_interface)
     if (reds->secure_listen_socket != -1) {
         reds_init_ssl();
     }
-    inputs_init();
 
-#ifdef USE_SMARTCARD
-    smartcard_channel_init();
+#if HAVE_SASL
+    int saslerr;
+    if ((saslerr = sasl_server_init(NULL, sasl_appname ?
+                                    sasl_appname : "spice")) != SASL_OK) {
+        red_error("Failed to initialize SASL auth %s",
+                  sasl_errstring(saslerr, NULL, NULL));
+        goto err;
+    }
 #endif
+
+    inputs_init();
 
     reds->mouse_mode = SPICE_MOUSE_MODE_SERVER;
     atexit(reds_exit);
@@ -3861,7 +4536,7 @@ err:
 }
 
 /* new interface */
-__visible__ SpiceServer *spice_server_new(void)
+SPICE_GNUC_VISIBLE SpiceServer *spice_server_new(void)
 {
     /* we can't handle multiple instances (yet) */
     ASSERT(reds == NULL);
@@ -3870,7 +4545,7 @@ __visible__ SpiceServer *spice_server_new(void)
     return reds;
 }
 
-__visible__ int spice_server_init(SpiceServer *s, SpiceCoreInterface *core)
+SPICE_GNUC_VISIBLE int spice_server_init(SpiceServer *s, SpiceCoreInterface *core)
 {
     int ret;
 
@@ -3882,19 +4557,19 @@ __visible__ int spice_server_init(SpiceServer *s, SpiceCoreInterface *core)
     return ret;
 }
 
-__visible__ void spice_server_destroy(SpiceServer *s)
+SPICE_GNUC_VISIBLE void spice_server_destroy(SpiceServer *s)
 {
     ASSERT(reds == s);
     reds_exit();
 }
 
-__visible__ spice_compat_version_t spice_get_current_compat_version(void)
+SPICE_GNUC_VISIBLE spice_compat_version_t spice_get_current_compat_version(void)
 {
     return SPICE_COMPAT_VERSION_CURRENT;
 }
 
-__visible__ int spice_server_set_compat_version(SpiceServer *s,
-                                                spice_compat_version_t version)
+SPICE_GNUC_VISIBLE int spice_server_set_compat_version(SpiceServer *s,
+                                                       spice_compat_version_t version)
 {
     if (version < SPICE_COMPAT_VERSION_0_6) {
         /* We don't support 0.4 compat mode atm */
@@ -3908,7 +4583,7 @@ __visible__ int spice_server_set_compat_version(SpiceServer *s,
     return 0;
 }
 
-__visible__ int spice_server_set_port(SpiceServer *s, int port)
+SPICE_GNUC_VISIBLE int spice_server_set_port(SpiceServer *s, int port)
 {
     ASSERT(reds == s);
     if (port < 0 || port > 0xffff) {
@@ -3918,7 +4593,7 @@ __visible__ int spice_server_set_port(SpiceServer *s, int port)
     return 0;
 }
 
-__visible__ void spice_server_set_addr(SpiceServer *s, const char *addr, int flags)
+SPICE_GNUC_VISIBLE void spice_server_set_addr(SpiceServer *s, const char *addr, int flags)
 {
     ASSERT(reds == s);
     strncpy(spice_addr, addr, sizeof(spice_addr));
@@ -3930,7 +4605,7 @@ __visible__ void spice_server_set_addr(SpiceServer *s, const char *addr, int fla
     }
 }
 
-__visible__ int spice_server_set_noauth(SpiceServer *s)
+SPICE_GNUC_VISIBLE int spice_server_set_noauth(SpiceServer *s)
 {
     ASSERT(reds == s);
     memset(taTicket.password, 0, sizeof(taTicket.password));
@@ -3938,14 +4613,37 @@ __visible__ int spice_server_set_noauth(SpiceServer *s)
     return 0;
 }
 
-__visible__ int spice_server_set_ticket(SpiceServer *s,
-                                        const char *passwd, int lifetime,
-                                        int fail_if_connected,
-                                        int disconnect_if_connected)
+SPICE_GNUC_VISIBLE int spice_server_set_sasl(SpiceServer *s, int enabled)
+{
+    ASSERT(reds == s);
+#if HAVE_SASL
+    sasl_enabled = enabled;
+    return 0;
+#else
+    return -1;
+#endif
+}
+
+SPICE_GNUC_VISIBLE int spice_server_set_sasl_appname(SpiceServer *s, const char *appname)
+{
+    ASSERT(reds == s);
+#if HAVE_SASL
+    free(sasl_appname);
+    sasl_appname = strdup(appname);
+    return 0;
+#else
+    return -1;
+#endif
+}
+
+SPICE_GNUC_VISIBLE int spice_server_set_ticket(SpiceServer *s,
+                                               const char *passwd, int lifetime,
+                                               int fail_if_connected,
+                                               int disconnect_if_connected)
 {
     ASSERT(reds == s);
 
-    if (reds->peer) {
+    if (reds->stream) {
         if (fail_if_connected) {
             return -1;
         }
@@ -3971,10 +4669,10 @@ __visible__ int spice_server_set_ticket(SpiceServer *s,
     return 0;
 }
 
-__visible__ int spice_server_set_tls(SpiceServer *s, int port,
-                                     const char *ca_cert_file, const char *certs_file,
-                                     const char *private_key_file, const char *key_passwd,
-                                     const char *dh_key_file, const char *ciphersuite)
+SPICE_GNUC_VISIBLE int spice_server_set_tls(SpiceServer *s, int port,
+                                            const char *ca_cert_file, const char *certs_file,
+                                            const char *private_key_file, const char *key_passwd,
+                                            const char *dh_key_file, const char *ciphersuite)
 {
     ASSERT(reds == s);
     if (port == 0 || ca_cert_file == NULL || certs_file == NULL ||
@@ -4009,21 +4707,21 @@ __visible__ int spice_server_set_tls(SpiceServer *s, int port,
     return 0;
 }
 
-__visible__ int spice_server_set_image_compression(SpiceServer *s,
-                                                   spice_image_compression_t comp)
+SPICE_GNUC_VISIBLE int spice_server_set_image_compression(SpiceServer *s,
+                                                          spice_image_compression_t comp)
 {
     ASSERT(reds == s);
     set_image_compression(comp);
     return 0;
 }
 
-__visible__ spice_image_compression_t spice_server_get_image_compression(SpiceServer *s)
+SPICE_GNUC_VISIBLE spice_image_compression_t spice_server_get_image_compression(SpiceServer *s)
 {
     ASSERT(reds == s);
     return image_compression;
 }
 
-__visible__ int spice_server_set_jpeg_compression(SpiceServer *s, spice_wan_compression_t comp)
+SPICE_GNUC_VISIBLE int spice_server_set_jpeg_compression(SpiceServer *s, spice_wan_compression_t comp)
 {
     ASSERT(reds == s);
     if (comp == SPICE_WAN_COMPRESSION_INVALID) {
@@ -4035,7 +4733,7 @@ __visible__ int spice_server_set_jpeg_compression(SpiceServer *s, spice_wan_comp
     return 0;
 }
 
-__visible__ int spice_server_set_zlib_glz_compression(SpiceServer *s, spice_wan_compression_t comp)
+SPICE_GNUC_VISIBLE int spice_server_set_zlib_glz_compression(SpiceServer *s, spice_wan_compression_t comp)
 {
     ASSERT(reds == s);
     if (comp == SPICE_WAN_COMPRESSION_INVALID) {
@@ -4047,7 +4745,7 @@ __visible__ int spice_server_set_zlib_glz_compression(SpiceServer *s, spice_wan_
     return 0;
 }
 
-__visible__ int spice_server_set_channel_security(SpiceServer *s, const char *channel, int security)
+SPICE_GNUC_VISIBLE int spice_server_set_channel_security(SpiceServer *s, const char *channel, int security)
 {
     static const char *names[] = {
         [ SPICE_CHANNEL_MAIN     ] = "main",
@@ -4080,31 +4778,31 @@ __visible__ int spice_server_set_channel_security(SpiceServer *s, const char *ch
     return -1;
 }
 
-__visible__ int spice_server_get_sock_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen)
+SPICE_GNUC_VISIBLE int spice_server_get_sock_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen)
 {
     ASSERT(reds == s);
-    if (!reds->peer) {
+    if (!reds->stream) {
         return -1;
     }
-    if (getsockname(reds->peer->socket, sa, salen) < 0) {
+    if (getsockname(reds->stream->socket, sa, salen) < 0) {
         return -1;
     }
     return 0;
 }
 
-__visible__ int spice_server_get_peer_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen)
+SPICE_GNUC_VISIBLE int spice_server_get_peer_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen)
 {
     ASSERT(reds == s);
-    if (!reds->peer) {
+    if (!reds->stream) {
         return -1;
     }
-    if (getpeername(reds->peer->socket, sa, salen) < 0) {
+    if (getpeername(reds->stream->socket, sa, salen) < 0) {
         return -1;
     }
     return 0;
 }
 
-__visible__ int spice_server_add_renderer(SpiceServer *s, const char *name)
+SPICE_GNUC_VISIBLE int spice_server_add_renderer(SpiceServer *s, const char *name)
 {
     ASSERT(reds == s);
     if (!red_dispatcher_add_renderer(name)) {
@@ -4114,13 +4812,13 @@ __visible__ int spice_server_add_renderer(SpiceServer *s, const char *name)
     return 0;
 }
 
-__visible__ int spice_server_kbd_leds(SpiceKbdInstance *sin, int leds)
+SPICE_GNUC_VISIBLE int spice_server_kbd_leds(SpiceKbdInstance *sin, int leds)
 {
     reds_on_keyboard_leds_change(NULL, leds);
     return 0;
 }
 
-__visible__ int spice_server_set_streaming_video(SpiceServer *s, int value)
+SPICE_GNUC_VISIBLE int spice_server_set_streaming_video(SpiceServer *s, int value)
 {
     ASSERT(reds == s);
     if (value != SPICE_STREAM_VIDEO_OFF &&
@@ -4132,14 +4830,14 @@ __visible__ int spice_server_set_streaming_video(SpiceServer *s, int value)
     return 0;
 }
 
-__visible__ int spice_server_set_playback_compression(SpiceServer *s, int enable)
+SPICE_GNUC_VISIBLE int spice_server_set_playback_compression(SpiceServer *s, int enable)
 {
     ASSERT(reds == s);
     snd_set_playback_compression(enable);
     return 0;
 }
 
-__visible__ int spice_server_set_agent_mouse(SpiceServer *s, int enable)
+SPICE_GNUC_VISIBLE int spice_server_set_agent_mouse(SpiceServer *s, int enable)
 {
     ASSERT(reds == s);
     agent_mouse = enable;
@@ -4147,7 +4845,7 @@ __visible__ int spice_server_set_agent_mouse(SpiceServer *s, int enable)
     return 0;
 }
 
-__visible__ int spice_server_set_agent_copypaste(SpiceServer *s, int enable)
+SPICE_GNUC_VISIBLE int spice_server_set_agent_copypaste(SpiceServer *s, int enable)
 {
     ASSERT(reds == s);
     agent_copypaste = enable;
@@ -4156,7 +4854,7 @@ __visible__ int spice_server_set_agent_copypaste(SpiceServer *s, int enable)
     return 0;
 }
 
-__visible__ int spice_server_migrate_info(SpiceServer *s, const char* dest,
+SPICE_GNUC_VISIBLE int spice_server_migrate_info(SpiceServer *s, const char* dest,
                                           int port, int secure_port,
                                           const char* cert_subject)
 {
@@ -4181,7 +4879,7 @@ __visible__ int spice_server_migrate_info(SpiceServer *s, const char* dest,
 }
 
 /* interface for seamless migration */
-__visible__ int spice_server_migrate_start(SpiceServer *s)
+SPICE_GNUC_VISIBLE int spice_server_migrate_start(SpiceServer *s)
 {
     ASSERT(reds == s);
 
@@ -4197,11 +4895,11 @@ __visible__ int spice_server_migrate_start(SpiceServer *s)
     return 0;
 }
 
-__visible__ int spice_server_migrate_client_state(SpiceServer *s)
+SPICE_GNUC_VISIBLE int spice_server_migrate_client_state(SpiceServer *s)
 {
     ASSERT(reds == s);
 
-    if (!reds->peer) {
+    if (!reds->stream) {
         return SPICE_MIGRATE_CLIENT_NONE;
     } else if (reds->mig_wait_connect) {
         return SPICE_MIGRATE_CLIENT_WAITING;
@@ -4211,7 +4909,7 @@ __visible__ int spice_server_migrate_client_state(SpiceServer *s)
     return 0;
 }
 
-__visible__ int spice_server_migrate_end(SpiceServer *s, int completed)
+SPICE_GNUC_VISIBLE int spice_server_migrate_end(SpiceServer *s, int completed)
 {
     ASSERT(reds == s);
     reds_mig_finished(completed);
@@ -4219,9 +4917,89 @@ __visible__ int spice_server_migrate_end(SpiceServer *s, int completed)
 }
 
 /* interface for switch-host migration */
-__visible__ int spice_server_migrate_switch(SpiceServer *s)
+SPICE_GNUC_VISIBLE int spice_server_migrate_switch(SpiceServer *s)
 {
     ASSERT(reds == s);
     reds_mig_switch();
     return 0;
+}
+
+ssize_t reds_stream_read(RedsStream *s, void *buf, size_t nbyte)
+{
+    ssize_t ret;
+
+#if HAVE_SASL
+    if (s->sasl.conn && s->sasl.runSSF) {
+        ret = reds_stream_sasl_read(s, buf, nbyte);
+    } else
+#endif
+        ret = s->read(s, buf, nbyte);
+
+    return ret;
+}
+
+ssize_t reds_stream_write(RedsStream *s, const void *buf, size_t nbyte)
+{
+    ssize_t ret;
+
+#if HAVE_SASL
+    if (s->sasl.conn && s->sasl.runSSF) {
+        ret = reds_stream_sasl_write(s, buf, nbyte);
+    } else
+#endif
+        ret = s->write(s, buf, nbyte);
+
+    return ret;
+}
+
+ssize_t reds_stream_writev(RedsStream *s, const struct iovec *iov, int iovcnt)
+{
+    int i;
+    int n;
+    ssize_t ret = 0;
+
+    if (s->writev != NULL) {
+        return s->writev(s, iov, iovcnt);
+    }
+
+    for (i = 0; i < iovcnt; ++i) {
+        n = reds_stream_write(s, iov[i].iov_base, iov[i].iov_len);
+        if (n <= 0)
+            return ret == 0 ? n : ret;
+        ret += n;
+    }
+
+    return ret;
+}
+
+void reds_stream_free(RedsStream *s)
+{
+    if (!s) {
+        return;
+    }
+
+    reds_channel_event(s, SPICE_CHANNEL_EVENT_DISCONNECTED);
+
+#if HAVE_SASL
+    if (s->sasl.conn) {
+        s->sasl.runSSF = s->sasl.wantSSF = 0;
+        s->sasl.len = 0;
+        s->sasl.encodedLength = s->sasl.encodedOffset = 0;
+        s->sasl.encoded = NULL;
+        free(s->sasl.mechlist);
+        free(s->sasl.mechname);
+        s->sasl.mechlist = NULL;
+        sasl_dispose(&s->sasl.conn);
+        s->sasl.conn = NULL;
+    }
+#endif
+
+    if (s->ssl) {
+        SSL_free(s->ssl);
+    }
+
+    reds_stream_remove_watch(s);
+    close(s->socket);
+
+    free(s);
 }

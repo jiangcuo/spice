@@ -24,10 +24,6 @@ void spice_marshall_msg_migrate(SpiceMarshaller *m, SpiceMsgMigrate *msg)
 void spice_marshall_SpiceMsgData(SpiceMarshaller *m, SpiceMsgData *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgData *src;
-    src = (SpiceMsgData *)msg;
-
-    /* Remaining data must be appended manually */
 }
 
 void spice_marshall_msg_set_ack(SpiceMarshaller *m, SpiceMsgSetAck *msg)
@@ -126,9 +122,6 @@ void spice_marshall_msg_main_migrate_begin(SpiceMarshaller *m, SpiceMsgMainMigra
 void spice_marshall_SpiceMsgEmpty(SpiceMarshaller *m, SpiceMsgEmpty *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgEmpty *src;
-    src = (SpiceMsgEmpty *)msg;
-
 }
 
 void spice_marshall_msg_main_init(SpiceMarshaller *m, SpiceMsgMainInit *msg)
@@ -416,6 +409,21 @@ void spice_marshall_msg_display_stream_destroy(SpiceMarshaller *m, SpiceMsgDispl
     spice_marshaller_add_uint32(m, src->id);
 }
 
+void spice_marshall_msg_display_draw_fill(SpiceMarshaller *m, SpiceMsgDisplayDrawFill *msg, SpiceMarshaller **brush_pat_out, SpiceMarshaller **mask_bitmap_out)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    *brush_pat_out = NULL;
+    *mask_bitmap_out = NULL;
+}
+
+void spice_marshall_msg_display_draw_opaque(SpiceMarshaller *m, SpiceMsgDisplayDrawOpaque *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **pat_out, SpiceMarshaller **mask_bitmap_out)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    *src_bitmap_out = NULL;
+    *pat_out = NULL;
+    *mask_bitmap_out = NULL;
+}
+
 void spice_marshall_Palette(SpiceMarshaller *m, SpicePalette *ptr)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
@@ -491,137 +499,6 @@ void spice_marshall_Image(SpiceMarshaller *m, SpiceImage *ptr, SpiceMarshaller *
         /* Don't marshall @nomarshal data */
     } else if (src->descriptor.type == SPICE_IMAGE_TYPE_SURFACE) {
         spice_marshaller_add_uint32(m, src->u.surface.surface_id);
-    }
-}
-
-void spice_marshall_msg_display_draw_fill(SpiceMarshaller *m, SpiceMsgDisplayDrawFill *msg, SpiceMarshaller **brush_pat_out, SpiceMarshaller **mask_bitmap_out)
-{
-    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgDisplayDrawFill *src;
-    uint32_t i;
-    *brush_pat_out = NULL;
-    *mask_bitmap_out = NULL;
-    src = (SpiceMsgDisplayDrawFill *)msg;
-
-    /* base */ {
-        spice_marshaller_add_uint32(m, src->base.surface_id);
-        /* box */ {
-            spice_marshaller_add_int32(m, src->base.box.top);
-            spice_marshaller_add_int32(m, src->base.box.left);
-            spice_marshaller_add_int32(m, src->base.box.bottom);
-            spice_marshaller_add_int32(m, src->base.box.right);
-        }
-        /* clip */ {
-            spice_marshaller_add_uint8(m, src->base.clip.type);
-            if (src->base.clip.type == SPICE_CLIP_TYPE_RECTS) {
-                SpiceRect *rects__element;
-                spice_marshaller_add_uint32(m, src->base.clip.rects->num_rects);
-                rects__element = src->base.clip.rects->rects;
-                for (i = 0; i < src->base.clip.rects->num_rects; i++) {
-                    SpiceRect *src2;
-                    src2 = (SpiceRect *)rects__element;
-
-                    spice_marshaller_add_int32(m, src2->top);
-                    spice_marshaller_add_int32(m, src2->left);
-                    spice_marshaller_add_int32(m, src2->bottom);
-                    spice_marshaller_add_int32(m, src2->right);
-                    rects__element++;
-                }
-            }
-        }
-    }
-    /* data */ {
-        /* brush */ {
-            spice_marshaller_add_uint8(m, src->data.brush.type);
-            if (src->data.brush.type == SPICE_BRUSH_TYPE_SOLID) {
-                spice_marshaller_add_uint32(m, src->data.brush.u.color);
-            } else if (src->data.brush.type == SPICE_BRUSH_TYPE_PATTERN) {
-                *brush_pat_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-                /* pos */ {
-                    spice_marshaller_add_int32(m, src->data.brush.u.pattern.pos.x);
-                    spice_marshaller_add_int32(m, src->data.brush.u.pattern.pos.y);
-                }
-            }
-        }
-        spice_marshaller_add_uint16(m, src->data.rop_descriptor);
-        /* mask */ {
-            spice_marshaller_add_uint8(m, src->data.mask.flags);
-            /* pos */ {
-                spice_marshaller_add_int32(m, src->data.mask.pos.x);
-                spice_marshaller_add_int32(m, src->data.mask.pos.y);
-            }
-            *mask_bitmap_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-        }
-    }
-}
-
-void spice_marshall_msg_display_draw_opaque(SpiceMarshaller *m, SpiceMsgDisplayDrawOpaque *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **pat_out, SpiceMarshaller **mask_bitmap_out)
-{
-    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgDisplayDrawOpaque *src;
-    uint32_t i;
-    *src_bitmap_out = NULL;
-    *pat_out = NULL;
-    *mask_bitmap_out = NULL;
-    src = (SpiceMsgDisplayDrawOpaque *)msg;
-
-    /* base */ {
-        spice_marshaller_add_uint32(m, src->base.surface_id);
-        /* box */ {
-            spice_marshaller_add_int32(m, src->base.box.top);
-            spice_marshaller_add_int32(m, src->base.box.left);
-            spice_marshaller_add_int32(m, src->base.box.bottom);
-            spice_marshaller_add_int32(m, src->base.box.right);
-        }
-        /* clip */ {
-            spice_marshaller_add_uint8(m, src->base.clip.type);
-            if (src->base.clip.type == SPICE_CLIP_TYPE_RECTS) {
-                SpiceRect *rects__element;
-                spice_marshaller_add_uint32(m, src->base.clip.rects->num_rects);
-                rects__element = src->base.clip.rects->rects;
-                for (i = 0; i < src->base.clip.rects->num_rects; i++) {
-                    SpiceRect *src2;
-                    src2 = (SpiceRect *)rects__element;
-
-                    spice_marshaller_add_int32(m, src2->top);
-                    spice_marshaller_add_int32(m, src2->left);
-                    spice_marshaller_add_int32(m, src2->bottom);
-                    spice_marshaller_add_int32(m, src2->right);
-                    rects__element++;
-                }
-            }
-        }
-    }
-    /* data */ {
-        *src_bitmap_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-        /* src_area */ {
-            spice_marshaller_add_int32(m, src->data.src_area.top);
-            spice_marshaller_add_int32(m, src->data.src_area.left);
-            spice_marshaller_add_int32(m, src->data.src_area.bottom);
-            spice_marshaller_add_int32(m, src->data.src_area.right);
-        }
-        /* brush */ {
-            spice_marshaller_add_uint8(m, src->data.brush.type);
-            if (src->data.brush.type == SPICE_BRUSH_TYPE_SOLID) {
-                spice_marshaller_add_uint32(m, src->data.brush.u.color);
-            } else if (src->data.brush.type == SPICE_BRUSH_TYPE_PATTERN) {
-                *pat_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-                /* pos */ {
-                    spice_marshaller_add_int32(m, src->data.brush.u.pattern.pos.x);
-                    spice_marshaller_add_int32(m, src->data.brush.u.pattern.pos.y);
-                }
-            }
-        }
-        spice_marshaller_add_uint16(m, src->data.rop_descriptor);
-        spice_marshaller_add_uint8(m, src->data.scale_mode);
-        /* mask */ {
-            spice_marshaller_add_uint8(m, src->data.mask.flags);
-            /* pos */ {
-                spice_marshaller_add_int32(m, src->data.mask.pos.x);
-                spice_marshaller_add_int32(m, src->data.mask.pos.y);
-            }
-            *mask_bitmap_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-        }
     }
 }
 
@@ -883,339 +760,23 @@ void spice_marshall_msg_display_draw_invers(SpiceMarshaller *m, SpiceMsgDisplayD
 void spice_marshall_msg_display_draw_rop3(SpiceMarshaller *m, SpiceMsgDisplayDrawRop3 *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **pat_out, SpiceMarshaller **mask_bitmap_out)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgDisplayDrawRop3 *src;
-    uint32_t i;
     *src_bitmap_out = NULL;
     *pat_out = NULL;
     *mask_bitmap_out = NULL;
-    src = (SpiceMsgDisplayDrawRop3 *)msg;
-
-    /* base */ {
-        spice_marshaller_add_uint32(m, src->base.surface_id);
-        /* box */ {
-            spice_marshaller_add_int32(m, src->base.box.top);
-            spice_marshaller_add_int32(m, src->base.box.left);
-            spice_marshaller_add_int32(m, src->base.box.bottom);
-            spice_marshaller_add_int32(m, src->base.box.right);
-        }
-        /* clip */ {
-            spice_marshaller_add_uint8(m, src->base.clip.type);
-            if (src->base.clip.type == SPICE_CLIP_TYPE_RECTS) {
-                SpiceRect *rects__element;
-                spice_marshaller_add_uint32(m, src->base.clip.rects->num_rects);
-                rects__element = src->base.clip.rects->rects;
-                for (i = 0; i < src->base.clip.rects->num_rects; i++) {
-                    SpiceRect *src2;
-                    src2 = (SpiceRect *)rects__element;
-
-                    spice_marshaller_add_int32(m, src2->top);
-                    spice_marshaller_add_int32(m, src2->left);
-                    spice_marshaller_add_int32(m, src2->bottom);
-                    spice_marshaller_add_int32(m, src2->right);
-                    rects__element++;
-                }
-            }
-        }
-    }
-    /* data */ {
-        *src_bitmap_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-        /* src_area */ {
-            spice_marshaller_add_int32(m, src->data.src_area.top);
-            spice_marshaller_add_int32(m, src->data.src_area.left);
-            spice_marshaller_add_int32(m, src->data.src_area.bottom);
-            spice_marshaller_add_int32(m, src->data.src_area.right);
-        }
-        /* brush */ {
-            spice_marshaller_add_uint8(m, src->data.brush.type);
-            if (src->data.brush.type == SPICE_BRUSH_TYPE_SOLID) {
-                spice_marshaller_add_uint32(m, src->data.brush.u.color);
-            } else if (src->data.brush.type == SPICE_BRUSH_TYPE_PATTERN) {
-                *pat_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-                /* pos */ {
-                    spice_marshaller_add_int32(m, src->data.brush.u.pattern.pos.x);
-                    spice_marshaller_add_int32(m, src->data.brush.u.pattern.pos.y);
-                }
-            }
-        }
-        spice_marshaller_add_uint8(m, src->data.rop3);
-        spice_marshaller_add_uint8(m, src->data.scale_mode);
-        /* mask */ {
-            spice_marshaller_add_uint8(m, src->data.mask.flags);
-            /* pos */ {
-                spice_marshaller_add_int32(m, src->data.mask.pos.x);
-                spice_marshaller_add_int32(m, src->data.mask.pos.y);
-            }
-            *mask_bitmap_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-        }
-    }
-}
-
-void spice_marshall_Path(SpiceMarshaller *m, SpicePath *ptr)
-{
-    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpicePath *src;
-    SpicePathSeg * *segments__element;
-    uint32_t i;
-    uint32_t j;
-
-    src = (SpicePath *)ptr;
-
-    spice_marshaller_add_uint32(m, src->num_segments);
-    segments__element = src->segments;
-    for (i = 0; i < src->num_segments; i++) {
-        SpicePathSeg *src2;
-        SpicePointFix *points__element;
-        src2 = (SpicePathSeg *)*segments__element;
-
-        spice_marshaller_add_uint8(m, src2->flags);
-        spice_marshaller_add_uint32(m, src2->count);
-        points__element = src2->points;
-        for (j = 0; j < src2->count; j++) {
-            SpicePointFix *src3;
-            src3 = (SpicePointFix *)points__element;
-
-            spice_marshaller_add_int32(m, src3->x);
-            spice_marshaller_add_int32(m, src3->y);
-            points__element++;
-        }
-        segments__element++;
-    }
-}
-
-SPICE_GNUC_UNUSED static void spice_marshall_array_int32(SpiceMarshaller *m, int32_t *ptr, int count)
-{
-    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    uint32_t i;
-
-    for (i = 0; i < count; i++) {
-        spice_marshaller_add_int32(m, *ptr++);
-    }
 }
 
 void spice_marshall_msg_display_draw_stroke(SpiceMarshaller *m, SpiceMsgDisplayDrawStroke *msg, SpiceMarshaller **style_out, SpiceMarshaller **pat_out)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgDisplayDrawStroke *src;
-    uint32_t i;
     *style_out = NULL;
     *pat_out = NULL;
-    src = (SpiceMsgDisplayDrawStroke *)msg;
-
-    /* base */ {
-        spice_marshaller_add_uint32(m, src->base.surface_id);
-        /* box */ {
-            spice_marshaller_add_int32(m, src->base.box.top);
-            spice_marshaller_add_int32(m, src->base.box.left);
-            spice_marshaller_add_int32(m, src->base.box.bottom);
-            spice_marshaller_add_int32(m, src->base.box.right);
-        }
-        /* clip */ {
-            spice_marshaller_add_uint8(m, src->base.clip.type);
-            if (src->base.clip.type == SPICE_CLIP_TYPE_RECTS) {
-                SpiceRect *rects__element;
-                spice_marshaller_add_uint32(m, src->base.clip.rects->num_rects);
-                rects__element = src->base.clip.rects->rects;
-                for (i = 0; i < src->base.clip.rects->num_rects; i++) {
-                    SpiceRect *src2;
-                    src2 = (SpiceRect *)rects__element;
-
-                    spice_marshaller_add_int32(m, src2->top);
-                    spice_marshaller_add_int32(m, src2->left);
-                    spice_marshaller_add_int32(m, src2->bottom);
-                    spice_marshaller_add_int32(m, src2->right);
-                    rects__element++;
-                }
-            }
-        }
-    }
-    /* data */ {
-        m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
-        spice_marshall_Path(m2, src->data.path);
-        /* attr */ {
-            spice_marshaller_add_uint8(m, src->data.attr.flags);
-            if ((src->data.attr.flags & SPICE_LINE_FLAGS_STYLED)) {
-                spice_marshaller_add_uint8(m, src->data.attr.style_nseg);
-            }
-            if ((src->data.attr.flags & SPICE_LINE_FLAGS_STYLED)) {
-                *style_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-            }
-        }
-        /* brush */ {
-            spice_marshaller_add_uint8(m, src->data.brush.type);
-            if (src->data.brush.type == SPICE_BRUSH_TYPE_SOLID) {
-                spice_marshaller_add_uint32(m, src->data.brush.u.color);
-            } else if (src->data.brush.type == SPICE_BRUSH_TYPE_PATTERN) {
-                *pat_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-                /* pos */ {
-                    spice_marshaller_add_int32(m, src->data.brush.u.pattern.pos.x);
-                    spice_marshaller_add_int32(m, src->data.brush.u.pattern.pos.y);
-                }
-            }
-        }
-        spice_marshaller_add_uint16(m, src->data.fore_mode);
-        spice_marshaller_add_uint16(m, src->data.back_mode);
-    }
-}
-
-void spice_marshall_String(SpiceMarshaller *m, SpiceString *ptr)
-{
-    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceString *src;
-    SpiceRasterGlyph * *glyphs__element;
-    uint32_t i;
-    uint32_t j;
-
-    src = (SpiceString *)ptr;
-
-    spice_marshaller_add_uint16(m, src->length);
-    spice_marshaller_add_uint8(m, src->flags);
-    if ((src->flags & SPICE_STRING_FLAGS_RASTER_A1)) {
-        glyphs__element = src->glyphs;
-        for (i = 0; i < src->length; i++) {
-            SpiceRasterGlyph *src2;
-            uint8_t *data__element;
-            src2 = (SpiceRasterGlyph *)*glyphs__element;
-
-            /* render_pos */ {
-                spice_marshaller_add_int32(m, src2->render_pos.x);
-                spice_marshaller_add_int32(m, src2->render_pos.y);
-            }
-            /* glyph_origin */ {
-                spice_marshaller_add_int32(m, src2->glyph_origin.x);
-                spice_marshaller_add_int32(m, src2->glyph_origin.y);
-            }
-            spice_marshaller_add_uint16(m, src2->width);
-            spice_marshaller_add_uint16(m, src2->height);
-            data__element = src2->data;
-            for (j = 0; j < (((src2->width + 7) / 8 ) * src2->height); j++) {
-                spice_marshaller_add_uint8(m, *data__element);
-                data__element++;
-            }
-            glyphs__element++;
-        }
-    } else if ((src->flags & SPICE_STRING_FLAGS_RASTER_A4)) {
-        glyphs__element = src->glyphs;
-        for (i = 0; i < src->length; i++) {
-            SpiceRasterGlyph *src2;
-            uint8_t *data__element;
-            src2 = (SpiceRasterGlyph *)*glyphs__element;
-
-            /* render_pos */ {
-                spice_marshaller_add_int32(m, src2->render_pos.x);
-                spice_marshaller_add_int32(m, src2->render_pos.y);
-            }
-            /* glyph_origin */ {
-                spice_marshaller_add_int32(m, src2->glyph_origin.x);
-                spice_marshaller_add_int32(m, src2->glyph_origin.y);
-            }
-            spice_marshaller_add_uint16(m, src2->width);
-            spice_marshaller_add_uint16(m, src2->height);
-            data__element = src2->data;
-            for (j = 0; j < (((4 * src2->width + 7) / 8 ) * src2->height); j++) {
-                spice_marshaller_add_uint8(m, *data__element);
-                data__element++;
-            }
-            glyphs__element++;
-        }
-    } else if ((src->flags & SPICE_STRING_FLAGS_RASTER_A8)) {
-        glyphs__element = src->glyphs;
-        for (i = 0; i < src->length; i++) {
-            SpiceRasterGlyph *src2;
-            uint8_t *data__element;
-            src2 = (SpiceRasterGlyph *)*glyphs__element;
-
-            /* render_pos */ {
-                spice_marshaller_add_int32(m, src2->render_pos.x);
-                spice_marshaller_add_int32(m, src2->render_pos.y);
-            }
-            /* glyph_origin */ {
-                spice_marshaller_add_int32(m, src2->glyph_origin.x);
-                spice_marshaller_add_int32(m, src2->glyph_origin.y);
-            }
-            spice_marshaller_add_uint16(m, src2->width);
-            spice_marshaller_add_uint16(m, src2->height);
-            data__element = src2->data;
-            for (j = 0; j < (src2->width * src2->height); j++) {
-                spice_marshaller_add_uint8(m, *data__element);
-                data__element++;
-            }
-            glyphs__element++;
-        }
-    }
 }
 
 void spice_marshall_msg_display_draw_text(SpiceMarshaller *m, SpiceMsgDisplayDrawText *msg, SpiceMarshaller **fore_brush_pat_out, SpiceMarshaller **back_brush_pat_out)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgDisplayDrawText *src;
-    uint32_t i;
     *fore_brush_pat_out = NULL;
     *back_brush_pat_out = NULL;
-    src = (SpiceMsgDisplayDrawText *)msg;
-
-    /* base */ {
-        spice_marshaller_add_uint32(m, src->base.surface_id);
-        /* box */ {
-            spice_marshaller_add_int32(m, src->base.box.top);
-            spice_marshaller_add_int32(m, src->base.box.left);
-            spice_marshaller_add_int32(m, src->base.box.bottom);
-            spice_marshaller_add_int32(m, src->base.box.right);
-        }
-        /* clip */ {
-            spice_marshaller_add_uint8(m, src->base.clip.type);
-            if (src->base.clip.type == SPICE_CLIP_TYPE_RECTS) {
-                SpiceRect *rects__element;
-                spice_marshaller_add_uint32(m, src->base.clip.rects->num_rects);
-                rects__element = src->base.clip.rects->rects;
-                for (i = 0; i < src->base.clip.rects->num_rects; i++) {
-                    SpiceRect *src2;
-                    src2 = (SpiceRect *)rects__element;
-
-                    spice_marshaller_add_int32(m, src2->top);
-                    spice_marshaller_add_int32(m, src2->left);
-                    spice_marshaller_add_int32(m, src2->bottom);
-                    spice_marshaller_add_int32(m, src2->right);
-                    rects__element++;
-                }
-            }
-        }
-    }
-    /* data */ {
-        m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
-        spice_marshall_String(m2, src->data.str);
-        /* back_area */ {
-            spice_marshaller_add_int32(m, src->data.back_area.top);
-            spice_marshaller_add_int32(m, src->data.back_area.left);
-            spice_marshaller_add_int32(m, src->data.back_area.bottom);
-            spice_marshaller_add_int32(m, src->data.back_area.right);
-        }
-        /* fore_brush */ {
-            spice_marshaller_add_uint8(m, src->data.fore_brush.type);
-            if (src->data.fore_brush.type == SPICE_BRUSH_TYPE_SOLID) {
-                spice_marshaller_add_uint32(m, src->data.fore_brush.u.color);
-            } else if (src->data.fore_brush.type == SPICE_BRUSH_TYPE_PATTERN) {
-                *fore_brush_pat_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-                /* pos */ {
-                    spice_marshaller_add_int32(m, src->data.fore_brush.u.pattern.pos.x);
-                    spice_marshaller_add_int32(m, src->data.fore_brush.u.pattern.pos.y);
-                }
-            }
-        }
-        /* back_brush */ {
-            spice_marshaller_add_uint8(m, src->data.back_brush.type);
-            if (src->data.back_brush.type == SPICE_BRUSH_TYPE_SOLID) {
-                spice_marshaller_add_uint32(m, src->data.back_brush.u.color);
-            } else if (src->data.back_brush.type == SPICE_BRUSH_TYPE_PATTERN) {
-                *back_brush_pat_out = spice_marshaller_get_ptr_submarshaller(m, 0);
-                /* pos */ {
-                    spice_marshaller_add_int32(m, src->data.back_brush.u.pattern.pos.x);
-                    spice_marshaller_add_int32(m, src->data.back_brush.u.pattern.pos.y);
-                }
-            }
-        }
-        spice_marshaller_add_uint16(m, src->data.fore_mode);
-        spice_marshaller_add_uint16(m, src->data.back_mode);
-    }
 }
 
 void spice_marshall_msg_display_draw_transparent(SpiceMarshaller *m, SpiceMsgDisplayDrawTransparent *msg, SpiceMarshaller **src_bitmap_out)
@@ -1560,6 +1121,93 @@ void spice_marshall_msg_tunnel_socket_closed_ack(SpiceMarshaller *m, SpiceMsgTun
     spice_marshaller_add_uint16(m, src->connection_id);
 }
 
+void spice_marshall_String(SpiceMarshaller *m, SpiceString *ptr)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceString *src;
+    SpiceRasterGlyph * *glyphs__element;
+    uint32_t i;
+    uint32_t j;
+
+    src = (SpiceString *)ptr;
+
+    spice_marshaller_add_uint16(m, src->length);
+    spice_marshaller_add_uint8(m, src->flags);
+    if ((src->flags & SPICE_STRING_FLAGS_RASTER_A1)) {
+        glyphs__element = src->glyphs;
+        for (i = 0; i < src->length; i++) {
+            SpiceRasterGlyph *src2;
+            uint8_t *data__element;
+            src2 = (SpiceRasterGlyph *)*glyphs__element;
+
+            /* render_pos */ {
+                spice_marshaller_add_int32(m, src2->render_pos.x);
+                spice_marshaller_add_int32(m, src2->render_pos.y);
+            }
+            /* glyph_origin */ {
+                spice_marshaller_add_int32(m, src2->glyph_origin.x);
+                spice_marshaller_add_int32(m, src2->glyph_origin.y);
+            }
+            spice_marshaller_add_uint16(m, src2->width);
+            spice_marshaller_add_uint16(m, src2->height);
+            data__element = src2->data;
+            for (j = 0; j < (((src2->width + 7) / 8 ) * src2->height); j++) {
+                spice_marshaller_add_uint8(m, *data__element);
+                data__element++;
+            }
+            glyphs__element++;
+        }
+    } else if ((src->flags & SPICE_STRING_FLAGS_RASTER_A4)) {
+        glyphs__element = src->glyphs;
+        for (i = 0; i < src->length; i++) {
+            SpiceRasterGlyph *src2;
+            uint8_t *data__element;
+            src2 = (SpiceRasterGlyph *)*glyphs__element;
+
+            /* render_pos */ {
+                spice_marshaller_add_int32(m, src2->render_pos.x);
+                spice_marshaller_add_int32(m, src2->render_pos.y);
+            }
+            /* glyph_origin */ {
+                spice_marshaller_add_int32(m, src2->glyph_origin.x);
+                spice_marshaller_add_int32(m, src2->glyph_origin.y);
+            }
+            spice_marshaller_add_uint16(m, src2->width);
+            spice_marshaller_add_uint16(m, src2->height);
+            data__element = src2->data;
+            for (j = 0; j < (((4 * src2->width + 7) / 8 ) * src2->height); j++) {
+                spice_marshaller_add_uint8(m, *data__element);
+                data__element++;
+            }
+            glyphs__element++;
+        }
+    } else if ((src->flags & SPICE_STRING_FLAGS_RASTER_A8)) {
+        glyphs__element = src->glyphs;
+        for (i = 0; i < src->length; i++) {
+            SpiceRasterGlyph *src2;
+            uint8_t *data__element;
+            src2 = (SpiceRasterGlyph *)*glyphs__element;
+
+            /* render_pos */ {
+                spice_marshaller_add_int32(m, src2->render_pos.x);
+                spice_marshaller_add_int32(m, src2->render_pos.y);
+            }
+            /* glyph_origin */ {
+                spice_marshaller_add_int32(m, src2->glyph_origin.x);
+                spice_marshaller_add_int32(m, src2->glyph_origin.y);
+            }
+            spice_marshaller_add_uint16(m, src2->width);
+            spice_marshaller_add_uint16(m, src2->height);
+            data__element = src2->data;
+            for (j = 0; j < (src2->width * src2->height); j++) {
+                spice_marshaller_add_uint8(m, *data__element);
+                data__element++;
+            }
+            glyphs__element++;
+        }
+    }
+}
+
 void spice_marshall_Rect(SpiceMarshaller *m, SpiceRect *ptr)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
@@ -1840,6 +1488,48 @@ void spice_marshall_Rop3(SpiceMarshaller *m, SpiceRop3 *ptr, SpiceMarshaller **s
             spice_marshaller_add_int32(m, src->mask.pos.y);
         }
         *mask_bitmap_out = spice_marshaller_get_ptr_submarshaller(m, 0);
+    }
+}
+
+void spice_marshall_Path(SpiceMarshaller *m, SpicePath *ptr)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpicePath *src;
+    SpicePathSeg * *segments__element;
+    uint32_t i;
+    uint32_t j;
+
+    src = (SpicePath *)ptr;
+
+    spice_marshaller_add_uint32(m, src->num_segments);
+    segments__element = src->segments;
+    for (i = 0; i < src->num_segments; i++) {
+        SpicePathSeg *src2;
+        SpicePointFix *points__element;
+        src2 = (SpicePathSeg *)*segments__element;
+
+        spice_marshaller_add_uint8(m, src2->flags);
+        spice_marshaller_add_uint32(m, src2->count);
+        points__element = src2->points;
+        for (j = 0; j < src2->count; j++) {
+            SpicePointFix *src3;
+            src3 = (SpicePointFix *)points__element;
+
+            spice_marshaller_add_int32(m, src3->x);
+            spice_marshaller_add_int32(m, src3->y);
+            points__element++;
+        }
+        segments__element++;
+    }
+}
+
+SPICE_GNUC_UNUSED static void spice_marshall_array_int32(SpiceMarshaller *m, int32_t *ptr, int count)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    uint32_t i;
+
+    for (i = 0; i < count; i++) {
+        spice_marshaller_add_int32(m, *ptr++);
     }
 }
 
