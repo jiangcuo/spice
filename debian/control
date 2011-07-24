@@ -3,7 +3,6 @@ Section: misc
 Priority: optional 
 Maintainer: Liang Guo <bluestonechina@gmail.com>
 Build-Depends: debhelper (>= 7.0.50~),
- autotools-dev,
  libcegui-mk2-dev (>= 0.6.0~),
  libspice-protocol-dev (>= 0.8.1~),
  libpixman-1-dev (>= 0.17.7~),
