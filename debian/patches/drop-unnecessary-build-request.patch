@@ -1,0 +1,55 @@
+From: Hans de Goede <hdegoede@redhat.com>
+Subject: Drop unnecessary X11 and alsa requires from spice-server.pc
+Origin: upstream, http://cgit.freedesktop.org/spice/spice/commit/?h=0.8&id=54c660470a5aea19f799c5574cc0d4a707696712
+--- a/configure.ac
++++ b/configure.ac
+@@ -219,7 +219,6 @@
+ 	PKG_CHECK_MODULES(ALSA, alsa)
+ 	AC_SUBST(ALSA_CFLAGS)
+ 	AC_SUBST(ALSA_LIBS)
+-	SPICE_REQUIRES+=" alsa"
+ fi
+ 
+ PKG_CHECK_MODULES(SSL, openssl)
+@@ -253,7 +252,6 @@
+ 	PKG_CHECK_MODULES(XFIXES, xfixes)
+ 	AC_SUBST(XRANDR_CFLAGS)
+ 	AC_SUBST(XRANDR_LIBS)
+-	SPICE_REQUIRES+=" xrandr xfixes"
+ 
+ 	PKG_CHECK_MODULES(XRANDR12,
+ 	        xrandr >= 1.2,
+@@ -272,7 +270,6 @@
+ 	PKG_CHECK_MODULES(MISC_X, x11 xext xrender)
+ 	AC_SUBST(MISC_X_CFLAGS)
+ 	AC_SUBST(MISC_X_LIBS)
+-	SPICE_REQUIRES+=" x11 xext xrender"
+ fi
+ 
+ # Add parameter for (partial) static linkage of spice client.
+--- a/configure
++++ b/configure
+@@ -16907,7 +16907,6 @@
+ fi
+ 
+ 
+-	SPICE_REQUIRES+=" alsa"
+ fi
+ 
+ 
+@@ -17293,7 +17292,6 @@
+ fi
+ 
+ 
+-	SPICE_REQUIRES+=" xrandr xfixes"
+ 
+ 
+ pkg_failed=no
+@@ -17476,7 +17474,6 @@
+ fi
+ 
+ 
+-	SPICE_REQUIRES+=" x11 xext xrender"
+ fi
+ 
+ # Add parameter for (partial) static linkage of spice client.
