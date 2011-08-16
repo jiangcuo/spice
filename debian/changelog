@@ -1,7 +1,10 @@
 spice (0.8.2-2) unstable; urgency=low
 
-  * Add libpixman-1-dev and libssl-dev to libspice-server1 
-    Depends (Closes: #637189)
+  [ Michael Tokarev ]
+  * move libraries used internally by libspice-server from Requires
+    to Requires.private in pkg-config file (Closes: #637189)
+
+  [ Liang Guo ]
   * Remove alsa, xrandr, xfixes, x11, xext and xrender 
     from spice-server.pc Requires
   * Fix typo in debian/spicec.1
