@@ -4,6 +4,7 @@ spice (0.8.2-2) unstable; urgency=low
     Depends (Closes: #637189)
   * Remove alsa, xrandr, xfixes, x11, xext and xrender 
     from spice-server.pc Requires
+  * Fix typo in debian/spicec.1
 
  -- Liang Guo <bluestonechina@gmail.com>  Tue, 16 Aug 2011 10:36:31 +0800
 
