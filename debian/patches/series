@@ -1,4 +1,3 @@
 fix-typo-in-record-cpp.patch
 fix-typo-in-cmd_line_parser-cpp.patch
-drop-unnecessary-build-request.patch
 use-requires-private-for-libspice-pkgconfig.patch
