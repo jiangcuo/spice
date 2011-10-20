@@ -520,7 +520,7 @@ static uint8_t * parse_MainChannel_msgc(uint8_t *message_start, uint8_t *message
         parse_SpiceMsgData,
         parse_msgc_disconnecting
     };
-    static parse_msg_func_t funcs2[8] =  {
+    static parse_msg_func_t funcs2[9] =  {
         parse_msgc_main_client_info,
         parse_SpiceMsgEmpty,
         parse_SpiceMsgEmpty,
@@ -528,11 +528,12 @@ static uint8_t * parse_MainChannel_msgc(uint8_t *message_start, uint8_t *message
         parse_msgc_main_mouse_mode_request,
         parse_msgc_main_agent_start,
         parse_SpiceMsgData,
-        parse_msgc_main_agent_token
+        parse_msgc_main_agent_token,
+        parse_SpiceMsgEmpty
     };
     if (message_type >= 1 && message_type < 7) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
-    } else if (message_type >= 101 && message_type < 109) {
+    } else if (message_type >= 101 && message_type < 110) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
     }
     return NULL;
@@ -1753,7 +1754,7 @@ spice_parse_channel_func_t spice_get_client_channel_parser(uint32_t channel, uns
 {
     static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[9] =  {
         { NULL, 0},
-        { parse_MainChannel_msgc, 108},
+        { parse_MainChannel_msgc, 109},
         { parse_DisplayChannel_msgc, 101},
         { parse_InputsChannel_msgc, 114},
         { parse_CursorChannel_msgc, 6},

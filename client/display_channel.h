@@ -80,21 +80,6 @@ private:
     DisplayChannel& _channel;
 };
 
-class DisplaySurfacesManger {
-public:
-    void add_surface(int surface_id, SpiceCanvas *surface);
-    void del_surface(int surface_id);
-    void add_canvas(int surface_id, Canvas *canvas);
-    void del_canvas(int surface_id);
-
-    CSurfaces& get_surfaces();
-    bool is_present_canvas(int surface_id);
-    Canvas* get_canvas(int surface_id);
-private:
-    CSurfaces surfaces;
-    CCanvases canvases;
-};
-
 class DisplayChannel: public RedChannel, public ScreenLayer {
 public:
     DisplayChannel(RedClient& client, uint32_t id,
@@ -129,6 +114,7 @@ public:
 protected:
     virtual void on_connect();
     virtual void on_disconnect();
+    virtual void on_disconnect_mig_src();
 
 private:
     void set_draw_handlers();
@@ -144,13 +130,17 @@ private:
     void destroy_canvas(int surface_id);
     void create_canvas(int surface_id, const std::vector<int>& canvas_type, int width, int height,
                        uint32_t format);
-    void destroy_strams();
+    void destroy_streams();
     void update_cursor();
 
     void create_primary_surface(int width, int height, uint32_t format);
     void create_surface(int surface_id, int width, int height, uint32_t format);
     void destroy_primary_surface();
     void destroy_surface(int surface_id);
+    void destroy_all_surfaces();
+    void do_destroy_all_surfaces();
+    void destroy_off_screen_surfaces();
+    void do_destroy_off_screen_surfaces();
 
     void handle_mode(RedPeer::InMessage* message);
     void handle_mark(RedPeer::InMessage* message);
@@ -189,10 +179,12 @@ private:
     void activate_streams_timer();
     void stream_update_request(uint32_t update_time);
     void reset_screen();
+    void clear(bool destroy_primary = true);
 
     static void set_clip_rects(const SpiceClip& clip, uint32_t& num_clip_rects, SpiceRect*& clip_rects);
+
 private:
-    DisplaySurfacesManger surfaces_mngr;
+    SurfacesCache _surfaces_cache;
     PixmapCache& _pixmap_cache;
     PaletteCache _palette_cache;
     GlzDecoderWindow& _glz_window;
@@ -231,11 +223,13 @@ private:
 #endif
     InterruptUpdate _interrupt_update;
 
+    bool _mig_wait_primary;
     friend class SetModeEvent;
     friend class CreatePrimarySurfaceEvent;
     friend class DestroyPrimarySurfaceEvent;
     friend class CreateSurfaceEvent;
     friend class DestroySurfaceEvent;
+    friend class DestroyAllSurfacesEvent;
     friend class ActivateTimerEvent;
     friend class VideoStream;
     friend class StreamsTrigger;
@@ -243,6 +237,7 @@ private:
     friend class StreamsTimer;
     friend class AttachChannelsEvent;
     friend class DetachChannelsEvent;
+    friend class MigPrimarySurfaceTimer;
 };
 
 #endif

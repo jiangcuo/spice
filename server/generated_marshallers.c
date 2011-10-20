@@ -113,10 +113,11 @@ void spice_marshall_msg_main_migrate_begin(SpiceMarshaller *m, SpiceMsgMainMigra
     spice_marshaller_add_uint32(m, src->host_size);
     m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
     spice_marshall_array_uint8(m2, src->host_data, src->host_size);
-    spice_marshaller_add_uint16(m, src->pub_key_type);
-    spice_marshaller_add_uint32(m, src->pub_key_size);
+    spice_marshaller_add_uint32(m, src->cert_subject_size);
     m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
-    spice_marshall_array_uint8(m2, src->pub_key_data, src->pub_key_size);
+    if (src->cert_subject_data != NULL) {
+        spice_marshall_array_uint8(m2, src->cert_subject_data, src->cert_subject_size);
+    }
 }
 
 void spice_marshall_SpiceMsgEmpty(SpiceMarshaller *m, SpiceMsgEmpty *msg)

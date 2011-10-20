@@ -1368,7 +1368,8 @@ void Application::on_screen_unlocked(RedScreen& screen)
 
 void Application::rearrange_monitors(bool force_capture,
                                      bool enter_full_screen,
-                                     RedScreen* screen)
+                                     RedScreen* screen,
+                                     std::vector<SpicePoint> *sizes)
 {
     bool capture;
     bool toggle_full_screen;
@@ -1386,7 +1387,7 @@ void Application::rearrange_monitors(bool force_capture,
         hide();
     }
 #endif
-    prepare_monitors();
+    prepare_monitors(sizes);
     position_screens();
     if (enter_full_screen) {
         // toggling to full screen
@@ -1445,16 +1446,19 @@ void Application::assign_monitors()
     }
 }
 
-void Application::prepare_monitors()
+void Application::prepare_monitors(std::vector<SpicePoint> *sizes)
 {
     //todo: test match of monitors size/position against real world size/position
     for (int i = 0; i < (int)_screens.size(); i++) {
         Monitor* mon;
         if (_screens[i] && (mon = _screens[i]->get_monitor())) {
-
             if (_screens[i]->is_size_locked()) {
-                SpicePoint size = _screens[i]->get_size();
-                mon->set_mode(size.x, size.y);
+                if (sizes) {
+                    mon->set_mode((*sizes)[i].x, (*sizes)[i].y);
+                } else {
+                    SpicePoint size = _screens[i]->get_size();
+                    mon->set_mode(size.x, size.y);
+                }
             } else {
                 SpicePoint size = mon->get_size();
                 _screens[i]->resize(size.x, size.y);
@@ -1590,14 +1594,31 @@ bool Application::toggle_full_screen()
 
 void Application::resize_screen(RedScreen *screen, int width, int height)
 {
-    Monitor* mon;
+    std::vector<SpicePoint> sizes;
+    std::vector<SpicePoint> *p_sizes = NULL;
+    bool capture = false;
+
     if (_full_screen) {
-        if ((mon = screen->get_monitor())) {
-            mon->set_mode(width, height);
+        capture = (_main_screen == screen) && _active_screen &&
+                                              _active_screen->is_mouse_captured();
+        sizes.resize(_screens.size());
+        for (int i = 0; i < (int)_screens.size(); i++) {
+            if (_screens[i]) {
+                if (_screens[i] == screen) {
+                    sizes[i].x = width;
+                    sizes[i].y = height;
+                } else {
+                    sizes[i] = _screens[i]->get_size();
+                }
+            }
         }
+        p_sizes = &sizes;
     }
+    rearrange_monitors(false, false, NULL, p_sizes);
     screen->resize(width, height);
-    rearrange_monitors(false, false);
+    if (capture) {
+        screen->capture_mouse();
+    }
     if (screen->is_out_of_sync()) {
         _out_of_sync = true;
         /* If the client monitor cannot handle the guest resolution
@@ -1994,56 +2015,13 @@ bool Application::set_ca_file(const char* ca_file, const char* arg0)
 
 bool Application::set_host_cert_subject(const char* subject, const char* arg0)
 {
-    std::string subject_str(subject);
-    std::string::const_iterator iter = subject_str.begin();
-    std::string entry;
-    _host_auth_opt.type_flags = RedPeer::HostAuthOptions::HOST_AUTH_OP_SUBJECT;
-    _host_auth_opt.host_subject.clear();
+     if (!_host_auth_opt.set_cert_subject(subject)) {
+        Platform::term_printf("%s: bad cert subject %s", arg0, subject);
+        _exit_code = SPICEC_ERROR_CODE_INVALID_ARG;
+        return false;
+     }
 
-    while (true) {
-        if ((iter == subject_str.end()) || (*iter == ',')) {
-            RedPeer::HostAuthOptions::CertFieldValuePair entry_pair;
-            int value_pos = entry.find_first_of('=');
-            if ((value_pos == std::string::npos) || (value_pos == (entry.length() - 1))) {
-                Platform::term_printf("%s: host_subject bad format: assignment for %s is missing\n",
-                                      arg0, entry.c_str());
-                _exit_code = SPICEC_ERROR_CODE_INVALID_ARG;
-                return false;
-            }
-            size_t start_pos = entry.find_first_not_of(' ');
-            if ((start_pos == std::string::npos) || (start_pos == value_pos)) {
-                Platform::term_printf("%s: host_subject bad format: first part of assignment must be non empty in %s\n",
-                                      arg0, entry.c_str());
-                _exit_code = SPICEC_ERROR_CODE_INVALID_ARG;
-                return false;
-            }
-            entry_pair.first = entry.substr(start_pos, value_pos - start_pos);
-            entry_pair.second = entry.substr(value_pos + 1);
-            _host_auth_opt.host_subject.push_back(entry_pair);
-            DBG(0, "subject entry: %s=%s", entry_pair.first.c_str(), entry_pair.second.c_str());
-            if (iter == subject_str.end()) {
-                break;
-            }
-            entry.clear();
-        } else if (*iter == '\\') {
-            iter++;
-            if (iter == subject_str.end()) {
-                LOG_WARN("single \\ in host subject");
-                entry.append(1, '\\');
-                continue;
-            } else if ((*iter == '\\') || (*iter == ',')) {
-                entry.append(1, *iter);
-            } else {
-                LOG_WARN("single \\ in host subject");
-                entry.append(1, '\\');
-                continue;
-            }
-        } else {
-            entry.append(1, *iter);
-        }
-        iter++;
-    }
-    return true;
+     return true;
 }
 
 bool Application::set_canvas_option(CmdLineParser& parser, char *val, const char* arg0)
