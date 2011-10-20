@@ -1,3 +1,10 @@
+spice (0.8.3-1) unstable; urgency=low
+
+  * New upstream release
+  * Update Format field in debian/copyright
+
+ -- Liang Guo <bluestonechina@gmail.com>  Thu, 20 Oct 2011 11:13:23 +0800
+
 spice (0.8.2-2) unstable; urgency=low
 
   [ Michael Tokarev ]
