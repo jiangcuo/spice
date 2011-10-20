@@ -53,18 +53,18 @@ am__v_at_0 = @
 SOURCES =
 DIST_SOURCES =
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = aclocal -I /home/alon/spice/upstream/share/aclocal
+ACLOCAL = aclocal
 ALSA_CFLAGS = -I/usr/include/alsa  
 ALSA_LIBS = -lasound  
-AMTAR = ${SHELL} /home/alon/src/spice_upstream/spice/missing --run tar
+AMTAR = ${SHELL} /home/alon/src/spice_upstream/distfull/missing --run tar
 AM_DEFAULT_VERBOSITY = 0
 AR = ar
-AUTOCONF = ${SHELL} /home/alon/src/spice_upstream/spice/missing --run autoconf
-AUTOHEADER = ${SHELL} /home/alon/src/spice_upstream/spice/missing --run autoheader
-AUTOMAKE = ${SHELL} /home/alon/src/spice_upstream/spice/missing --run automake-1.11
+AUTOCONF = ${SHELL} /home/alon/src/spice_upstream/distfull/missing --run autoconf
+AUTOHEADER = ${SHELL} /home/alon/src/spice_upstream/distfull/missing --run autoheader
+AUTOMAKE = ${SHELL} /home/alon/src/spice_upstream/distfull/missing --run automake-1.11
 AWK = gawk
-CAC_CARD_CFLAGS = -I/home/alon/spice/upstream/include/cacard -I/usr/include/nss3 -I/usr/include/nspr4  
-CAC_CARD_LIBS = -L/home/alon/spice/upstream/lib -lcacard -lssl3 -lsmime3 -lnss3 -lnssutil3 -lplds4 -lplc4 -lnspr4 -lpthread -ldl  
+CAC_CARD_CFLAGS = 
+CAC_CARD_LIBS = 
 CC = ccache gcc
 CCDEPMODE = depmode=gcc3
 CEGUI06_CFLAGS = 
@@ -74,14 +74,14 @@ CEGUI_LIBS =
 CELT051_CFLAGS =  
 CELT051_LIBDIR = 
 CELT051_LIBS = -lcelt051 -lm  
-CFLAGS =  -DALLOW_NO_SSL -O0 -ggdb
+CFLAGS = -g -O2
 CFLAGS_CFLAGS = 
 CPP = ccache gcc -E
 CPPFLAGS =   -pthread -lm -lrt
 CXX = ccache g++
 CXXCPP = ccache g++ -E
 CXXDEPMODE = depmode=gcc3
-CXXFLAGS =  -DALLOW_NO_SSL -DDEBUG_RED_CHANNEL -O0 -ggdb
+CXXFLAGS = -g -O2
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
@@ -113,8 +113,8 @@ LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = 
 LN_S = ln -s
 LTLIBOBJS = 
-MAINT = #
-MAKEINFO = ${SHELL} /home/alon/src/spice_upstream/spice/missing --run makeinfo
+MAINT = 
+MAKEINFO = ${SHELL} /home/alon/src/spice_upstream/distfull/missing --run makeinfo
 MANIFEST_TOOL = :
 MISC_X_CFLAGS = -I/home/alon/spice/upstream/include  
 MISC_X_LIBS = -lXext -lXrender -lX11  
@@ -128,10 +128,10 @@ OTOOL64 =
 PACKAGE = spice
 PACKAGE_BUGREPORT = 
 PACKAGE_NAME = spice
-PACKAGE_STRING = spice 0.8.2
+PACKAGE_STRING = spice 0.8.3
 PACKAGE_TARNAME = spice
 PACKAGE_URL = 
-PACKAGE_VERSION = 0.8.2
+PACKAGE_VERSION = 0.8.3
 PATH_SEPARATOR = :
 PIXMAN_CFLAGS = -I/home/alon/spice/upstream/include/pixman-1  
 PIXMAN_LIBS = -L/home/alon/spice/upstream/lib -lpixman-1  
@@ -147,20 +147,20 @@ SASL_LIBS =  -lsasl2
 SED = /bin/sed
 SET_MAKE = 
 SHELL = /bin/sh
-SLIRP_CFLAGS = -I/home/alon/spice/upstream/include/libslirp  
-SLIRP_LIBS = -L/home/alon/spice/upstream/lib -lslirp  
-SMARTCARD_CFLAGS = -I/home/alon/spice/upstream/include/cacard -I/usr/include/nss3 -I/usr/include/nspr4  
-SMARTCARD_LIBS = -L/home/alon/spice/upstream/lib -lcacard -lssl3 -lsmime3 -lnss3 -lnssutil3 -lplds4 -lplc4 -lnspr4 -lpthread -ldl  
+SLIRP_CFLAGS = 
+SLIRP_LIBS = 
+SMARTCARD_CFLAGS = 
+SMARTCARD_LIBS = 
 SPICEC_STATIC_LINKAGE_BSTATIC = 
 SPICE_COMMON_SRCDIR = $(top_srcdir)/common
 SPICE_LT_VERSION = 1:0:2
 SPICE_NONPKGCONFIG_CFLAGS = 
 SPICE_NONPKGCONFIG_LIBS =  -pthread -lm -lrt 
-SPICE_REQUIRES =  slirp pixman-1 >= 0.17.7 celt051 >= 0.5.1.1 alsa openssl xrandr xfixes x11 xext xrender
+SPICE_REQUIRES =  pixman-1 >= 0.17.7 celt051 >= 0.5.1.1 openssl
 SSL_CFLAGS =  
 SSL_LIBS = -lssl -lcrypto -ldl -lz  
 STRIP = strip
-VERSION = 0.8.2
+VERSION = 0.8.3
 VISIBILITY_HIDDEN_CFLAGS = -fvisibility=hidden
 WARN_CFLAGS =  -Wall -Wno-sign-compare -Wno-deprecated-declarations -Werror
 XFIXES_CFLAGS = -I/home/alon/spice/upstream/include  
@@ -170,10 +170,10 @@ XRANDR12_LIBS = -lXrandr
 XRANDR_CFLAGS = -I/home/alon/spice/upstream/include  
 XRANDR_LIBS = -lXrandr  
 Z_LIBS = -lz
-abs_builddir = /home/alon/src/spice_upstream/spice/common/win/my_getopt-1.5
-abs_srcdir = /home/alon/src/spice_upstream/spice/common/win/my_getopt-1.5
-abs_top_builddir = /home/alon/src/spice_upstream/spice
-abs_top_srcdir = /home/alon/src/spice_upstream/spice
+abs_builddir = /home/alon/src/spice_upstream/distfull/common/win/my_getopt-1.5
+abs_srcdir = /home/alon/src/spice_upstream/distfull/common/win/my_getopt-1.5
+abs_top_builddir = /home/alon/src/spice_upstream/distfull
+abs_top_srcdir = /home/alon/src/spice_upstream/distfull
 ac_ct_AR = ar
 ac_ct_CC = ccache gcc
 ac_ct_CXX = 
@@ -203,7 +203,7 @@ host_vendor = unknown
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/alon/src/spice_upstream/spice/install-sh
+install_sh = ${SHELL} /home/alon/src/spice_upstream/distfull/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -212,7 +212,7 @@ mandir = ${datarootdir}/man
 mkdir_p = /bin/mkdir -p
 oldincludedir = /usr/include
 pdfdir = ${docdir}
-prefix = /home/alon/spice/upstream
+prefix = /usr/local
 program_transform_name = s,x,x,
 psdir = ${docdir}
 red_target = x11
@@ -241,7 +241,7 @@ EXTRA_DIST = \
 all: all-am
 
 .SUFFIXES:
-$(srcdir)/Makefile.in: # $(srcdir)/Makefile.am  $(am__configure_deps)
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -266,9 +266,9 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 
-$(top_srcdir)/configure: # $(am__configure_deps)
+$(top_srcdir)/configure:  $(am__configure_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
-$(ACLOCAL_M4): # $(am__aclocal_m4_deps)
+$(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
 

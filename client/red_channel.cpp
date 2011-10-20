@@ -27,6 +27,15 @@
 #include "openssl/evp.h"
 #include "openssl/x509.h"
 
+void MigrationDisconnectSrcEvent::response(AbstractProcessLoop& events_loop)
+{
+    static_cast<RedChannel*>(events_loop.get_owner())->do_migration_disconnect_src();
+}
+
+void MigrationConnectTargetEvent::response(AbstractProcessLoop& events_loop)
+{
+    static_cast<RedChannel*>(events_loop.get_owner())->do_migration_connect_target();
+}
 
 RedChannelBase::RedChannelBase(uint8_t type, uint8_t id, const ChannelCaps& common_caps,
                                const ChannelCaps& caps)
@@ -68,10 +77,7 @@ void RedChannelBase::link(uint32_t connection_id, const std::string& password,
     uint32_t link_res;
     uint32_t i;
 
-    EVP_PKEY *pubkey;
-    int nRSASize;
     BIO *bioKey;
-    RSA *rsa;
     uint8_t *buffer, *p;
     uint32_t expected_major;
 
@@ -168,6 +174,10 @@ void RedChannelBase::link(uint32_t connection_id, const std::string& password,
 
     bioKey = BIO_new(BIO_s_mem());
     if (bioKey != NULL) {
+        EVP_PKEY *pubkey;
+        int nRSASize;
+        RSA *rsa;
+
         BIO_write(bioKey, reply->pub_key, SPICE_TICKET_PUBKEY_BYTES);
         pubkey = d2i_PUBKEY_bio(bioKey, NULL);
         rsa = pubkey->pkey.rsa;
@@ -183,10 +193,13 @@ void RedChannelBase::link(uint32_t connection_id, const std::string& password,
                                rsa, RSA_PKCS1_OAEP_PADDING) > 0) {
             send((uint8_t*)bufEncrypted.get(), nRSASize);
         } else {
+            EVP_PKEY_free(pubkey);
+            BIO_free(bioKey);
             THROW("could not encrypt password");
         }
 
         memset(bufEncrypted.get(), 0, nRSASize);
+        EVP_PKEY_free(pubkey);
     } else {
         THROW("Could not initiate BIO");
     }
@@ -280,6 +293,20 @@ bool RedChannelBase::test_common_capability(uint32_t cap)
 bool RedChannelBase::test_capability(uint32_t cap)
 {
     return test_capability(_remote_caps, cap);
+}
+
+void RedChannelBase::swap(RedChannelBase* other)
+{
+    int tmp_ver;
+
+    RedPeer::swap(other);
+    tmp_ver = _remote_major;
+    _remote_major = other->_remote_major;
+    other->_remote_major = tmp_ver;
+
+    tmp_ver = _remote_minor;
+    _remote_minor = other->_remote_minor;
+    other->_remote_minor = tmp_ver;
 }
 
 SendTrigger::SendTrigger(RedChannel& channel)
@@ -431,6 +458,63 @@ void RedChannel::disconnect()
     _action = DISCONNECT_ACTION;
     RedPeer::disconnect();
     _action_cond.notify_one();
+}
+
+void RedChannel::disconnect_migration_src()
+{
+    clear_outgoing_messages();
+
+    Lock lock(_action_lock);
+    if (_state == CONNECTING_STATE || _state == CONNECTED_STATE) {
+        AutoRef<MigrationDisconnectSrcEvent> migrate_event(new MigrationDisconnectSrcEvent());
+        _loop.push_event(*migrate_event);
+    }
+}
+
+void RedChannel::connect_migration_target()
+{
+    LOG_INFO("");
+    AutoRef<MigrationConnectTargetEvent> migrate_event(new MigrationConnectTargetEvent());
+    _loop.push_event(*migrate_event);
+}
+
+void RedChannel::do_migration_disconnect_src()
+{
+    if (_socket_in_loop) {
+        _socket_in_loop = false;
+        _loop.remove_socket(*this);
+    }
+
+    clear_outgoing_messages();
+    if (_outgoing_message) {
+        _outgoing_message->release();
+        _outgoing_message = NULL;
+    }
+    _incomming_header_pos = 0;
+    if (_incomming_message) {
+        _incomming_message->unref();
+        _incomming_message = NULL;
+    }
+
+    on_disconnect_mig_src();
+    get_client().migrate_channel(*this);
+    get_client().on_channel_disconnect_mig_src_completed(*this);
+}
+
+void RedChannel::do_migration_connect_target()
+{
+    LOG_INFO("");
+    ASSERT(get_client().get_protocol() != 0);
+    if (get_client().get_protocol() == 1) {
+        _marshallers = spice_message_marshallers_get1();
+    } else {
+        _marshallers = spice_message_marshallers_get();
+    }
+    _loop.add_socket(*this);
+    _socket_in_loop = true;
+    on_connect_mig_target();
+    set_state(CONNECTED_STATE);
+    on_event();
 }
 
 void RedChannel::clear_outgoing_messages()

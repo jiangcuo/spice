@@ -512,8 +512,8 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
     PointerInfo ptr_info[2];
     size_t host_data__extra_size;
     uint32_t host_data__array__nelements;
-    size_t pub_key_data__extra_size;
-    uint32_t pub_key_data__array__nelements;
+    size_t cert_subject_data__extra_size;
+    uint32_t cert_subject_data__array__nelements;
     SpiceMsgMainMigrationBegin *out;
     uint32_t i;
 
@@ -548,39 +548,36 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
         host_data__extra_size = host_data__array__mem_size + /* for alignment */ 3;
     }
 
-    { /* pub_key_data */
-        uint32_t pub_key_data__value;
-        uint32_t pub_key_data__array__nw_size;
-        uint32_t pub_key_data__array__mem_size;
-        uint32_t pub_key_size__value;
-        pos = (start + 18);
+    { /* cert_subject_data */
+        uint32_t cert_subject_data__value;
+        uint32_t cert_subject_data__array__nw_size;
+        uint32_t cert_subject_data__array__mem_size;
+        uint32_t cert_subject_size__value;
+        pos = (start + 16);
         if (SPICE_UNLIKELY(pos + 4 > message_end)) {
             goto error;
         }
-        pub_key_data__value = read_uint32(pos);
-        if (SPICE_UNLIKELY(pub_key_data__value == 0)) {
+        cert_subject_data__value = read_uint32(pos);
+        if (SPICE_UNLIKELY(message_start + cert_subject_data__value >= message_end)) {
             goto error;
         }
-        if (SPICE_UNLIKELY(message_start + pub_key_data__value >= message_end)) {
-            goto error;
-        }
-        pos = start + 14;
+        pos = start + 12;
         if (SPICE_UNLIKELY(pos + 4 > message_end)) {
             goto error;
         }
-        pub_key_size__value = read_uint32(pos);
-        pub_key_data__array__nelements = pub_key_size__value;
+        cert_subject_size__value = read_uint32(pos);
+        cert_subject_data__array__nelements = cert_subject_size__value;
 
-        pub_key_data__array__nw_size = pub_key_data__array__nelements;
-        pub_key_data__array__mem_size = sizeof(uint8_t) * pub_key_data__array__nelements;
-        if (SPICE_UNLIKELY(message_start + pub_key_data__value + pub_key_data__array__nw_size > message_end)) {
+        cert_subject_data__array__nw_size = cert_subject_data__array__nelements;
+        cert_subject_data__array__mem_size = sizeof(uint8_t) * cert_subject_data__array__nelements;
+        if (SPICE_UNLIKELY(message_start + cert_subject_data__value + cert_subject_data__array__nw_size > message_end)) {
             goto error;
         }
-        pub_key_data__extra_size = pub_key_data__array__mem_size + /* for alignment */ 3;
+        cert_subject_data__extra_size = cert_subject_data__array__mem_size + /* for alignment */ 3;
     }
 
-    nw_size = 22;
-    mem_size = sizeof(SpiceMsgMainMigrationBegin) + host_data__extra_size + pub_key_data__extra_size;
+    nw_size = 20;
+    mem_size = sizeof(SpiceMsgMainMigrationBegin) + host_data__extra_size + cert_subject_data__extra_size;
 
     /* Check if message fits in reported side */
     if (start + nw_size > message_end) {
@@ -605,12 +602,11 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
     ptr_info[n_ptr].dest = (void **)&out->host_data;
     ptr_info[n_ptr].nelements = host_data__array__nelements;
     n_ptr++;
-    out->pub_key_type = consume_uint16(&in);
-    out->pub_key_size = consume_uint32(&in);
+    out->cert_subject_size = consume_uint32(&in);
     ptr_info[n_ptr].offset = consume_uint32(&in);
     ptr_info[n_ptr].parse = parse_array_uint8;
-    ptr_info[n_ptr].dest = (void **)&out->pub_key_data;
-    ptr_info[n_ptr].nelements = pub_key_data__array__nelements;
+    ptr_info[n_ptr].dest = (void **)&out->cert_subject_data;
+    ptr_info[n_ptr].nelements = cert_subject_data__array__nelements;
     n_ptr++;
 
     assert(in <= message_end);
@@ -1125,7 +1121,7 @@ static uint8_t * parse_MainChannel_msg(uint8_t *message_start, uint8_t *message_
         parse_msg_disconnecting,
         parse_msg_notify
     };
-    static parse_msg_func_t funcs2[11] =  {
+    static parse_msg_func_t funcs2[12] =  {
         parse_msg_main_migrate_begin,
         parse_SpiceMsgEmpty,
         parse_msg_main_init,
@@ -1136,11 +1132,12 @@ static uint8_t * parse_MainChannel_msg(uint8_t *message_start, uint8_t *message_
         parse_msg_main_agent_disconnected,
         parse_SpiceMsgData,
         parse_msg_main_agent_token,
-        parse_msg_main_migrate_switch_host
+        parse_msg_main_migrate_switch_host,
+        parse_SpiceMsgEmpty
     };
     if (message_type >= 1 && message_type < 8) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
-    } else if (message_type >= 101 && message_type < 112) {
+    } else if (message_type >= 101 && message_type < 113) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
     }
     return NULL;
@@ -6766,7 +6763,7 @@ spice_parse_channel_func_t spice_get_server_channel_parser(uint32_t channel, uns
 {
     static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[9] =  {
         { NULL, 0},
-        { parse_MainChannel_msg, 111},
+        { parse_MainChannel_msg, 112},
         { parse_DisplayChannel_msg, 315},
         { parse_InputsChannel_msg, 111},
         { parse_CursorChannel_msg, 108},

@@ -23,6 +23,7 @@
 #include "utils.h"
 #include "debug.h"
 #include "marshallers.h"
+#include <algorithm>
 
 #ifndef INFINITY
 #define INFINITY HUGE
@@ -120,6 +121,11 @@ void ClipboardReleaseEvent::response(AbstractProcessLoop& events_loop)
         VD_AGENT_CLIPBOARD_RELEASE, 0, NULL);
 }
 
+void MigrateEndEvent::response(AbstractProcessLoop& events_loop)
+{
+    static_cast<RedClient*>(events_loop.get_owner())->send_migrate_end();
+}
+
 Migrate::Migrate(RedClient& client)
     : _client (client)
     , _running (false)
@@ -127,6 +133,7 @@ Migrate::Migrate(RedClient& client)
     , _connected (false)
     , _thread (NULL)
     , _pending_con (0)
+    , _protocol (0)
 {
 }
 
@@ -183,7 +190,7 @@ void Migrate::swap_peer(RedChannelBase& other)
                 curr->set_valid(false);
                 if (!--_pending_con) {
                     lock.unlock();
-                    _client.set_target(_host.c_str(), _port, _sport);
+                    _client.set_target(_host.c_str(), _port, _sport, _protocol);
                     abort();
                 }
                 return;
@@ -206,6 +213,13 @@ void Migrate::connect_one(MigChannel& channel, const RedPeer::ConnectionOptions&
     channel.connect(options, connection_id, _host.c_str(), _password);
     ++_pending_con;
     channel.set_valid(true);
+    if (_protocol == 0) {
+        if (channel.get_peer_major() == 1) {
+            _protocol = 1;
+        } else {
+            _protocol = 2;
+        }
+    }
 }
 
 void Migrate::run()
@@ -226,7 +240,7 @@ void Migrate::run()
         for (++iter; iter != _channels.end(); ++iter) {
             conn_type = _client.get_connection_options((*iter)->get_type());
             con_opt = RedPeer::ConnectionOptions(conn_type, _port, _sport,
-						 _client.get_protocol(),
+                                                 _protocol,
                                                  _auth_options, _con_ciphers);
             connect_one(**iter, con_opt, connection_id);
         }
@@ -257,9 +271,15 @@ void* Migrate::worker_main(void *data)
 
 void Migrate::start(const SpiceMsgMainMigrationBegin* migrate)
 {
+    std::string cert_subject;
+    uint32_t peer_major;
+    uint32_t peer_minor;
+
     DBG(0, "");
     abort();
-    if ((_client.get_peer_major() == 1) && (_client.get_peer_minor() < 1)) {
+    peer_major = _client.get_peer_major();
+    peer_minor = _client.get_peer_minor();
+    if ((peer_major == 1) && (peer_minor < 1)) {
         LOG_INFO("server minor version incompatible for destination authentication"
                  "(missing dest pubkey in SpiceMsgMainMigrationBegin)");
         OldRedMigrationBegin* old_migrate = (OldRedMigrationBegin*)migrate;
@@ -271,8 +291,17 @@ void Migrate::start(const SpiceMsgMainMigrationBegin* migrate)
         _host.assign((char *)migrate->host_data);
         _port = migrate->port ? migrate->port : -1;
         _sport = migrate->sport ? migrate->sport : -1;
-        _auth_options.type_flags = RedPeer::HostAuthOptions::HOST_AUTH_OP_PUBKEY;
-        _auth_options.host_pubkey.assign(migrate->pub_key_data, migrate->pub_key_data + migrate->pub_key_size);
+        if ((peer_major == 1) || (peer_major == 2 && peer_minor < 1)) {
+            _auth_options.type_flags = RedPeer::HostAuthOptions::HOST_AUTH_OP_PUBKEY;
+            _auth_options.host_pubkey.assign(migrate->pub_key_data, migrate->pub_key_data +
+                                             migrate->pub_key_size);
+        } else {
+            _auth_options.type_flags = RedPeer::HostAuthOptions::HOST_AUTH_OP_SUBJECT;
+            _auth_options.CA_file =  _client.get_host_auth_options().CA_file;
+            if (migrate->cert_subject_size != 0) {
+                _auth_options.set_cert_subject((char *)migrate->cert_subject_data);
+            }
+        }
     }
 
     _con_ciphers = _client.get_connection_ciphers();
@@ -375,6 +404,7 @@ RedClient::RedClient(Application& application)
     , _agent_caps(NULL)
     , _migrate (*this)
     , _glz_window (_glz_debug)
+    , _during_migration (false)
 {
     Platform::set_clipboard_listener(this);
     MainChannelLoop* message_loop = static_cast<MainChannelLoop*>(get_message_handler());
@@ -393,6 +423,7 @@ RedClient::RedClient(Application& application)
 
     message_loop->set_handler(SPICE_MSG_MAIN_MIGRATE_BEGIN, &RedClient::handle_migrate_begin);
     message_loop->set_handler(SPICE_MSG_MAIN_MIGRATE_CANCEL, &RedClient::handle_migrate_cancel);
+    message_loop->set_handler(SPICE_MSG_MAIN_MIGRATE_END, &RedClient::handle_migrate_end);
     message_loop->set_handler(SPICE_MSG_MAIN_MIGRATE_SWITCH_HOST,
                               &RedClient::handle_migrate_switch_host);
     message_loop->set_handler(SPICE_MSG_MAIN_INIT, &RedClient::handle_init);
@@ -404,6 +435,8 @@ RedClient::RedClient(Application& application)
     message_loop->set_handler(SPICE_MSG_MAIN_AGENT_DISCONNECTED, &RedClient::handle_agent_disconnected);
     message_loop->set_handler(SPICE_MSG_MAIN_AGENT_DATA, &RedClient::handle_agent_data);
     message_loop->set_handler(SPICE_MSG_MAIN_AGENT_TOKEN, &RedClient::handle_agent_tokens);
+
+    set_capability(SPICE_MAIN_CAP_SEMI_SEAMLESS_MIGRATE);
     start();
 }
 
@@ -415,11 +448,16 @@ RedClient::~RedClient()
     delete[] _agent_caps;
 }
 
-void RedClient::set_target(const std::string& host, int port, int sport)
+void RedClient::set_target(const std::string& host, int port, int sport, int protocol)
 {
+    if (protocol != get_protocol()) {
+        LOG_INFO("old protocol %d, new protocol %d", get_protocol(), protocol);
+    }
+
     _port = port;
     _sport = sport;
     _host.assign(host);
+    set_protocol(protocol);
 }
 
 void RedClient::push_event(Event* event)
@@ -468,9 +506,19 @@ void RedClient::on_disconnect()
     (*sync_event)->wait();
 }
 
+void RedClient::on_disconnect_mig_src()
+{
+    _application.deactivate_interval_timer(*_agent_timer);
+    delete[] _agent_msg_data;
+    _agent_msg_data = NULL;
+    _agent_msg_pos = 0;
+    _agent_tokens = 0;
+}
+
 void RedClient::delete_channels()
 {
     Lock lock(_channels_lock);
+    _pending_mig_disconnect_channels.clear();
     while (!_channels.empty()) {
         RedChannel *channel = *_channels.begin();
         _channels.pop_front();
@@ -538,6 +586,7 @@ void RedClient::connect(bool wait_main_disconnect)
 void RedClient::disconnect()
 {
     _migrate.abort();
+    _msg_attach_channels_sent = false;
     RedChannel::disconnect();
 }
 
@@ -597,7 +646,7 @@ bool RedClient::abort()
 
 void RedClient::handle_migrate_begin(RedPeer::InMessage* message)
 {
-    DBG(0, "");
+    LOG_INFO("");
     SpiceMsgMainMigrationBegin* migrate = (SpiceMsgMainMigrationBegin*)message->data();
     //add mig channels
     _migrate.start(migrate);
@@ -605,7 +654,55 @@ void RedClient::handle_migrate_begin(RedPeer::InMessage* message)
 
 void RedClient::handle_migrate_cancel(RedPeer::InMessage* message)
 {
+    LOG_INFO("");
     _migrate.abort();
+}
+
+void RedClient::handle_migrate_end(RedPeer::InMessage* message)
+{
+    LOG_INFO("");
+
+    Lock lock(_channels_lock);
+    ASSERT(_pending_mig_disconnect_channels.empty());
+    Channels::iterator iter = _channels.begin();
+    for (; iter != _channels.end(); ++iter) {
+        (*iter)->disconnect_migration_src();
+        _pending_mig_disconnect_channels.push_back(*iter);
+    }
+    RedChannel::disconnect_migration_src();
+     _pending_mig_disconnect_channels.push_back(this);
+     _during_migration = true;
+}
+
+void RedClient::on_channel_disconnect_mig_src_completed(RedChannel& channel)
+{
+    Lock lock(_channels_lock);
+    Channels::iterator pending_iter = std::find(_pending_mig_disconnect_channels.begin(),
+                                                _pending_mig_disconnect_channels.end(),
+                                                &channel);
+
+    LOG_INFO("");
+    if (pending_iter == _pending_mig_disconnect_channels.end()) {
+        THROW("unexpected channel");
+    }
+
+    _pending_mig_disconnect_channels.erase(pending_iter);
+    /* clean shared data when all channels have disconnected */
+    if (_pending_mig_disconnect_channels.empty()) {
+        _pixmap_cache.clear();
+        _glz_window.clear();
+        memset(_sync_info, 0, sizeof(_sync_info));
+        LOG_INFO("calling main to connect and wait for handle_init to tell all the other channels to connect");
+        RedChannel::connect_migration_target();
+        AutoRef<MigrateEndEvent> mig_end_event(new MigrateEndEvent());
+        get_process_loop().push_event(*mig_end_event);
+    }
+}
+
+void RedClient::send_migrate_end()
+{
+    Message* message = new Message(SPICE_MSGC_MAIN_MIGRATE_END);
+    post_message(message);
 }
 
 ChannelFactory* RedClient::find_factory(uint32_t type)
@@ -736,6 +833,7 @@ void RedClient::send_agent_display_config()
         spice_marshaller_reserve_space(message->marshaller(), sizeof(VDAgentDisplayConfig));
 
     disp_config->flags = 0;
+    disp_config->depth = 0;
     if (_display_setting._disable_wallpaper) {
         disp_config->flags |= VD_AGENT_DISPLAY_CONFIG_FLAG_DISABLE_WALLPAPER;
     }
@@ -951,12 +1049,37 @@ void RedClient::set_mouse_mode(uint32_t supported_modes, uint32_t current_mode)
     }
 }
 
+/* returns true if we should wait for a response from the agent */
+bool RedClient::init_guest_display()
+{
+    if (_agent_connected) {
+        if (_auto_display_res) {
+            send_agent_monitors_config();
+        }
+
+        if (_auto_display_res || !_display_setting.is_empty()) {
+            _application.activate_interval_timer(*_agent_timer, AGENT_TIMEOUT);
+        } else {
+            return false;
+        }
+    } else {
+        if (_auto_display_res || !_display_setting.is_empty()) {
+            LOG_WARN("no agent running, display options have been ignored");
+        }
+        return false;
+    }
+    return true;
+}
+
 void RedClient::handle_init(RedPeer::InMessage* message)
 {
     SpiceMsgMainInit *init = (SpiceMsgMainInit *)message->data();
+    LOG_INFO("");
     _connection_id = init->session_id;
     set_mm_time(init->multi_media_time);
-    calc_pixmap_cach_and_glz_window_size(init->display_channels_hint, init->ram_hint);
+    if (!_during_migration) {
+        calc_pixmap_cach_and_glz_window_size(init->display_channels_hint, init->ram_hint);
+    }
     set_mouse_mode(init->supported_mouse_modes, init->current_mouse_mode);
     _agent_tokens = init->agent_tokens;
     _agent_connected = !!init->agent_connected;
@@ -967,15 +1090,19 @@ void RedClient::handle_init(RedPeer::InMessage* message)
         _marshallers->msgc_main_agent_start(msg->marshaller(), &agent_start);
         post_message(msg);
         send_agent_announce_capabilities(true);
-        if (_auto_display_res) {
-           send_agent_monitors_config();
+    }
+
+    if (!_during_migration) {
+        if (!init_guest_display()) {
+            send_main_attach_channels();
         }
-        _application.activate_interval_timer(*_agent_timer, AGENT_TIMEOUT);
     } else {
-        if (_auto_display_res || !_display_setting.is_empty()) {
-            LOG_WARN("no agent running, display options have been ignored");
+        LOG_INFO("connecting all channels after migration");
+        Channels::iterator iter = _channels.begin();
+        for (; iter != _channels.end(); ++iter) {
+            (*iter)->connect_migration_target();
         }
-        send_main_attach_channels();
+        _during_migration = false;
     }
 }
 
