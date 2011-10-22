@@ -20,6 +20,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
  SPICE_SERVER_0.8.1@SPICE_SERVER_0.8.1 0.8.2
  SPICE_SERVER_0.8.2@SPICE_SERVER_0.8.2 0.8.2
+ SPICE_SERVER_0.8.3@SPICE_SERVER_0.8.3 0.8.3
  spice_get_current_compat_version@SPICE_SERVER_0.6.1 0.8.2
  spice_qxl_add_memslot@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_add_memslot_async@SPICE_SERVER_0.8.2 0.8.2
@@ -54,6 +55,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_init@SPICE_SERVER_0.6.0 0.8.2
  spice_server_kbd_leds@SPICE_SERVER_0.6.0 0.8.2
  spice_server_migrate_client_state@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_migrate_connect@SPICE_SERVER_0.8.3 0.8.3
  spice_server_migrate_end@SPICE_SERVER_0.6.0 0.8.2
  spice_server_migrate_info@SPICE_SERVER_0.6.0 0.8.2
  spice_server_migrate_start@SPICE_SERVER_0.6.0 0.8.2
