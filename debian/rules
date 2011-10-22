@@ -23,7 +23,7 @@ build: build-stamp
 build-stamp: build-celt-stamp
 	[ -f celt/config.log ] || rm -f celt/config.log
 	[ -f celt/config.status ] || rm -f celt/config.status
-	CELT051_CFLAGS="-I$(CURDIR)" CELT051_LIBS="-L$(CURDIR)/celt051/.libs -lcelt051 -lm" ./configure --prefix=/usr --enable-gui
+	CELT051_CFLAGS="-I$(CURDIR)" CELT051_LIBS="-L$(CURDIR)/celt051/.libs -lcelt051 -lm" ./configure --prefix=/usr
 	$(MAKE) 
 	touch build-stamp
 
