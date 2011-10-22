@@ -1,7 +1,7 @@
 spice (0.8.3-1) unstable; urgency=low
 
   * New upstream release
-  * Update Format field in debian/copyright
+  * Update debian/copyright to fit DEP-5
   * Remove drop-unnecessary-build-request.patch, applied upstream
   * Update Build-Depends on libspice-protocol-dev to 0.8.2~
   * Disable GUI support, CEGUI version in Debian not supported.
