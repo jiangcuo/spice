@@ -4,7 +4,7 @@ Source: http://www.spice-space.org/
 Comment: celt is downloaded from http://downloads.us.xiph.org/releases/celt/celt-0.5.1.3.tar.gz
 
 Files: *
-Copyright: Copyright (C) 2009,2010 Red Hat, Inc.
+Copyright: Copyright (C) 2009,2010,2011 Red Hat, Inc.
 License: LGPL-2.1+
 
 Files: client/windows/stdint.h
