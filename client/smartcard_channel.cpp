@@ -14,16 +14,20 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <spice/enums.h>
 
 #include "red_client.h"
 #include "mutex.h"
 
 extern "C" {
-#include "vscard_common.h"
-#include "vreader.h"
-#include "vcard_emul.h"
-#include "vevent.h"
+#include <vscard_common.h>
+#include <vreader.h>
+#include <vcard_emul.h>
+#include <vevent.h>
 }
 
 #include "smartcard_channel.h"

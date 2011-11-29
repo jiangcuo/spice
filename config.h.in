@@ -3,11 +3,32 @@
 /* Define if building universal (internal helper macro) */
 #undef AC_APPLE_UNIVERSAL_BUILD
 
+/* Define to one of `_getb67', `GETB67', `getb67' for Cray-2 and Cray-YMP
+   systems. This function is required for `alloca.c' support on those systems.
+   */
+#undef CRAY_STACKSEG_END
+
+/* Define to 1 if using `alloca.c'. */
+#undef C_ALLOCA
+
+/* Enable GLExt prototypes */
+#undef GL_GLEXT_PROTOTYPES
+
+/* Define to 1 if you have `alloca', as a function or macro. */
+#undef HAVE_ALLOCA
+
+/* Define to 1 if you have <alloca.h> and it should be used (not on Ultrix).
+   */
+#undef HAVE_ALLOCA_H
+
 /* Defined if we have clock_gettime() */
 #undef HAVE_CLOCK_GETTIME
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the <execinfo.h> header file. */
+#undef HAVE_EXECINFO_H
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -79,8 +100,22 @@
 /* The POSIX RT yield function */
 #undef POSIX_YIELD_FUNC
 
+/* If using the C implementation of alloca, define if you know the
+   direction of stack growth for your system; otherwise it will be
+   automatically deduced at runtime.
+	STACK_DIRECTION > 0 => grows toward higher addresses
+	STACK_DIRECTION < 0 => grows toward lower addresses
+	STACK_DIRECTION = 0 => direction of growth unknown */
+#undef STACK_DIRECTION
+
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* Define to build with CEGUI support */
+#undef USE_GUI
+
+/* Define to build with OpenGL support */
+#undef USE_OPENGL
 
 /* Define if supporting smartcard proxying */
 #undef USE_SMARTCARD
@@ -90,10 +125,6 @@
 
 /* Version number of package */
 #undef VERSION
-
-/* Define to the value your compiler uses to support the warn-unused-result
-   attribute */
-#undef WARN_UNUSED_RESULT
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
@@ -106,3 +137,6 @@
 #  undef WORDS_BIGENDIAN
 # endif
 #endif
+
+/* Define to `unsigned int' if <sys/types.h> does not define. */
+#undef size_t

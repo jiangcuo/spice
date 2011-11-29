@@ -21,9 +21,9 @@
 #include "common.h"
 #include "region.h"
 #include "red_key.h"
-#ifdef USE_OGL
+#ifdef USE_OPENGL
 #include "GL/gl.h"
-#endif // USE_OGL
+#endif // USE_OPENGL
 
 #include "red_window.h"
 #include "platform.h"
@@ -62,7 +62,7 @@ public:
     void attach_layer(ScreenLayer& layer);
     void detach_layer(ScreenLayer& layer);
     void on_layer_changed(ScreenLayer& layer);
-    /* When resizing on full screen mode, the monitor must be configured 
+    /* When resizing on full screen mode, the monitor must be configured
      * correctly before calling resize*/
     void resize(int width, int height);
     void set_name(const std::string& name);
@@ -97,7 +97,7 @@ public:
     int get_id() { return _id;}
     int get_screen_id();
 
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     void untouch_context();
     bool need_recreate_context_gl();
     void set_type_gl();
@@ -167,7 +167,7 @@ private:
     AtomicCount _refs;
     std::string _name;
     RedWindow _window;
-    std::vector<ScreenLayer*> _layes;
+    std::vector<ScreenLayer*> _layers;
     QRegion _dirty_region;
     RecurciveMutex _update_lock;
     bool _active;

@@ -34,13 +34,14 @@
 
 #endif
 
+#define CHANNEL_FROM_RCC(rcc) SPICE_CONTAINEROF((rcc)->channel, CHANNEL, common.base);
 
-static int FUNC_NAME(hit)(CACHE *cache, uint64_t id, int *lossy, CHANNEL *channel)
+static int FUNC_NAME(hit)(CACHE *cache, uint64_t id, int *lossy, DisplayChannelClient *dcc)
 {
     NewCacheItem *item;
     uint64_t serial;
 
-    serial = channel_message_serial((RedChannel *)channel);
+    serial = red_channel_client_get_message_serial(&dcc->common.base);
     pthread_mutex_lock(&cache->lock);
     item = cache->hash_table[CACHE_HASH_KEY(id)];
 
@@ -48,9 +49,9 @@ static int FUNC_NAME(hit)(CACHE *cache, uint64_t id, int *lossy, CHANNEL *channe
         if (item->id == id) {
             ring_remove(&item->lru_link);
             ring_add(&cache->lru, &item->lru_link);
-            ASSERT(channel->base.id < MAX_CACHE_CLIENTS)
-            item->sync[channel->base.id] = serial;
-            cache->sync[channel->base.id] = serial;
+            ASSERT(dcc->common.id < MAX_CACHE_CLIENTS)
+            item->sync[dcc->common.id] = serial;
+            cache->sync[dcc->common.id] = serial;
             *lossy = item->lossy;
             break;
         }
@@ -79,7 +80,7 @@ static int FUNC_NAME(set_lossy)(CACHE *cache, uint64_t id, int lossy)
     return !!item;
 }
 
-static int FUNC_NAME(add)(CACHE *cache, uint64_t id, uint32_t size, int lossy, CHANNEL *channel)
+static int FUNC_NAME(add)(CACHE *cache, uint64_t id, uint32_t size, int lossy, DisplayChannelClient *dcc)
 {
     NewCacheItem *item;
     uint64_t serial;
@@ -88,14 +89,15 @@ static int FUNC_NAME(add)(CACHE *cache, uint64_t id, uint32_t size, int lossy, C
     ASSERT(size > 0);
 
     item = spice_new(NewCacheItem, 1);
-    serial = channel_message_serial((RedChannel *)channel);
+    serial = red_channel_client_get_message_serial(&dcc->common.base);
 
     pthread_mutex_lock(&cache->lock);
 
-    if (cache->generation != channel->CACH_GENERATION) {
-        if (!channel->pending_pixmaps_sync) {
-            red_pipe_add_type((RedChannel *)channel, PIPE_ITEM_TYPE_PIXMAP_SYNC);
-            channel->pending_pixmaps_sync = TRUE;
+    if (cache->generation != dcc->CACH_GENERATION) {
+        if (!dcc->pending_pixmaps_sync) {
+            red_channel_client_pipe_add_type(
+                &dcc->common.base, PIPE_ITEM_TYPE_PIXMAP_SYNC);
+            dcc->pending_pixmaps_sync = TRUE;
         }
         pthread_mutex_unlock(&cache->lock);
         free(item);
@@ -108,7 +110,7 @@ static int FUNC_NAME(add)(CACHE *cache, uint64_t id, uint32_t size, int lossy, C
         NewCacheItem **now;
 
         if (!(tail = (NewCacheItem *)ring_get_tail(&cache->lru)) ||
-                                                   tail->sync[channel->base.id] == serial) {
+                                                   tail->sync[dcc->common.id] == serial) {
             cache->available += size;
             pthread_mutex_unlock(&cache->lock);
             free(item);
@@ -127,8 +129,8 @@ static int FUNC_NAME(add)(CACHE *cache, uint64_t id, uint32_t size, int lossy, C
         ring_remove(&tail->lru_link);
         cache->items--;
         cache->available += tail->size;
-        cache->sync[channel->base.id] = serial;
-        display_channel_push_release(channel, SPICE_RES_TYPE_PIXMAP, tail->id, tail->sync);
+        cache->sync[dcc->common.id] = serial;
+        display_channel_push_release(dcc, SPICE_RES_TYPE_PIXMAP, tail->id, tail->sync);
         free(tail);
     }
     ++cache->items;
@@ -140,8 +142,8 @@ static int FUNC_NAME(add)(CACHE *cache, uint64_t id, uint32_t size, int lossy, C
     item->size = size;
     item->lossy = lossy;
     memset(item->sync, 0, sizeof(item->sync));
-    item->sync[channel->base.id] = serial;
-    cache->sync[channel->base.id] = serial;
+    item->sync[dcc->common.id] = serial;
+    cache->sync[dcc->common.id] = serial;
     pthread_mutex_unlock(&cache->lock);
     return TRUE;
 }
@@ -166,24 +168,24 @@ static void PRIVATE_FUNC_NAME(clear)(CACHE *cache)
     cache->items = 0;
 }
 
-static void FUNC_NAME(reset)(CACHE *cache, CHANNEL *channel, SpiceMsgWaitForChannels* sync_data)
+static void FUNC_NAME(reset)(CACHE *cache, DisplayChannelClient *dcc, SpiceMsgWaitForChannels* sync_data)
 {
     uint8_t wait_count;
     uint64_t serial;
     uint32_t i;
 
-    serial = channel_message_serial((RedChannel *)channel);
+    serial = red_channel_client_get_message_serial(&dcc->common.base);
     pthread_mutex_lock(&cache->lock);
     PRIVATE_FUNC_NAME(clear)(cache);
 
-    channel->CACH_GENERATION = ++cache->generation;
-    cache->generation_initiator.client = channel->base.id;
+    dcc->CACH_GENERATION = ++cache->generation;
+    cache->generation_initiator.client = dcc->common.id;
     cache->generation_initiator.message = serial;
-    cache->sync[channel->base.id] = serial;
+    cache->sync[dcc->common.id] = serial;
 
     wait_count = 0;
     for (i = 0; i < MAX_CACHE_CLIENTS; i++) {
-        if (cache->sync[i] && i != channel->base.id) {
+        if (cache->sync[i] && i != dcc->common.id) {
             sync_data->wait_list[wait_count].channel_type = SPICE_CHANNEL_DISPLAY;
             sync_data->wait_list[wait_count].channel_id = i;
             sync_data->wait_list[wait_count++].message_serial = cache->sync[i];
@@ -230,4 +232,4 @@ static void FUNC_NAME(destroy)(CACHE *cache)
 #undef FUNC_NAME
 #undef VAR_NAME
 #undef CHANNEL
-
+#undef CHANNEL_FROM_RCC

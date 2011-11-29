@@ -14,11 +14,18 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "jpeg_decoder.h"
 #include "debug.h"
 #include "utils.h"
+
+#if !defined(jpeg_boolean) && !defined(__MINGW32__)
+#define jpeg_boolean boolean
+#endif
 
 static void op_begin_decode(SpiceJpegDecoder *decoder,
                             uint8_t* data,
@@ -41,11 +48,11 @@ static void op_decode(SpiceJpegDecoder *decoder,
 
 extern "C" {
 
-    void jpeg_decoder_init_source(j_decompress_ptr cinfo)
+    static void jpeg_decoder_init_source(j_decompress_ptr cinfo)
     {
     }
 
-    static boolean jpeg_decoder_fill_input_buffer(j_decompress_ptr cinfo)
+    static jpeg_boolean jpeg_decoder_fill_input_buffer(j_decompress_ptr cinfo)
     {
         PANIC("no more data for jpeg");
         return FALSE;

@@ -15,6 +15,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #ifdef QUIC_FAMILY_8BPC
 #undef QUIC_FAMILY_8BPC
@@ -53,8 +56,8 @@ static void FNAME(golomb_coding)(const BYTE n, const unsigned int l, unsigned in
     }
 }
 
-unsigned int FNAME(golomb_decoding)(const unsigned int l, const unsigned int bits,
-                                    unsigned int * const codewordlen)
+static unsigned int FNAME(golomb_decoding)(const unsigned int l, const unsigned int bits,
+                                           unsigned int * const codewordlen)
 {
     if (bits > VNAME(family).notGRprefixmask[l]) { /*GR*/
         const unsigned int zeroprefix = cnt_l_zeroes(bits);       /* leading zeroes in codeword */

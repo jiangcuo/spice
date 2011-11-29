@@ -35,6 +35,21 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+@SUPPORT_TUNNEL_TRUE@am__append_1 = \
+@SUPPORT_TUNNEL_TRUE@	red_tunnel_worker.c	\
+@SUPPORT_TUNNEL_TRUE@	red_tunnel_worker.h	\
+@SUPPORT_TUNNEL_TRUE@	$(NULL)
+
+@SUPPORT_GL_TRUE@am__append_2 = \
+@SUPPORT_GL_TRUE@	reds_gl_canvas.c	\
+@SUPPORT_GL_TRUE@	reds_gl_canvas.h	\
+@SUPPORT_GL_TRUE@	$(NULL)
+
+@SUPPORT_SMARTCARD_TRUE@am__append_3 = \
+@SUPPORT_SMARTCARD_TRUE@	smartcard.c		\
+@SUPPORT_SMARTCARD_TRUE@	smartcard.h		\
+@SUPPORT_SMARTCARD_TRUE@	$(NULL)
+
 subdir = server
 DIST_COMMON = $(libspice_serverinclude_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
@@ -71,50 +86,45 @@ am__installdirs = "$(DESTDIR)$(libdir)" \
 	"$(DESTDIR)$(libspice_serverincludedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-libspice_server_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+libspice_server_la_DEPENDENCIES =  \
+	$(top_builddir)/common/libspice-common.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am__libspice_server_la_SOURCES_DIST = agent-msg-filter.c \
-	agent-msg-filter.h demarshallers.h glz_encoder.c \
+	agent-msg-filter.h char_device.h demarshallers.h \
+	generated_demarshallers.c generated_marshallers.c \
+	generated_marshallers.h glz_encoder.c glz_encoder.h \
 	glz_encoder_config.h glz_encoder_dictionary.c \
 	glz_encoder_dictionary.h glz_encoder_dictionary_protected.h \
-	glz_encoder.h jpeg_encoder.c jpeg_encoder.h mjpeg_encoder.h \
-	mjpeg_encoder.c red_bitmap_utils.h red_client_cache.h \
-	red_client_shared_cache.h red_common.h red_dispatcher.c \
-	red_dispatcher.h red_memslots.c red_memslots.h red_parse_qxl.c \
-	red_parse_qxl.h reds.c reds.h stat.h red_worker.c red_worker.h \
-	snd_worker.c snd_worker.h red_channel.h red_channel.c spice.h \
-	spice-experimental.h generated_demarshallers.c \
-	generated_marshallers.c generated_marshallers.h zlib_encoder.c \
-	zlib_encoder.h char_device.h red_tunnel_worker.c \
-	red_tunnel_worker.h smartcard.c smartcard.h \
-	$(top_srcdir)/common/sw_canvas.c \
-	$(top_srcdir)/common/pixman_utils.c \
-	$(top_srcdir)/common/lines.c $(top_srcdir)/common/region.c \
-	$(top_srcdir)/common/rop3.c $(top_srcdir)/common/quic.c \
-	$(top_srcdir)/common/lz.c $(top_srcdir)/common/canvas_utils.c \
-	$(top_srcdir)/common/mem.c $(top_srcdir)/common/marshaller.c \
-	$(top_srcdir)/common/gl_canvas.c $(top_srcdir)/common/glc.c \
-	$(top_srcdir)/common/ogl_ctx.c
+	inputs_channel.c inputs_channel.h jpeg_encoder.c \
+	jpeg_encoder.h main_channel.c main_channel.h mjpeg_encoder.c \
+	mjpeg_encoder.h red_bitmap_utils.h red_channel.c red_channel.h \
+	red_client_cache.h red_client_shared_cache.h red_common.h \
+	dispatcher.c dispatcher.h red_dispatcher.c red_dispatcher.h \
+	main_dispatcher.c main_dispatcher.h red_memslots.c \
+	red_memslots.h red_parse_qxl.c red_parse_qxl.h red_worker.c \
+	red_worker.h reds.c reds.h reds_sw_canvas.c reds_sw_canvas.h \
+	snd_worker.c snd_worker.h spice-experimental.h spice.h stat.h \
+	spicevmc.c zlib_encoder.c zlib_encoder.h red_tunnel_worker.c \
+	red_tunnel_worker.h reds_gl_canvas.c reds_gl_canvas.h \
+	smartcard.c smartcard.h
 am__objects_1 =
 @SUPPORT_TUNNEL_TRUE@am__objects_2 = red_tunnel_worker.lo \
 @SUPPORT_TUNNEL_TRUE@	$(am__objects_1)
-@SUPPORT_SMARTCARD_TRUE@am__objects_3 = smartcard.lo $(am__objects_1)
-am__objects_4 = sw_canvas.lo pixman_utils.lo lines.lo region.lo \
-	rop3.lo quic.lo lz.lo canvas_utils.lo mem.lo marshaller.lo \
-	$(am__objects_1)
-@SUPPORT_GL_TRUE@am__objects_5 = gl_canvas.lo glc.lo ogl_ctx.lo \
-@SUPPORT_GL_TRUE@	$(am__objects_1)
-am_libspice_server_la_OBJECTS = agent-msg-filter.lo glz_encoder.lo \
-	glz_encoder_dictionary.lo jpeg_encoder.lo mjpeg_encoder.lo \
-	red_dispatcher.lo red_memslots.lo red_parse_qxl.lo reds.lo \
-	red_worker.lo snd_worker.lo red_channel.lo \
+@SUPPORT_GL_TRUE@am__objects_3 = reds_gl_canvas.lo $(am__objects_1)
+@SUPPORT_SMARTCARD_TRUE@am__objects_4 = smartcard.lo $(am__objects_1)
+am_libspice_server_la_OBJECTS = agent-msg-filter.lo \
 	generated_demarshallers.lo generated_marshallers.lo \
-	zlib_encoder.lo $(am__objects_2) $(am__objects_3) \
-	$(am__objects_4) $(am__objects_5) $(am__objects_1)
+	glz_encoder.lo glz_encoder_dictionary.lo inputs_channel.lo \
+	jpeg_encoder.lo main_channel.lo mjpeg_encoder.lo \
+	red_channel.lo dispatcher.lo red_dispatcher.lo \
+	main_dispatcher.lo red_memslots.lo red_parse_qxl.lo \
+	red_worker.lo reds.lo reds_sw_canvas.lo snd_worker.lo \
+	spicevmc.lo zlib_encoder.lo $(am__objects_1) $(am__objects_2) \
+	$(am__objects_3) $(am__objects_4)
 libspice_server_la_OBJECTS = $(am_libspice_server_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -194,6 +204,7 @@ am__relativize = \
   done; \
   reldir="$$dir2"
 ACLOCAL = @ACLOCAL@
+ALLOCA = @ALLOCA@
 ALSA_CFLAGS = @ALSA_CFLAGS@
 ALSA_LIBS = @ALSA_LIBS@
 AMTAR = @AMTAR@
@@ -218,6 +229,7 @@ CFLAGS = @CFLAGS@
 CFLAGS_CFLAGS = @CFLAGS_CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CXIMAGE_CFLAGS = @CXIMAGE_CFLAGS@
 CXX = @CXX@
 CXXCPP = @CXXCPP@
 CXXDEPMODE = @CXXDEPMODE@
@@ -292,7 +304,6 @@ SLIRP_LIBS = @SLIRP_LIBS@
 SMARTCARD_CFLAGS = @SMARTCARD_CFLAGS@
 SMARTCARD_LIBS = @SMARTCARD_LIBS@
 SPICEC_STATIC_LINKAGE_BSTATIC = @SPICEC_STATIC_LINKAGE_BSTATIC@
-SPICE_COMMON_SRCDIR = @SPICE_COMMON_SRCDIR@
 SPICE_LT_VERSION = @SPICE_LT_VERSION@
 SPICE_NONPKGCONFIG_CFLAGS = @SPICE_NONPKGCONFIG_CFLAGS@
 SPICE_NONPKGCONFIG_LIBS = @SPICE_NONPKGCONFIG_LIBS@
@@ -303,6 +314,7 @@ STRIP = @STRIP@
 VERSION = @VERSION@
 VISIBILITY_HIDDEN_CFLAGS = @VISIBILITY_HIDDEN_CFLAGS@
 WARN_CFLAGS = @WARN_CFLAGS@
+WINDRES = @WINDRES@
 XFIXES_CFLAGS = @XFIXES_CFLAGS@
 XFIXES_LIBS = @XFIXES_LIBS@
 XRANDR12_CFLAGS = @XRANDR12_CFLAGS@
@@ -355,7 +367,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-red_target = @red_target@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -367,124 +378,58 @@ top_srcdir = @top_srcdir@
 SUBDIRS = . tests
 NULL = 
 INCLUDES = \
-	-I.					\
+	-I$(top_srcdir)				\
 	-I$(top_srcdir)/common			\
-	-I$(top_srcdir)/common/linux	\
-	$(PROTOCOL_CFLAGS)			\
-	$(JPEG_CFLAGS)				\
-	$(PIXMAN_CFLAGS)			\
-	$(GL_CFLAGS)				\
-	$(SSL_CFLAGS)				\
-	$(SASL_CFLAGS)				\
-	$(CELT051_CFLAGS)			\
-	$(SLIRP_CFLAGS)				\
-	-DSW_CANVAS_IMAGE_CACHE			\
 	-DRED_STATISTICS			\
-	$(WARN_CFLAGS)                          \
+	$(Z_LIBS)				\
+	$(CELT051_CFLAGS)			\
+	$(PIXMAN_CFLAGS)			\
+	$(PROTOCOL_CFLAGS)			\
+	$(SASL_CFLAGS)				\
+	$(SLIRP_CFLAGS)				\
+	$(SMARTCARD_CFLAGS)			\
+	$(SSL_CFLAGS)				\
 	$(VISIBILITY_HIDDEN_CFLAGS)		\
-	$(SMARTCARD_CFLAGS)				\
+	$(WARN_CFLAGS)				\
 	$(NULL)
 
 spice_built_sources = generated_marshallers.c generated_marshallers.h generated_demarshallers.c
 STRUCTS = -M String -M Rect -M Point -M DisplayBase -M Fill -M Opaque -M Copy -M Blend -M Blackness -M Whiteness -M Invers -M Rop3 -M Stroke -M Text -M Transparent -M AlphaBlend
-@SUPPORT_GL_FALSE@GL_SRCS = 
-@SUPPORT_GL_TRUE@GL_SRCS = \
-@SUPPORT_GL_TRUE@	$(top_srcdir)/common/gl_canvas.c		\
-@SUPPORT_GL_TRUE@	$(top_srcdir)/common/glc.c			\
-@SUPPORT_GL_TRUE@	$(top_srcdir)/common/ogl_ctx.c			\
-@SUPPORT_GL_TRUE@	$(NULL)
-
-COMMON_SRCS = \
-	$(top_srcdir)/common/sw_canvas.c		\
-	$(top_srcdir)/common/pixman_utils.c		\
-	$(top_srcdir)/common/lines.c			\
-	$(top_srcdir)/common/region.c			\
-	$(top_srcdir)/common/rop3.c			\
-	$(top_srcdir)/common/quic.c			\
-	$(top_srcdir)/common/lz.c			\
-	$(top_srcdir)/common/canvas_utils.c		\
-	$(top_srcdir)/common/mem.c			\
-	$(top_srcdir)/common/marshaller.c		\
-	$(NULL)
-
 lib_LTLIBRARIES = libspice-server.la
 libspice_server_la_LDFLAGS = \
-	-version-number $(SPICE_LT_VERSION)	\
+	-version-number $(SPICE_LT_VERSION)				\
 	-Wl,--version-script=$(top_srcdir)/server/spice-server.syms	\
-	-no-undefined				\
+	-no-undefined							\
 	$(NULL)
 
 libspice_server_la_LIBADD = \
-	$(GL_LIBS)				\
-	$(JPEG_LIBS)				\
-	$(PIXMAN_LIBS)				\
-	$(SSL_LIBS)				\
-	$(SASL_LIBS)				\
-	$(CELT051_LIBS)				\
-	$(SLIRP_LIBS)				\
-	$(LIBRT)				\
-	$(Z_LIBS)				\
+	$(top_builddir)/common/libspice-common.la	\
+	$(CELT051_LIBS)					\
+	$(GL_LIBS)					\
+	$(JPEG_LIBS)					\
+	$(LIBRT)					\
+	$(PIXMAN_LIBS)					\
+	$(SASL_LIBS)					\
+	$(SLIRP_LIBS)					\
+	$(SSL_LIBS)					\
 	$(NULL)
 
-@SUPPORT_TUNNEL_FALSE@TUNNEL_SRCS = 
-@SUPPORT_TUNNEL_TRUE@TUNNEL_SRCS = \
-@SUPPORT_TUNNEL_TRUE@	red_tunnel_worker.c	\
-@SUPPORT_TUNNEL_TRUE@	red_tunnel_worker.h	\
-@SUPPORT_TUNNEL_TRUE@	$(NULL)
-
-@SUPPORT_SMARTCARD_FALSE@SMARTCARD_SRCS = 
-@SUPPORT_SMARTCARD_TRUE@SMARTCARD_SRCS = \
-@SUPPORT_SMARTCARD_TRUE@	smartcard.c			\
-@SUPPORT_SMARTCARD_TRUE@	smartcard.h			\
-@SUPPORT_SMARTCARD_TRUE@	$(NULL)
-
-libspice_server_la_SOURCES = \
-	agent-msg-filter.c			\
-	agent-msg-filter.h			\
-	demarshallers.h				\
-	glz_encoder.c				\
-	glz_encoder_config.h			\
-	glz_encoder_dictionary.c		\
-	glz_encoder_dictionary.h		\
-	glz_encoder_dictionary_protected.h	\
-	glz_encoder.h				\
-	jpeg_encoder.c				\
-	jpeg_encoder.h				\
-	mjpeg_encoder.h				\
-	mjpeg_encoder.c				\
-	red_bitmap_utils.h			\
-	red_client_cache.h			\
-	red_client_shared_cache.h		\
-	red_common.h				\
-	red_dispatcher.c			\
-	red_dispatcher.h			\
-	red_memslots.c				\
-	red_memslots.h				\
-	red_parse_qxl.c				\
-	red_parse_qxl.h				\
-	reds.c					\
-	reds.h					\
-	stat.h					\
-	red_worker.c				\
-	red_worker.h				\
-	snd_worker.c				\
-	snd_worker.h				\
-	red_channel.h				\
-	red_channel.c				\
-	spice.h					\
-	spice-experimental.h			\
-	generated_demarshallers.c		\
-	generated_marshallers.c			\
-	generated_marshallers.h			\
-	zlib_encoder.c				\
-	zlib_encoder.h				\
-	char_device.h				\
-	$(TUNNEL_SRCS)				\
-	$(SMARTCARD_SRCS)			\
-	$(COMMON_SRCS)				\
-	$(GL_SRCS)				\
-	$(NULL)
-
+libspice_server_la_SOURCES = agent-msg-filter.c agent-msg-filter.h \
+	char_device.h demarshallers.h generated_demarshallers.c \
+	generated_marshallers.c generated_marshallers.h glz_encoder.c \
+	glz_encoder.h glz_encoder_config.h glz_encoder_dictionary.c \
+	glz_encoder_dictionary.h glz_encoder_dictionary_protected.h \
+	inputs_channel.c inputs_channel.h jpeg_encoder.c \
+	jpeg_encoder.h main_channel.c main_channel.h mjpeg_encoder.c \
+	mjpeg_encoder.h red_bitmap_utils.h red_channel.c red_channel.h \
+	red_client_cache.h red_client_shared_cache.h red_common.h \
+	dispatcher.c dispatcher.h red_dispatcher.c red_dispatcher.h \
+	main_dispatcher.c main_dispatcher.h red_memslots.c \
+	red_memslots.h red_parse_qxl.c red_parse_qxl.h red_worker.c \
+	red_worker.h reds.c reds.h reds_sw_canvas.c reds_sw_canvas.h \
+	snd_worker.c snd_worker.h spice-experimental.h spice.h stat.h \
+	spicevmc.c zlib_encoder.c zlib_encoder.h $(NULL) \
+	$(am__append_1) $(am__append_2) $(am__append_3)
 libspice_serverincludedir = $(includedir)/spice-server
 libspice_serverinclude_HEADERS = \
 	spice.h					\
@@ -574,22 +519,16 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/agent-msg-filter.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/canvas_utils.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dispatcher.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_demarshallers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_marshallers.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gl_canvas.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glz_encoder.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glz_encoder_dictionary.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inputs_channel.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jpeg_encoder.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lines.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lz.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/marshaller.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mem.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_channel.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_dispatcher.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mjpeg_encoder.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ogl_ctx.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pixman_utils.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/quic.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_channel.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_dispatcher.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_memslots.Plo@am__quote@
@@ -597,140 +536,39 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_tunnel_worker.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_worker.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reds.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/region.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rop3.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reds_gl_canvas.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reds_sw_canvas.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/smartcard.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_worker.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sw_canvas.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spicevmc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zlib_encoder.Plo@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c $<
+@am__fastdepCC_FALSE@	$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+@am__fastdepCC_FALSE@	$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
-
-sw_canvas.lo: $(top_srcdir)/common/sw_canvas.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT sw_canvas.lo -MD -MP -MF $(DEPDIR)/sw_canvas.Tpo -c -o sw_canvas.lo `test -f '$(top_srcdir)/common/sw_canvas.c' || echo '$(srcdir)/'`$(top_srcdir)/common/sw_canvas.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sw_canvas.Tpo $(DEPDIR)/sw_canvas.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/sw_canvas.c' object='sw_canvas.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o sw_canvas.lo `test -f '$(top_srcdir)/common/sw_canvas.c' || echo '$(srcdir)/'`$(top_srcdir)/common/sw_canvas.c
-
-pixman_utils.lo: $(top_srcdir)/common/pixman_utils.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT pixman_utils.lo -MD -MP -MF $(DEPDIR)/pixman_utils.Tpo -c -o pixman_utils.lo `test -f '$(top_srcdir)/common/pixman_utils.c' || echo '$(srcdir)/'`$(top_srcdir)/common/pixman_utils.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pixman_utils.Tpo $(DEPDIR)/pixman_utils.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/pixman_utils.c' object='pixman_utils.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o pixman_utils.lo `test -f '$(top_srcdir)/common/pixman_utils.c' || echo '$(srcdir)/'`$(top_srcdir)/common/pixman_utils.c
-
-lines.lo: $(top_srcdir)/common/lines.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT lines.lo -MD -MP -MF $(DEPDIR)/lines.Tpo -c -o lines.lo `test -f '$(top_srcdir)/common/lines.c' || echo '$(srcdir)/'`$(top_srcdir)/common/lines.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/lines.Tpo $(DEPDIR)/lines.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/lines.c' object='lines.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o lines.lo `test -f '$(top_srcdir)/common/lines.c' || echo '$(srcdir)/'`$(top_srcdir)/common/lines.c
-
-region.lo: $(top_srcdir)/common/region.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT region.lo -MD -MP -MF $(DEPDIR)/region.Tpo -c -o region.lo `test -f '$(top_srcdir)/common/region.c' || echo '$(srcdir)/'`$(top_srcdir)/common/region.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/region.Tpo $(DEPDIR)/region.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/region.c' object='region.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o region.lo `test -f '$(top_srcdir)/common/region.c' || echo '$(srcdir)/'`$(top_srcdir)/common/region.c
-
-rop3.lo: $(top_srcdir)/common/rop3.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rop3.lo -MD -MP -MF $(DEPDIR)/rop3.Tpo -c -o rop3.lo `test -f '$(top_srcdir)/common/rop3.c' || echo '$(srcdir)/'`$(top_srcdir)/common/rop3.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rop3.Tpo $(DEPDIR)/rop3.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/rop3.c' object='rop3.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rop3.lo `test -f '$(top_srcdir)/common/rop3.c' || echo '$(srcdir)/'`$(top_srcdir)/common/rop3.c
-
-quic.lo: $(top_srcdir)/common/quic.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT quic.lo -MD -MP -MF $(DEPDIR)/quic.Tpo -c -o quic.lo `test -f '$(top_srcdir)/common/quic.c' || echo '$(srcdir)/'`$(top_srcdir)/common/quic.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/quic.Tpo $(DEPDIR)/quic.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/quic.c' object='quic.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o quic.lo `test -f '$(top_srcdir)/common/quic.c' || echo '$(srcdir)/'`$(top_srcdir)/common/quic.c
-
-lz.lo: $(top_srcdir)/common/lz.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT lz.lo -MD -MP -MF $(DEPDIR)/lz.Tpo -c -o lz.lo `test -f '$(top_srcdir)/common/lz.c' || echo '$(srcdir)/'`$(top_srcdir)/common/lz.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/lz.Tpo $(DEPDIR)/lz.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/lz.c' object='lz.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o lz.lo `test -f '$(top_srcdir)/common/lz.c' || echo '$(srcdir)/'`$(top_srcdir)/common/lz.c
-
-canvas_utils.lo: $(top_srcdir)/common/canvas_utils.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT canvas_utils.lo -MD -MP -MF $(DEPDIR)/canvas_utils.Tpo -c -o canvas_utils.lo `test -f '$(top_srcdir)/common/canvas_utils.c' || echo '$(srcdir)/'`$(top_srcdir)/common/canvas_utils.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/canvas_utils.Tpo $(DEPDIR)/canvas_utils.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/canvas_utils.c' object='canvas_utils.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o canvas_utils.lo `test -f '$(top_srcdir)/common/canvas_utils.c' || echo '$(srcdir)/'`$(top_srcdir)/common/canvas_utils.c
-
-mem.lo: $(top_srcdir)/common/mem.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mem.lo -MD -MP -MF $(DEPDIR)/mem.Tpo -c -o mem.lo `test -f '$(top_srcdir)/common/mem.c' || echo '$(srcdir)/'`$(top_srcdir)/common/mem.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mem.Tpo $(DEPDIR)/mem.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/mem.c' object='mem.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mem.lo `test -f '$(top_srcdir)/common/mem.c' || echo '$(srcdir)/'`$(top_srcdir)/common/mem.c
-
-marshaller.lo: $(top_srcdir)/common/marshaller.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT marshaller.lo -MD -MP -MF $(DEPDIR)/marshaller.Tpo -c -o marshaller.lo `test -f '$(top_srcdir)/common/marshaller.c' || echo '$(srcdir)/'`$(top_srcdir)/common/marshaller.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/marshaller.Tpo $(DEPDIR)/marshaller.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/marshaller.c' object='marshaller.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o marshaller.lo `test -f '$(top_srcdir)/common/marshaller.c' || echo '$(srcdir)/'`$(top_srcdir)/common/marshaller.c
-
-gl_canvas.lo: $(top_srcdir)/common/gl_canvas.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT gl_canvas.lo -MD -MP -MF $(DEPDIR)/gl_canvas.Tpo -c -o gl_canvas.lo `test -f '$(top_srcdir)/common/gl_canvas.c' || echo '$(srcdir)/'`$(top_srcdir)/common/gl_canvas.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/gl_canvas.Tpo $(DEPDIR)/gl_canvas.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/gl_canvas.c' object='gl_canvas.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o gl_canvas.lo `test -f '$(top_srcdir)/common/gl_canvas.c' || echo '$(srcdir)/'`$(top_srcdir)/common/gl_canvas.c
-
-glc.lo: $(top_srcdir)/common/glc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT glc.lo -MD -MP -MF $(DEPDIR)/glc.Tpo -c -o glc.lo `test -f '$(top_srcdir)/common/glc.c' || echo '$(srcdir)/'`$(top_srcdir)/common/glc.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/glc.Tpo $(DEPDIR)/glc.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/glc.c' object='glc.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o glc.lo `test -f '$(top_srcdir)/common/glc.c' || echo '$(srcdir)/'`$(top_srcdir)/common/glc.c
-
-ogl_ctx.lo: $(top_srcdir)/common/ogl_ctx.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ogl_ctx.lo -MD -MP -MF $(DEPDIR)/ogl_ctx.Tpo -c -o ogl_ctx.lo `test -f '$(top_srcdir)/common/ogl_ctx.c' || echo '$(srcdir)/'`$(top_srcdir)/common/ogl_ctx.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/ogl_ctx.Tpo $(DEPDIR)/ogl_ctx.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$(top_srcdir)/common/ogl_ctx.c' object='ogl_ctx.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ogl_ctx.lo `test -f '$(top_srcdir)/common/ogl_ctx.c' || echo '$(srcdir)/'`$(top_srcdir)/common/ogl_ctx.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

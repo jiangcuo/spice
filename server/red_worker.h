@@ -18,17 +18,21 @@
 #ifndef _H_REDWORKER
 #define _H_REDWORKER
 
+#include <unistd.h>
+#include <errno.h>
 #include "red_common.h"
 
 
 static inline void set_bit(int index, uint32_t *addr)
 {
-    __asm__ __volatile__ ("lock btsl %1, %0": : "m" (*addr), "r" (index));
+    uint32_t mask = 1 << index;
+    __sync_or_and_fetch(addr, mask);
 }
 
 static inline void clear_bit(int index, uint32_t *addr)
 {
-    __asm__ __volatile__ ("lock btrl %1, %0": : "m" (*addr), "r" (index));
+    uint32_t mask = ~(1 << index);
+    __sync_and_and_fetch(addr, mask);
 }
 
 static inline int test_bit(int index, uint32_t val)
@@ -77,6 +81,11 @@ enum {
     RED_WORKER_MESSAGE_DESTROY_SURFACE_WAIT_ASYNC,
     /* suspend/windows resolution change command */
     RED_WORKER_MESSAGE_FLUSH_SURFACES_ASYNC,
+
+    RED_WORKER_MESSAGE_DISPLAY_CHANNEL_CREATE,
+    RED_WORKER_MESSAGE_CURSOR_CHANNEL_CREATE,
+
+    RED_WORKER_MESSAGE_COUNT // LAST
 };
 
 typedef uint32_t RedWorkerMessage;
@@ -95,7 +104,6 @@ typedef struct RedDispatcher RedDispatcher;
 typedef struct WorkerInitData {
     struct QXLInstance *qxl;
     int id;
-    int channel;
     uint32_t *pending;
     uint32_t num_renderers;
     uint32_t renderers[RED_MAX_RENDERERS];
@@ -109,7 +117,7 @@ typedef struct WorkerInitData {
     uint8_t memslot_id_bits;
     uint8_t internal_groupslot_id;
     uint32_t n_surfaces;
-    RedDispatcher *dispatcher;
+    RedDispatcher *red_dispatcher;
 } WorkerInitData;
 
 void *red_worker_main(void *arg);

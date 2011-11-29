@@ -15,6 +15,13 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#ifndef SPICE_CANVAS_INTERNAL
+#error "This file shouldn't be compiled directly"
+#endif
 
 #include <math.h>
 #include "sw_canvas.h"
@@ -976,8 +983,8 @@ static void canvas_put_image(SpiceCanvas *spice_canvas,
 {
     SwCanvas *canvas = (SwCanvas *)spice_canvas;
     pixman_image_t *src;
-    int dest_width;
-    int dest_height;
+    uint32_t dest_width;
+    uint32_t dest_height;
     double sx, sy;
     pixman_transform_t transform;
 

@@ -15,9 +15,16 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
-#include <Windows.h>
-#include <Wingdi.h>
+#ifndef SPICE_CANVAS_INTERNAL
+#error "This file shouldn't be compiled directly"
+#endif
+
+#include <windows.h>
+#include <wingdi.h>
 #include "gdi_canvas.h"
 #define GDI_CANVAS
 #include "canvas_base.c"
@@ -471,7 +478,7 @@ static void copy_bitmap_alpha(const uint8_t *src_alpha, int height, int width, i
 
             alphaval = src_alpha[i];
             alphaval = alphaval >> (i_count * i_offset);
-            alphaval = alphaval &= ((uint8_t)0xff >> (8 - i_offset));
+            alphaval &= ((uint8_t)0xff >> (8 - i_offset));
             alphaval = ((255 * alphaval) / ((uint8_t)0xff >> (8 - i_offset)));
 
             dest_bitmap[x * 4 + 3] = alphaval;
@@ -637,7 +644,7 @@ static HBRUSH get_brush(GdiCanvas *canvas, SpiceBrush *brush, RecurciveMutex **b
     case SPICE_BRUSH_TYPE_PATTERN: { 
         GdiCanvas *gdi_surface = NULL;
         HBRUSH hbrush;
-        pixman_image_t *surface;
+        pixman_image_t *surface = NULL;
         HDC dc;
         HBITMAP bitmap;
         HBITMAP prev_bitmap;

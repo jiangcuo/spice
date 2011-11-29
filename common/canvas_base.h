@@ -19,11 +19,17 @@
 #ifndef _H_CANVAS_BASE
 #define _H_CANVAS_BASE
 
+#ifndef SPICE_CANVAS_INTERNAL
+#error "This header shouldn't be included directly"
+#endif
 
 #include "pixman_utils.h"
 #include "lz.h"
 #include "region.h"
 #include "draw.h"
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {

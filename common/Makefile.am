@@ -1,53 +1,77 @@
+if OS_WIN32
 SUBDIRS = win
+endif
 
 NULL =
 
-COMMON_SRCS =				\
-	sw_canvas.h			\
-	sw_canvas.c			\
-	pixman_utils.h			\
-	pixman_utils.c			\
-	canvas_base.h			\
-	canvas_base.c			\
-	canvas_utils.h			\
+noinst_LTLIBRARIES = libspice-common.la
+libspice_common_la_SOURCES =		\
+	bitops.h			\
 	canvas_utils.c			\
+	canvas_utils.h			\
 	draw.h				\
-	gdi_canvas.h			\
-	gdi_canvas.c			\
-	gl_canvas.h			\
-	gl_canvas.c			\
-	glc.h				\
-	glc.c				\
-	gl_utils.h			\
+	lines.c				\
+	lines.h				\
+	lz.c				\
+	lz.h				\
 	lz_common.h			\
+	lz_config.h			\
+	marshaller.c			\
+	marshaller.h			\
+	mem.c				\
+	mem.h				\
+	messages.h			\
 	mutex.h				\
-	ogl_ctx.h			\
-	ogl_ctx.c			\
-	quic.h				\
+	pixman_utils.c			\
+	pixman_utils.h			\
 	quic.c				\
+	quic.h				\
 	quic_config.h			\
 	rect.h				\
-	region.h			\
 	region.c			\
+	region.h			\
 	ring.h				\
-	rop3.h				\
 	rop3.c				\
-	lines.h				\
-	lines.c				\
-	lz.c				\
+	rop3.h				\
+	spice_common.h			\
+	ssl_verify.c			\
+	ssl_verify.h			\
+	backtrace.c			\
+	backtrace.h			\
+	$(NULL)
+
+if SUPPORT_GL
+libspice_common_la_SOURCES +=		\
+	gl_utils.h			\
+	glc.h				\
+	glc.c				\
+	ogl_ctx.h			\
+	ogl_ctx.c			\
+	$(NULL)
+endif
+
+INCLUDES = \
+	$(GL_CFLAGS)			\
+	$(PIXMAN_CFLAGS)		\
+	$(PROTOCOL_CFLAGS)		\
+	$(VISIBILITY_HIDDEN_CFLAGS)	\
+	$(WARN_CFLAGS)			\
+	-std=gnu99			\
+	$(NULL)
+
+EXTRA_DIST =				\
+	canvas_base.c			\
+	canvas_base.h			\
+	gdi_canvas.c			\
+	gdi_canvas.h			\
+	gl_canvas.c			\
+	gl_canvas.h			\
+	sw_canvas.c			\
+	sw_canvas.h			\
 	lz_compress_tmpl.c		\
-	lz_config.h			\
 	lz_decompress_tmpl.c		\
-	lz.h				\
-	marshaller.h			\
-	marshaller.c			\
-	messages.h			\
-	mem.h				\
-	mem.c				\
 	quic_family_tmpl.c		\
 	quic_rgb_tmpl.c			\
 	quic_tmpl.c			\
 	$(NULL)
-
-EXTRA_DIST = $(COMMON_SRCS)
 

@@ -15,6 +15,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -24,11 +27,6 @@
 #include "region.h"
 #include "rect.h"
 #include "mem.h"
-
-#define ASSERT(x) if (!(x)) {                               \
-    printf("%s: ASSERT %s failed\n", __FUNCTION__, #x);     \
-    abort();                                                \
-}
 
 /*  true iff two Boxes overlap */
 #define EXTENTCHECK(r1, r2)        \

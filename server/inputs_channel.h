@@ -15,38 +15,25 @@
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _H_EVENT_SOURCES_P
-#define _H_EVENT_SOURCES_P
+#ifndef _INPUTS_CHANNEL_H_
+#define _INPUTS_CHANNEL_H_
 
-#include "common.h"
+// Inputs channel, dealing with keyboard, mouse, tablet.
+// This include should only be used by reds.c and inputs_channel.c
 
-#include <vector>
+#include <stdint.h>
+#include <spice/vd_agent.h>
 
-class EventSource;
-class Handle_p;
-
-class EventSources_p {
-protected:
-    /* return true if quit should be performed */
-    bool process_system_events();
-    void add_event(HANDLE event, EventSource* source);
-    void remove_event(EventSource* source);
-public:
-    std::vector<EventSource*> _events;
-    std::vector<HANDLE> _handles;
-};
-
-class Handle_p {
-public:
-    Handle_p();
-    virtual ~Handle_p();
-    HANDLE get_handle() { return _event;}
-protected:
-    HANDLE _event;
-};
-
-class Trigger_p: public Handle_p {
-};
+void inputs_init(void);
+int inputs_inited(void);
+int inputs_has_tablet(void);
+const VDAgentMouseState *inputs_get_mouse_state(void);
+void inputs_on_keyboard_leds_change(void *opaque, uint8_t leds);
+int inputs_set_keyboard(SpiceKbdInstance *_keyboard);
+int inputs_set_mouse(SpiceMouseInstance *_mouse);
+int inputs_set_tablet(SpiceTabletInstance *_tablet);
+void inputs_detach_tablet(SpiceTabletInstance *_tablet);
+void inputs_set_tablet_logical_size(int x_res, int y_res);
 
 #endif
 

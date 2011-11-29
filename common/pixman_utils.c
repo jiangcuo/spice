@@ -15,29 +15,18 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
+
 #include "pixman_utils.h"
+#include "spice_common.h"
 #include <spice/macros.h>
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include "mem.h"
-
-#ifndef ASSERT
-#define ASSERT(x) if (!(x)) {                               \
-    printf("%s: ASSERT %s failed\n", __FUNCTION__, #x);     \
-    abort();                                                \
-}
-#endif
-
-#ifndef PANIC
-#define PANIC(str) {                                \
-    printf("%s: panic: %s", __FUNCTION__, str);     \
-    abort();                                        \
-}
-#endif
 
 #define SOLID_RASTER_OP(_name, _size, _type, _equation)  \
 static void                                        \
@@ -1048,7 +1037,7 @@ pixman_image_t *spice_bitmap_try_as_pixman(int src_format,
 #define UINT32_FROM_LE(x) (x)
 #endif
 
-static inline uint32_t rgb_16_555_to_32(uint16_t color)
+static INLINE uint32_t rgb_16_555_to_32(uint16_t color)
 {
     uint32_t ret;
 
@@ -1059,7 +1048,7 @@ static inline uint32_t rgb_16_555_to_32(uint16_t color)
     return ret;
 }
 
-static inline uint16_t rgb_32_to_16_555(uint32_t color)
+static INLINE uint16_t rgb_32_to_16_555(uint32_t color)
 {
     return
         (((color) >> 3) & 0x001f) |
@@ -1321,7 +1310,7 @@ static void bitmap_4be_16_to_16_555(uint8_t* dest, int dest_stride,
     }
 }
 
-static inline int test_bit_be(void* addr, int bit)
+static INLINE int test_bit_be(void* addr, int bit)
 {
     return !!(((uint8_t*)addr)[bit >> 3] & (0x80 >> (bit & 0x07)));
 }

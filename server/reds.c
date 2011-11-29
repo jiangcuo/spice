@@ -15,8 +15,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-
-#include "config.h"
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -51,8 +52,11 @@
 #include <spice/vd_agent.h>
 #include "agent-msg-filter.h"
 
+#include "inputs_channel.h"
+#include "main_channel.h"
 #include "red_common.h"
 #include "red_dispatcher.h"
+#include "main_dispatcher.h"
 #include "snd_worker.h"
 #include <spice/stats.h>
 #include "stat.h"
@@ -60,7 +64,7 @@
 #include "demarshallers.h"
 #include "marshaller.h"
 #include "generated_marshallers.h"
-#include "char_device.h"
+#include "server/char_device.h"
 #ifdef USE_TUNNEL
 #include "red_tunnel_worker.h"
 #endif
@@ -69,11 +73,12 @@
 #endif
 
 SpiceCoreInterface *core = NULL;
-static SpiceKbdInstance *keyboard = NULL;
-static SpiceMouseInstance *mouse = NULL;
-static SpiceTabletInstance *tablet = NULL;
 static SpiceCharDeviceInstance *vdagent = NULL;
 static SpiceMigrateInstance *migration_interface = NULL;
+
+/* Debugging only variable: allow multiple client connections to the spice
+ * server */
+#define SPICE_DEBUG_ALLOW_MC_ENV "SPICE_DEBUG_ALLOW_MC"
 
 #define MIGRATION_NOTIFY_SPICE_KEY "spice_mig_ext"
 
@@ -82,14 +87,8 @@ static SpiceMigrateInstance *migration_interface = NULL;
 #define REDS_MIG_ABORT 2
 #define REDS_MIG_DIFF_VERSION 3
 
-#define REDS_AGENT_WINDOW_SIZE 10
 #define REDS_TOKENS_TO_SEND 5
-#define REDS_NUM_INTERNAL_AGENT_MESSAGES 1
-#define REDS_VDI_PORT_NUM_RECIVE_BUFFS 5
-#define REDS_MAX_SEND_IOVEC 100
-
-#define NET_TEST_WARMUP_BYTES 0
-#define NET_TEST_BYTES (1024 * 250)
+#define REDS_VDI_PORT_NUM_RECEIVE_BUFFS 5
 
 static int spice_port = -1;
 static int spice_secure_port = -1;
@@ -114,42 +113,11 @@ void *red_tunnel = NULL;
 int agent_mouse = TRUE;
 int agent_copypaste = TRUE;
 
-static void openssl_init();
-
 #define MIGRATE_TIMEOUT (1000 * 10) /* 10sec */
-#define PING_INTERVAL (1000 * 10)
-#define KEY_MODIFIERS_TTL (1000 * 2) /*2sec*/
 #define MM_TIMER_GRANULARITY_MS (1000 / 30)
 #define MM_TIME_DELTA 400 /*ms*/
 #define VDI_PORT_WRITE_RETRY_TIMEOUT 100 /*ms*/
 
-// approximate max receive message size
-#define RECIVE_BUF_SIZE \
-    (4096 + (REDS_AGENT_WINDOW_SIZE + REDS_NUM_INTERNAL_AGENT_MESSAGES) * SPICE_AGENT_MAX_DATA_SIZE)
-
-#define SEND_BUF_SIZE 4096
-
-#define SCROLL_LOCK_SCAN_CODE 0x46
-#define NUM_LOCK_SCAN_CODE 0x45
-#define CAPS_LOCK_SCAN_CODE 0x3a
-
-typedef struct IncomingHandler {
-    spice_parse_channel_func_t parser;
-    void *opaque;
-    int shut;
-    uint8_t buf[RECIVE_BUF_SIZE];
-    uint32_t end_pos;
-    void (*handle_message)(void *opaque, size_t size, uint32_t type, void *message);
-} IncomingHandler;
-
-typedef struct OutgoingHandler {
-    void *opaque;
-    uint8_t buf[SEND_BUF_SIZE];
-    uint8_t *now;
-    uint32_t length;
-    void (*select)(void *opaque, int select);
-    void (*may_write)(void *opaque);
-} OutgoingHandler;
 
 typedef struct TicketAuthentication {
     char password[SPICE_MAX_PASSWORD_LENGTH];
@@ -170,13 +138,6 @@ typedef struct MonitorMode {
     uint32_t y_res;
 } MonitorMode;
 
-typedef struct RedsOutItem RedsOutItem;
-struct RedsOutItem {
-    RingItem link;
-    SpiceMarshaller *m;
-    SpiceDataHeader *header;
-};
-
 typedef struct VDIReadBuf {
     RingItem link;
     int len;
@@ -195,7 +156,6 @@ struct SpiceCharDeviceState vdagent_char_device_state = {
 };
 
 typedef struct VDIPortState {
-    int connected;
     uint32_t plug_generation;
 
     uint32_t num_tokens;
@@ -216,32 +176,6 @@ typedef struct VDIPortState {
     VDIChunkHeader vdi_chunk_header;
 } VDIPortState;
 
-typedef struct InputsState {
-    Channel *channel;
-    RedsStream *stream;
-    IncomingHandler in_handler;
-    OutgoingHandler out_handler;
-    VDAgentMouseState mouse_state;
-    int pending_mouse_event;
-    uint32_t motion_count;
-    uint64_t serial; //migrate me
-} InputsState;
-
-typedef struct RedsOutgoingData {
-    Ring pipe;
-    RedsOutItem *item;
-    int vec_size;
-    struct iovec vec_buf[REDS_MAX_SEND_IOVEC];
-    struct iovec *vec;
-} RedsOutgoingData;
-
-enum NetTestStage {
-    NET_TEST_STAGE_INVALID,
-    NET_TEST_STAGE_WARMUP,
-    NET_TEST_STAGE_LATENCY,
-    NET_TEST_STAGE_RATE,
-};
-
 #ifdef RED_STATISTICS
 
 #define REDS_MAX_STAT_NODES 100
@@ -257,49 +191,43 @@ typedef struct RedsStatValue {
 
 #endif
 
-typedef struct RedsMigSpice RedsMigSpice;
-typedef struct RedsMigPendingLink RedsMigPendingLink;
-
-struct RedsMigPendingLink {
-    RedsMigPendingLink *next;
+typedef struct RedsMigPendingLink {
+    RingItem ring_link; // list of links that belongs to the same client
     SpiceLinkMess *link_msg;
     RedsStream *stream;
-};
+} RedsMigPendingLink;
+
+typedef struct RedsMigTargetClient {
+    RingItem link;
+    RedClient *client;
+    Ring pending_links;
+} RedsMigTargetClient;
 
 typedef struct RedsState {
     int listen_socket;
     int secure_listen_socket;
     SpiceWatch *listen_watch;
     SpiceWatch *secure_listen_watch;
-    RedsStream *stream;
-    int disconnecting;
-    uint32_t link_id;
-    uint64_t serial; //migrate me
     VDIPortState agent_state;
-    InputsState *inputs_state;
+    int pending_mouse_event;
+    Ring clients;
+    int num_clients;
+    MainChannel *main_channel;
 
-    int client_semi_mig_cap;
     int mig_wait_connect;
     int mig_wait_disconnect;
-    int mig_wait_prev_complete;
     int mig_inprogress;
-    int mig_connect_ok;
     int expect_migrate;
-    int mig_target;
+    Ring mig_target_clients;
+    int num_mig_target_clients;
     RedsMigSpice *mig_spice;
-    RedsMigPendingLink *mig_pending_links;
-    int num_mig_links;
     int num_of_channels;
-    IncomingHandler in_handler;
-    RedsOutgoingData outgoing;
-    Channel *channels;
-    Channel main_channel;
+    Ring channels;
     int mouse_mode;
     int is_client_mouse_allowed;
     int dispatcher_allows_client_mouse;
     MonitorMode monitor_mode;
     SpiceTimer *mig_timer;
-    SpiceTimer *key_modifiers_timer;
     SpiceTimer *mm_timer;
     SpiceTimer *vdi_port_write_timer;
     int vdi_port_write_timer_started;
@@ -311,17 +239,10 @@ typedef struct RedsState {
     SpiceStat *stat;
     pthread_mutex_t stat_lock;
     RedsStatValue roundtrip_stat;
-    SpiceTimer *ping_timer;
-    int ping_interval;
 #endif
-    uint32_t ping_id;
-    uint32_t net_test_id;
-    int net_test_stage;
     int peer_minor_version;
+    int allow_multiple_clients;
 } RedsState;
-
-uint64_t bitrate_per_sec = ~0;
-static uint64_t latency = 0;
 
 static RedsState *reds = NULL;
 
@@ -385,16 +306,9 @@ struct ChannelSecurityOptions {
     ChannelSecurityOptions *next;
 };
 
-#define ZERO_BUF_SIZE 4096
-
-static uint8_t zero_page[ZERO_BUF_SIZE] = {0};
-
-static void reds_push();
-static void reds_out_item_free(RedsOutItem *item);
 static void migrate_timeout(void *opaque);
-static void reds_mig_pending_links_free(void);
-static void reds_handle_client_migrate_complete(void);
-static void reds_mig_started(void);
+static RedsMigTargetClient* reds_mig_target_client_find(RedClient *client);
+static void reds_mig_target_client_free(RedsMigTargetClient *mig_client);
 
 static ChannelSecurityOptions *channels_security = NULL;
 static int default_channel_security =
@@ -411,11 +325,11 @@ static ChannelSecurityOptions *find_channel_security(int id)
     return now;
 }
 
-static void reds_channel_event(RedsStream *stream, int event)
+static void reds_stream_channel_event(RedsStream *s, int event)
 {
     if (core->base.minor_version < 3 || core->channel_event == NULL)
         return;
-    core->channel_event(event, &stream->info);
+    main_dispatcher_channel_event(event, &s->info);
 }
 
 static ssize_t stream_write_cb(RedsStream *s, const void *buf, size_t size)
@@ -488,23 +402,9 @@ static void reds_link_free(RedLinkInfo *link)
     free(link);
 }
 
-static struct iovec *reds_iovec_skip(struct iovec vec[], int skip, int *vec_size)
-{
-    struct iovec *now = vec;
-
-    while (skip && skip >= now->iov_len) {
-        skip -= now->iov_len;
-        --*vec_size;
-        now++;
-    }
-    now->iov_base = (uint8_t *)now->iov_base + skip;
-    now->iov_len -= skip;
-    return now;
-}
-
 #ifdef RED_STATISTICS
 
-void insert_stat_node(StatNodeRef parent, StatNodeRef ref)
+static void insert_stat_node(StatNodeRef parent, StatNodeRef ref)
 {
     SpiceStatNode *node = &reds->stat->nodes[ref];
     uint32_t pos = INVALID_STAT_REF;
@@ -573,7 +473,7 @@ StatNodeRef stat_add_node(StatNodeRef parent, const char *name, int visible)
     return ref;
 }
 
-void stat_remove(SpiceStatNode *node)
+static void stat_remove(SpiceStatNode *node)
 {
     pthread_mutex_lock(&reds->stat_lock);
     node->flags &= ~SPICE_STAT_NODE_FLAG_ENABLED;
@@ -605,8 +505,10 @@ void stat_remove_counter(uint64_t *counter)
     stat_remove((SpiceStatNode *)(counter - offsetof(SpiceStatNode, value)));
 }
 
-static void reds_update_stat_value(RedsStatValue* stat_value, uint32_t value)
+void reds_update_stat_value(uint32_t value)
 {
+    RedsStatValue *stat_value = &reds->roundtrip_stat;
+
     stat_value->value = value;
     stat_value->min = (stat_value->count ? MIN(stat_value->min, value) : value);
     stat_value->max = MAX(stat_value->max, value);
@@ -617,51 +519,40 @@ static void reds_update_stat_value(RedsStatValue* stat_value, uint32_t value)
 
 #endif
 
-void reds_register_channel(Channel *channel)
+void reds_register_channel(RedChannel *channel)
 {
     ASSERT(reds);
-    channel->next = reds->channels;
-    reds->channels = channel;
+    ring_add(&reds->channels, &channel->link);
     reds->num_of_channels++;
 }
 
-void reds_unregister_channel(Channel *channel)
+void reds_unregister_channel(RedChannel *channel)
 {
-    Channel **now = &reds->channels;
+    if (ring_item_is_linked(&channel->link)) {
+        ring_remove(&channel->link);
+        reds->num_of_channels--;
+    } else {
+        red_printf("not found");
+    }
+}
 
-    while (*now) {
-        if (*now == channel) {
-            *now = channel->next;
-            reds->num_of_channels--;
-            return;
+static RedChannel *reds_find_channel(uint32_t type, uint32_t id)
+{
+    RingItem *now;
+
+    RING_FOREACH(now, &reds->channels) {
+        RedChannel *channel = SPICE_CONTAINEROF(now, RedChannel, link);
+        if (channel->type == type && channel->id == id) {
+            return channel;
         }
-        now = &(*now)->next;
     }
-    red_printf("not found");
+    return NULL;
 }
 
-static Channel *reds_find_channel(uint32_t type, uint32_t id)
-{
-    Channel *channel = reds->channels;
-    while (channel && !(channel->type == type && channel->id == id)) {
-        channel = channel->next;
-    }
-    return channel;
-}
-
-static void reds_shatdown_channels()
-{
-    Channel *channel = reds->channels;
-    while (channel) {
-        channel->shutdown(channel);
-        channel = channel->next;
-    }
-}
-
-static void reds_mig_cleanup()
+static void reds_mig_cleanup(void)
 {
     if (reds->mig_inprogress) {
-        if (reds->mig_wait_connect || reds->mig_wait_prev_complete) {
+        if (reds->mig_wait_connect) {
             SpiceMigrateInterface *sif;
             ASSERT(migration_interface);
             sif = SPICE_CONTAINEROF(migration_interface->base.sif, SpiceMigrateInterface, base);
@@ -670,18 +561,14 @@ static void reds_mig_cleanup()
         reds->mig_inprogress = FALSE;
         reds->mig_wait_connect = FALSE;
         reds->mig_wait_disconnect = FALSE;
-        reds->mig_wait_prev_complete = FALSE;
         core->timer_cancel(reds->mig_timer);
-    }
-    if (reds->num_mig_links) {
-        ASSERT(reds->mig_target);
-        reds_mig_pending_links_free();
     }
 }
 
-static void reds_reset_vdp()
+static void reds_reset_vdp(void)
 {
     VDIPortState *state = &reds->agent_state;
+    SpiceCharDeviceInterface *sif;
 
     while (!ring_is_empty(&state->write_queue)) {
         VDIPortBuf *buf;
@@ -706,346 +593,85 @@ static void reds_reset_vdp()
        messages written by the client */
     state->write_filter.result = AGENT_MSG_FILTER_DISCARD;
     state->write_filter.discard_all = TRUE;
+
+    sif = SPICE_CONTAINEROF(vdagent->base.sif, SpiceCharDeviceInterface, base);
+    if (sif->state) {
+        sif->state(vdagent, 0);
+    }
 }
 
-static void reds_reset_outgoing()
+static int reds_main_channel_connected(void)
 {
-    RedsOutgoingData *outgoing = &reds->outgoing;
-    RingItem *ring_item;
-
-    if (outgoing->item) {
-        reds_out_item_free(outgoing->item);
-        outgoing->item = NULL;
-    }
-    while ((ring_item = ring_get_tail(&outgoing->pipe))) {
-        RedsOutItem *out_item = (RedsOutItem *)ring_item;
-        ring_remove(ring_item);
-        reds_out_item_free(out_item);
-    }
-    outgoing->vec_size = 0;
-    outgoing->vec = outgoing->vec_buf;
+    return main_channel_is_connected(reds->main_channel);
 }
 
-static void reds_disconnect()
+void reds_client_disconnect(RedClient *client)
 {
-    if (!reds->stream || reds->disconnecting) {
+    RedsMigTargetClient *mig_client;
+
+    if (!client || client->disconnecting) {
         return;
     }
 
     red_printf("");
-    reds->disconnecting = TRUE;
-    reds_reset_outgoing();
-    /* Reset write filter to start with clean state on client reconnect */
-    agent_msg_filter_init(&reds->agent_state.write_filter, agent_copypaste,
-                          TRUE);
-    /* Throw away pending chunks from the current (if any) and future
-       messages read from the agent */
-    reds->agent_state.read_filter.result = AGENT_MSG_FILTER_DISCARD;
-    reds->agent_state.read_filter.discard_all = TRUE;
+    /* disconnecting is set to prevent recursion because of the following:
+     * main_channel_client_on_disconnect->
+     *  reds_client_disconnect->red_client_destroy->main_channel...
+     */
+    client->disconnecting = TRUE;
 
-    if (reds->agent_state.connected) {
-        SpiceCharDeviceInterface *sif;
-        sif = SPICE_CONTAINEROF(vdagent->base.sif, SpiceCharDeviceInterface, base);
-        reds->agent_state.connected = 0;
-        if (sif->state) {
-            sif->state(vdagent, reds->agent_state.connected);
-        }
+    // TODO: we need to handle agent properly for all clients!!!! (e.g., cut and paste, how?)
+    // We shouldn't initialize the agent when there are still clients connected
+
+    mig_client = reds_mig_target_client_find(client);
+    if (mig_client) {
+        reds_mig_target_client_free(mig_client);
     }
+    ring_remove(&client->link);
+    reds->num_clients--;
+    red_client_destroy(client);
 
-    reds_shatdown_channels();
-    reds_stream_free(reds->stream);
-    reds->stream = NULL;
-    reds->in_handler.shut = TRUE;
-    reds->link_id = 0;
-    reds->serial = 0;
-    reds->ping_id = 0;
-    reds->net_test_id = 0;
-    reds->net_test_stage = NET_TEST_STAGE_INVALID;
-    reds->in_handler.end_pos = 0;
-    reds->expect_migrate = FALSE;
+   // TODO: we need to handle agent properly for all clients!!!! (e.g., cut and paste, how? Maybe throw away messages
+   // if we are in the middle of one from another client)
+    if (reds->num_clients == 0) {
+       /* Reset write filter to start with clean state on client reconnect */
+        agent_msg_filter_init(&reds->agent_state.write_filter, agent_copypaste,
+                              TRUE);
 
-    bitrate_per_sec = ~0;
-    latency = 0;
+        /* Throw away pending chunks from the current (if any) and future
+         *  messages read from the agent */
+        reds->agent_state.read_filter.result = AGENT_MSG_FILTER_DISCARD;
+        reds->agent_state.read_filter.discard_all = TRUE;
 
-    reds_mig_cleanup();
-    reds->disconnecting = FALSE;
+        reds_mig_cleanup();
+    }
 }
 
-static void reds_mig_disconnect()
+// TODO: go over all usage of reds_disconnect, most/some of it should be converted to
+// reds_client_disconnect
+static void reds_disconnect(void)
 {
-    if (reds->stream) {
+    RingItem *link, *next;
+
+    red_printf("");
+    RING_FOREACH_SAFE(link, next, &reds->clients) {
+        reds_client_disconnect(SPICE_CONTAINEROF(link, RedClient, link));
+    }
+    reds_mig_cleanup();
+}
+
+static void reds_mig_disconnect(void)
+{
+    if (reds_main_channel_connected()) {
         reds_disconnect();
     } else {
         reds_mig_cleanup();
     }
 }
 
-static int handle_incoming(RedsStream *stream, IncomingHandler *handler)
+int reds_get_mouse_mode(void)
 {
-    for (;;) {
-        uint8_t *buf = handler->buf;
-        uint32_t pos = handler->end_pos;
-        uint8_t *end = buf + pos;
-        SpiceDataHeader *header;
-        int n;
-        n = reds_stream_read(stream, buf + pos, RECIVE_BUF_SIZE - pos);
-        if (n <= 0) {
-            if (n == 0) {
-                return -1;
-            }
-            switch (errno) {
-            case EAGAIN:
-                return 0;
-            case EINTR:
-                break;
-            case EPIPE:
-                return -1;
-            default:
-                red_printf("%s", strerror(errno));
-                return -1;
-            }
-        } else {
-            pos += n;
-            end = buf + pos;
-            while (buf + sizeof(SpiceDataHeader) <= end &&
-                   buf + sizeof(SpiceDataHeader) + (header = (SpiceDataHeader *)buf)->size <= end) {
-                uint8_t *data = (uint8_t *)(header+1);
-                size_t parsed_size;
-                uint8_t *parsed;
-                message_destructor_t parsed_free;
-
-
-                buf += sizeof(SpiceDataHeader) + header->size;
-                parsed = handler->parser(data, data + header->size, header->type,
-                                         SPICE_VERSION_MINOR, &parsed_size, &parsed_free);
-                if (parsed == NULL) {
-                    red_printf("failed to parse message type %d", header->type);
-                    return -1;
-                }
-                handler->handle_message(handler->opaque, parsed_size, header->type, parsed);
-                parsed_free(parsed);
-                if (handler->shut) {
-                    return -1;
-                }
-            }
-            memmove(handler->buf, buf, (handler->end_pos = end - buf));
-        }
-    }
-}
-
-static int handle_outgoing(RedsStream *stream, OutgoingHandler *handler)
-{
-    if (!handler->length) {
-        return 0;
-    }
-
-    while (handler->length) {
-        int n;
-
-        n = reds_stream_write(stream, handler->now, handler->length);
-        if (n <= 0) {
-            if (n == 0) {
-                return -1;
-            }
-            switch (errno) {
-            case EAGAIN:
-                return 0;
-            case EINTR:
-                break;
-            case EPIPE:
-                return -1;
-            default:
-                red_printf("%s", strerror(errno));
-                return -1;
-            }
-        } else {
-            handler->now += n;
-            handler->length -= n;
-        }
-    }
-    handler->select(handler->opaque, FALSE);
-    handler->may_write(handler->opaque);
-    return 0;
-}
-
-#define OUTGOING_OK 0
-#define OUTGOING_FAILED -1
-#define OUTGOING_BLOCKED 1
-
-static int outgoing_write(RedsStream *stream, OutgoingHandler *handler, void *in_data,
-                          int length)
-{
-    uint8_t *data = in_data;
-    ASSERT(length <= SEND_BUF_SIZE);
-    if (handler->length) {
-        return OUTGOING_BLOCKED;
-    }
-
-    while (length) {
-        int n = reds_stream_write(stream, data, length);
-        if (n < 0) {
-            switch (errno) {
-            case EAGAIN:
-                handler->length = length;
-                memcpy(handler->buf, data, length);
-                handler->select(handler->opaque, TRUE);
-                return OUTGOING_OK;
-            case EINTR:
-                break;
-            case EPIPE:
-                return OUTGOING_FAILED;
-            default:
-                red_printf("%s", strerror(errno));
-                return OUTGOING_FAILED;
-            }
-        } else {
-            data += n;
-            length -= n;
-        }
-    }
-    return OUTGOING_OK;
-}
-
-static RedsOutItem *new_out_item(uint32_t type)
-{
-    RedsOutItem *item;
-
-    item = spice_new(RedsOutItem, 1);
-    ring_item_init(&item->link);
-
-    item->m = spice_marshaller_new();
-    item->header = (SpiceDataHeader *)
-        spice_marshaller_reserve_space(item->m, sizeof(SpiceDataHeader));
-    spice_marshaller_set_base(item->m, sizeof(SpiceDataHeader));
-
-    item->header->serial = ++reds->serial;
-    item->header->type = type;
-    item->header->sub_list = 0;
-
-    return item;
-}
-
-static void reds_out_item_free(RedsOutItem *item)
-{
-    spice_marshaller_destroy(item->m);
-    free(item);
-}
-
-static void reds_push_pipe_item(RedsOutItem *item)
-{
-    ring_add(&reds->outgoing.pipe, &item->link);
-    reds_push();
-}
-
-static void reds_send_channels()
-{
-    SpiceMsgChannels* channels_info;
-    RedsOutItem *item;
-    Channel *channel;
-    int i;
-
-    if (reds->mig_target) {
-        red_printf("warning: unexpected SPICE_MSGC_MAIN_ATTACH_CHANNELS during migration");
-        return;
-    }
-
-    item = new_out_item(SPICE_MSG_MAIN_CHANNELS_LIST);
-    channels_info = (SpiceMsgChannels *)spice_malloc(sizeof(SpiceMsgChannels) + reds->num_of_channels * sizeof(SpiceChannelId));
-    channels_info->num_of_channels = reds->num_of_channels;
-    channel = reds->channels;
-
-    for (i = 0; i < reds->num_of_channels; i++) {
-        ASSERT(channel);
-        channels_info->channels[i].type = channel->type;
-        channels_info->channels[i].id = channel->id;
-        channel = channel->next;
-    }
-    spice_marshall_msg_main_channels_list(item->m, channels_info);
-    free(channels_info);
-    reds_push_pipe_item(item);
-}
-
-static int send_ping(int size)
-{
-    struct timespec time_space;
-    RedsOutItem *item;
-    SpiceMsgPing ping;
-
-    if (!reds->stream) {
-        return FALSE;
-    }
-    item = new_out_item(SPICE_MSG_PING);
-    ping.id = ++reds->ping_id;
-    clock_gettime(CLOCK_MONOTONIC, &time_space);
-    ping.timestamp = time_space.tv_sec * 1000000LL + time_space.tv_nsec / 1000LL;
-    spice_marshall_msg_ping(item->m, &ping);
-
-    while (size > 0) {
-        int now = MIN(ZERO_BUF_SIZE, size);
-        size -= now;
-        spice_marshaller_add_ref(item->m, zero_page, now);
-    }
-
-    reds_push_pipe_item(item);
-
-    return TRUE;
-}
-
-#ifdef RED_STATISTICS
-
-static void do_ping_client(const char *opt, int has_interval, int interval)
-{
-    if (!reds->stream) {
-        red_printf("not connected to stream");
-        return;
-    }
-
-    if (!opt) {
-        send_ping(0);
-    } else if (!strcmp(opt, "on")) {
-        if (has_interval && interval > 0) {
-            reds->ping_interval = interval * 1000;
-        }
-        core->timer_start(reds->ping_timer, reds->ping_interval);
-    } else if (!strcmp(opt, "off")) {
-        core->timer_cancel(reds->ping_timer);
-    } else {
-        return;
-    }
-}
-
-static void ping_timer_cb()
-{
-    if (!reds->stream) {
-        red_printf("not connected to stream, ping off");
-        core->timer_cancel(reds->ping_timer);
-        return;
-    }
-    do_ping_client(NULL, 0, 0);
-    core->timer_start(reds->ping_timer, reds->ping_interval);
-}
-
-#endif
-
-static void reds_send_mouse_mode()
-{
-    SpiceMsgMainMouseMode mouse_mode;
-    RedsOutItem *item;
-
-    if (!reds->stream || reds->mig_target) {
-        return;
-    }
-
-    item = new_out_item(SPICE_MSG_MAIN_MOUSE_MODE);
-    mouse_mode.supported_modes = SPICE_MOUSE_MODE_SERVER;
-    if (reds->is_client_mouse_allowed) {
-        mouse_mode.supported_modes |= SPICE_MOUSE_MODE_CLIENT;
-    }
-    mouse_mode.current_mode = reds->mouse_mode;
-
-    spice_marshall_msg_main_mouse_mode(item->m, &mouse_mode);
-
-    reds_push_pipe_item(item);
+    return reds->mouse_mode;
 }
 
 static void reds_set_mouse_mode(uint32_t mode)
@@ -1055,15 +681,20 @@ static void reds_set_mouse_mode(uint32_t mode)
     }
     reds->mouse_mode = mode;
     red_dispatcher_set_mouse_mode(reds->mouse_mode);
-    reds_send_mouse_mode();
+    main_channel_push_mouse_mode(reds->main_channel, reds->mouse_mode, reds->is_client_mouse_allowed);
 }
 
-static void reds_update_mouse_mode()
+int reds_get_agent_mouse(void)
+{
+    return agent_mouse;
+}
+
+static void reds_update_mouse_mode(void)
 {
     int allowed = 0;
     int qxl_count = red_dispatcher_qxl_count();
 
-    if ((agent_mouse && vdagent) || (tablet && qxl_count == 1)) {
+    if ((agent_mouse && vdagent) || (inputs_has_tablet() && qxl_count == 1)) {
         allowed = reds->dispatcher_allows_client_mouse;
     }
     if (allowed == reds->is_client_mouse_allowed) {
@@ -1074,78 +705,37 @@ static void reds_update_mouse_mode()
         reds_set_mouse_mode(SPICE_MOUSE_MODE_SERVER);
         return;
     }
-    reds_send_mouse_mode();
-}
-
-static void reds_send_agent_connected()
-{
-    RedsOutItem *item;
-
-    item = new_out_item(SPICE_MSG_MAIN_AGENT_CONNECTED);
-    reds_push_pipe_item(item);
-}
-
-static void reds_send_agent_disconnected()
-{
-    SpiceMsgMainAgentDisconnect disconnect;
-    RedsOutItem *item;
-
-    item = new_out_item(SPICE_MSG_MAIN_AGENT_DISCONNECTED);
-    disconnect.error_code = SPICE_LINK_ERR_OK;
-    spice_marshall_msg_main_agent_disconnected(item->m, &disconnect);
-    reds_push_pipe_item(item);
-}
-
-static void reds_agent_remove()
-{
-    SpiceCharDeviceInstance *sin = vdagent;
-    SpiceCharDeviceInterface *sif;
-
-    // TODO: is this cond needed
-    if (!reds->mig_target) {
-        reds_reset_vdp();
+    if (reds->main_channel) {
+        main_channel_push_mouse_mode(reds->main_channel, reds->mouse_mode,
+                                     reds->is_client_mouse_allowed);
     }
+}
 
-    reds->agent_state.connected = 0;
+static void reds_agent_remove(void)
+{
+    // TODO: agent is broken with multiple clients. also need to figure out what to do when
+    // part of the clients are during target migration.
+    reds_reset_vdp();
+
     vdagent = NULL;
     reds_update_mouse_mode();
-    if (!reds->stream || !sin) {
-        return;
-    }
-    sif = SPICE_CONTAINEROF(sin->base.sif, SpiceCharDeviceInterface, base);
-    if (sif->state) {
-        sif->state(sin, reds->agent_state.connected);
-    }
 
-    if (reds->mig_target) {
-        return;
+    if (reds_main_channel_connected()) {
+        main_channel_push_agent_disconnected(reds->main_channel);
     }
-    reds_send_agent_disconnected();
 }
 
-static void reds_send_tokens()
+static void reds_push_tokens(void)
 {
-    SpiceMsgMainAgentTokens tokens;
-    RedsOutItem *item;
-
-    if (!reds->stream || reds->mig_target) {
-        return;
-    }
-
-    item = new_out_item(SPICE_MSG_MAIN_AGENT_TOKEN);
-    tokens.num_tokens = reds->agent_state.num_tokens;
-    reds->agent_state.num_client_tokens += tokens.num_tokens;
+    reds->agent_state.num_client_tokens += reds->agent_state.num_tokens;
     ASSERT(reds->agent_state.num_client_tokens <= REDS_AGENT_WINDOW_SIZE);
+    main_channel_push_tokens(reds->main_channel, reds->agent_state.num_tokens);
     reds->agent_state.num_tokens = 0;
-
-    spice_marshall_msg_main_agent_token(item->m, &tokens);
-
-    reds_push_pipe_item(item);
 }
 
-static int write_to_vdi_port();
+static int write_to_vdi_port(void);
 
-static void vdi_port_write_timer_start()
+static void vdi_port_write_timer_start(void)
 {
     if (reds->vdi_port_write_timer_started) {
         return;
@@ -1155,13 +745,13 @@ static void vdi_port_write_timer_start()
                       VDI_PORT_WRITE_RETRY_TIMEOUT);
 }
 
-static void vdi_port_write_retry()
+static void vdi_port_write_retry(void *opaque)
 {
     reds->vdi_port_write_timer_started = FALSE;
     write_to_vdi_port();
 }
 
-static int write_to_vdi_port()
+static int write_to_vdi_port(void)
 {
     VDIPortState *state = &reds->agent_state;
     SpiceCharDeviceInterface *sif;
@@ -1170,7 +760,7 @@ static int write_to_vdi_port()
     int total = 0;
     int n;
 
-    if (!vdagent || reds->mig_target) {
+    if (!vdagent) {
         return 0;
     }
 
@@ -1202,7 +792,7 @@ static int write_to_vdi_port()
 
 static int read_from_vdi_port(void);
 
-void vdi_read_buf_release(uint8_t *data, void *opaque)
+static void vdi_read_buf_release(uint8_t *data, void *opaque)
 {
     VDIReadBuf *buf = (VDIReadBuf *)opaque;
 
@@ -1218,7 +808,6 @@ void vdi_read_buf_release(uint8_t *data, void *opaque)
 static void dispatch_vdi_port_data(int port, VDIReadBuf *buf)
 {
     VDIPortState *state = &reds->agent_state;
-    RedsOutItem *item;
     int res;
 
     switch (port) {
@@ -1236,10 +825,8 @@ static void dispatch_vdi_port_data(int port, VDIReadBuf *buf)
             reds_agent_remove();
             return;
         }
-        item = new_out_item(SPICE_MSG_MAIN_AGENT_DATA);
-        spice_marshaller_add_ref_full(item->m, buf->data, buf->len,
-                                      vdi_read_buf_release, buf);
-        reds_push_pipe_item(item);
+        main_channel_push_agent_data(reds->main_channel, buf->data, buf->len,
+                                     vdi_read_buf_release, buf);
         break;
     }
     case VDP_SERVER_PORT:
@@ -1277,8 +864,8 @@ static int read_from_vdi_port(void)
     }
     inside_call = 1;
 
-    if (reds->mig_target || !vdagent) {
-        // discard data only if we are migrating or vdagent has not been
+    if (!vdagent) {
+        // discard data only if we are migrating (?) or vdagent has not been
         // initialized.
         inside_call = 0;
         return 0;
@@ -1351,57 +938,171 @@ void vdagent_char_device_wakeup(SpiceCharDeviceInstance *sin)
     while (read_from_vdi_port());
 }
 
-static void reds_handle_agent_mouse_event()
+int reds_has_vdagent(void)
+{
+    return !!vdagent;
+}
+
+void reds_handle_agent_mouse_event(const VDAgentMouseState *mouse_state)
 {
     RingItem *ring_item;
     VDInternalBuf *buf;
 
-    if (!reds->inputs_state) {
+    if (!inputs_inited()) {
         return;
     }
-    if (reds->mig_target || !(ring_item = ring_get_head(&reds->agent_state.internal_bufs))) {
-        reds->inputs_state->pending_mouse_event = TRUE;
+    if (!(ring_item = ring_get_head(&reds->agent_state.internal_bufs))) {
+        reds->pending_mouse_event = TRUE;
         vdi_port_write_timer_start();
         return;
     }
-    reds->inputs_state->pending_mouse_event = FALSE;
+    reds->pending_mouse_event = FALSE;
     ring_remove(ring_item);
     buf = (VDInternalBuf *)ring_item;
     buf->base.now = (uint8_t *)&buf->base.chunk_header;
     buf->base.write_len = sizeof(VDIChunkHeader) + sizeof(VDAgentMessage) +
                           sizeof(VDAgentMouseState);
-    buf->u.mouse_state = reds->inputs_state->mouse_state;
+    buf->u.mouse_state = *mouse_state;
     ring_add(&reds->agent_state.write_queue, &buf->base.link);
     write_to_vdi_port();
 }
 
-static void add_token()
+static void add_token(void)
 {
     VDIPortState *state = &reds->agent_state;
 
     if (++state->num_tokens == REDS_TOKENS_TO_SEND) {
-        reds_send_tokens();
+        reds_push_tokens();
     }
 }
 
-typedef struct MainMigrateData {
-    uint32_t version;
-    uint32_t serial;
-    uint32_t ping_id;
+int reds_num_of_channels(void)
+{
+    return reds ? reds->num_of_channels : 0;
+}
 
-    uint32_t agent_connected;
-    uint32_t client_agent_started;
-    uint32_t num_client_tokens;
-    uint32_t send_tokens;
+int reds_num_of_clients(void)
+{
+    return reds ? reds->num_clients : 0;
+}
 
-    uint32_t read_state;
-    VDIChunkHeader vdi_chunk_header;
-    uint32_t recive_len;
-    uint32_t message_recive_len;
-    uint32_t read_buf_len;
+SPICE_GNUC_VISIBLE int spice_server_get_num_clients(SpiceServer *s)
+{
+    ASSERT(reds == s);
+    return reds_num_of_clients();
+}
 
-    uint32_t write_queue_size;
-} MainMigrateData;
+static int secondary_channels[] = {
+    SPICE_CHANNEL_MAIN, SPICE_CHANNEL_DISPLAY, SPICE_CHANNEL_CURSOR, SPICE_CHANNEL_INPUTS};
+
+static int channel_is_secondary(RedChannel *channel)
+{
+    int i;
+    for (i = 0 ; i < sizeof(secondary_channels)/sizeof(secondary_channels[0]); ++i) {
+        if (channel->type == secondary_channels[i]) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+void reds_fill_channels(SpiceMsgChannels *channels_info)
+{
+    RingItem *now;
+    int used_channels = 0;
+
+    channels_info->num_of_channels = reds->num_of_channels;
+    RING_FOREACH(now, &reds->channels) {
+        RedChannel *channel = SPICE_CONTAINEROF(now, RedChannel, link);
+        if (reds->num_clients > 1 && !channel_is_secondary(channel)) {
+            continue;
+        }
+        channels_info->channels[used_channels].type = channel->type;
+        channels_info->channels[used_channels].id = channel->id;
+        used_channels++;
+    }
+
+    channels_info->num_of_channels = used_channels;
+    if (used_channels != reds->num_of_channels) {
+        red_printf("sent %d out of %d", used_channels, reds->num_of_channels);
+    }
+}
+
+void reds_on_main_agent_start(void)
+{
+    if (!vdagent) {
+        return;
+    }
+    reds->agent_state.write_filter.discard_all = FALSE;
+}
+
+void reds_on_main_agent_data(MainChannelClient *mcc, void *message, size_t size)
+{
+    // TODO - use mcc (and start tracking agent data per channel. probably just move the whole
+    // tokens accounting to mainchannel.
+    RingItem *ring_item;
+    VDAgentExtBuf *buf;
+    int res;
+
+    if (!reds->agent_state.num_client_tokens) {
+        red_printf("token violation");
+        reds_disconnect();
+        return;
+    }
+    --reds->agent_state.num_client_tokens;
+
+    res = agent_msg_filter_process_data(&reds->agent_state.write_filter,
+                                        message, size);
+    switch (res) {
+    case AGENT_MSG_FILTER_OK:
+        break;
+    case AGENT_MSG_FILTER_DISCARD:
+        add_token();
+        return;
+    case AGENT_MSG_FILTER_PROTO_ERROR:
+        reds_disconnect();
+        return;
+    }
+
+    if (!(ring_item = ring_get_head(&reds->agent_state.external_bufs))) {
+        red_printf("no agent free bufs");
+        reds_disconnect();
+        return;
+    }
+    ring_remove(ring_item);
+    buf = (VDAgentExtBuf *)ring_item;
+    buf->base.now = (uint8_t *)&buf->base.chunk_header.port;
+    buf->base.write_len = size + sizeof(VDIChunkHeader);
+    buf->base.chunk_header.size = size;
+    memcpy(buf->buf, message, size);
+    ring_add(&reds->agent_state.write_queue, ring_item);
+    write_to_vdi_port();
+}
+
+void reds_on_main_migrate_connected(void)
+{
+    if (reds->mig_wait_connect) {
+        reds_mig_cleanup();
+    }
+}
+
+void reds_on_main_mouse_mode_request(void *message, size_t size)
+{
+    switch (((SpiceMsgcMainMouseModeRequest *)message)->mode) {
+    case SPICE_MOUSE_MODE_CLIENT:
+        if (reds->is_client_mouse_allowed) {
+            reds_set_mouse_mode(SPICE_MOUSE_MODE_CLIENT);
+        } else {
+            red_printf("client mouse is disabled");
+        }
+        break;
+    case SPICE_MOUSE_MODE_SERVER:
+        reds_set_mouse_mode(SPICE_MOUSE_MODE_SERVER);
+        break;
+    default:
+        red_printf("unsupported mouse mode");
+    }
+}
 
 #define MAIN_CHANNEL_MIG_DATA_VERSION 1
 
@@ -1410,22 +1111,15 @@ typedef struct WriteQueueInfo {
     uint32_t len;
 } WriteQueueInfo;
 
-static void main_channel_push_migrate_data_item()
+void reds_marshall_migrate_data_item(SpiceMarshaller *m, MainMigrateData *data)
 {
-    RedsOutItem *item;
-    MainMigrateData *data;
     VDIPortState *state = &reds->agent_state;
     int buf_index;
     RingItem *now;
 
-    item = new_out_item(SPICE_MSG_MIGRATE_DATA);
-
-    data = (MainMigrateData *)spice_marshaller_reserve_space(item->m, sizeof(MainMigrateData));
     data->version = MAIN_CHANNEL_MIG_DATA_VERSION;
-    data->serial = reds->serial;
-    data->ping_id = reds->ping_id;
 
-    data->agent_connected = !!state->connected;
+    data->agent_connected = !!vdagent;
     data->client_agent_started = !state->write_filter.discard_all;
     data->num_client_tokens = state->num_client_tokens;
     data->send_tokens = ~0;
@@ -1439,7 +1133,7 @@ static void main_channel_push_migrate_data_item()
         data->read_buf_len = state->current_read_buf->len;
 
         if (data->read_buf_len - data->recive_len) {
-            spice_marshaller_add_ref(item->m,
+            spice_marshaller_add_ref(m,
                                      state->current_read_buf->data,
                                      data->read_buf_len - data->recive_len);
         }
@@ -1456,7 +1150,7 @@ static void main_channel_push_migrate_data_item()
         WriteQueueInfo *queue_info;
 
         queue_info = (WriteQueueInfo *)
-            spice_marshaller_reserve_space(item->m,
+            spice_marshaller_reserve_space(m,
                                            data->write_queue_size * sizeof(queue_info[0]));
 
         buf_index = 0;
@@ -1465,15 +1159,13 @@ static void main_channel_push_migrate_data_item()
             VDIPortBuf *buf = (VDIPortBuf *)now;
             queue_info[buf_index].port = buf->chunk_header.port;
             queue_info[buf_index++].len = buf->write_len;
-            spice_marshaller_add_ref(item->m, buf->now, buf->write_len);
+            spice_marshaller_add_ref(m, buf->now, buf->write_len);
         }
     }
-
-    reds_push_pipe_item((RedsOutItem *)item);
 }
 
 
-static int main_channel_restore_vdi_read_state(MainMigrateData *data, uint8_t **in_pos,
+static int reds_main_channel_restore_vdi_read_state(MainMigrateData *data, uint8_t **in_pos,
                                                uint8_t *end)
 {
     VDIPortState *state = &reds->agent_state;
@@ -1558,7 +1250,7 @@ static void free_tmp_internal_buf(VDIPortBuf *buf)
     free(buf);
 }
 
-static int main_channel_restore_vdi_wqueue(MainMigrateData *data, uint8_t *pos, uint8_t *end)
+static int reds_main_channel_restore_vdi_wqueue(MainMigrateData *data, uint8_t *pos, uint8_t *end)
 {
     VDIPortState *state = &reds->agent_state;
     WriteQueueInfo *inf;
@@ -1629,7 +1321,7 @@ static int main_channel_restore_vdi_wqueue(MainMigrateData *data, uint8_t *pos, 
     return TRUE;
 }
 
-static void main_channel_recive_migrate_data(MainMigrateData *data, uint8_t *end)
+void reds_on_main_receive_migrate_data(MainMigrateData *data, uint8_t *end)
 {
     VDIPortState *state = &reds->agent_state;
     uint8_t *pos;
@@ -1640,29 +1332,26 @@ static void main_channel_recive_migrate_data(MainMigrateData *data, uint8_t *end
         return;
     }
 
-    reds->serial = data->serial;
-    reds->ping_id = data->ping_id;
-
     state->num_client_tokens = data->num_client_tokens;
     ASSERT(state->num_client_tokens + data->write_queue_size <= REDS_AGENT_WINDOW_SIZE +
                                                                 REDS_NUM_INTERNAL_AGENT_MESSAGES);
     state->num_tokens = REDS_AGENT_WINDOW_SIZE - state->num_client_tokens;
 
     if (!data->agent_connected) {
-        if (state->connected) {
-            reds_send_agent_connected();
+        if (vdagent) {
+            main_channel_push_agent_connected(reds->main_channel);
         }
         return;
     }
 
-    if (!state->connected) {
-        reds_send_agent_disconnected();
+    if (!vdagent) {
+        main_channel_push_agent_disconnected(reds->main_channel);
         return;
     }
 
     if (state->plug_generation > 1) {
-        reds_send_agent_disconnected();
-        reds_send_agent_connected();
+        main_channel_push_agent_disconnected(reds->main_channel);
+        main_channel_push_agent_connected(reds->main_channel);
         return;
     }
 
@@ -1670,262 +1359,20 @@ static void main_channel_recive_migrate_data(MainMigrateData *data, uint8_t *end
 
     pos = (uint8_t *)(data + 1);
 
-    if (!main_channel_restore_vdi_read_state(data, &pos, end)) {
+    if (!reds_main_channel_restore_vdi_read_state(data, &pos, end)) {
         return;
     }
 
-    main_channel_restore_vdi_wqueue(data, pos, end);
+    reds_main_channel_restore_vdi_wqueue(data, pos, end);
     ASSERT(state->num_client_tokens + state->num_tokens == REDS_AGENT_WINDOW_SIZE);
-}
 
-static void reds_main_handle_message(void *opaque, size_t size, uint32_t type, void *message)
-{
-    int res;
-
-    switch (type) {
-    case SPICE_MSGC_MAIN_AGENT_START:
-        red_printf("agent start");
-        if (!reds->stream || !vdagent) {
-            return;
-        }
-        reds->agent_state.write_filter.discard_all = FALSE;
-        break;
-    case SPICE_MSGC_MAIN_AGENT_DATA: {
-        RingItem *ring_item;
-        VDAgentExtBuf *buf;
-
-        if (!reds->agent_state.num_client_tokens) {
-            red_printf("token violation");
-            reds_disconnect();
-            break;
-        }
-        --reds->agent_state.num_client_tokens;
-
-        res = agent_msg_filter_process_data(&reds->agent_state.write_filter,
-                                            message, size);
-        switch (res) {
-        case AGENT_MSG_FILTER_OK:
-            break;
-        case AGENT_MSG_FILTER_DISCARD:
-            add_token();
-            return;
-        case AGENT_MSG_FILTER_PROTO_ERROR:
-            reds_disconnect();
-            return;
-        }
-
-        if (!(ring_item = ring_get_head(&reds->agent_state.external_bufs))) {
-            red_printf("no agent free bufs");
-            reds_disconnect();
-            break;
-        }
-        ring_remove(ring_item);
-        buf = (VDAgentExtBuf *)ring_item;
-        buf->base.now = (uint8_t *)&buf->base.chunk_header.port;
-        buf->base.write_len = size + sizeof(VDIChunkHeader);
-        buf->base.chunk_header.size = size;
-        memcpy(buf->buf, message, size);
-        ring_add(&reds->agent_state.write_queue, ring_item);
-        write_to_vdi_port();
-        break;
-    }
-    case SPICE_MSGC_MAIN_AGENT_TOKEN:
-        break;
-    case SPICE_MSGC_MAIN_ATTACH_CHANNELS:
-        reds_send_channels();
-        break;
-    case SPICE_MSGC_MAIN_MIGRATE_CONNECTED:
-        red_printf("client connected to migration target");
-        if (reds->mig_wait_connect) {
-            reds->mig_connect_ok = TRUE;
-            reds_mig_cleanup();
-        }
-        break;
-    case SPICE_MSGC_MAIN_MIGRATE_CONNECT_ERROR:
-        red_printf("mig connect error");
-        if (reds->mig_wait_connect) {
-            reds->mig_connect_ok = FALSE;
-            reds_mig_cleanup();
-        }
-        break;
-    case SPICE_MSGC_MAIN_MOUSE_MODE_REQUEST: {
-        switch (((SpiceMsgcMainMouseModeRequest *)message)->mode) {
-        case SPICE_MOUSE_MODE_CLIENT:
-            if (reds->is_client_mouse_allowed) {
-                reds_set_mouse_mode(SPICE_MOUSE_MODE_CLIENT);
-            } else {
-                red_printf("client mouse is disabled");
-            }
-            break;
-        case SPICE_MOUSE_MODE_SERVER:
-            reds_set_mouse_mode(SPICE_MOUSE_MODE_SERVER);
-            break;
-        default:
-            red_printf("unsupported mouse mode");
-        }
-        break;
-    }
-    case SPICE_MSGC_PONG: {
-        SpiceMsgPing *ping = (SpiceMsgPing *)message;
-        uint64_t roundtrip;
-        struct timespec ts;
-
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        roundtrip = ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL - ping->timestamp;
-
-        if (ping->id == reds->net_test_id) {
-            switch (reds->net_test_stage) {
-            case NET_TEST_STAGE_WARMUP:
-                reds->net_test_id++;
-                reds->net_test_stage = NET_TEST_STAGE_LATENCY;
-                break;
-            case NET_TEST_STAGE_LATENCY:
-                reds->net_test_id++;
-                reds->net_test_stage = NET_TEST_STAGE_RATE;
-                latency = roundtrip;
-                break;
-            case NET_TEST_STAGE_RATE:
-                reds->net_test_id = 0;
-                if (roundtrip <= latency) {
-                    // probably high load on client or server result with incorrect values
-                    latency = 0;
-                    red_printf("net test: invalid values, latency %lu roundtrip %lu. assuming high"
-                               "bandwidth", latency, roundtrip);
-                    break;
-                }
-                bitrate_per_sec = (uint64_t)(NET_TEST_BYTES * 8) * 1000000 / (roundtrip - latency);
-                red_printf("net test: latency %f ms, bitrate %lu bps (%f Mbps)%s",
-                           (double)latency / 1000,
-                           bitrate_per_sec,
-                           (double)bitrate_per_sec / 1024 / 1024,
-                           IS_LOW_BANDWIDTH() ? " LOW BANDWIDTH" : "");
-                reds->net_test_stage = NET_TEST_STAGE_INVALID;
-                break;
-            default:
-                red_printf("invalid net test stage, ping id %d test id %d stage %d",
-                           ping->id,
-                           reds->net_test_id,
-                           reds->net_test_stage);
-            }
-            break;
-        }
-#ifdef RED_STATISTICS
-        reds_update_stat_value(&reds->roundtrip_stat, roundtrip);
-#endif
-        break;
-    }
-    case SPICE_MSGC_MIGRATE_FLUSH_MARK:
-        main_channel_push_migrate_data_item();
-        break;
-    case SPICE_MSGC_MIGRATE_DATA:
-        main_channel_recive_migrate_data((MainMigrateData *)message,
-                                         ((uint8_t *)message) + size);
-        reds->mig_target = FALSE;
-        while (write_to_vdi_port() || read_from_vdi_port());
-        break;
-    case SPICE_MSGC_DISCONNECTING:
-        break;
-    case SPICE_MSGC_MAIN_MIGRATE_END:
-        if (!reds->mig_target) {
-            red_printf("unexpected SPICE_MSGC_MIGRATE_END, not target");
-            return;
-        }
-        if (!reds->client_semi_mig_cap) {
-            red_printf("unexpected SPICE_MSGC_MIGRATE_END"
-                       ",client does not support semi-seamless migration");
-            return;
-        }
-        reds_handle_client_migrate_complete();
-        break;
-    default:
-        red_printf("unexpected type %d", type);
-    }
-}
-
-static int reds_send_data()
-{
-    RedsOutgoingData *outgoing = &reds->outgoing;
-    int n;
-
-    if (!outgoing->item) {
-        return TRUE;
-    }
-
-    ASSERT(outgoing->vec_size);
-    for (;;) {
-        if ((n = reds_stream_writev(reds->stream, outgoing->vec, outgoing->vec_size)) == -1) {
-            switch (errno) {
-            case EAGAIN:
-                core->watch_update_mask(reds->stream->watch,
-                                        SPICE_WATCH_EVENT_READ | SPICE_WATCH_EVENT_WRITE);
-                return FALSE;
-            case EINTR:
-                break;
-            case EPIPE:
-                reds_disconnect();
-                return FALSE;
-            default:
-                red_printf("%s", strerror(errno));
-                reds_disconnect();
-                return FALSE;
-            }
-        } else {
-            outgoing->vec = reds_iovec_skip(outgoing->vec, n, &outgoing->vec_size);
-            if (!outgoing->vec_size) {
-                reds_out_item_free(outgoing->item);
-                outgoing->item = NULL;
-                outgoing->vec = outgoing->vec_buf;
-                return TRUE;
-            }
-        }
-    }
-}
-
-static void reds_push()
-{
-    RedsOutgoingData *outgoing = &reds->outgoing;
-    RingItem *ring_item;
-    RedsOutItem *item;
-
-    for (;;) {
-        if (!reds->stream || outgoing->item || !(ring_item = ring_get_tail(&outgoing->pipe))) {
-            return;
-        }
-        ring_remove(ring_item);
-        outgoing->item = item = (RedsOutItem *)ring_item;
-
-        spice_marshaller_flush(item->m);
-        item->header->size = spice_marshaller_get_total_size(item->m) - sizeof(SpiceDataHeader);
-
-        outgoing->vec_size = spice_marshaller_fill_iovec(item->m,
-                                                         outgoing->vec_buf,
-                                                         REDS_MAX_SEND_IOVEC, 0);
-        reds_send_data();
-    }
-}
-
-static void reds_main_event(int fd, int event, void *data)
-{
-    if (event & SPICE_WATCH_EVENT_READ) {
-        if (handle_incoming(reds->stream, &reds->in_handler)) {
-            reds_disconnect();
-        }
-    }
-    if (event & SPICE_WATCH_EVENT_WRITE) {
-        RedsOutgoingData *outgoing = &reds->outgoing;
-        if (reds_send_data()) {
-            reds_push();
-            if (!outgoing->item && reds->stream) {
-                core->watch_update_mask(reds->stream->watch,
-                                        SPICE_WATCH_EVENT_READ);
-            }
-        }
-    }
+    while (write_to_vdi_port() || read_from_vdi_port());
 }
 
 static int sync_write(RedsStream *stream, const void *in_buf, size_t n)
 {
     const uint8_t *buf = (uint8_t *)in_buf;
+
     while (n) {
         int now = reds_stream_write(stream, buf, n);
         if (now <= 0) {
@@ -1940,66 +1387,22 @@ static int sync_write(RedsStream *stream, const void *in_buf, size_t n)
     return TRUE;
 }
 
-static void reds_channel_set_caps(Channel *channel, int cap, int active)
-{
-    int nbefore, n;
-
-    nbefore = channel->num_caps;
-    n = cap / 32;
-    channel->num_caps = MAX(channel->num_caps, n + 1);
-    channel->caps = spice_renew(uint32_t, channel->caps, channel->num_caps);
-    memset(channel->caps + nbefore, 0,
-           (channel->num_caps - nbefore) * sizeof(uint32_t));
-    if (active) {
-        channel->caps[n] |= (1 << cap);
-    } else {
-        channel->caps[n] &= ~(1 << cap);
-    }
-}
-
-static void reds_channel_set_common_caps(Channel *channel, int cap, int active)
-{
-    int nbefore, n;
-
-    nbefore = channel->num_common_caps;
-    n = cap / 32;
-    channel->num_common_caps = MAX(channel->num_common_caps, n + 1);
-    channel->common_caps = spice_renew(uint32_t, channel->common_caps, channel->num_common_caps);
-    memset(channel->common_caps + nbefore, 0,
-           (channel->num_common_caps - nbefore) * sizeof(uint32_t));
-    if (active) {
-        channel->common_caps[n] |= (1 << cap);
-    } else {
-        channel->common_caps[n] &= ~(1 << cap);
-    }
-}
-
-void reds_channel_init_auth_caps(Channel *channel)
+static void reds_channel_init_auth_caps(RedChannel *channel)
 {
     if (sasl_enabled) {
-        reds_channel_set_common_caps(channel, SPICE_COMMON_CAP_AUTH_SASL, TRUE);
+        red_channel_set_common_cap(channel, SPICE_COMMON_CAP_AUTH_SASL);
     } else {
-        reds_channel_set_common_caps(channel, SPICE_COMMON_CAP_AUTH_SPICE, TRUE);
+        red_channel_set_common_cap(channel, SPICE_COMMON_CAP_AUTH_SPICE);
     }
-    reds_channel_set_common_caps(channel, SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION, TRUE);
-}
-
-void reds_channel_dispose(Channel *channel)
-{
-    free(channel->caps);
-    channel->caps = NULL;
-    channel->num_caps = 0;
-
-    free(channel->common_caps);
-    channel->common_caps = NULL;
-    channel->num_common_caps = 0;
+    red_channel_set_common_cap(channel, SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION);
 }
 
 static int reds_send_link_ack(RedLinkInfo *link)
 {
     SpiceLinkHeader header;
     SpiceLinkReply ack;
-    Channel *channel;
+    RedChannel *channel;
+    RedChannelCapabilities *channel_caps;
     BUF_MEM *bmBuf;
     BIO *bio;
     int ret = FALSE;
@@ -2014,13 +1417,15 @@ static int reds_send_link_ack(RedLinkInfo *link)
     channel = reds_find_channel(link->link_mess->channel_type, 0);
     if (!channel) {
         ASSERT(link->link_mess->channel_type == SPICE_CHANNEL_MAIN);
-        channel = &reds->main_channel;
+        ASSERT(reds->main_channel);
+        channel = &reds->main_channel->base;
     }
 
     reds_channel_init_auth_caps(channel); /* make sure common caps are set */
 
-    ack.num_common_caps = channel->num_common_caps;
-    ack.num_channel_caps = channel->num_caps;
+    channel_caps = &channel->local_caps;
+    ack.num_common_caps = channel_caps->num_common_caps;
+    ack.num_channel_caps = channel_caps->num_caps;
     header.size += (ack.num_common_caps + ack.num_channel_caps) * sizeof(uint32_t);
     ack.caps_offset = sizeof(SpiceLinkReply);
 
@@ -2042,14 +1447,13 @@ static int reds_send_link_ack(RedLinkInfo *link)
     BIO_get_mem_ptr(bio, &bmBuf);
     memcpy(ack.pub_key, bmBuf->data, sizeof(ack.pub_key));
 
-
     if (!sync_write(link->stream, &header, sizeof(header)))
         goto end;
     if (!sync_write(link->stream, &ack, sizeof(ack)))
         goto end;
-    if (!sync_write(link->stream, channel->common_caps, channel->num_common_caps * sizeof(uint32_t)))
+    if (!sync_write(link->stream, channel_caps->common_caps, channel_caps->num_common_caps * sizeof(uint32_t)))
         goto end;
-    if (!sync_write(link->stream, channel->caps, channel->num_caps * sizeof(uint32_t)))
+    if (!sync_write(link->stream, channel_caps->caps, channel_caps->num_caps * sizeof(uint32_t)))
         goto end;
 
     ret = TRUE;
@@ -2071,7 +1475,7 @@ static int reds_send_link_error(RedLinkInfo *link, uint32_t error)
     memset(&reply, 0, sizeof(reply));
     reply.error = error;
     return sync_write(link->stream, &header, sizeof(header)) && sync_write(link->stream, &reply,
-                                                                           sizeof(reply));
+                                                                         sizeof(reply));
 }
 
 static void reds_show_new_channel(RedLinkInfo *link, int connection_id)
@@ -2087,7 +1491,7 @@ static void reds_show_new_channel(RedLinkInfo *link, int connection_id)
     link->stream->info.connection_id = connection_id;
     link->stream->info.type = link->link_mess->channel_type;
     link->stream->info.id   = link->link_mess->channel_id;
-    reds_channel_event(link->stream, SPICE_CHANNEL_EVENT_INITIALIZED);
+    reds_stream_channel_event(link->stream, SPICE_CHANNEL_EVENT_INITIALIZED);
 }
 
 static void reds_send_link_result(RedLinkInfo *link, uint32_t error)
@@ -2095,125 +1499,155 @@ static void reds_send_link_result(RedLinkInfo *link, uint32_t error)
     sync_write(link->stream, &error, sizeof(error));
 }
 
-static void reds_start_net_test()
+int reds_expects_link_id(uint32_t connection_id)
 {
-    if (!reds->stream || reds->net_test_id) {
-        return;
-    }
+    red_printf("TODO: keep a list of connection_id's from migration, compare to them");
+    return 1;
+}
 
-    if (send_ping(NET_TEST_WARMUP_BYTES) && send_ping(0) && send_ping(NET_TEST_BYTES)) {
-        reds->net_test_id = reds->ping_id - 2;
-        reds->net_test_stage = NET_TEST_STAGE_WARMUP;
+static void reds_mig_target_client_add(RedClient *client)
+{
+    RedsMigTargetClient *mig_client;
+
+    ASSERT(reds);
+    red_printf("");
+    mig_client = spice_malloc0(sizeof(RedsMigTargetClient));
+    mig_client->client = client;
+    ring_init(&mig_client->pending_links);
+    ring_add(&reds->mig_target_clients, &mig_client->link);
+    reds->num_mig_target_clients++;
+
+}
+
+static RedsMigTargetClient* reds_mig_target_client_find(RedClient *client)
+{
+    RingItem *item;
+
+    RING_FOREACH(item, &reds->mig_target_clients) {
+        RedsMigTargetClient *mig_client;
+
+        mig_client = SPICE_CONTAINEROF(item, RedsMigTargetClient, link);
+        if (mig_client->client == client) {
+            return mig_client;
+        }
+    }
+    return NULL;
+}
+
+static void reds_mig_target_client_add_pending_link(RedsMigTargetClient *client,
+                                                    SpiceLinkMess *link_msg,
+                                                    RedsStream *stream)
+{
+    RedsMigPendingLink *mig_link;
+
+    ASSERT(reds);
+    ASSERT(client);
+    mig_link = spice_malloc0(sizeof(RedsMigPendingLink));
+    mig_link->link_msg = link_msg;
+    mig_link->stream = stream;
+
+    ring_add(&client->pending_links, &mig_link->ring_link);
+}
+
+static void reds_mig_target_client_free(RedsMigTargetClient *mig_client)
+{
+    RingItem *now, *next;
+
+    ring_remove(&mig_client->link);
+    reds->num_mig_target_clients--;
+
+    RING_FOREACH_SAFE(now, next, &mig_client->pending_links) {
+        RedsMigPendingLink *mig_link = SPICE_CONTAINEROF(now, RedsMigPendingLink, ring_link);
+        ring_remove(now);
+        free(mig_link);
+    }
+    free(mig_client);
+}
+
+static void reds_mig_target_client_disconnect_all()
+{
+    RingItem *now, *next;
+
+    RING_FOREACH_SAFE(now, next, &reds->mig_target_clients) {
+        RedsMigTargetClient *mig_client = SPICE_CONTAINEROF(now, RedsMigTargetClient, link);
+        reds_client_disconnect(mig_client->client);
     }
 }
 
-static int test_capability(uint32_t *caps, uint32_t num_caps, uint32_t cap)
-{
-    uint32_t index = cap / 32;
-    if (num_caps < index + 1) {
-        return FALSE;
-    }
-
-    return (caps[index] & (1 << (cap % 32))) != 0;
-}
-
-static void reds_main_channel_init(int do_net_test)
-{
-    RedsOutItem *item;
-    SpiceMsgMainInit init;
-
-    item = new_out_item(SPICE_MSG_MAIN_INIT);
-    init.session_id = reds->link_id;
-    init.display_channels_hint = red_dispatcher_count();
-    init.current_mouse_mode = reds->mouse_mode;
-    init.supported_mouse_modes = SPICE_MOUSE_MODE_SERVER;
-    if (reds->is_client_mouse_allowed) {
-        init.supported_mouse_modes |= SPICE_MOUSE_MODE_CLIENT;
-    }
-    init.agent_connected = !!vdagent;
-    init.agent_tokens = REDS_AGENT_WINDOW_SIZE;
-    reds->agent_state.num_client_tokens = REDS_AGENT_WINDOW_SIZE;
-    init.multi_media_time = reds_get_mm_time() - MM_TIME_DELTA;
-    init.ram_hint = red_dispatcher_qxl_ram_size();
-
-    spice_marshall_msg_main_init(item->m, &init);
-
-    reds_push_pipe_item(item);
-    if (do_net_test) {
-        reds_start_net_test();
-    }
-    /* Now that we have a client, forward any pending agent data */
-    while (read_from_vdi_port());
-}
-
+// TODO: now that main is a separate channel this should
+// actually be joined with reds_handle_other_links, become reds_handle_link
 static void reds_handle_main_link(RedLinkInfo *link)
 {
-    SpiceLinkMess *link_mess = link->link_mess;
+    RedClient *client;
+    RedsStream *stream;
+    SpiceLinkMess *link_mess;
+    uint32_t *caps;
     uint32_t connection_id;
-    uint32_t *channel_caps;
-    uint32_t num_channel_caps;
+    MainChannelClient *mcc;
+    int mig_target = FALSE;
 
     red_printf("");
+    ASSERT(reds->main_channel);
 
-    reds_disconnect();
+    link_mess = link->link_mess;
+    if (!reds->allow_multiple_clients) {
+        reds_disconnect();
+    }
 
-    if (!link_mess->connection_id) {
+    if (link_mess->connection_id == 0) {
         reds_send_link_result(link, SPICE_LINK_ERR_OK);
         while((connection_id = rand()) == 0);
         reds->agent_state.num_tokens = 0;
-        reds->mig_target = FALSE;
+        mig_target = FALSE;
     } else {
         // TODO: make sure link_mess->connection_id is the same
         // connection id the migration src had (use vmstate to store the connection id)
         reds_send_link_result(link, SPICE_LINK_ERR_OK);
         connection_id = link_mess->connection_id;
-        reds->mig_target = TRUE;
+        mig_target = TRUE;
     }
 
-    reds->link_id = connection_id;
     reds->mig_inprogress = FALSE;
     reds->mig_wait_connect = FALSE;
     reds->mig_wait_disconnect = FALSE;
-    reds->mig_connect_ok = FALSE;
-    reds->stream = link->stream;
-    reds->in_handler.shut = FALSE;
-
-    num_channel_caps = link_mess->num_channel_caps;
-    channel_caps = num_channel_caps ? (uint32_t *)((uint8_t *)link_mess +
-                                                    link_mess->caps_offset) + link_mess->num_common_caps :
-                                      NULL;
-    reds->client_semi_mig_cap = test_capability(channel_caps, num_channel_caps, SPICE_MAIN_CAP_SEMI_SEAMLESS_MIGRATE);
-    if (reds->client_semi_mig_cap && (SPICE_VERSION_MAJOR == 2) && (reds->peer_minor_version < 1)) {
-        red_printf("warning: client claims to support semi seamless migration,"
-                   "but its version is incompatible");
-        reds->client_semi_mig_cap = FALSE;
-    }
 
     reds_show_new_channel(link, connection_id);
-    reds_stream_remove_watch(link->stream);
+    stream = link->stream;
+    reds_stream_remove_watch(stream);
     link->stream = NULL;
     link->link_mess = NULL;
     reds_link_free(link);
-    // TODO: should this be moved to be done only after mig completed (reds_main_channel_init)?
+    caps = (uint32_t *)((uint8_t *)link_mess + link_mess->caps_offset);
+    client = red_client_new(mig_target);
+    ring_add(&reds->clients, &client->link);
+    reds->num_clients++;
+    mcc = main_channel_link(reds->main_channel, client,
+                            stream, connection_id, mig_target,
+                            link_mess->num_common_caps,
+                            link_mess->num_common_caps ? caps : NULL, link_mess->num_channel_caps,
+                            link_mess->num_channel_caps ? caps + link_mess->num_common_caps : NULL);
+    red_printf("NEW Client %p mcc %p connect-id %d", client, mcc, connection_id);
+    free(link_mess);
+    red_client_set_main(client, mcc);
+
     if (vdagent) {
-        SpiceCharDeviceInterface *sif;
-        sif = SPICE_CONTAINEROF(vdagent->base.sif, SpiceCharDeviceInterface, base);
-        reds->agent_state.connected = 1;
         reds->agent_state.read_filter.discard_all = FALSE;
-        if (sif->state) {
-            sif->state(vdagent, reds->agent_state.connected);
-        }
         reds->agent_state.plug_generation++;
     }
-    reds->stream->watch = core->watch_add(reds->stream->socket,
-                                        SPICE_WATCH_EVENT_READ,
-                                        reds_main_event, NULL);
 
-    if (!reds->mig_target) {
-        reds_main_channel_init(TRUE);
-    }
-    else {
-        ASSERT(reds->client_semi_mig_cap);
+    reds->agent_state.num_client_tokens = REDS_AGENT_WINDOW_SIZE;
+
+    if (!mig_target) {
+        main_channel_push_init(mcc, red_dispatcher_count(),
+            reds->mouse_mode, reds->is_client_mouse_allowed,
+            reds_get_mm_time() - MM_TIME_DELTA,
+            red_dispatcher_qxl_ram_size());
+
+        main_channel_client_start_net_test(mcc);
+        /* Now that we have a client, forward any pending agent data */
+        while (read_from_vdi_port());
+    } else {
+        reds_mig_target_client_add(client);
     }
 }
 
@@ -2227,396 +1661,15 @@ static void reds_handle_main_link(RedLinkInfo *link)
      ((state & SPICE_MOUSE_BUTTON_MASK_MIDDLE) ? VD_AGENT_MBUTTON_MASK : 0) |    \
      ((state & SPICE_MOUSE_BUTTON_MASK_RIGHT) ? VD_AGENT_RBUTTON_MASK : 0))
 
-static void activate_modifiers_watch()
-{
-    core->timer_start(reds->key_modifiers_timer, KEY_MODIFIERS_TTL);
-}
-
-static void kbd_push_scan(SpiceKbdInstance *sin, uint8_t scan)
-{
-    SpiceKbdInterface *sif;
-
-    if (!sin) {
-        return;
-    }
-    sif = SPICE_CONTAINEROF(sin->base.sif, SpiceKbdInterface, base);
-    sif->push_scan_freg(sin, scan);
-}
-
-static uint8_t kbd_get_leds(SpiceKbdInstance *sin)
-{
-    SpiceKbdInterface *sif;
-
-    if (!sin) {
-        return 0;
-    }
-    sif = SPICE_CONTAINEROF(sin->base.sif, SpiceKbdInterface, base);
-    return sif->get_leds(sin);
-}
-
-static SpiceMarshaller *marshaller_new_for_outgoing(InputsState *state, int type)
-{
-    SpiceMarshaller *m;
-    SpiceDataHeader *header;
-
-    m = spice_marshaller_new();
-    header = (SpiceDataHeader *)
-        spice_marshaller_reserve_space(m, sizeof(SpiceDataHeader));
-    header->serial = ++state->serial;
-    header->type = type;
-    header->sub_list = 0;
-
-    return m;
-}
-
-static int marshaller_outgoing_write(SpiceMarshaller *m,
-                                     InputsState *state)
-{
-    SpiceDataHeader *header = (SpiceDataHeader *)spice_marshaller_get_ptr(m);
-    uint8_t *data;
-    size_t len;
-    int free_data;
-
-    spice_marshaller_flush(m);
-    header->size = spice_marshaller_get_total_size(m) - sizeof(SpiceDataHeader);
-
-    data = spice_marshaller_linearize(m, 0, &len, &free_data);
-
-    if (outgoing_write(state->stream, &state->out_handler, data, len) != OUTGOING_OK) {
-        return FALSE;
-    }
-
-    if (free_data) {
-        free(data);
-    }
-
-    return TRUE;
-}
-
-
-static void inputs_handle_input(void *opaque, size_t size, uint32_t type, void *message)
-{
-    InputsState *state = (InputsState *)opaque;
-    uint8_t *buf = (uint8_t *)message;
-    SpiceMarshaller *m;
-
-    switch (type) {
-    case SPICE_MSGC_INPUTS_KEY_DOWN: {
-        SpiceMsgcKeyDown *key_up = (SpiceMsgcKeyDown *)buf;
-        if (key_up->code == CAPS_LOCK_SCAN_CODE || key_up->code == NUM_LOCK_SCAN_CODE ||
-            key_up->code == SCROLL_LOCK_SCAN_CODE) {
-            activate_modifiers_watch();
-        }
-    }
-    case SPICE_MSGC_INPUTS_KEY_UP: {
-        SpiceMsgcKeyDown *key_down = (SpiceMsgcKeyDown *)buf;
-        uint8_t *now = (uint8_t *)&key_down->code;
-        uint8_t *end = now + sizeof(key_down->code);
-        for (; now < end && *now; now++) {
-            kbd_push_scan(keyboard, *now);
-        }
-        break;
-    }
-    case SPICE_MSGC_INPUTS_MOUSE_MOTION: {
-        SpiceMsgcMouseMotion *mouse_motion = (SpiceMsgcMouseMotion *)buf;
-
-        if (++state->motion_count % SPICE_INPUT_MOTION_ACK_BUNCH == 0) {
-            m = marshaller_new_for_outgoing(state, SPICE_MSG_INPUTS_MOUSE_MOTION_ACK);
-            if (!marshaller_outgoing_write(m, state)) {
-                red_printf("motion ack failed");
-                reds_disconnect();
-            }
-            spice_marshaller_destroy(m);
-        }
-        if (mouse && reds->mouse_mode == SPICE_MOUSE_MODE_SERVER) {
-            SpiceMouseInterface *sif;
-            sif = SPICE_CONTAINEROF(mouse->base.sif, SpiceMouseInterface, base);
-            sif->motion(mouse,
-                        mouse_motion->dx, mouse_motion->dy, 0,
-                        RED_MOUSE_STATE_TO_LOCAL(mouse_motion->buttons_state));
-        }
-        break;
-    }
-    case SPICE_MSGC_INPUTS_MOUSE_POSITION: {
-        SpiceMsgcMousePosition *pos = (SpiceMsgcMousePosition *)buf;
-
-        if (++state->motion_count % SPICE_INPUT_MOTION_ACK_BUNCH == 0) {
-            m = marshaller_new_for_outgoing(state, SPICE_MSG_INPUTS_MOUSE_MOTION_ACK);
-            if (!marshaller_outgoing_write(m, state)) {
-                red_printf("position ack failed");
-                reds_disconnect();
-            }
-            spice_marshaller_destroy(m);
-        }
-        if (reds->mouse_mode != SPICE_MOUSE_MODE_CLIENT) {
-            break;
-        }
-        ASSERT((agent_mouse && vdagent) || tablet);
-        if (!agent_mouse || !vdagent) {
-            SpiceTabletInterface *sif;
-            sif = SPICE_CONTAINEROF(tablet->base.sif, SpiceTabletInterface, base);
-            sif->position(tablet, pos->x, pos->y, RED_MOUSE_STATE_TO_LOCAL(pos->buttons_state));
-            break;
-        }
-        VDAgentMouseState *mouse_state = &state->mouse_state;
-        mouse_state->x = pos->x;
-        mouse_state->y = pos->y;
-        mouse_state->buttons = RED_MOUSE_BUTTON_STATE_TO_AGENT(pos->buttons_state);
-        mouse_state->display_id = pos->display_id;
-        reds_handle_agent_mouse_event();
-        break;
-    }
-    case SPICE_MSGC_INPUTS_MOUSE_PRESS: {
-        SpiceMsgcMousePress *mouse_press = (SpiceMsgcMousePress *)buf;
-        int dz = 0;
-        if (mouse_press->button == SPICE_MOUSE_BUTTON_UP) {
-            dz = -1;
-        } else if (mouse_press->button == SPICE_MOUSE_BUTTON_DOWN) {
-            dz = 1;
-        }
-        if (reds->mouse_mode == SPICE_MOUSE_MODE_CLIENT) {
-            if (agent_mouse && vdagent) {
-                reds->inputs_state->mouse_state.buttons =
-                    RED_MOUSE_BUTTON_STATE_TO_AGENT(mouse_press->buttons_state) |
-                    (dz == -1 ? VD_AGENT_UBUTTON_MASK : 0) |
-                    (dz == 1 ? VD_AGENT_DBUTTON_MASK : 0);
-                reds_handle_agent_mouse_event();
-            } else if (tablet) {
-                SpiceTabletInterface *sif;
-                sif = SPICE_CONTAINEROF(tablet->base.sif, SpiceTabletInterface, base);
-                sif->wheel(tablet, dz, RED_MOUSE_STATE_TO_LOCAL(mouse_press->buttons_state));
-            }
-        } else if (mouse) {
-            SpiceMouseInterface *sif;
-            sif = SPICE_CONTAINEROF(mouse->base.sif, SpiceMouseInterface, base);
-            sif->motion(mouse, 0, 0, dz,
-                        RED_MOUSE_STATE_TO_LOCAL(mouse_press->buttons_state));
-        }
-        break;
-    }
-    case SPICE_MSGC_INPUTS_MOUSE_RELEASE: {
-        SpiceMsgcMouseRelease *mouse_release = (SpiceMsgcMouseRelease *)buf;
-        if (reds->mouse_mode == SPICE_MOUSE_MODE_CLIENT) {
-            if (agent_mouse && vdagent) {
-                reds->inputs_state->mouse_state.buttons =
-                    RED_MOUSE_BUTTON_STATE_TO_AGENT(mouse_release->buttons_state);
-                reds_handle_agent_mouse_event();
-            } else if (tablet) {
-                SpiceTabletInterface *sif;
-                sif = SPICE_CONTAINEROF(tablet->base.sif, SpiceTabletInterface, base);
-                sif->buttons(tablet, RED_MOUSE_STATE_TO_LOCAL(mouse_release->buttons_state));
-            }
-        } else if (mouse) {
-            SpiceMouseInterface *sif;
-            sif = SPICE_CONTAINEROF(mouse->base.sif, SpiceMouseInterface, base);
-            sif->buttons(mouse,
-                         RED_MOUSE_STATE_TO_LOCAL(mouse_release->buttons_state));
-        }
-        break;
-    }
-    case SPICE_MSGC_INPUTS_KEY_MODIFIERS: {
-        SpiceMsgcKeyModifiers *modifiers = (SpiceMsgcKeyModifiers *)buf;
-        uint8_t leds;
-
-        if (!keyboard) {
-            break;
-        }
-        leds = kbd_get_leds(keyboard);
-        if ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK) !=
-            (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK)) {
-            kbd_push_scan(keyboard, SCROLL_LOCK_SCAN_CODE);
-            kbd_push_scan(keyboard, SCROLL_LOCK_SCAN_CODE | 0x80);
-        }
-        if ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK) !=
-            (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK)) {
-            kbd_push_scan(keyboard, NUM_LOCK_SCAN_CODE);
-            kbd_push_scan(keyboard, NUM_LOCK_SCAN_CODE | 0x80);
-        }
-        if ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK) !=
-            (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK)) {
-            kbd_push_scan(keyboard, CAPS_LOCK_SCAN_CODE);
-            kbd_push_scan(keyboard, CAPS_LOCK_SCAN_CODE | 0x80);
-        }
-        activate_modifiers_watch();
-        break;
-    }
-    case SPICE_MSGC_DISCONNECTING:
-        break;
-    default:
-        red_printf("unexpected type %d", type);
-    }
-}
-
 void reds_set_client_mouse_allowed(int is_client_mouse_allowed, int x_res, int y_res)
 {
     reds->monitor_mode.x_res = x_res;
     reds->monitor_mode.y_res = y_res;
     reds->dispatcher_allows_client_mouse = is_client_mouse_allowed;
     reds_update_mouse_mode();
-    if (reds->is_client_mouse_allowed && tablet) {
-        SpiceTabletInterface *sif;
-        sif = SPICE_CONTAINEROF(tablet->base.sif, SpiceTabletInterface, base);
-        sif->set_logical_size(tablet, reds->monitor_mode.x_res, reds->monitor_mode.y_res);
+    if (reds->is_client_mouse_allowed && inputs_has_tablet()) {
+        inputs_set_tablet_logical_size(reds->monitor_mode.x_res, reds->monitor_mode.y_res);
     }
-}
-
-static void inputs_relase_keys(void)
-{
-    kbd_push_scan(keyboard, 0x2a | 0x80); //LSHIFT
-    kbd_push_scan(keyboard, 0x36 | 0x80); //RSHIFT
-    kbd_push_scan(keyboard, 0xe0); kbd_push_scan(keyboard, 0x1d | 0x80); //RCTRL
-    kbd_push_scan(keyboard, 0x1d | 0x80); //LCTRL
-    kbd_push_scan(keyboard, 0xe0); kbd_push_scan(keyboard, 0x38 | 0x80); //RALT
-    kbd_push_scan(keyboard, 0x38 | 0x80); //LALT
-}
-
-static void inputs_event(int fd, int event, void *data)
-{
-    InputsState *inputs_state = data;
-
-    if (event & SPICE_WATCH_EVENT_READ) {
-        if (handle_incoming(inputs_state->stream, &inputs_state->in_handler)) {
-            inputs_relase_keys();
-            if (inputs_state->channel) {
-                inputs_state->channel->data = NULL;
-                reds->inputs_state = NULL;
-            }
-            reds_stream_free(inputs_state->stream);
-            free(inputs_state);
-        }
-    }
-    if (event & SPICE_WATCH_EVENT_WRITE) {
-        if (handle_outgoing(inputs_state->stream, &inputs_state->out_handler)) {
-            reds_disconnect();
-        }
-    }
-}
-
-
-static void inputs_shutdown(Channel *channel)
-{
-    InputsState *state = (InputsState *)channel->data;
-    if (state) {
-        state->in_handler.shut = TRUE;
-        shutdown(state->stream->socket, SHUT_RDWR);
-        channel->data = NULL;
-        state->channel = NULL;
-        reds->inputs_state = NULL;
-    }
-}
-
-static void inputs_migrate(Channel *channel)
-{
-    InputsState *state = (InputsState *)channel->data;
-    SpiceMarshaller *m;
-    SpiceMsgMigrate migrate;
-
-    m = marshaller_new_for_outgoing(state, SPICE_MSG_MIGRATE);
-
-    migrate.flags = 0;
-    spice_marshall_msg_migrate(m, &migrate);
-
-    if (!marshaller_outgoing_write(m, state)) {
-        red_printf("write failed");
-    }
-    spice_marshaller_destroy(m);
-}
-
-static void inputs_select(void *opaque, int select)
-{
-    InputsState *inputs_state;
-    int eventmask = SPICE_WATCH_EVENT_READ;
-    red_printf("");
-
-    inputs_state = (InputsState *)opaque;
-    if (select) {
-        eventmask |= SPICE_WATCH_EVENT_WRITE;
-    }
-    core->watch_update_mask(inputs_state->stream->watch, eventmask);
-}
-
-static void inputs_may_write(void *opaque)
-{
-    red_printf("");
-}
-
-static void inputs_link(Channel *channel, RedsStream *stream, int migration,
-                        int num_common_caps, uint32_t *common_caps, int num_caps,
-                        uint32_t *caps)
-{
-    InputsState *inputs_state;
-    int delay_val;
-    int flags;
-
-    red_printf("");
-    ASSERT(channel->data == NULL);
-
-    inputs_state = spice_new0(InputsState, 1);
-
-    delay_val = 1;
-    if (setsockopt(stream->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val, sizeof(delay_val)) == -1) {
-        red_printf("setsockopt failed, %s", strerror(errno));
-    }
-
-    if ((flags = fcntl(stream->socket, F_GETFL)) == -1 ||
-                                            fcntl(stream->socket, F_SETFL, flags | O_ASYNC) == -1) {
-        red_printf("fcntl failed, %s", strerror(errno));
-    }
-
-    inputs_state->stream = stream;
-    inputs_state->channel = channel;
-    inputs_state->in_handler.parser = spice_get_client_channel_parser(SPICE_CHANNEL_INPUTS, NULL);
-    inputs_state->in_handler.opaque = inputs_state;
-    inputs_state->in_handler.handle_message = inputs_handle_input;
-    inputs_state->out_handler.length = 0;
-    inputs_state->out_handler.opaque = inputs_state;
-    inputs_state->out_handler.select = inputs_select;
-    inputs_state->out_handler.may_write = inputs_may_write;
-    inputs_state->pending_mouse_event = FALSE;
-    channel->data = inputs_state;
-    reds->inputs_state = inputs_state;
-    stream->watch = core->watch_add(stream->socket, SPICE_WATCH_EVENT_READ,
-                                  inputs_event, inputs_state);
-
-    SpiceMarshaller *m;
-    SpiceMsgInputsInit inputs_init;
-    m = marshaller_new_for_outgoing(inputs_state, SPICE_MSG_INPUTS_INIT);
-    inputs_init.keyboard_modifiers = kbd_get_leds(keyboard);
-    spice_marshall_msg_inputs_init(m, &inputs_init);
-    if (!marshaller_outgoing_write(m, inputs_state)) {
-        red_printf("failed to send modifiers state");
-        reds_disconnect();
-    }
-    spice_marshaller_destroy(m);
-}
-
-static void reds_send_keyboard_modifiers(uint8_t modifiers)
-{
-    Channel *channel = reds_find_channel(SPICE_CHANNEL_INPUTS, 0);
-    InputsState *state;
-    SpiceMsgInputsKeyModifiers key_modifiers;
-    SpiceMarshaller *m;
-
-    if (!channel || !(state = (InputsState *)channel->data)) {
-        return;
-    }
-    ASSERT(state->stream);
-
-    m = marshaller_new_for_outgoing(state, SPICE_MSG_INPUTS_KEY_MODIFIERS);
-
-    key_modifiers.modifiers = modifiers;
-    spice_marshall_msg_inputs_key_modifiers(m, &key_modifiers);
-
-    if (!marshaller_outgoing_write(m, state)) {
-        red_printf("failed to send modifiers state");
-        reds_disconnect();
-    }
-    spice_marshaller_destroy(m);
-}
-
-static void reds_on_keyboard_leds_change(void *opaque, uint8_t leds)
-{
-    reds_send_keyboard_modifiers(leds);
 }
 
 static void openssl_init(RedLinkInfo *link)
@@ -2631,72 +1684,9 @@ static void openssl_init(RedLinkInfo *link)
     BN_set_word(link->tiTicketing.bn, f4);
 }
 
-static void main_init()
-{
-    reds->main_channel.type = SPICE_CHANNEL_MAIN;
-    reds_channel_set_caps(&reds->main_channel, SPICE_MAIN_CAP_SEMI_SEAMLESS_MIGRATE, TRUE);
-}
-
-static void inputs_init()
-{
-    Channel *channel;
-
-    channel = spice_new0(Channel, 1);
-    channel->type = SPICE_CHANNEL_INPUTS;
-    channel->link = inputs_link;
-    channel->shutdown = inputs_shutdown;
-    channel->migrate = inputs_migrate;
-    reds_register_channel(channel);
-}
-
-static void reds_mig_pending_link_add(SpiceLinkMess *link_msg, RedsStream *stream)
-{
-    RedsMigPendingLink *mig_link;
-
-    ASSERT(reds);
-    mig_link = spice_malloc0(sizeof(RedsMigPendingLink));
-    mig_link->link_msg = link_msg;
-    mig_link->stream = stream;
-
-    mig_link->next = reds->mig_pending_links;
-    reds->mig_pending_links = mig_link;
-    reds->num_mig_links++;
-}
-
-static void reds_mig_pending_links_free(void)
-{
-    red_printf("");
-    while(reds->mig_pending_links) {
-        RedsMigPendingLink *tmp = reds->mig_pending_links;
-        reds->mig_pending_links = tmp->next;
-        free(tmp->link_msg);
-        free(tmp);
-    }
-
-    reds->num_mig_links = 0;
-}
-static void reds_send_input_channel_insecure_warn()
-{
-    RedsOutItem *item;
-    SpiceMsgNotify notify;
-    char *mess = "keyboard channel is insecure";
-    const int mess_len = strlen(mess);
-
-    item = new_out_item(SPICE_MSG_NOTIFY);
-
-    notify.time_stamp = get_time_stamp();
-    notify.severity = SPICE_NOTIFY_SEVERITY_WARN;
-    notify.visibilty = SPICE_NOTIFY_VISIBILITY_HIGH;
-    notify.what = SPICE_WARN_GENERAL;
-    notify.message_len = mess_len;
-
-    spice_marshall_msg_notify(item->m, &notify);
-    spice_marshaller_add(item->m, (uint8_t *)mess, mess_len + 1);
-
-    reds_push_pipe_item(item);
-}
-
-static void reds_channel_do_link(Channel *channel, SpiceLinkMess *link_msg, RedsStream *stream)
+static void reds_channel_do_link(RedChannel *channel, RedClient *client,
+                                 SpiceLinkMess *link_msg,
+                                 RedsStream *stream)
 {
     uint32_t *caps;
 
@@ -2705,56 +1695,87 @@ static void reds_channel_do_link(Channel *channel, SpiceLinkMess *link_msg, Reds
     ASSERT(stream);
 
     if (link_msg->channel_type == SPICE_CHANNEL_INPUTS && !stream->ssl) {
-        reds_send_input_channel_insecure_warn();
+        char *mess = "keyboard channel is insecure";
+        const int mess_len = strlen(mess);
+        main_channel_push_notify(reds->main_channel, (uint8_t*)mess, mess_len);
     }
+
     caps = (uint32_t *)((uint8_t *)link_msg + link_msg->caps_offset);
-    channel->link(channel, stream, FALSE, link_msg->num_common_caps,
-                  link_msg->num_common_caps ? caps : NULL, link_msg->num_channel_caps,
-                  link_msg->num_channel_caps ? caps + link_msg->num_common_caps : NULL);
+    channel->client_cbs.connect(channel, client, stream,
+                                red_client_during_migrate_at_target(client),
+                                link_msg->num_common_caps,
+                                link_msg->num_common_caps ? caps : NULL,
+                                link_msg->num_channel_caps,
+                                link_msg->num_channel_caps ?
+                                caps + link_msg->num_common_caps : NULL);
 }
 
-static void reds_handle_client_migrate_complete(void)
+void reds_on_client_migrate_complete(RedClient *client)
 {
-    RedsMigPendingLink *cur_link;
+    RedsMigTargetClient *mig_client;
+    MainChannelClient *mcc;
+    RingItem *item;
 
-    red_printf("");
+    red_printf("%p", client);
+    mcc = red_client_get_main(client);
+    mig_client = reds_mig_target_client_find(client);
+    if (!mig_client) {
+        red_printf("Error: mig target client was not found");
+        return;
+    }
+
     // TODO: not doing net test. consider doing it on client_migrate_info
-    reds_main_channel_init(FALSE);
+    main_channel_push_init(mcc, red_dispatcher_count(),
+                           reds->mouse_mode, reds->is_client_mouse_allowed,
+                           reds_get_mm_time() - MM_TIME_DELTA,
+                           red_dispatcher_qxl_ram_size());
 
-    for (cur_link = reds->mig_pending_links; cur_link; cur_link = cur_link->next) {
-        Channel *channel = reds_find_channel(cur_link->link_msg->channel_type,
-                                             cur_link->link_msg->channel_id);
+    RING_FOREACH(item, &mig_client->pending_links) {
+        RedsMigPendingLink *mig_link;
+        RedChannel *channel;
+
+        mig_link = SPICE_CONTAINEROF(item, RedsMigPendingLink, ring_link);
+        channel = reds_find_channel(mig_link->link_msg->channel_type,
+                                    mig_link->link_msg->channel_id);
         if (!channel) {
-            red_printf("warning: channel (%d, %d) (type,id) wasn't found",
-                       cur_link->link_msg->channel_type, cur_link->link_msg->channel_id);
+            red_printf("warning: client %p channel (%d, %d) (type, id) wasn't found",
+                       client,
+                       mig_link->link_msg->channel_type,
+                       mig_link->link_msg->channel_id);
             continue;
-       }
-       reds_channel_do_link(channel, cur_link->link_msg, cur_link->stream);
+        }
+        reds_channel_do_link(channel, client, mig_link->link_msg, mig_link->stream);
     }
 
-    reds_mig_pending_links_free();
-    reds->mig_target = FALSE;
-    if (reds->mig_wait_prev_complete) {
-        reds->mig_wait_prev_complete = FALSE;
-        core->timer_cancel(reds->mig_timer);
-        // starting a pending migrate info command
-        reds_mig_started();
-    }
+    reds_mig_target_client_free(mig_client);
+
+    /* Now that we have a client, forward any pending agent data */
+    while (read_from_vdi_port());
 }
 
 static void reds_handle_other_links(RedLinkInfo *link)
 {
-    Channel *channel;
+    RedChannel *channel;
+    RedClient *client = NULL;
     SpiceLinkMess *link_mess;
+    RedsMigTargetClient *mig_client;
 
     link_mess = link->link_mess;
+    if (reds->main_channel) {
+        client = main_channel_get_client_by_link_id(reds->main_channel,
+                                                    link_mess->connection_id);
+    }
 
-    if (!reds->link_id || reds->link_id != link_mess->connection_id) {
+    // TODO: MC: broke migration (at least for the dont-drop-connection kind).
+    // On migration we should get a connection_id to expect (must be a security measure)
+    // where do we store it? on reds, but should be a list (MC).
+    if (!client) {
         reds_send_link_result(link, SPICE_LINK_ERR_BAD_CONNECTION_ID);
         reds_link_free(link);
         return;
     }
 
+    // TODO: MC: be less lenient. Tally connections from same connection_id (by same client).
     if (!(channel = reds_find_channel(link_mess->channel_type,
                                       link_mess->channel_id))) {
         reds_send_link_result(link, SPICE_LINK_ERR_CHANNEL_NOT_AVAILABLE);
@@ -2763,16 +1784,18 @@ static void reds_handle_other_links(RedLinkInfo *link)
     }
 
     reds_send_link_result(link, SPICE_LINK_ERR_OK);
-    reds_show_new_channel(link, reds->link_id);
+    reds_show_new_channel(link, link_mess->connection_id);
     reds_stream_remove_watch(link->stream);
 
-    if (reds->mig_target) {
-        reds_mig_pending_link_add(link_mess, link->stream);
+    mig_client = reds_mig_target_client_find(client);
+    if (red_client_during_migrate_at_target(client)) {
+        ASSERT(mig_client);
+        reds_mig_target_client_add_pending_link(mig_client, link_mess, link->stream);
     } else {
-        reds_channel_do_link(channel, link_mess, link->stream);
+        ASSERT(!mig_client);
+        reds_channel_do_link(channel, client, link_mess, link->stream);
         free(link_mess);
     }
-
     link->stream = NULL;
     link->link_mess = NULL;
     reds_link_free(link);
@@ -2825,6 +1848,7 @@ static inline void async_read_clear_handlers(AsyncRead *obj)
     if (!obj->stream->watch) {
         return;
     }
+
     reds_stream_remove_watch(obj->stream);
 }
 
@@ -2839,7 +1863,7 @@ static int sync_write_u32(RedsStream *s, uint32_t n)
     return sync_write(s, &n, sizeof(uint32_t));
 }
 
-ssize_t reds_stream_sasl_write(RedsStream *s, const void *buf, size_t nbyte)
+static ssize_t reds_stream_sasl_write(RedsStream *s, const void *buf, size_t nbyte)
 {
     ssize_t ret;
 
@@ -2884,7 +1908,7 @@ ssize_t reds_stream_sasl_write(RedsStream *s, const void *buf, size_t nbyte)
     return -1;
 }
 
-static ssize_t reds_stream_sasl_read(RedsStream *s, void *buf, size_t nbyte)
+static ssize_t reds_stream_sasl_read(RedsStream *s, uint8_t *buf, size_t nbyte)
 {
     uint8_t encoded[4096];
     const char *decoded;
@@ -2941,8 +1965,8 @@ static void async_read_handler(int fd, int event, void *data)
                 case EAGAIN:
                     if (!obj->stream->watch) {
                         obj->stream->watch = core->watch_add(obj->stream->socket,
-                                                             SPICE_WATCH_EVENT_READ,
-                                                             async_read_handler, obj);
+                                                           SPICE_WATCH_EVENT_READ,
+                                                           async_read_handler, obj);
                     }
                     return;
                 case EINTR:
@@ -3539,8 +2563,8 @@ static void reds_handle_read_link_done(void *opaque)
         return;
     }
 
-    auth_selection = link_mess->num_common_caps > 0 &&
-        (caps[0] & (1 << SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION));;
+    auth_selection = test_capabilty(caps, link_mess->num_common_caps,
+                                    SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION);
 
     if (!reds_security_check(link)) {
         if (link->stream->ssl) {
@@ -3693,14 +2717,14 @@ static RedLinkInfo *__reds_accept_connection(int listen_socket)
     link = spice_new0(RedLinkInfo, 1);
     stream = spice_new0(RedsStream, 1);
     link->stream = stream;
-    stream->socket = socket;
 
+    stream->socket = socket;
     /* gather info + send event */
     stream->info.llen = sizeof(stream->info.laddr);
     stream->info.plen = sizeof(stream->info.paddr);
     getsockname(stream->socket, (struct sockaddr*)(&stream->info.laddr), &stream->info.llen);
     getpeername(stream->socket, (struct sockaddr*)(&stream->info.paddr), &stream->info.plen);
-    reds_channel_event(stream, SPICE_CHANNEL_EVENT_CONNECTED);
+    reds_stream_channel_event(stream, SPICE_CHANNEL_EVENT_CONNECTED);
 
     openssl_init(link);
 
@@ -3929,7 +2953,7 @@ static unsigned long pthreads_thread_id(void)
     return (ret);
 }
 
-static void pthreads_locking_callback(int mode, int type, char *file, int line)
+static void pthreads_locking_callback(int mode, int type, const char *file, int line)
 {
     if (mode & CRYPTO_LOCK) {
         pthread_mutex_lock(&(lock_cs[type]));
@@ -3939,7 +2963,7 @@ static void pthreads_locking_callback(int mode, int type, char *file, int line)
     }
 }
 
-static void openssl_thread_setup()
+static void openssl_thread_setup(void)
 {
     int i;
 
@@ -3951,11 +2975,11 @@ static void openssl_thread_setup()
         pthread_mutex_init(&(lock_cs[i]), NULL);
     }
 
-    CRYPTO_set_id_callback((unsigned long (*)())pthreads_thread_id);
-    CRYPTO_set_locking_callback((void (*)())pthreads_locking_callback);
+    CRYPTO_set_id_callback(pthreads_thread_id);
+    CRYPTO_set_locking_callback(pthreads_locking_callback);
 }
 
-static void reds_init_ssl()
+static void reds_init_ssl(void)
 {
 #if OPENSSL_VERSION_NUMBER >= 0x10000000L
     const SSL_METHOD *ssl_method;
@@ -4023,10 +3047,10 @@ static void reds_init_ssl()
 #endif
 }
 
-static void reds_exit()
+static void reds_exit(void)
 {
-    if (reds->stream) {
-        close(reds->stream->socket);
+    if (reds->main_channel) {
+        main_channel_close(reds->main_channel);
     }
 #ifdef RED_STATISTICS
     shm_unlink(reds->stat_shm_name);
@@ -4067,9 +3091,9 @@ enum {
     SPICE_TICKET_OPTION_CONNECTED,
 };
 
-static inline void on_activating_ticketing()
+static inline void on_activating_ticketing(void)
 {
-    if (!ticketing_enabled && reds->stream) {
+    if (!ticketing_enabled && reds_main_channel_connected()) {
         red_printf("disconnecting");
         reds_disconnect();
     }
@@ -4101,16 +3125,8 @@ static void set_one_channel_security(int id, uint32_t security)
 
 #define REDS_SAVE_VERSION 1
 
-struct RedsMigSpice {
-    uint32_t mig_key;
-    char *host;
-    char *cert_subject;
-    int port;
-    int sport;
-};
-
 typedef struct RedsMigSpiceMessage {
-    uint32_t link_id;
+    uint32_t connection_id;
 } RedsMigSpiceMessage;
 
 typedef struct RedsMigCertPubKeyInfo {
@@ -4128,186 +3144,58 @@ static void reds_mig_release(void)
     }
 }
 
-static void reds_mig_connect(void)
+static void reds_mig_started(void)
 {
-    RedsMigSpice *s = reds->mig_spice;
-    SpiceMsgMainMigrationBegin migrate;
-    RedsOutItem *item;
-
     red_printf("");
-    ASSERT(reds->client_semi_mig_cap);
-    item = new_out_item(SPICE_MSG_MAIN_MIGRATE_BEGIN);
+    ASSERT(reds->mig_spice);
 
-    migrate.port = s->port;
-    migrate.sport = s->sport;
-    migrate.host_size = strlen(s->host) + 1;
-    migrate.host_data = (uint8_t *)s->host;
-    if (s->cert_subject) {
-        migrate.cert_subject_size = strlen(s->cert_subject) + 1;
-        migrate.cert_subject_data = (uint8_t *)s->cert_subject;
-    } else {
-        migrate.cert_subject_size = 0;
-        migrate.cert_subject_data = NULL;
-    }
-    spice_marshall_msg_main_migrate_begin(item->m, &migrate);
-
-    reds_push_pipe_item(item);
-
+    reds->mig_inprogress = TRUE;
     reds->mig_wait_connect = TRUE;
     core->timer_start(reds->mig_timer, MIGRATE_TIMEOUT);
 }
 
-static void reds_listen_start(void)
-{
-    ASSERT(reds);
-    if (reds->listen_watch != NULL) {
-        core->watch_update_mask(reds->listen_watch, SPICE_WATCH_EVENT_READ);
-    }
-
-    if (reds->secure_listen_watch != NULL) {
-        core->watch_update_mask(reds->secure_listen_watch, SPICE_WATCH_EVENT_READ);
-    }
-}
-
-static void reds_listen_stop(void)
-{
-    ASSERT(reds);
-    if (reds->listen_watch != NULL) {
-        core->watch_update_mask(reds->listen_watch, 0);
-    }
-
-    if (reds->secure_listen_watch != NULL) {
-        core->watch_update_mask(reds->secure_listen_watch, 0);
-    }
-}
-
-static void reds_mig_started(void)
-{
-    SpiceMigrateInterface *sif = NULL;
-
-    red_printf("");
-    ASSERT(reds->mig_spice);
-
-    if (!migration_interface) {
-        return;
-    }
-
-    reds_listen_stop();
-    sif = SPICE_CONTAINEROF(migration_interface->base.sif, SpiceMigrateInterface, base);
-    reds->mig_connect_ok = FALSE;
-
-    if (reds->stream == NULL) {
-        red_printf("not connected to stream");
-        reds_mig_release();
-        sif->migrate_connect_complete(migration_interface);
-        return;
-    }
-
-    reds->expect_migrate = TRUE;
-    if (reds->client_semi_mig_cap) {
-        reds->mig_inprogress = TRUE;
-        if (reds->mig_target) {
-            red_printf("previous spice migration hasn't completed yet. Waiting for client");
-            reds->mig_wait_prev_complete = TRUE;
-            core->timer_start(reds->mig_timer, MIGRATE_TIMEOUT);
-        } else {
-            reds_mig_connect();
-        }
-    } else {
-        if (sif) {
-            // switch host msg will be sent after migration completes
-            sif->migrate_connect_complete(migration_interface);
-         }
-    }
-}
-
 static void reds_mig_finished(int completed)
 {
-    RedsOutItem *item;
-
     red_printf("");
-    reds_mig_release();
-    if (reds->stream == NULL) {
-        red_printf("no stream connected");
+
+    if (!reds_main_channel_connected()) {
+        red_printf("no peer connected");
         return;
     }
     reds->mig_inprogress = TRUE;
 
-    if (completed) {
-#ifdef SPICE_SEAMLESS_MIGRATION
-        Channel *channel;
-        SpiceMsgMigrate migrate;
-
-        item = new_out_item(SPICE_MSG_MIGRATE);
-        migrate.flags = SPICE_MIGRATE_NEED_FLUSH | SPICE_MIGRATE_NEED_DATA_TRANSFER;
-        spice_marshall_msg_migrate(item->m, &migrate);
-        reds_push_pipe_item(item);
-        channel = reds->channels;
-        while (channel) {
-            channel->migrate(channel);
-            channel = channel->next;
-        }
-#else
-        item = new_out_item(SPICE_MSG_MAIN_MIGRATE_END);
-        reds_push_pipe_item(item);
-#endif
+    if (main_channel_migrate_complete(reds->main_channel, completed)) {
         reds->mig_wait_disconnect = TRUE;
         core->timer_start(reds->mig_timer, MIGRATE_TIMEOUT);
     } else {
-        item = new_out_item(SPICE_MSG_MAIN_MIGRATE_CANCEL);
-        reds_push_pipe_item(item);
         reds_mig_cleanup();
     }
+    reds_mig_release();
 }
 
 static void reds_mig_switch(void)
 {
-    RedsMigSpice *s = reds->mig_spice;
-    SpiceMsgMainMigrationSwitchHost migrate;
-    RedsOutItem *item;
-
-    if (s == NULL) {
-        red_printf("warning: migration target was not set. disconnecting client");
-        reds_disconnect();
+    if (!reds->mig_spice) {
+        red_printf("warning: reds_mig_switch called without migrate_info set");
         return;
     }
-
-    red_printf("");
-    item = new_out_item(SPICE_MSG_MAIN_MIGRATE_SWITCH_HOST);
-
-    migrate.port = s->port;
-    migrate.sport = s->sport;
-    migrate.host_size = strlen(s->host) + 1;
-    migrate.host_data = (uint8_t *)s->host;
-    if (s->cert_subject) {
-        migrate.cert_subject_size = strlen(s->cert_subject) + 1;
-        migrate.cert_subject_data = (uint8_t *)s->cert_subject;
-    } else {
-        migrate.cert_subject_size = 0;
-        migrate.cert_subject_data = NULL;
-    }
-    spice_marshall_msg_main_migrate_switch_host(item->m, &migrate);
-
-    reds_push_pipe_item(item);
-
+    main_channel_migrate_switch(reds->main_channel, reds->mig_spice);
     reds_mig_release();
 }
 
 static void migrate_timeout(void *opaque)
 {
     red_printf("");
-    ASSERT(reds->mig_wait_connect || reds->mig_wait_disconnect || reds->mig_wait_prev_complete);
+    ASSERT(reds->mig_wait_connect || reds->mig_wait_disconnect);
     if (reds->mig_wait_connect) {
-        reds->mig_connect_ok = FALSE;
+        /* we will fall back to the switch host scheme when migration completes */
+        main_channel_migrate_cancel_wait(reds->main_channel);
+        /* in case part of the client haven't yet completed the previous migration, disconnect them */
+        reds_mig_target_client_disconnect_all();
         reds_mig_cleanup();
     } else {
         reds_mig_disconnect();
     }
-}
-
-static void key_modifiers_sender(void *opaque)
-{
-    reds_send_keyboard_modifiers(kbd_get_leds(keyboard));
 }
 
 uint32_t reds_get_mm_time(void)
@@ -4324,21 +3212,14 @@ void reds_update_mm_timer(uint32_t mm_time)
 
 void reds_enable_mm_timer(void)
 {
-    SpiceMsgMainMultiMediaTime time_mes;
-    RedsOutItem *item;
-
     core->timer_start(reds->mm_timer, MM_TIMER_GRANULARITY_MS);
-    if (!reds->stream || reds->mig_target) {
+    if (!reds_main_channel_connected()) {
         return;
     }
-
-    item = new_out_item(SPICE_MSG_MAIN_MULTI_MEDIA_TIME);
-    time_mes.time = reds_get_mm_time() - MM_TIME_DELTA;
-    spice_marshall_msg_main_multi_media_time(item->m, &time_mes);
-    reds_push_pipe_item(item);
+    main_channel_push_multi_media_time(reds->main_channel, reds_get_mm_time() - MM_TIME_DELTA);
 }
 
-void reds_desable_mm_timer(void)
+void reds_disable_mm_timer(void)
 {
     core->timer_cancel(reds->mm_timer);
 }
@@ -4356,22 +3237,20 @@ static void attach_to_red_agent(SpiceCharDeviceInstance *sin)
 
     vdagent = sin;
     reds_update_mouse_mode();
-    if (!reds->stream) {
+
+    sif = SPICE_CONTAINEROF(vdagent->base.sif, SpiceCharDeviceInterface, base);
+    if (sif->state) {
+        sif->state(vdagent, 1);
+    }
+
+    if (!reds_main_channel_connected()) {
         return;
     }
-    sif = SPICE_CONTAINEROF(vdagent->base.sif, SpiceCharDeviceInterface, base);
-    state->connected = 1;
+
     state->read_filter.discard_all = FALSE;
-    if (sif->state) {
-        sif->state(vdagent, state->connected);
-    }
     reds->agent_state.plug_generation++;
 
-    if (reds->mig_target) {
-        return;
-    }
-
-    reds_send_agent_connected();
+    main_channel_push_agent_connected(reds->main_channel);
 }
 
 SPICE_GNUC_VISIBLE void spice_server_char_device_wakeup(SpiceCharDeviceInstance* sin)
@@ -4381,16 +3260,18 @@ SPICE_GNUC_VISIBLE void spice_server_char_device_wakeup(SpiceCharDeviceInstance*
 
 #define SUBTYPE_VDAGENT "vdagent"
 #define SUBTYPE_SMARTCARD "smartcard"
+#define SUBTYPE_USBREDIR "usbredir"
 
 const char *spice_server_char_device_recognized_subtypes_list[] = {
     SUBTYPE_VDAGENT,
 #ifdef USE_SMARTCARD
     SUBTYPE_SMARTCARD,
 #endif
+    SUBTYPE_USBREDIR,
     NULL,
 };
 
-SPICE_GNUC_VISIBLE const char** spice_server_char_device_recognized_subtypes()
+SPICE_GNUC_VISIBLE const char** spice_server_char_device_recognized_subtypes(void)
 {
     return spice_server_char_device_recognized_subtypes_list;
 }
@@ -4417,6 +3298,9 @@ static int spice_server_char_device_add_interface(SpiceServer *s,
         }
     }
 #endif
+    else if (strcmp(char_device->subtype, SUBTYPE_USBREDIR) == 0) {
+        spicevmc_device_connect(char_device, SPICE_CHANNEL_USBREDIR);
+    }
     return 0;
 }
 
@@ -4436,6 +3320,9 @@ static void spice_server_char_device_remove_interface(SpiceBaseInstance *sin)
         smartcard_device_disconnect(char_device);
     }
 #endif
+    else if (strcmp(char_device->subtype, SUBTYPE_USBREDIR) == 0) {
+        spicevmc_device_disconnect(char_device);
+    }
 }
 
 SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *s,
@@ -4447,32 +3334,24 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *s,
 
     if (strcmp(interface->type, SPICE_INTERFACE_KEYBOARD) == 0) {
         red_printf("SPICE_INTERFACE_KEYBOARD");
-        if (keyboard) {
-            red_printf("already have keyboard");
-            return -1;
-        }
         if (interface->major_version != SPICE_INTERFACE_KEYBOARD_MAJOR ||
             interface->minor_version > SPICE_INTERFACE_KEYBOARD_MINOR) {
             red_printf("unsupported keyboard interface");
             return -1;
         }
-        keyboard = SPICE_CONTAINEROF(sin, SpiceKbdInstance, base);
-        keyboard->st = spice_new0(SpiceKbdState, 1);
-
-    } else if (strcmp(interface->type, SPICE_INTERFACE_MOUSE) == 0) {
-        red_printf("SPICE_INTERFACE_MOUSE");
-        if (mouse) {
-            red_printf("already have mouse");
+        if (inputs_set_keyboard(SPICE_CONTAINEROF(sin, SpiceKbdInstance, base)) != 0) {
             return -1;
         }
+    } else if (strcmp(interface->type, SPICE_INTERFACE_MOUSE) == 0) {
+        red_printf("SPICE_INTERFACE_MOUSE");
         if (interface->major_version != SPICE_INTERFACE_MOUSE_MAJOR ||
             interface->minor_version > SPICE_INTERFACE_MOUSE_MINOR) {
             red_printf("unsupported mouse interface");
             return -1;
         }
-        mouse = SPICE_CONTAINEROF(sin, SpiceMouseInstance, base);
-        mouse->st = spice_new0(SpiceMouseState, 1);
-
+        if (inputs_set_mouse(SPICE_CONTAINEROF(sin, SpiceMouseInstance, base)) != 0) {
+            return -1;
+        }
     } else if (strcmp(interface->type, SPICE_INTERFACE_QXL) == 0) {
         QXLInstance *qxl;
 
@@ -4490,23 +3369,17 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *s,
 
     } else if (strcmp(interface->type, SPICE_INTERFACE_TABLET) == 0) {
         red_printf("SPICE_INTERFACE_TABLET");
-        if (tablet) {
-            red_printf("already have tablet");
-            return -1;
-        }
         if (interface->major_version != SPICE_INTERFACE_TABLET_MAJOR ||
             interface->minor_version > SPICE_INTERFACE_TABLET_MINOR) {
             red_printf("unsupported tablet interface");
             return -1;
         }
-        tablet = SPICE_CONTAINEROF(sin, SpiceTabletInstance, base);
-        tablet->st = spice_new0(SpiceTabletState, 1);
+        if (inputs_set_tablet(SPICE_CONTAINEROF(sin, SpiceTabletInstance, base)) != 0) {
+            return -1;
+        }
         reds_update_mouse_mode();
         if (reds->is_client_mouse_allowed) {
-            SpiceTabletInterface *sif;
-            sif = SPICE_CONTAINEROF(tablet->base.sif, SpiceTabletInterface, base);
-            sif->set_logical_size(tablet, reds->monitor_mode.x_res,
-                                  reds->monitor_mode.y_res);
+            inputs_set_tablet_logical_size(reds->monitor_mode.x_res, reds->monitor_mode.y_res);
         }
 
     } else if (strcmp(interface->type, SPICE_INTERFACE_PLAYBACK) == 0) {
@@ -4580,11 +3453,8 @@ SPICE_GNUC_VISIBLE int spice_server_remove_interface(SpiceBaseInstance *sin)
 
     if (strcmp(interface->type, SPICE_INTERFACE_TABLET) == 0) {
         red_printf("remove SPICE_INTERFACE_TABLET");
-        if (sin == &tablet->base) {
-            tablet = NULL;
-            reds_update_mouse_mode();
-        }
-
+        inputs_detach_tablet(SPICE_CONTAINEROF(sin, SpiceTabletInstance, base));
+        reds_update_mouse_mode();
     } else if (strcmp(interface->type, SPICE_INTERFACE_PLAYBACK) == 0) {
         red_printf("remove SPICE_INTERFACE_PLAYBACK");
         snd_detach_playback(SPICE_CONTAINEROF(sin, SpicePlaybackInstance, base));
@@ -4616,12 +3486,12 @@ static void free_internal_agent_buff(VDIPortBuf *in_buf)
     VDIPortState *state = &reds->agent_state;
 
     ring_add(&state->internal_bufs, &in_buf->link);
-    if (reds->inputs_state && reds->inputs_state->pending_mouse_event) {
-        reds_handle_agent_mouse_event();
+    if (inputs_inited() && reds->pending_mouse_event) {
+        reds_handle_agent_mouse_event(inputs_get_mouse_state());
     }
 }
 
-static void init_vd_agent_resources()
+static void init_vd_agent_resources(void)
 {
     VDIPortState *state = &reds->agent_state;
     int i;
@@ -4658,7 +3528,7 @@ static void init_vd_agent_resources()
         ring_add(&reds->agent_state.internal_bufs, &buf->base.link);
     }
 
-    for (i = 0; i < REDS_VDI_PORT_NUM_RECIVE_BUFFS; i++) {
+    for (i = 0; i < REDS_VDI_PORT_NUM_RECEIVE_BUFFS; i++) {
         VDIReadBuf *buf = spice_new0(VDIReadBuf, 1);
         ring_item_init(&buf->link);
         ring_add(&reds->agent_state.read_bufs, &buf->link);
@@ -4678,19 +3548,15 @@ static int do_spice_init(SpiceCoreInterface *core_interface)
     core = core_interface;
     reds->listen_socket = -1;
     reds->secure_listen_socket = -1;
-    reds->stream = NULL;
-    reds->in_handler.parser = spice_get_client_channel_parser(SPICE_CHANNEL_MAIN, NULL);
-    reds->in_handler.handle_message = reds_main_handle_message;
-    ring_init(&reds->outgoing.pipe);
-    reds->outgoing.vec = reds->outgoing.vec_buf;
-
     init_vd_agent_resources();
+    ring_init(&reds->clients);
+    reds->num_clients = 0;
+    main_dispatcher_init(core);
+    ring_init(&reds->channels);
+    ring_init(&reds->mig_target_clients);
 
     if (!(reds->mig_timer = core->timer_add(migrate_timeout, NULL))) {
         red_error("migration timer create failed");
-    }
-    if (!(reds->key_modifiers_timer = core->timer_add(key_modifiers_sender, NULL))) {
-        red_error("key modifiers timer create failed");
     }
     if (!(reds->vdi_port_write_timer = core->timer_add(vdi_port_write_retry, NULL)))
     {
@@ -4721,10 +3587,6 @@ static int do_spice_init(SpiceCoreInterface *core_interface)
     if (pthread_mutex_init(&reds->stat_lock, NULL)) {
         red_error("mutex init failed");
     }
-    if (!(reds->ping_timer = core->timer_add(ping_timer_cb, NULL))) {
-        red_error("ping timer create failed");
-    }
-    reds->ping_interval = PING_INTERVAL;
 #endif
 
     if (!(reds->mm_timer = core->timer_add(mm_timer_proc, NULL))) {
@@ -4738,7 +3600,6 @@ static int do_spice_init(SpiceCoreInterface *core_interface)
     if (reds->secure_listen_socket != -1) {
         reds_init_ssl();
     }
-
 #if HAVE_SASL
     int saslerr;
     if ((saslerr = sasl_server_init(NULL, sasl_appname ?
@@ -4749,10 +3610,14 @@ static int do_spice_init(SpiceCoreInterface *core_interface)
     }
 #endif
 
-    main_init();
+    reds->main_channel = main_channel_init();
     inputs_init();
 
     reds->mouse_mode = SPICE_MOUSE_MODE_SERVER;
+    reds->allow_multiple_clients = getenv(SPICE_DEBUG_ALLOW_MC_ENV) != NULL;
+    if (reds->allow_multiple_clients) {
+        red_printf("spice: allowing multiple client connections");
+    }
     atexit(reds_exit);
     return 0;
 
@@ -4868,7 +3733,7 @@ SPICE_GNUC_VISIBLE int spice_server_set_ticket(SpiceServer *s,
 {
     ASSERT(reds == s);
 
-    if (reds->stream) {
+    if (reds_main_channel_connected()) {
         if (fail_if_connected) {
             return -1;
         }
@@ -5006,10 +3871,7 @@ SPICE_GNUC_VISIBLE int spice_server_set_channel_security(SpiceServer *s, const c
 SPICE_GNUC_VISIBLE int spice_server_get_sock_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen)
 {
     ASSERT(reds == s);
-    if (!reds->stream) {
-        return -1;
-    }
-    if (getsockname(reds->stream->socket, sa, salen) < 0) {
+    if (main_channel_getsockname(reds->main_channel, sa, salen) < 0) {
         return -1;
     }
     return 0;
@@ -5018,10 +3880,7 @@ SPICE_GNUC_VISIBLE int spice_server_get_sock_info(SpiceServer *s, struct sockadd
 SPICE_GNUC_VISIBLE int spice_server_get_peer_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen)
 {
     ASSERT(reds == s);
-    if (!reds->stream) {
-        return -1;
-    }
-    if (getpeername(reds->stream->socket, sa, salen) < 0) {
+    if (main_channel_getpeername(reds->main_channel, sa, salen) < 0) {
         return -1;
     }
     return 0;
@@ -5039,7 +3898,7 @@ SPICE_GNUC_VISIBLE int spice_server_add_renderer(SpiceServer *s, const char *nam
 
 SPICE_GNUC_VISIBLE int spice_server_kbd_leds(SpiceKbdInstance *sin, int leds)
 {
-    reds_on_keyboard_leds_change(NULL, leds);
+    inputs_on_keyboard_leds_change(NULL, leds);
     return 0;
 }
 
@@ -5087,7 +3946,6 @@ static int reds_set_migration_dest_info(const char* dest,
     RedsMigSpice *spice_migration = NULL;
 
     reds_mig_release();
-
     if ((port == -1 && secure_port == -1) || !dest) {
         return FALSE;
     }
@@ -5110,22 +3968,36 @@ SPICE_GNUC_VISIBLE int spice_server_migrate_connect(SpiceServer *s, const char* 
                                                     int port, int secure_port,
                                                     const char* cert_subject)
 {
+    SpiceMigrateInterface *sif;
+
     red_printf("");
     ASSERT(migration_interface);
     ASSERT(reds == s);
 
-    if (reds->expect_migrate && reds->client_semi_mig_cap) {
+    if (reds->expect_migrate) {
         red_printf("warning: consecutive calls without migration. Canceling previous call");
-        reds_mig_finished(FALSE);
+        main_channel_migrate_complete(reds->main_channel, FALSE);
     }
 
+    sif = SPICE_CONTAINEROF(migration_interface->base.sif, SpiceMigrateInterface, base);
+
     if (!reds_set_migration_dest_info(dest, port, secure_port, cert_subject)) {
-        SpiceMigrateInterface *sif;
-        sif = SPICE_CONTAINEROF(migration_interface->base.sif, SpiceMigrateInterface, base);
         sif->migrate_connect_complete(migration_interface);
         return -1;
     }
-    reds_mig_started();
+
+    reds->expect_migrate = TRUE;
+
+    /* main channel will take care of clients that are still during migration (at target)*/
+    if (main_channel_migrate_connect(reds->main_channel, reds->mig_spice)) {
+        reds_mig_started();
+    } else {
+        if (reds->num_clients == 0) {
+            reds_mig_release();
+            red_printf("no client connected");
+        }
+        sif->migrate_connect_complete(migration_interface);
+    }
 
     return 0;
 }
@@ -5158,7 +4030,7 @@ SPICE_GNUC_VISIBLE int spice_server_migrate_client_state(SpiceServer *s)
 {
     ASSERT(reds == s);
 
-    if (!reds->stream) {
+    if (!reds_main_channel_connected()) {
         return SPICE_MIGRATE_CLIENT_NONE;
     } else if (reds->mig_wait_connect) {
         return SPICE_MIGRATE_CLIENT_WAITING;
@@ -5173,32 +4045,21 @@ SPICE_GNUC_VISIBLE int spice_server_migrate_end(SpiceServer *s, int completed)
     SpiceMigrateInterface *sif;
     int ret = 0;
 
-    red_printf("completed=%d", completed);
+    red_printf("");
+
     ASSERT(migration_interface);
     ASSERT(reds == s);
 
-    reds_listen_start();
     sif = SPICE_CONTAINEROF(migration_interface->base.sif, SpiceMigrateInterface, base);
-
-    if (!reds->stream) {
-        ret = 0;
-        goto complete;
-    }
-
-    if (!reds->expect_migrate) {
-        red_printf("spice_server_migrate_info failed or was not called, disconnecting client");
-        reds_disconnect("");
+    if (!reds->expect_migrate && reds->num_clients) {
+        red_printf("spice_server_migrate_info was not called, disconnecting clients");
+        reds_disconnect();
         ret = -1;
         goto complete;
     }
 
-    if (reds->client_semi_mig_cap && reds->mig_connect_ok) {
-        reds_mig_finished(completed);
-    } else {
-        if (completed) {
-            ret = spice_server_migrate_switch(s);
-        }
-    }
+    reds->expect_migrate = FALSE;
+    reds_mig_finished(completed);
     ret = 0;
 complete:
     if (sif->migrate_end_complete) {
@@ -5212,7 +4073,7 @@ SPICE_GNUC_VISIBLE int spice_server_migrate_switch(SpiceServer *s)
 {
     ASSERT(reds == s);
     red_printf("");
-    if (!reds->stream) {
+    if (!reds->num_clients) {
        return 0;
     }
     reds->expect_migrate = FALSE;
@@ -5274,7 +4135,7 @@ void reds_stream_free(RedsStream *s)
         return;
     }
 
-    reds_channel_event(s, SPICE_CHANNEL_EVENT_DISCONNECTED);
+    reds_stream_channel_event(s, SPICE_CHANNEL_EVENT_DISCONNECTED);
 
 #if HAVE_SASL
     if (s->sasl.conn) {

@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2009 Red Hat, Inc.
+   Copyright (C) 2011 Red Hat, Inc.
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -14,11 +14,13 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifndef _H_RED_CANVAS_BASE
+#define _H_RED_CANVAS_BASE
 
-#include "common.h"
-#include "utils.h"
+#define SPICE_CANVAS_INTERNAL
+#define SW_CANVAS_CACHE
+#include "canvas_base.h"
+#undef SW_CANVAS_CACHE
+#undef SPICE_CANVAS_INTERNAL
 
-
-#define CANVAS_ERROR(format, ...) THROW(format, ## __VA_ARGS__)
-
-#include "../common/lines.c"
+#endif

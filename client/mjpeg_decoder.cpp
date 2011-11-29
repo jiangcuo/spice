@@ -15,11 +15,18 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "debug.h"
 #include "utils.h"
 #include "mjpeg_decoder.h"
+
+#if !defined(jpeg_boolean) && !defined(__MINGW32__)
+#define jpeg_boolean boolean
+#endif
 
 enum {
     STATE_READ_HEADER,
@@ -34,7 +41,7 @@ extern "C" {
     {
     }
 
-    static boolean fill_input_buffer(j_decompress_ptr cinfo)
+    static jpeg_boolean fill_input_buffer(j_decompress_ptr cinfo)
     {
         return FALSE;
     }
@@ -104,7 +111,7 @@ void MJpegDecoder::convert_scanline(void)
     uint32_t *row;
     uint32_t c;
     uint8_t *s;
-    int x;
+    unsigned x;
 
     ASSERT(_width % 2 == 0);
     ASSERT(_height % 2 == 0);

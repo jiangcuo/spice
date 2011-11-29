@@ -15,12 +15,18 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#ifndef SPICE_CANVAS_INTERNAL
+#error "This file shouldn't be compiled directly"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "gl_canvas.h"
 #include "quic.h"
 #include "rop3.h"
 #include "region.h"

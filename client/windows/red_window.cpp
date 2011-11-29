@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "red_window.h"
@@ -78,11 +81,6 @@ static inline RedKey translate_key(int virtual_key, uint32_t scan, bool escape)
         }
         return (RedKey)scan;
     }
-}
-
-static int menu_cmd_to_app(WPARAM wparam)
-{
-    return 0;
 }
 
 static inline void send_filtered_keys(RedWindow* window)
@@ -371,7 +369,7 @@ void RedWindow_p::destroy(PixelsSource_p& pixels_source)
 
     ReleaseDC(_win, pixels_source.dc);
     SetWindowLongPtr(_win, GWLP_WNDPROC, (LONG_PTR)DefWindowProc);
-    SetWindowLongPtr(_win, GWLP_USERDATA, NULL);
+    SetWindowLongPtr(_win, GWLP_USERDATA, (LONG_PTR)NULL);
     DestroyWindow(_win);
 }
 
@@ -816,7 +814,7 @@ void RedWindow::cleanup()
     UnhookWindowsHookEx(low_keyboard_hook);
 }
 
-#ifdef USE_OGL
+#ifdef USE_OPENGL
 
 void RedWindow::touch_context_draw()
 {
@@ -901,7 +899,7 @@ void RedWindow::on_pointer_leave()
     }
 }
 
-static void insert_seperator(HMENU menu)
+static void insert_separator(HMENU menu)
 {
     MENUITEMINFO item_info;
     item_info.cbSize = sizeof(item_info);
@@ -1006,7 +1004,7 @@ static void insert_menu(Menu* menu, HMENU native, CommandMap& _commands_map)
             break;
         }
         case Menu::MENU_ITEM_TYPE_SEPARATOR:
-            insert_seperator(native);
+            insert_separator(native);
             break;
         case Menu::MENU_ITEM_TYPE_INVALID:
             return;
@@ -1038,7 +1036,7 @@ void RedWindow::set_menu(Menu* menu)
     }
     _menu = menu->ref();
     _sys_menu = GetSystemMenu(_win, FALSE);
-    insert_seperator(_sys_menu);
+    insert_separator(_sys_menu);
     insert_menu(_menu, _sys_menu, _commands_map);
 }
 

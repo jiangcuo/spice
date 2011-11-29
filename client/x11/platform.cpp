@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 
@@ -75,9 +78,9 @@ static Display* x_display = NULL;
 static bool x_shm_avail = false;
 static XVisualInfo **vinfo = NULL;
 static RedDrawable::Format *screen_format = NULL;
-#ifdef USE_OGL
+#ifdef USE_OPENGL
 static GLXFBConfig **fb_config = NULL;
-#endif // USE_OGL
+#endif // USE_OPENGL
 static XIM x_input_method = NULL;
 static XIC x_input_context = NULL;
 
@@ -507,12 +510,12 @@ RedDrawable::Format XPlatform::get_screen_format(int screen)
     return screen_format[screen];
 }
 
-#ifdef USE_OGL
+#ifdef USE_OPENGL
 GLXFBConfig** XPlatform::get_fbconfig()
 {
     return fb_config;
 }
-#endif // USE_OGL
+#endif // USE_OPENGL
 
 XIC XPlatform::get_input_context()
 {
@@ -1077,6 +1080,7 @@ public:
 
     void disable();
     void enable();
+    void restore();
 
     bool set_monitor_mode(XMonitor& monitor, const XRRModeInfo& mode_info);
 
@@ -1089,7 +1093,6 @@ private:
 
     XMonitor* crtc_overlap_test(int x, int y, int width, int height);
     void monitors_cleanup();
-    void restore();
 
 private:
     int _min_width;
@@ -1144,8 +1147,8 @@ protected:
 
 private:
     void update_position();
-    bool finde_mode_in_outputs(RRMode mode, int start_index, XRRScreenResources* res);
-    bool finde_mode_in_clones(RRMode mode, XRRScreenResources* res);
+    bool find_mode_in_outputs(RRMode mode, int start_index, XRRScreenResources* res);
+    bool find_mode_in_clones(RRMode mode, XRRScreenResources* res);
     XRRModeInfo* find_mode(int width, int height, XRRScreenResources* res);
 
 private:
@@ -1353,13 +1356,7 @@ void MultyMonScreen::restore()
     X_DEBUG_SYNC(get_display());
     XMonitor::inc_change_ref();
     disable();
-    Window root_window = RootWindow(get_display(), get_screen());
-
-    XLockDisplay(get_display());
-    XRRSetScreenSize(get_display(), root_window, _saved_width,
-                     _saved_height,
-                     _saved_width_mm, _saved_height_mm);
-    XUnlockDisplay(get_display());
+    set_size(_saved_width, _saved_height);
     XMonitorsList::iterator iter = _monitors.begin();
     for (; iter != _monitors.end(); iter++) {
         (*iter)->revert();
@@ -2038,7 +2035,7 @@ void XMonitor::update_position()
     X_DEBUG_SYNC(display);
 }
 
-bool XMonitor::finde_mode_in_outputs(RRMode mode, int start_index, XRRScreenResources* res)
+bool XMonitor::find_mode_in_outputs(RRMode mode, int start_index, XRRScreenResources* res)
 {
     int i, j;
     bool retval = true;
@@ -2062,11 +2059,11 @@ bool XMonitor::finde_mode_in_outputs(RRMode mode, int start_index, XRRScreenReso
     return retval;
 }
 
-bool XMonitor::finde_mode_in_clones(RRMode mode, XRRScreenResources* res)
+bool XMonitor::find_mode_in_clones(RRMode mode, XRRScreenResources* res)
 {
     XMonitorsList::iterator iter = _clones.begin();
     for (; iter != _clones.end(); iter++) {
-        if (!(*iter)->finde_mode_in_outputs(mode, 0, res)) {
+        if (!(*iter)->find_mode_in_outputs(mode, 0, res)) {
             return false;
         }
     }
@@ -2111,12 +2108,12 @@ XRRModeInfo* XMonitor::find_mode(int width, int height, XRRScreenResources* res)
     while (!modes_set.empty()) {
         ModesSet::iterator iter = modes_set.begin();
 
-        if (!finde_mode_in_outputs((*iter).info->id, 1, res)) {
+        if (!find_mode_in_outputs((*iter).info->id, 1, res)) {
             modes_set.erase(iter);
             continue;
         }
 
-        if (!finde_mode_in_clones((*iter).info->id, res)) {
+        if (!find_mode_in_clones((*iter).info->id, res)) {
             modes_set.erase(iter);
             continue;
         }
@@ -2235,7 +2232,7 @@ void XMonitor::do_restore()
     if (!mode_changed()) {
         return;
     }
-    do_set_mode(_saved_size.x, _saved_size.y);
+    _container.restore();
 }
 
 int XMonitor::get_depth()
@@ -2891,7 +2888,7 @@ static void cleanup(void)
         delete[] vinfo;
         vinfo = NULL;
     }
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     if (fb_config) {
         for (i = 0; i < ScreenCount(x_display); ++i) {
             if (fb_config[i]) {
@@ -2901,7 +2898,7 @@ static void cleanup(void)
         delete fb_config;
         fb_config = NULL;
     }
-#endif // USE_OGL
+#endif // USE_OPENGL
 }
 
 static void quit_handler(int sig)
@@ -2956,27 +2953,6 @@ static void init_xfixes()
         XFixesQueryVersion(x_display, &major, &minor) && major >= 1;
 }
 
-static unsigned int get_modifier_mask(KeySym modifier)
-{
-    int mask = 0;
-    int i;
-
-    XModifierKeymap* map = XGetModifierMapping(x_display);
-    KeyCode keycode = XKeysymToKeycode(x_display, modifier);
-    if (keycode == NoSymbol) {
-        XFreeModifiermap(map);
-        return 0;
-    }
-
-    for (i = 0; i < 8; i++) {
-        if (map->modifiermap[map->max_keypermod * i] == keycode) {
-            mask = 1 << i;
-        }
-    }
-    XFreeModifiermap(map);
-    return mask;
-}
-
 static void init_kbd()
 {
     int xkb_major = XkbMajorVersion;
@@ -2989,8 +2965,8 @@ static void init_kbd()
         !XkbQueryExtension(x_display, &opcode, &event, &error, &xkb_major, &xkb_minor)) {
         return;
     }
-    caps_lock_mask = get_modifier_mask(XK_Caps_Lock);
-    num_lock_mask = get_modifier_mask(XK_Num_Lock);
+    caps_lock_mask = XkbKeysymToModifiers(x_display, XK_Caps_Lock);
+    num_lock_mask = XkbKeysymToModifiers(x_display, XK_Num_Lock);
 }
 
 static void init_XIM()
@@ -3065,10 +3041,10 @@ static XVisualInfo* get_x_vis_info(int screen)
 
 void Platform::init()
 {
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     int err, ev;
     int threads_enable;
-#endif // USE_OGL
+#endif // USE_OPENGL
     int major, minor;
     Bool pixmaps;
 
@@ -3076,7 +3052,7 @@ void Platform::init()
 
     setlocale(LC_ALL, "");
 
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     threads_enable = XInitThreads();
 #else
     XInitThreads();
@@ -3095,7 +3071,7 @@ void Platform::init()
     memset(vinfo, 0, sizeof(XVisualInfo *) * ScreenCount(x_display));
     screen_format = new RedDrawable::Format[ScreenCount(x_display)];
     memset(screen_format, 0, sizeof(RedDrawable::Format) * ScreenCount(x_display));
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     fb_config = new GLXFBConfig *[ScreenCount(x_display)];
     memset(fb_config, 0, sizeof(GLXFBConfig *) * ScreenCount(x_display));
 
@@ -3130,13 +3106,13 @@ void Platform::init()
             }
         }
     } else
-#else // !USE_OGL
+#else // !USE_OPENGL
     {
         for (int i = 0; i < ScreenCount(x_display); ++i) {
             vinfo[i] = get_x_vis_info(i);
         }
     }
-#endif // USE_OGL
+#endif // USE_OPENGL
 
     for (int i = 0; i < ScreenCount(x_display); ++i) {
         if (vinfo[i] == NULL) {

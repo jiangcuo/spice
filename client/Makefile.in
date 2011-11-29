@@ -14,6 +14,7 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
+
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkgincludedir = $(includedir)/@PACKAGE@
@@ -33,6 +34,94 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+bin_PROGRAMS = spicec$(EXEEXT)
+@OS_WIN32_TRUE@am__append_1 = \
+@OS_WIN32_TRUE@	red_gdi_canvas.cpp		\
+@OS_WIN32_TRUE@	red_gdi_canvas.h		\
+@OS_WIN32_TRUE@	red_pixmap_gdi.h		\
+@OS_WIN32_TRUE@	windows/atomic_count.h		\
+@OS_WIN32_TRUE@	windows/event_sources_p.cpp	\
+@OS_WIN32_TRUE@	windows/main.cpp		\
+@OS_WIN32_TRUE@	windows/my_getopt.cpp		\
+@OS_WIN32_TRUE@	windows/named_pipe.cpp		\
+@OS_WIN32_TRUE@	windows/named_pipe.h		\
+@OS_WIN32_TRUE@	windows/pixels_source.cpp	\
+@OS_WIN32_TRUE@	windows/pixels_source_p.h	\
+@OS_WIN32_TRUE@	windows/platform.cpp		\
+@OS_WIN32_TRUE@	windows/platform_utils.cpp	\
+@OS_WIN32_TRUE@	windows/platform_utils.h	\
+@OS_WIN32_TRUE@	windows/playback.cpp		\
+@OS_WIN32_TRUE@	windows/playback.h		\
+@OS_WIN32_TRUE@	windows/record.cpp		\
+@OS_WIN32_TRUE@	windows/record.h		\
+@OS_WIN32_TRUE@	windows/red_drawable.cpp	\
+@OS_WIN32_TRUE@	windows/red_pixmap.cpp		\
+@OS_WIN32_TRUE@	windows/red_pixmap_gdi.cpp	\
+@OS_WIN32_TRUE@	windows/red_pixmap_sw.cpp	\
+@OS_WIN32_TRUE@	windows/red_window.cpp		\
+@OS_WIN32_TRUE@	windows/red_window_p.h		\
+@OS_WIN32_TRUE@	windows/resource.h		\
+@OS_WIN32_TRUE@	windows/stdint.h		\
+@OS_WIN32_TRUE@	windows/win_platform.h		\
+@OS_WIN32_TRUE@	$(NULL)
+
+@OS_WIN32_FALSE@am__append_2 = \
+@OS_WIN32_FALSE@	x11/atomic_count.h		\
+@OS_WIN32_FALSE@	x11/event_sources_p.cpp		\
+@OS_WIN32_FALSE@	x11/event_sources_p.h		\
+@OS_WIN32_FALSE@	x11/main.cpp			\
+@OS_WIN32_FALSE@	x11/named_pipe.cpp		\
+@OS_WIN32_FALSE@	x11/named_pipe.h		\
+@OS_WIN32_FALSE@	x11/pixels_source.cpp		\
+@OS_WIN32_FALSE@	x11/pixels_source_p.h		\
+@OS_WIN32_FALSE@	x11/platform.cpp		\
+@OS_WIN32_FALSE@	x11/platform_utils.cpp		\
+@OS_WIN32_FALSE@	x11/platform_utils.h		\
+@OS_WIN32_FALSE@	x11/playback.cpp		\
+@OS_WIN32_FALSE@	x11/playback.h			\
+@OS_WIN32_FALSE@	x11/record.cpp			\
+@OS_WIN32_FALSE@	x11/record.h			\
+@OS_WIN32_FALSE@	x11/red_drawable.cpp		\
+@OS_WIN32_FALSE@	x11/red_pixmap.cpp		\
+@OS_WIN32_FALSE@	x11/red_pixmap_sw.cpp		\
+@OS_WIN32_FALSE@	x11/red_window.cpp		\
+@OS_WIN32_FALSE@	x11/red_window_p.h		\
+@OS_WIN32_FALSE@	x11/res.cpp			\
+@OS_WIN32_FALSE@	x11/res.h			\
+@OS_WIN32_FALSE@	x11/resource.h			\
+@OS_WIN32_FALSE@	x11/x_icon.cpp			\
+@OS_WIN32_FALSE@	x11/x_icon.h			\
+@OS_WIN32_FALSE@	x11/x_platform.h		\
+@OS_WIN32_FALSE@	$(NULL)
+
+@SUPPORT_TUNNEL_TRUE@am__append_3 = \
+@SUPPORT_TUNNEL_TRUE@	tunnel_channel.cpp	\
+@SUPPORT_TUNNEL_TRUE@	tunnel_channel.h	\
+@SUPPORT_TUNNEL_TRUE@	$(NULL)
+
+@SUPPORT_GUI_TRUE@am__append_4 = \
+@SUPPORT_GUI_TRUE@	gui/gui.cpp			\
+@SUPPORT_GUI_TRUE@	gui/gui.h			\
+@SUPPORT_GUI_TRUE@	gui/resource_provider.cpp	\
+@SUPPORT_GUI_TRUE@	gui/resource_provider.h		\
+@SUPPORT_GUI_TRUE@	gui/softrenderer.cpp		\
+@SUPPORT_GUI_TRUE@	gui/softrenderer.h		\
+@SUPPORT_GUI_TRUE@	gui/softtexture.cpp		\
+@SUPPORT_GUI_TRUE@	gui/softtexture.h		\
+@SUPPORT_GUI_TRUE@	$(NULL)
+
+@SUPPORT_GL_TRUE@am__append_5 = \
+@SUPPORT_GL_TRUE@	red_gl_canvas.cpp	\
+@SUPPORT_GL_TRUE@	red_gl_canvas.h		\
+@SUPPORT_GL_TRUE@	red_pixmap_gl.h		\
+@SUPPORT_GL_TRUE@	$(NULL)
+
+@OS_WIN32_FALSE@@SUPPORT_GL_TRUE@am__append_6 = x11/red_pixmap_gl.cpp
+@SUPPORT_SMARTCARD_TRUE@am__append_7 = \
+@SUPPORT_SMARTCARD_TRUE@	smartcard_channel.cpp	\
+@SUPPORT_SMARTCARD_TRUE@	smartcard_channel.h	\
+@SUPPORT_SMARTCARD_TRUE@	$(NULL)
+
 subdir = client
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -43,55 +132,184 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-AM_V_GEN = $(am__v_GEN_$(V))
-am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
-am__v_GEN_0 = @echo "  GEN   " $@;
+am__installdirs = "$(DESTDIR)$(bindir)"
+PROGRAMS = $(bin_PROGRAMS)
+am__spicec_SOURCES_DIST = application.cpp application.h \
+	audio_channels.h audio_devices.h cache.hpp canvas.cpp canvas.h \
+	client_net_socket.cpp client_net_socket.h cmd_line_parser.cpp \
+	cmd_line_parser.h common.h controller.cpp controller.h \
+	cursor.cpp cursor.h cursor_channel.cpp cursor_channel.h \
+	debug.h demarshallers.h display_channel.cpp display_channel.h \
+	event_sources.h foreign_menu.cpp foreign_menu.h \
+	glz_decoded_image.h glz_decoder.cpp glz_decoder.h \
+	glz_decoder_config.h glz_decoder_window.cpp \
+	glz_decoder_window.h hot_keys.cpp hot_keys.h icon.h \
+	inputs_channel.cpp inputs_channel.h inputs_handler.h \
+	jpeg_decoder.cpp jpeg_decoder.h marshallers.h menu.cpp menu.h \
+	mjpeg_decoder.cpp mjpeg_decoder.h monitor.cpp monitor.h \
+	pixels_source.h platform.h playback_channel.cpp \
+	process_loop.cpp process_loop.h read_write_mutex.h \
+	record_channel.cpp red_canvas_base.h red_channel.cpp \
+	red_channel.h red_client.cpp red_client.h red_drawable.h \
+	red_key.h red_peer.cpp red_peer.h red_pixmap.h red_pixmap_sw.h \
+	red_sw_canvas.cpp red_sw_canvas.h red_types.h red_window.h \
+	screen.cpp screen.h screen_layer.cpp screen_layer.h \
+	shared_cache.hpp threads.cpp threads.h utils.cpp utils.h \
+	zlib_decoder.cpp zlib_decoder.h generated_demarshallers.cpp \
+	generated_marshallers.cpp generated_demarshallers1.cpp \
+	generated_marshallers1.cpp red_gdi_canvas.cpp red_gdi_canvas.h \
+	red_pixmap_gdi.h windows/atomic_count.h \
+	windows/event_sources_p.cpp windows/main.cpp \
+	windows/my_getopt.cpp windows/named_pipe.cpp \
+	windows/named_pipe.h windows/pixels_source.cpp \
+	windows/pixels_source_p.h windows/platform.cpp \
+	windows/platform_utils.cpp windows/platform_utils.h \
+	windows/playback.cpp windows/playback.h windows/record.cpp \
+	windows/record.h windows/red_drawable.cpp \
+	windows/red_pixmap.cpp windows/red_pixmap_gdi.cpp \
+	windows/red_pixmap_sw.cpp windows/red_window.cpp \
+	windows/red_window_p.h windows/resource.h windows/stdint.h \
+	windows/win_platform.h x11/atomic_count.h \
+	x11/event_sources_p.cpp x11/event_sources_p.h x11/main.cpp \
+	x11/named_pipe.cpp x11/named_pipe.h x11/pixels_source.cpp \
+	x11/pixels_source_p.h x11/platform.cpp x11/platform_utils.cpp \
+	x11/platform_utils.h x11/playback.cpp x11/playback.h \
+	x11/record.cpp x11/record.h x11/red_drawable.cpp \
+	x11/red_pixmap.cpp x11/red_pixmap_sw.cpp x11/red_window.cpp \
+	x11/red_window_p.h x11/res.cpp x11/res.h x11/resource.h \
+	x11/x_icon.cpp x11/x_icon.h x11/x_platform.h \
+	tunnel_channel.cpp tunnel_channel.h gui/gui.cpp gui/gui.h \
+	gui/resource_provider.cpp gui/resource_provider.h \
+	gui/softrenderer.cpp gui/softrenderer.h gui/softtexture.cpp \
+	gui/softtexture.h red_gl_canvas.cpp red_gl_canvas.h \
+	red_pixmap_gl.h x11/red_pixmap_gl.cpp smartcard_channel.cpp \
+	smartcard_channel.h
+am__objects_1 =
+am__objects_2 = generated_demarshallers.$(OBJEXT) \
+	generated_marshallers.$(OBJEXT) \
+	generated_demarshallers1.$(OBJEXT) \
+	generated_marshallers1.$(OBJEXT) $(am__objects_1)
+am__dirstamp = $(am__leading_dot)dirstamp
+@OS_WIN32_TRUE@am__objects_3 = red_gdi_canvas.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/event_sources_p.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/main.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/my_getopt.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/named_pipe.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/pixels_source.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/platform.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/platform_utils.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/playback.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/record.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/red_drawable.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/red_pixmap.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/red_pixmap_gdi.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/red_pixmap_sw.$(OBJEXT) \
+@OS_WIN32_TRUE@	windows/red_window.$(OBJEXT) $(am__objects_1)
+@OS_WIN32_FALSE@am__objects_4 = x11/event_sources_p.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/main.$(OBJEXT) x11/named_pipe.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/pixels_source.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/platform.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/platform_utils.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/playback.$(OBJEXT) x11/record.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/red_drawable.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/red_pixmap.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/red_pixmap_sw.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/red_window.$(OBJEXT) x11/res.$(OBJEXT) \
+@OS_WIN32_FALSE@	x11/x_icon.$(OBJEXT) $(am__objects_1)
+@SUPPORT_TUNNEL_TRUE@am__objects_5 = tunnel_channel.$(OBJEXT) \
+@SUPPORT_TUNNEL_TRUE@	$(am__objects_1)
+@SUPPORT_GUI_TRUE@am__objects_6 = gui/gui.$(OBJEXT) \
+@SUPPORT_GUI_TRUE@	gui/resource_provider.$(OBJEXT) \
+@SUPPORT_GUI_TRUE@	gui/softrenderer.$(OBJEXT) \
+@SUPPORT_GUI_TRUE@	gui/softtexture.$(OBJEXT) $(am__objects_1)
+@SUPPORT_GL_TRUE@am__objects_7 = red_gl_canvas.$(OBJEXT) \
+@SUPPORT_GL_TRUE@	$(am__objects_1)
+@OS_WIN32_FALSE@@SUPPORT_GL_TRUE@am__objects_8 =  \
+@OS_WIN32_FALSE@@SUPPORT_GL_TRUE@	x11/red_pixmap_gl.$(OBJEXT)
+@SUPPORT_SMARTCARD_TRUE@am__objects_9 = smartcard_channel.$(OBJEXT) \
+@SUPPORT_SMARTCARD_TRUE@	$(am__objects_1)
+am_spicec_OBJECTS = application.$(OBJEXT) canvas.$(OBJEXT) \
+	client_net_socket.$(OBJEXT) cmd_line_parser.$(OBJEXT) \
+	controller.$(OBJEXT) cursor.$(OBJEXT) cursor_channel.$(OBJEXT) \
+	display_channel.$(OBJEXT) foreign_menu.$(OBJEXT) \
+	glz_decoder.$(OBJEXT) glz_decoder_window.$(OBJEXT) \
+	hot_keys.$(OBJEXT) inputs_channel.$(OBJEXT) \
+	jpeg_decoder.$(OBJEXT) menu.$(OBJEXT) mjpeg_decoder.$(OBJEXT) \
+	monitor.$(OBJEXT) playback_channel.$(OBJEXT) \
+	process_loop.$(OBJEXT) record_channel.$(OBJEXT) \
+	red_channel.$(OBJEXT) red_client.$(OBJEXT) red_peer.$(OBJEXT) \
+	red_sw_canvas.$(OBJEXT) screen.$(OBJEXT) \
+	screen_layer.$(OBJEXT) threads.$(OBJEXT) utils.$(OBJEXT) \
+	zlib_decoder.$(OBJEXT) $(am__objects_2) $(am__objects_1) \
+	$(am__objects_3) $(am__objects_4) $(am__objects_5) \
+	$(am__objects_6) $(am__objects_7) $(am__objects_8) \
+	$(am__objects_9)
+spicec_OBJECTS = $(am_spicec_OBJECTS)
+am__DEPENDENCIES_1 =
+spicec_DEPENDENCIES = $(top_builddir)/common/libspice-common.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+AM_V_lt = $(am__v_lt_$(V))
+am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
+am__v_lt_0 = --silent
+spicec_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(spicec_LDFLAGS) $(LDFLAGS) -o $@
+DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
+depcomp = $(SHELL) $(top_srcdir)/depcomp
+am__depfiles_maybe = depfiles
+am__mv = mv -f
+CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
+	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
+LTCXXCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CXXFLAGS) $(CXXFLAGS)
+AM_V_CXX = $(am__v_CXX_$(V))
+am__v_CXX_ = $(am__v_CXX_$(AM_DEFAULT_VERBOSITY))
+am__v_CXX_0 = @echo "  CXX   " $@;
 AM_V_at = $(am__v_at_$(V))
 am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
 am__v_at_0 = @
-SOURCES =
-DIST_SOURCES =
-RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
-	html-recursive info-recursive install-data-recursive \
-	install-dvi-recursive install-exec-recursive \
-	install-html-recursive install-info-recursive \
-	install-pdf-recursive install-ps-recursive install-recursive \
-	installcheck-recursive installdirs-recursive pdf-recursive \
-	ps-recursive uninstall-recursive
-RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
-  distclean-recursive maintainer-clean-recursive
-AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
-	$(RECURSIVE_CLEAN_TARGETS:-recursive=) tags TAGS ctags CTAGS \
-	distdir
+CXXLD = $(CXX)
+CXXLINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CXXLD = $(am__v_CXXLD_$(V))
+am__v_CXXLD_ = $(am__v_CXXLD_$(AM_DEFAULT_VERBOSITY))
+am__v_CXXLD_0 = @echo "  CXXLD " $@;
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_$(V))
+am__v_CC_ = $(am__v_CC_$(AM_DEFAULT_VERBOSITY))
+am__v_CC_0 = @echo "  CC    " $@;
+CCLD = $(CC)
+LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_$(V))
+am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
+am__v_CCLD_0 = @echo "  CCLD  " $@;
+AM_V_GEN = $(am__v_GEN_$(V))
+am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
+am__v_GEN_0 = @echo "  GEN   " $@;
+SOURCES = $(spicec_SOURCES)
+DIST_SOURCES = $(am__spicec_SOURCES_DIST)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-am__relativize = \
-  dir0=`pwd`; \
-  sed_first='s,^\([^/]*\)/.*$$,\1,'; \
-  sed_rest='s,^[^/]*/*,,'; \
-  sed_last='s,^.*/\([^/]*\)$$,\1,'; \
-  sed_butlast='s,/*[^/]*$$,,'; \
-  while test -n "$$dir1"; do \
-    first=`echo "$$dir1" | sed -e "$$sed_first"`; \
-    if test "$$first" != "."; then \
-      if test "$$first" = ".."; then \
-        dir2=`echo "$$dir0" | sed -e "$$sed_last"`/"$$dir2"; \
-        dir0=`echo "$$dir0" | sed -e "$$sed_butlast"`; \
-      else \
-        first2=`echo "$$dir2" | sed -e "$$sed_first"`; \
-        if test "$$first2" = "$$first"; then \
-          dir2=`echo "$$dir2" | sed -e "$$sed_rest"`; \
-        else \
-          dir2="../$$dir2"; \
-        fi; \
-        dir0="$$dir0"/"$$first"; \
-      fi; \
-    fi; \
-    dir1=`echo "$$dir1" | sed -e "$$sed_rest"`; \
-  done; \
-  reldir="$$dir2"
 ACLOCAL = @ACLOCAL@
+ALLOCA = @ALLOCA@
 ALSA_CFLAGS = @ALSA_CFLAGS@
 ALSA_LIBS = @ALSA_LIBS@
 AMTAR = @AMTAR@
@@ -116,6 +334,7 @@ CFLAGS = @CFLAGS@
 CFLAGS_CFLAGS = @CFLAGS_CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CXIMAGE_CFLAGS = @CXIMAGE_CFLAGS@
 CXX = @CXX@
 CXXCPP = @CXXCPP@
 CXXDEPMODE = @CXXDEPMODE@
@@ -190,7 +409,6 @@ SLIRP_LIBS = @SLIRP_LIBS@
 SMARTCARD_CFLAGS = @SMARTCARD_CFLAGS@
 SMARTCARD_LIBS = @SMARTCARD_LIBS@
 SPICEC_STATIC_LINKAGE_BSTATIC = @SPICEC_STATIC_LINKAGE_BSTATIC@
-SPICE_COMMON_SRCDIR = @SPICE_COMMON_SRCDIR@
 SPICE_LT_VERSION = @SPICE_LT_VERSION@
 SPICE_NONPKGCONFIG_CFLAGS = @SPICE_NONPKGCONFIG_CFLAGS@
 SPICE_NONPKGCONFIG_LIBS = @SPICE_NONPKGCONFIG_LIBS@
@@ -201,6 +419,7 @@ STRIP = @STRIP@
 VERSION = @VERSION@
 VISIBILITY_HIDDEN_CFLAGS = @VISIBILITY_HIDDEN_CFLAGS@
 WARN_CFLAGS = @WARN_CFLAGS@
+WINDRES = @WINDRES@
 XFIXES_CFLAGS = @XFIXES_CFLAGS@
 XFIXES_LIBS = @XFIXES_LIBS@
 XRANDR12_CFLAGS = @XRANDR12_CFLAGS@
@@ -253,7 +472,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-red_target = @red_target@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -263,131 +481,97 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 NULL = 
-SUBDIRS = . $(red_target) gui
-DIST_SUBDIRS = x11 windows gui
-spice_built_sources = generated_demarshallers.cpp generated_marshallers.cpp generated_demarshallers1.cpp generated_marshallers1.cpp
-@SUPPORT_GL_FALSE@GL_SRCS = 
-@SUPPORT_GL_TRUE@GL_SRCS = \
-@SUPPORT_GL_TRUE@	gl_canvas.cpp			\
-@SUPPORT_GL_TRUE@	glc.cpp				\
-@SUPPORT_GL_TRUE@	red_gl_canvas.cpp		\
-@SUPPORT_GL_TRUE@	red_gl_canvas.h			\
-@SUPPORT_GL_TRUE@	red_pixmap_gl.h
-
-SMARTCARD_SRC_ENABLED = smartcard_channel.cpp smartcard_channel.h
-@SUPPORT_SMARTCARD_FALSE@SMARTCARD_SRCS = 
-@SUPPORT_SMARTCARD_TRUE@SMARTCARD_SRCS = $(SMARTCARD_SRC_ENABLED)
-RED_COMMON_SRCS = \
-	application.cpp			\
-	application.h			\
-	audio_channels.h		\
-	audio_devices.h			\
-	cache.hpp			\
-	sw_canvas.cpp			\
-	pixman_utils.cpp		\
-	lines.cpp			\
-	canvas.cpp			\
-	canvas.h			\
-	canvas_utils.cpp		\
-	red_sw_canvas.cpp		\
-	red_sw_canvas.h			\
-	client_net_socket.cpp		\
-	client_net_socket.h		\
-	cmd_line_parser.cpp		\
-	cmd_line_parser.h		\
-	common.h			\
-	demarshallers.h			\
-	marshallers.h			\
+BUILT_SOURCES = \
 	generated_demarshallers.cpp	\
-	generated_demarshallers1.cpp	\
-	marshaller.cpp			\
 	generated_marshallers.cpp	\
+	generated_demarshallers1.cpp	\
 	generated_marshallers1.cpp	\
-	controller.cpp			\
-	controller.h			\
-	cursor_channel.cpp		\
-	cursor_channel.h		\
-	cursor.cpp			\
-	cursor.h			\
-	debug.h				\
-	display_channel.cpp		\
-	display_channel.h		\
-	foreign_menu.cpp		\
-	foreign_menu.h			\
-	glz_decoded_image.h		\
-	glz_decoder_config.h		\
-	glz_decoder.cpp			\
-	glz_decoder.h			\
-	glz_decoder_window.cpp		\
-	glz_decoder_window.h		\
+	$(NULL)
+
+MAINTAINERCLEANFILES = $(BUILT_SOURCES)
+spicec_SOURCES = application.cpp application.h audio_channels.h \
+	audio_devices.h cache.hpp canvas.cpp canvas.h \
+	client_net_socket.cpp client_net_socket.h cmd_line_parser.cpp \
+	cmd_line_parser.h common.h controller.cpp controller.h \
+	cursor.cpp cursor.h cursor_channel.cpp cursor_channel.h \
+	debug.h demarshallers.h display_channel.cpp display_channel.h \
+	event_sources.h foreign_menu.cpp foreign_menu.h \
+	glz_decoded_image.h glz_decoder.cpp glz_decoder.h \
+	glz_decoder_config.h glz_decoder_window.cpp \
+	glz_decoder_window.h hot_keys.cpp hot_keys.h icon.h \
+	inputs_channel.cpp inputs_channel.h inputs_handler.h \
+	jpeg_decoder.cpp jpeg_decoder.h marshallers.h menu.cpp menu.h \
+	mjpeg_decoder.cpp mjpeg_decoder.h monitor.cpp monitor.h \
+	pixels_source.h platform.h playback_channel.cpp \
+	process_loop.cpp process_loop.h read_write_mutex.h \
+	record_channel.cpp red_canvas_base.h red_channel.cpp \
+	red_channel.h red_client.cpp red_client.h red_drawable.h \
+	red_key.h red_peer.cpp red_peer.h red_pixmap.h red_pixmap_sw.h \
+	red_sw_canvas.cpp red_sw_canvas.h red_types.h red_window.h \
+	screen.cpp screen.h screen_layer.cpp screen_layer.h \
+	shared_cache.hpp threads.cpp threads.h utils.cpp utils.h \
+	zlib_decoder.cpp zlib_decoder.h $(BUILT_SOURCES) $(NULL) \
+	$(am__append_1) $(am__append_2) $(am__append_3) \
+	$(am__append_4) $(am__append_5) $(am__append_6) \
+	$(am__append_7)
+INCLUDES = \
+	-D__STDC_LIMIT_MACROS				\
+	-I$(top_srcdir)/client/x11			\
+	-I$(top_srcdir)/common				\
+	$(ALSA_CFLAGS)					\
+	$(CEGUI_CFLAGS)					\
+	$(CEGUI06_CFLAGS)				\
+	$(CELT051_CFLAGS)				\
+	$(GL_CFLAGS)					\
+	$(MISC_X_CFLAGS)				\
+	$(PIXMAN_CFLAGS)				\
+	$(PROTOCOL_CFLAGS)				\
+	$(SPICE_NONPKGCONFIG_CFLAGS)			\
+	$(SMARTCARD_CFLAGS)				\
+	$(SSL_CFLAGS)					\
+	$(XRANDR_CFLAGS)				\
+	$(XFIXES_CFLAGS)				\
+	$(WARN_CFLAGS)					\
+	$(NULL)
+
+spicec_LDFLAGS = $(SPICEC_STATIC_LINKAGE_BSTATIC)
+spicec_LDADD = \
+	$(top_builddir)/common/libspice-common.la	\
+	$(ALSA_LIBS)					\
+	$(CEGUI_LIBS)					\
+	$(CEGUI06_LIBS)					\
+	$(CELT051_LIBS)					\
+	$(GL_LIBS)					\
+	$(JPEG_LIBS)					\
+	$(MISC_X_LIBS)					\
+	$(PIXMAN_LIBS)					\
+	$(SMARTCARD_LIBS)				\
+	$(SPICE_NONPKGCONFIG_LIBS)			\
+	$(SSL_LIBS)					\
+	$(XFIXES_LIBS)					\
+	$(XRANDR_LIBS)					\
+	$(Z_LIBS)					\
+	$(NULL)
+
+EXTRA_DIST = \
 	glz_decode_tmpl.c		\
-	inputs_channel.cpp		\
-	inputs_channel.h		\
-	inputs_handler.h		\
-	jpeg_decoder.cpp		\
-	jpeg_decoder.h			\
-	lz.cpp				\
-	monitor.cpp			\
-	monitor.h			\
-	mem.cpp				\
-	menu.cpp			\
-	menu.h				\
-	mjpeg_decoder.h			\
-	mjpeg_decoder.cpp		\
-	event_sources.h			\
-	pixels_source.h			\
-	platform.h			\
-	playback_channel.cpp		\
-	process_loop.cpp		\
-	process_loop.h			\
-	quic.cpp			\
-	read_write_mutex.h		\
-	record_channel.cpp		\
-	red_channel.cpp			\
-	red_channel.h			\
-	red_client.cpp			\
-	red_client.h			\
-	red_drawable.h			\
-	red_key.h			\
-	red_peer.cpp			\
-	red_peer.h			\
-	red_pixmap_sw.h			\
-	red_pixmap.h			\
-	red_types.h			\
-	red_window.h			\
-	region.cpp			\
-	rop3.cpp			\
-	screen.cpp			\
-	screen.h			\
-	screen_layer.cpp		\
-	screen_layer.h			\
-	shared_cache.hpp		\
-	tunnel_channel.cpp		\
-	tunnel_channel.h		\
-	hot_keys.cpp			\
-	hot_keys.h			\
-	threads.cpp			\
-	threads.h			\
-	utils.cpp			\
-	utils.h				\
-	zlib_decoder.cpp		\
-	zlib_decoder.h			\
+	x11/images/red_icon.c		\
+	x11/images/alt_image.c		\
+	gui/commonv2c.ttf.c		\
+	gui/commonwealth-10.font.c	\
+	gui/dejavu_sans-10.font.c	\
+	gui/dejavu_sans.ttf.c		\
+	gui/taharez_look.imageset.c	\
+	gui/taharez_look.looknfeel.c	\
+	gui/taharez_look.scheme.c	\
+	gui/taharez_look.tga.c		\
 	$(NULL)
 
-GDI_FILES = \
-	gdi_canvas.cpp			\
-	red_gdi_canvas.cpp		\
-	red_gdi_canvas.h		\
-	red_pixmap_gdi.h		\
-	$(NULL)
-
-MAINTAINERCLEANFILES = $(spice_built_sources)
-EXTRA_DIST = $(RED_COMMON_SRCS) $(spice_built_sources) $(GL_SRCS) $(GDI_FILES) $(SMARTCARD_SRC_ENABLED)
-BUILT_SOURCES = $(spice_built_sources)
 all: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) all-recursive
+	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
+.SUFFIXES: .cpp .lo .o .obj
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -418,82 +602,276 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
+install-binPROGRAMS: $(bin_PROGRAMS)
+	@$(NORMAL_INSTALL)
+	test -z "$(bindir)" || $(MKDIR_P) "$(DESTDIR)$(bindir)"
+	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
+	for p in $$list; do echo "$$p $$p"; done | \
+	sed 's/$(EXEEXT)$$//' | \
+	while read p p1; do if test -f $$p || test -f $$p1; \
+	  then echo "$$p"; echo "$$p"; else :; fi; \
+	done | \
+	sed -e 'p;s,.*/,,;n;h' -e 's|.*|.|' \
+	    -e 'p;x;s,.*/,,;s/$(EXEEXT)$$//;$(transform);s/$$/$(EXEEXT)/' | \
+	sed 'N;N;N;s,\n, ,g' | \
+	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1 } \
+	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
+	    if ($$2 == $$4) files[d] = files[d] " " $$1; \
+	    else { print "f", $$3 "/" $$4, $$1; } } \
+	  END { for (d in files) print "f", d, files[d] }' | \
+	while read type dir files; do \
+	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
+	    test -z "$$files" || { \
+	    echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(bindir)$$dir'"; \
+	    $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
+	    } \
+	; done
+
+uninstall-binPROGRAMS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
+	files=`for p in $$list; do echo "$$p"; done | \
+	  sed -e 'h;s,^.*/,,;s/$(EXEEXT)$$//;$(transform)' \
+	      -e 's/$$/$(EXEEXT)/' `; \
+	test -n "$$list" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(bindir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(bindir)" && rm -f $$files
+
+clean-binPROGRAMS:
+	@list='$(bin_PROGRAMS)'; test -n "$$list" || exit 0; \
+	echo " rm -f" $$list; \
+	rm -f $$list || exit $$?; \
+	test -n "$(EXEEXT)" || exit 0; \
+	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
+	echo " rm -f" $$list; \
+	rm -f $$list
+windows/$(am__dirstamp):
+	@$(MKDIR_P) windows
+	@: > windows/$(am__dirstamp)
+windows/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) windows/$(DEPDIR)
+	@: > windows/$(DEPDIR)/$(am__dirstamp)
+windows/event_sources_p.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/main.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/my_getopt.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/named_pipe.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/pixels_source.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/platform.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/platform_utils.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/playback.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/record.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/red_drawable.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/red_pixmap.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/red_pixmap_gdi.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/red_pixmap_sw.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+windows/red_window.$(OBJEXT): windows/$(am__dirstamp) \
+	windows/$(DEPDIR)/$(am__dirstamp)
+x11/$(am__dirstamp):
+	@$(MKDIR_P) x11
+	@: > x11/$(am__dirstamp)
+x11/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) x11/$(DEPDIR)
+	@: > x11/$(DEPDIR)/$(am__dirstamp)
+x11/event_sources_p.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/main.$(OBJEXT): x11/$(am__dirstamp) x11/$(DEPDIR)/$(am__dirstamp)
+x11/named_pipe.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/pixels_source.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/platform.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/platform_utils.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/playback.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/record.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/red_drawable.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/red_pixmap.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/red_pixmap_sw.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/red_window.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+x11/res.$(OBJEXT): x11/$(am__dirstamp) x11/$(DEPDIR)/$(am__dirstamp)
+x11/x_icon.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+gui/$(am__dirstamp):
+	@$(MKDIR_P) gui
+	@: > gui/$(am__dirstamp)
+gui/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) gui/$(DEPDIR)
+	@: > gui/$(DEPDIR)/$(am__dirstamp)
+gui/gui.$(OBJEXT): gui/$(am__dirstamp) gui/$(DEPDIR)/$(am__dirstamp)
+gui/resource_provider.$(OBJEXT): gui/$(am__dirstamp) \
+	gui/$(DEPDIR)/$(am__dirstamp)
+gui/softrenderer.$(OBJEXT): gui/$(am__dirstamp) \
+	gui/$(DEPDIR)/$(am__dirstamp)
+gui/softtexture.$(OBJEXT): gui/$(am__dirstamp) \
+	gui/$(DEPDIR)/$(am__dirstamp)
+x11/red_pixmap_gl.$(OBJEXT): x11/$(am__dirstamp) \
+	x11/$(DEPDIR)/$(am__dirstamp)
+spicec$(EXEEXT): $(spicec_OBJECTS) $(spicec_DEPENDENCIES) 
+	@rm -f spicec$(EXEEXT)
+	$(AM_V_CXXLD)$(spicec_LINK) $(spicec_OBJECTS) $(spicec_LDADD) $(LIBS)
+
+mostlyclean-compile:
+	-rm -f *.$(OBJEXT)
+	-rm -f gui/gui.$(OBJEXT)
+	-rm -f gui/resource_provider.$(OBJEXT)
+	-rm -f gui/softrenderer.$(OBJEXT)
+	-rm -f gui/softtexture.$(OBJEXT)
+	-rm -f windows/event_sources_p.$(OBJEXT)
+	-rm -f windows/main.$(OBJEXT)
+	-rm -f windows/my_getopt.$(OBJEXT)
+	-rm -f windows/named_pipe.$(OBJEXT)
+	-rm -f windows/pixels_source.$(OBJEXT)
+	-rm -f windows/platform.$(OBJEXT)
+	-rm -f windows/platform_utils.$(OBJEXT)
+	-rm -f windows/playback.$(OBJEXT)
+	-rm -f windows/record.$(OBJEXT)
+	-rm -f windows/red_drawable.$(OBJEXT)
+	-rm -f windows/red_pixmap.$(OBJEXT)
+	-rm -f windows/red_pixmap_gdi.$(OBJEXT)
+	-rm -f windows/red_pixmap_sw.$(OBJEXT)
+	-rm -f windows/red_window.$(OBJEXT)
+	-rm -f x11/event_sources_p.$(OBJEXT)
+	-rm -f x11/main.$(OBJEXT)
+	-rm -f x11/named_pipe.$(OBJEXT)
+	-rm -f x11/pixels_source.$(OBJEXT)
+	-rm -f x11/platform.$(OBJEXT)
+	-rm -f x11/platform_utils.$(OBJEXT)
+	-rm -f x11/playback.$(OBJEXT)
+	-rm -f x11/record.$(OBJEXT)
+	-rm -f x11/red_drawable.$(OBJEXT)
+	-rm -f x11/red_pixmap.$(OBJEXT)
+	-rm -f x11/red_pixmap_gl.$(OBJEXT)
+	-rm -f x11/red_pixmap_sw.$(OBJEXT)
+	-rm -f x11/red_window.$(OBJEXT)
+	-rm -f x11/res.$(OBJEXT)
+	-rm -f x11/x_icon.$(OBJEXT)
+
+distclean-compile:
+	-rm -f *.tab.c
+
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/application.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/canvas.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/client_net_socket.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmd_line_parser.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/controller.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cursor.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cursor_channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/display_channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/foreign_menu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_demarshallers.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_demarshallers1.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_marshallers.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_marshallers1.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glz_decoder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glz_decoder_window.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hot_keys.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inputs_channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jpeg_decoder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/menu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mjpeg_decoder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/monitor.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/playback_channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/process_loop.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/record_channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_client.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_gdi_canvas.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_gl_canvas.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_peer.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_sw_canvas.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/screen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/screen_layer.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/smartcard_channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/threads.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tunnel_channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zlib_decoder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@gui/$(DEPDIR)/gui.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@gui/$(DEPDIR)/resource_provider.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@gui/$(DEPDIR)/softrenderer.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@gui/$(DEPDIR)/softtexture.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/event_sources_p.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/my_getopt.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/named_pipe.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/pixels_source.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/platform.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/platform_utils.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/playback.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/record.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/red_drawable.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/red_pixmap.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/red_pixmap_gdi.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/red_pixmap_sw.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@windows/$(DEPDIR)/red_window.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/event_sources_p.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/named_pipe.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/pixels_source.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/platform.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/platform_utils.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/playback.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/record.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/red_drawable.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/red_pixmap.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/red_pixmap_gl.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/red_pixmap_sw.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/red_window.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/res.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x11/$(DEPDIR)/x_icon.Po@am__quote@
+
+.cpp.o:
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ $<
+
+.cpp.obj:
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+.cpp.lo:
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
 
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
-
-# This directory's subdirectories are mostly independent; you can cd
-# into them and run `make' without going through this Makefile.
-# To change the values of `make' variables: instead of editing Makefiles,
-# (1) if the variable is set in `config.status', edit `config.status'
-#     (which will cause the Makefiles to be regenerated when you run `make');
-# (2) otherwise, pass the desired values on the `make' command line.
-$(RECURSIVE_TARGETS):
-	@fail= failcom='exit 1'; \
-	for f in x $$MAKEFLAGS; do \
-	  case $$f in \
-	    *=* | --[!k]*);; \
-	    *k*) failcom='fail=yes';; \
-	  esac; \
-	done; \
-	dot_seen=no; \
-	target=`echo $@ | sed s/-recursive//`; \
-	list='$(SUBDIRS)'; for subdir in $$list; do \
-	  echo "Making $$target in $$subdir"; \
-	  if test "$$subdir" = "."; then \
-	    dot_seen=yes; \
-	    local_target="$$target-am"; \
-	  else \
-	    local_target="$$target"; \
-	  fi; \
-	  ($(am__cd) $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
-	  || eval $$failcom; \
-	done; \
-	if test "$$dot_seen" = "no"; then \
-	  $(MAKE) $(AM_MAKEFLAGS) "$$target-am" || exit 1; \
-	fi; test -z "$$fail"
-
-$(RECURSIVE_CLEAN_TARGETS):
-	@fail= failcom='exit 1'; \
-	for f in x $$MAKEFLAGS; do \
-	  case $$f in \
-	    *=* | --[!k]*);; \
-	    *k*) failcom='fail=yes';; \
-	  esac; \
-	done; \
-	dot_seen=no; \
-	case "$@" in \
-	  distclean-* | maintainer-clean-*) list='$(DIST_SUBDIRS)' ;; \
-	  *) list='$(SUBDIRS)' ;; \
-	esac; \
-	rev=''; for subdir in $$list; do \
-	  if test "$$subdir" = "."; then :; else \
-	    rev="$$subdir $$rev"; \
-	  fi; \
-	done; \
-	rev="$$rev ."; \
-	target=`echo $@ | sed s/-recursive//`; \
-	for subdir in $$rev; do \
-	  echo "Making $$target in $$subdir"; \
-	  if test "$$subdir" = "."; then \
-	    local_target="$$target-am"; \
-	  else \
-	    local_target="$$target"; \
-	  fi; \
-	  ($(am__cd) $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
-	  || eval $$failcom; \
-	done && test -z "$$fail"
-tags-recursive:
-	list='$(SUBDIRS)'; for subdir in $$list; do \
-	  test "$$subdir" = . || ($(am__cd) $$subdir && $(MAKE) $(AM_MAKEFLAGS) tags); \
-	done
-ctags-recursive:
-	list='$(SUBDIRS)'; for subdir in $$list; do \
-	  test "$$subdir" = . || ($(am__cd) $$subdir && $(MAKE) $(AM_MAKEFLAGS) ctags); \
-	done
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
@@ -505,23 +883,10 @@ ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	mkid -fID $$unique
 tags: TAGS
 
-TAGS: tags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+TAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
 	set x; \
 	here=`pwd`; \
-	if ($(ETAGS) --etags-include --version) >/dev/null 2>&1; then \
-	  include_option=--etags-include; \
-	  empty_fix=.; \
-	else \
-	  include_option=--include; \
-	  empty_fix=; \
-	fi; \
-	list='$(SUBDIRS)'; for subdir in $$list; do \
-	  if test "$$subdir" = .; then :; else \
-	    test ! -f $$subdir/TAGS || \
-	      set "$$@" "$$include_option=$$here/$$subdir/TAGS"; \
-	  fi; \
-	done; \
 	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
 	unique=`for i in $$list; do \
 	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
@@ -540,7 +905,7 @@ TAGS: tags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
 	  fi; \
 	fi
 ctags: CTAGS
-CTAGS: ctags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+CTAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
 	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
 	unique=`for i in $$list; do \
@@ -590,50 +955,24 @@ distdir: $(DISTFILES)
 	    || exit 1; \
 	  fi; \
 	done
-	@list='$(DIST_SUBDIRS)'; for subdir in $$list; do \
-	  if test "$$subdir" = .; then :; else \
-	    test -d "$(distdir)/$$subdir" \
-	    || $(MKDIR_P) "$(distdir)/$$subdir" \
-	    || exit 1; \
-	  fi; \
-	done
-	@list='$(DIST_SUBDIRS)'; for subdir in $$list; do \
-	  if test "$$subdir" = .; then :; else \
-	    dir1=$$subdir; dir2="$(distdir)/$$subdir"; \
-	    $(am__relativize); \
-	    new_distdir=$$reldir; \
-	    dir1=$$subdir; dir2="$(top_distdir)"; \
-	    $(am__relativize); \
-	    new_top_distdir=$$reldir; \
-	    echo " (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) top_distdir="$$new_top_distdir" distdir="$$new_distdir" \\"; \
-	    echo "     am__remove_distdir=: am__skip_length_check=: am__skip_mode_fix=: distdir)"; \
-	    ($(am__cd) $$subdir && \
-	      $(MAKE) $(AM_MAKEFLAGS) \
-	        top_distdir="$$new_top_distdir" \
-	        distdir="$$new_distdir" \
-		am__remove_distdir=: \
-		am__skip_length_check=: \
-		am__skip_mode_fix=: \
-	        distdir) \
-	      || exit 1; \
-	  fi; \
-	done
 check-am: all-am
 check: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) check-recursive
-all-am: Makefile
-installdirs: installdirs-recursive
-installdirs-am:
+	$(MAKE) $(AM_MAKEFLAGS) check-am
+all-am: Makefile $(PROGRAMS)
+installdirs:
+	for dir in "$(DESTDIR)$(bindir)"; do \
+	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
+	done
 install: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) install-recursive
-install-exec: install-exec-recursive
-install-data: install-data-recursive
-uninstall: uninstall-recursive
+	$(MAKE) $(AM_MAKEFLAGS) install-am
+install-exec: install-exec-am
+install-data: install-data-am
+uninstall: uninstall-am
 
 install-am: all-am
 	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
 
-installcheck: installcheck-recursive
+installcheck: installcheck-am
 install-strip:
 	$(MAKE) $(AM_MAKEFLAGS) INSTALL_PROGRAM="$(INSTALL_STRIP_PROGRAM)" \
 	  install_sh_PROGRAM="$(INSTALL_STRIP_PROGRAM)" INSTALL_STRIP_FLAG=-s \
@@ -646,95 +985,103 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f gui/$(DEPDIR)/$(am__dirstamp)
+	-rm -f gui/$(am__dirstamp)
+	-rm -f windows/$(DEPDIR)/$(am__dirstamp)
+	-rm -f windows/$(am__dirstamp)
+	-rm -f x11/$(DEPDIR)/$(am__dirstamp)
+	-rm -f x11/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
 	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 	-test -z "$(MAINTAINERCLEANFILES)" || rm -f $(MAINTAINERCLEANFILES)
-clean: clean-recursive
+clean: clean-am
 
-clean-am: clean-generic clean-libtool mostlyclean-am
+clean-am: clean-binPROGRAMS clean-generic clean-libtool mostlyclean-am
 
-distclean: distclean-recursive
+distclean: distclean-am
+	-rm -rf ./$(DEPDIR) gui/$(DEPDIR) windows/$(DEPDIR) x11/$(DEPDIR)
 	-rm -f Makefile
-distclean-am: clean-am distclean-generic distclean-tags
+distclean-am: clean-am distclean-compile distclean-generic \
+	distclean-tags
 
-dvi: dvi-recursive
+dvi: dvi-am
 
 dvi-am:
 
-html: html-recursive
+html: html-am
 
 html-am:
 
-info: info-recursive
+info: info-am
 
 info-am:
 
 install-data-am:
 
-install-dvi: install-dvi-recursive
+install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am:
+install-exec-am: install-binPROGRAMS
 
-install-html: install-html-recursive
+install-html: install-html-am
 
 install-html-am:
 
-install-info: install-info-recursive
+install-info: install-info-am
 
 install-info-am:
 
 install-man:
 
-install-pdf: install-pdf-recursive
+install-pdf: install-pdf-am
 
 install-pdf-am:
 
-install-ps: install-ps-recursive
+install-ps: install-ps-am
 
 install-ps-am:
 
 installcheck-am:
 
-maintainer-clean: maintainer-clean-recursive
+maintainer-clean: maintainer-clean-am
+	-rm -rf ./$(DEPDIR) gui/$(DEPDIR) windows/$(DEPDIR) x11/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
-mostlyclean: mostlyclean-recursive
+mostlyclean: mostlyclean-am
 
-mostlyclean-am: mostlyclean-generic mostlyclean-libtool
+mostlyclean-am: mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool
 
-pdf: pdf-recursive
+pdf: pdf-am
 
 pdf-am:
 
-ps: ps-recursive
+ps: ps-am
 
 ps-am:
 
-uninstall-am:
+uninstall-am: uninstall-binPROGRAMS
 
-.MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) all check \
-	ctags-recursive install install-am install-strip \
-	tags-recursive
+.MAKE: all check install install-am install-strip
 
-.PHONY: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) CTAGS GTAGS \
-	all all-am check check-am clean clean-generic clean-libtool \
-	ctags ctags-recursive distclean distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-recursive \
-	uninstall uninstall-am
+.PHONY: CTAGS GTAGS all all-am check check-am clean clean-binPROGRAMS \
+	clean-generic clean-libtool ctags distclean distclean-compile \
+	distclean-generic distclean-libtool distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-binPROGRAMS install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags uninstall uninstall-am \
+	uninstall-binPROGRAMS
 
 
 generated_demarshallers.cpp: $(top_srcdir)/spice.proto

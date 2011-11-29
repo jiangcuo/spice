@@ -41,12 +41,24 @@
 #include <string.h>
 
 #ifdef WIN32
+#ifdef __GNUC__
+#define UNICODE 1
+#define _UNICODE 1
+#define WINVER 0x0501
+#define swprintf_s(_str, _len, _fmt, ...) \
+    swprintf(_str, _fmt, ## __VA_ARGS__)
+#define vsnprintf_s(_str, _len1, _len2, _fmt, _valist) \
+    vsnprintf(_str, _len2, _fmt, _valist)
+#define _ftime_s(_t) _ftime(_t)
+#endif
 #include <winsock2.h>
 #include <windows.h>
 
+#ifndef __GNUC__
 #pragma warning(disable:4355)
 #pragma warning(disable:4996)
 #pragma warning(disable:4200)
+#endif
 
 #define strcasecmp stricmp
 
@@ -55,7 +67,7 @@ extern const char* PACKAGE_VERSION;
 #else
 #include <unistd.h>
 #include <X11/X.h>
-#ifdef USE_OGL
+#ifdef USE_OPENGL
 #include <GL/glx.h>
 #endif
 #endif

@@ -15,6 +15,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "red_pixmap_sw.h"
@@ -49,7 +52,7 @@ RedPixmapSw::RedPixmapSw(int width, int height, RedDrawable::Format format,
     bitmap_info.inf.bmiHeader.biWidth = _width;
     bitmap_info.inf.bmiHeader.biHeight = top_bottom ? -_height : _height;
 
-/*#ifdef USE_OGL
+/*#ifdef USE_OPENGL
     // -----------------------------------------------------------------------------
     // ensure valid access to additional stride.
     // apparently glReadPixels validate ((ptr of last line) + GL_PACK_ROW_LENGTH + 1).
@@ -84,6 +87,10 @@ RedPixmapSw::RedPixmapSw(int width, int height, RedDrawable::Format format,
         pixel_format[1] = 0x07e0;
         pixel_format[2] = 0x001f;
         break;
+     case RedDrawable::ARGB32:
+     case RedDrawable::RGB32:
+     case RedDrawable::RGB16_555:
+        break;
     }
     AutoDC dc(create_compatible_dc());
     AutoGDIObject bitmap(CreateDIBSection(dc.get(), &bitmap_info.inf, 0,
@@ -91,7 +98,7 @@ RedPixmapSw::RedPixmapSw(int width, int height, RedDrawable::Format format,
     if (!bitmap.valid()) {
         THROW("create compatible bitmap failed");
     }
-/*#ifdef USE_OGL
+/*#ifdef USE_OPENGL
     SetWindowOrgEx(dc.get(), 0, -1, NULL); // compensate for one pad line
 #endif*/
     ((RedPixmap_p*)get_opaque())->prev_bitmap = (HBITMAP)SelectObject(dc.get(), bitmap.release());

@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2009 Red Hat, Inc.
+   Copyright (C) 2011 Red Hat, Inc.
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -14,12 +14,15 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
-#include "common.h"
-#include "utils.h"
+#include "spice_common.h"
 
-
-#define CANVAS_ERROR(format, ...) THROW(format, ## __VA_ARGS__)
-
-#include "../common/canvas_utils.c"
-
+#include "reds_sw_canvas.h"
+#define SPICE_CANVAS_INTERNAL
+#define SW_CANVAS_IMAGE_CACHE
+#include "sw_canvas.c"
+#undef SW_CANVAS_IMAGE_CACHE
+#undef SPICE_CANVAS_INTERNAL
