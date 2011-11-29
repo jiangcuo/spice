@@ -1,3 +1,12 @@
+spice (0.10.0-1) unstable; urgency=low
+
+  * New upstream release
+  * Refresh debian/copyright
+  * Remove fix-typo-in-cmd_line_parser-cpp.patch, applied upstream
+  * Remove fix-typo-in-record-cpp.patch, applied upstream
+  * use-requires-private-for-libspice-pkgconfig.patch, applied upstream
+  
+
 spice (0.8.3-1) unstable; urgency=low
 
   * New upstream release
