@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include <math.h>
@@ -292,14 +295,16 @@ void Migrate::start(const SpiceMsgMainMigrationBegin* migrate)
         _port = migrate->port ? migrate->port : -1;
         _sport = migrate->sport ? migrate->sport : -1;
         if ((peer_major == 1) || (peer_major == 2 && peer_minor < 1)) {
-            _auth_options.type_flags = RedPeer::HostAuthOptions::HOST_AUTH_OP_PUBKEY;
+            _auth_options.type_flags = SPICE_SSL_VERIFY_OP_PUBKEY;
             _auth_options.host_pubkey.assign(migrate->pub_key_data, migrate->pub_key_data +
                                              migrate->pub_key_size);
         } else {
-            _auth_options.type_flags = RedPeer::HostAuthOptions::HOST_AUTH_OP_SUBJECT;
+            _auth_options.type_flags = SPICE_SSL_VERIFY_OP_SUBJECT;
             _auth_options.CA_file =  _client.get_host_auth_options().CA_file;
             if (migrate->cert_subject_size != 0) {
-                _auth_options.set_cert_subject((char *)migrate->cert_subject_data);
+                _auth_options.host_subject.assign(migrate->cert_subject_data,
+                                                  migrate->cert_subject_data +
+                                                  migrate->cert_subject_size);
             }
         }
     }
@@ -386,7 +391,7 @@ RedClient::RedClient(Application& application)
     , _mouse_mode (SPICE_MOUSE_MODE_SERVER)
     , _notify_disconnect (false)
     , _auto_display_res (false)
-    , _agent_reply_wait_type (-1)
+    , _agent_reply_wait_type (VD_AGENT_END_MESSAGE)
     , _aborting (false)
     , _msg_attach_channels_sent(false)
     , _agent_connected (false)
@@ -874,8 +879,8 @@ void RedClient::calc_pixmap_cach_and_glz_window_size(uint32_t display_channels_h
 {
 #ifdef WIN32
     display_channels_hint = MAX(1, display_channels_hint);
-    int max_cache_size = display_channels_hint * MAX_DISPLAY_PIXMAP_CACHE;
-    int min_cache_size = display_channels_hint * MIN_DISPLAY_PIXMAP_CACHE;
+    uint64_t max_cache_size = display_channels_hint * MAX_DISPLAY_PIXMAP_CACHE;
+    uint64_t min_cache_size = display_channels_hint * MIN_DISPLAY_PIXMAP_CACHE;
 
     MEMORYSTATUSEX mem_status;
     mem_status.dwLength = sizeof(mem_status);
@@ -909,7 +914,7 @@ void RedClient::calc_pixmap_cach_and_glz_window_size(uint32_t display_channels_h
 
 void RedClient::on_display_mode_change()
 {
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     Lock lock(_channels_lock);
     Channels::iterator iter = _channels.begin();
     for (; iter != _channels.end(); ++iter) {
@@ -1210,7 +1215,7 @@ void RedClient::on_agent_reply(VDAgentReply* reply)
         if (_agent_reply_wait_type == reply->type) {
             send_main_attach_channels();
             _application.deactivate_interval_timer(*_agent_timer);
-            _agent_reply_wait_type = -1;
+            _agent_reply_wait_type = VD_AGENT_END_MESSAGE;
         }
         break;
     default:

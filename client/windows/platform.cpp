@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 
@@ -32,10 +35,16 @@
 #include "playback.h"
 #include "cursor.h"
 #include "named_pipe.h"
+
+#ifndef DISABLE_CXIMAGE
+#define USE_CXIMAGE
+#endif
+
+#ifdef USE_CXIMAGE
 #include "ximage.h"
+#endif
 #include <spice/vd_agent.h>
 
-int gdi_handlers = 0;
 extern HINSTANCE instance;
 
 class DefaultEventListener: public Platform::EventListener {
@@ -82,6 +91,7 @@ static ClipboardFormat clipboard_formats[] = {
 
 #define clipboard_formats_count (sizeof(clipboard_formats) / sizeof(clipboard_formats[0]))
 
+#ifdef USE_CXIMAGE
 typedef struct ImageType {
     uint32_t type;
     DWORD cximage_format;
@@ -91,6 +101,7 @@ static ImageType image_types[] = {
     {VD_AGENT_CLIPBOARD_IMAGE_PNG, CXIMAGE_FORMAT_PNG},
     {VD_AGENT_CLIPBOARD_IMAGE_BMP, CXIMAGE_FORMAT_BMP},
 };
+#endif
 
 static std::set<uint32_t> grab_types;
 
@@ -108,7 +119,7 @@ void Platform::send_quit_request()
 static uint32_t get_clipboard_type(uint32_t format) {
     uint32_t* types = NULL;
 
-    for (int i = 0; i < clipboard_formats_count && !types; i++) {
+    for (size_t i = 0; i < clipboard_formats_count && !types; i++) {
         if (clipboard_formats[i].format == format) {
             types = clipboard_formats[i].types;
         }
@@ -125,7 +136,7 @@ static uint32_t get_clipboard_type(uint32_t format) {
 }
 
 static uint32_t get_clipboard_format(uint32_t type) {
-    for (int i = 0; i < clipboard_formats_count; i++) {
+    for (size_t i = 0; i < clipboard_formats_count; i++) {
         for (uint32_t* ptype = clipboard_formats[i].types; *ptype; ptype++) {
             if (*ptype == type) {
                 return clipboard_formats[i].format; 
@@ -140,7 +151,7 @@ static int get_available_clipboard_types(uint32_t** types)
     int count = 0;
 
     *types = new uint32_t[clipboard_formats_count * CLIPBOARD_FORMAT_MAX_TYPES];
-    for (int i = 0; i < clipboard_formats_count; i++) {
+    for (size_t i = 0; i < clipboard_formats_count; i++) {
         if (IsClipboardFormatAvailable(clipboard_formats[i].format)) {
             for (uint32_t* ptype = clipboard_formats[i].types; *ptype; ptype++) {
                 (*types)[count++] = *ptype;
@@ -154,15 +165,17 @@ static int get_available_clipboard_types(uint32_t** types)
     return count;
 }
 
+#ifdef USE_CXIMAGE
 static DWORD get_cximage_format(uint32_t type)
 {
-    for (int i = 0; i < sizeof(image_types) / sizeof(image_types[0]); i++) {
+    for (size_t i = 0; i < sizeof(image_types) / sizeof(image_types[0]); i++) {
         if (image_types[i].type == type) {
             return image_types[i].cximage_format;
         }
     }
     return 0;
 }
+#endif
 
 static LRESULT CALLBACK PlatformWinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -199,7 +212,7 @@ static LRESULT CALLBACK PlatformWinProc(HWND hWnd, UINT message, WPARAM wParam, 
             int type_count;
             uint32_t* types;
             Platform::set_clipboard_owner(Platform::owner_none);
-            if (type_count = get_available_clipboard_types(&types)) {
+            if ((type_count = get_available_clipboard_types(&types))) {
                 clipboard_listener->on_clipboard_grab(types, type_count);
                 delete[] types;
             } else {
@@ -461,10 +474,10 @@ bool WinMonitor::best_display_setting(uint32_t width, uint32_t height, uint32_t 
     DEVMODE mode;
     DWORD mode_id = 0;
     uint32_t mod_waste = ~0;
-    DWORD mod_width;
-    DWORD mod_height;
-    DWORD mod_depth;
-    DWORD mod_frequency;
+    DWORD mod_width = 0;
+    DWORD mod_height = 0;
+    DWORD mod_depth = 0;
+    DWORD mod_frequency = 0;
 
     mode.dmSize = sizeof(DEVMODE);
     mode.dmDriverExtra = 0;
@@ -503,7 +516,7 @@ bool WinMonitor::best_display_setting(uint32_t width, uint32_t height, uint32_t 
             }
         }
     }
-    if (mod_waste == ~0) {
+    if (mod_waste == ~0u) {
         return false;
     }
     mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
@@ -891,7 +904,7 @@ void WinPlatform::enter_modal_loop()
 
 static bool set_modal_loop_timer()
 {
-    int timeout = main_loop->get_soonest_timeout();
+    unsigned timeout = main_loop->get_soonest_timeout();
     if (timeout == INFINITE) {
         timeout = MODAL_LOOP_DEFAULT_TIMEOUT; /* for cases timeouts are added after
                                                  the enterance to the loop*/
@@ -1014,6 +1027,7 @@ bool Platform::on_clipboard_notify(uint32_t type, const uint8_t* data, int32_t s
     case VD_AGENT_CLIPBOARD_UTF8_TEXT:
         clip_data = utf8_alloc((LPCSTR)data, size);
         break;
+#ifdef USE_CXIMAGE
     case VD_AGENT_CLIPBOARD_IMAGE_PNG:
     case VD_AGENT_CLIPBOARD_IMAGE_BMP: {
         DWORD cximage_format = get_cximage_format(type);
@@ -1022,6 +1036,7 @@ bool Platform::on_clipboard_notify(uint32_t type, const uint8_t* data, int32_t s
         clip_data = image.CopyToHandle();
         break;
     }
+#endif
     default:
         LOG_INFO("Unsupported clipboard type %u", type);
         return true;
@@ -1081,6 +1096,7 @@ bool Platform::on_clipboard_request(uint32_t type)
         GlobalUnlock(clip_data);
         break;
     }
+#ifdef USE_CXIMAGE
     case VD_AGENT_CLIPBOARD_IMAGE_PNG:
     case VD_AGENT_CLIPBOARD_IMAGE_BMP: {
         DWORD cximage_format = get_cximage_format(type);
@@ -1100,6 +1116,7 @@ bool Platform::on_clipboard_request(uint32_t type)
         ret = true;
         break;
     }
+#endif
     default:
         LOG_INFO("Unsupported clipboard type %u", type);
     }

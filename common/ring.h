@@ -19,6 +19,8 @@
 #ifndef _H_RING2
 #define _H_RING2
 
+#include "spice_common.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -131,6 +133,36 @@ static inline RingItem *ring_prev(Ring *ring, RingItem *pos)
     ASSERT(pos->next != NULL && pos->prev != NULL);
     ret = pos->prev;
     return (ret == ring) ? NULL : ret;
+}
+
+#define RING_FOREACH_SAFE(var, next, ring)                    \
+    for ((var) = ring_get_head(ring);                         \
+            (var) && ((next) = ring_next(ring, (var)), 1);    \
+            (var) = (next))
+
+
+#define RING_FOREACH(var, ring)                 \
+    for ((var) = ring_get_head(ring);           \
+            (var);                              \
+            (var) = ring_next(ring, var))
+
+#define RING_FOREACH_REVERSED(var, ring)        \
+    for ((var) = ring_get_tail(ring);           \
+            (var);                              \
+            (var) = ring_prev(ring, var))
+
+
+static inline unsigned int ring_get_length(Ring *ring)
+{
+    RingItem *i;
+    unsigned int ret = 0;
+
+    for (i = ring_get_head(ring);
+         i != NULL;
+         i = ring_next(ring, i))
+        ret++;
+
+    return ret;
 }
 
 #ifdef __cplusplus

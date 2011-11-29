@@ -342,6 +342,11 @@ flags16 ropd {
     INVERS_RES,
 };
 
+/* This *must* remain with values identical to api/winddi.h
+   LA_STYLED == 0x8 (log_2)=> 3
+   LA_STARTGAP == 0x4 (log_2)=> 2
+   This is used by the windows driver.
+ */
 flags8 line_flags {
     STYLED = 3,
     START_WITH_GAP = 2,
@@ -929,6 +934,15 @@ enum16 audio_fmt {
     S16,
 };
 
+message AudioVolume {
+    uint8 nchannels;
+    uint16 volume[nchannels] @end;
+};
+
+message AudioMute {
+    uint8 mute;
+};
+
 channel PlaybackChannel : BaseChannel {
  server:
     message {
@@ -950,6 +964,8 @@ channel PlaybackChannel : BaseChannel {
     } start;
 
     Empty stop;
+    AudioVolume volume;
+    AudioMute mute;
 };
 
 channel RecordChannel : BaseChannel {
@@ -961,6 +977,8 @@ channel RecordChannel : BaseChannel {
     } start = 101;
 
     Empty stop;
+    AudioVolume volume;
+    AudioMute mute;
  client:
     message {
 	uint32 time;
@@ -1094,6 +1112,13 @@ client:
     Data data = 101;
 };
 
+channel UsbredirChannel : BaseChannel {
+server:
+    Data data = 101;
+client:
+    Data data = 101;
+};
+
 protocol Spice {
     MainChannel main = 1;
     DisplayChannel display;
@@ -1103,4 +1128,5 @@ protocol Spice {
     RecordChannel record;
     TunnelChannel tunnel;
     SmartcardChannel smartcard;
+    UsbredirChannel usbredir;
 };

@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #ifdef WIN32
@@ -31,8 +34,10 @@
 #include "red_gdi_canvas.h"
 #endif
 #include "platform.h"
-#include "sw_canvas.h"
-#include "gl_canvas.h"
+#include "red_sw_canvas.h"
+#ifdef USE_OPENGL
+#include "red_gl_canvas.h"
+#endif
 #include "quic.h"
 #include "mutex.h"
 #include "cmd_line_parser.h"
@@ -350,7 +355,7 @@ Application::Application()
     , _monitors (NULL)
     , _title ("SPICEc:%d")
     , _sys_key_intercept_mode (false)
-	, _enable_controller (false)
+    , _enable_controller (false)
 #ifdef USE_GUI
     , _gui_mode (GUI_MODE_FULL)
 #endif // USE_GUI
@@ -383,7 +388,7 @@ Application::Application()
     _canvas_types[0] = CANVAS_OPTION_SW;
 #endif
 
-    _host_auth_opt.type_flags = RedPeer::HostAuthOptions::HOST_AUTH_OP_NAME;
+    _host_auth_opt.type_flags = SPICE_SSL_VERIFY_OP_HOSTNAME;
 
     Platform::get_app_data_dir(_host_auth_opt.CA_file, app_name);
     Platform::path_append(_host_auth_opt.CA_file, CA_FILE_NAME);
@@ -1187,7 +1192,7 @@ ModifierKey modifier_keys[] = {
 void Application::sync_keyboard_modifiers()
 {
     uint32_t modifiers = Platform::get_keyboard_modifiers();
-    for (int i = 0; i < sizeof(modifier_keys) / sizeof(modifier_keys[0]); i++) {
+    for (size_t i = 0; i < sizeof(modifier_keys) / sizeof(modifier_keys[0]); i++) {
         if (modifiers & modifier_keys[i].modifier) {
             on_key_down(modifier_keys[i].key);
         } else {
@@ -1227,7 +1232,7 @@ void Application::on_key_down(RedKey key)
     }
 
     if (!_sticky_info.sticky_mode) {
-        int command = get_hotkeys_commnad();
+        int command = get_hotkeys_command();
         if (command != APP_CMD_INVALID) {
             do_command(command);
             return;
@@ -1404,7 +1409,7 @@ void Application::rearrange_monitors(bool force_capture,
                 exit_full_screen();
             }
         }
-    } 
+    }
 
     if (force_capture || capture) {
         if (!toggle_full_screen) {
@@ -1698,7 +1703,7 @@ bool Application::is_key_set_pressed(const HotkeySet& key_set)
     return iter == key_set.end();
 }
 
-int Application::get_hotkeys_commnad()
+int Application::get_hotkeys_command()
 {
     HotKeys::const_iterator iter = _hot_keys.begin();
 
@@ -2015,13 +2020,58 @@ bool Application::set_ca_file(const char* ca_file, const char* arg0)
 
 bool Application::set_host_cert_subject(const char* subject, const char* arg0)
 {
-     if (!_host_auth_opt.set_cert_subject(subject)) {
-        Platform::term_printf("%s: bad cert subject %s", arg0, subject);
-        _exit_code = SPICEC_ERROR_CODE_INVALID_ARG;
-        return false;
-     }
+    std::string subject_str(subject);
+    std::string::const_iterator iter = subject_str.begin();
+    std::string entry;
+    _host_auth_opt.type_flags = SPICE_SSL_VERIFY_OP_SUBJECT;
+    _host_auth_opt.host_subject = subject;
 
-     return true;
+    /* the follow is only checking code, subject is parsed later
+       ssl_verify.c.  We keep simply because of better error message... */
+    while (true) {
+        if ((iter == subject_str.end()) || (*iter == ',')) {
+            RedPeer::HostAuthOptions::CertFieldValuePair entry_pair;
+            size_t value_pos = entry.find_first_of('=');
+            if ((value_pos == std::string::npos) || (value_pos == (entry.length() - 1))) {
+                Platform::term_printf("%s: host_subject bad format: assignment for %s is missing\n",
+                                      arg0, entry.c_str());
+                _exit_code = SPICEC_ERROR_CODE_INVALID_ARG;
+                return false;
+            }
+            size_t start_pos = entry.find_first_not_of(' ');
+            if ((start_pos == std::string::npos) || (start_pos == value_pos)) {
+                Platform::term_printf("%s: host_subject bad format: first part of assignment must be non empty in %s\n",
+                                      arg0, entry.c_str());
+                _exit_code = SPICEC_ERROR_CODE_INVALID_ARG;
+                return false;
+            }
+            entry_pair.first = entry.substr(start_pos, value_pos - start_pos);
+            entry_pair.second = entry.substr(value_pos + 1);
+            DBG(0, "subject entry: %s=%s", entry_pair.first.c_str(), entry_pair.second.c_str());
+            if (iter == subject_str.end()) {
+                break;
+            }
+            entry.clear();
+        } else if (*iter == '\\') {
+            iter++;
+            if (iter == subject_str.end()) {
+                LOG_WARN("single \\ in host subject");
+                entry.append(1, '\\');
+                continue;
+            } else if ((*iter == '\\') || (*iter == ',')) {
+                entry.append(1, *iter);
+            } else {
+                LOG_WARN("single \\ in host subject");
+                entry.append(1, '\\');
+                continue;
+            }
+        } else {
+            entry.append(1, *iter);
+        }
+        iter++;
+    }
+
+    return true;
 }
 
 bool Application::set_canvas_option(CmdLineParser& parser, char *val, const char* arg0)
@@ -2033,7 +2083,7 @@ bool Application::set_canvas_option(CmdLineParser& parser, char *val, const char
 #ifdef WIN32
     canvas_types["gdi"] = CANVAS_OPTION_GDI;
 #endif
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     canvas_types["gl_fbo"] = CANVAS_OPTION_OGL_FBO;
     canvas_types["gl_pbuff"] = CANVAS_OPTION_OGL_PBUFF;
 #endif
@@ -2269,8 +2319,9 @@ bool Application::process_cmd_line(int argc, char** argv, bool &full_screen)
 #ifdef USE_SMARTCARD
     parser.add(SPICE_OPT_SMARTCARD, "smartcard", "enable smartcard channel");
     parser.add(SPICE_OPT_NOSMARTCARD, "nosmartcard", "disable smartcard channel");
-    parser.add(SPICE_OPT_SMARTCARD_CERT, "smartcard-cert", "Use virtual reader+card with given cert(s)",
-        "smartcard-cert", true);
+    parser.add(SPICE_OPT_SMARTCARD_CERT, "smartcard-cert",
+               "Use virtual reader+card with given cert(s)",
+               "smartcard-cert", true);
     parser.set_multi(SPICE_OPT_SMARTCARD_CERT, ',');
     parser.add(SPICE_OPT_SMARTCARD_DB, "smartcard-db", "Use given db for smartcard certs", "smartcard-db", true);
 #endif
@@ -2496,11 +2547,13 @@ void spice_log(unsigned int type, const char *function, const char *format, ...)
     va_end(ap);
 
     if (type >= log_level && log_file != NULL) {
-        fprintf(log_file, "%ld %s [%llu:%llu] %s: %s\n", (long)time(NULL), type_as_char[type],
-                (long long int)Platform::get_process_id(), (long long int)Platform::get_thread_id(),
+        fprintf(log_file,"%ld %s [%" PRIu64 ":%" PRIu64 "] %s: %s\n",
+                (long)time(NULL), type_as_char[type],
+                Platform::get_process_id(),
+                Platform::get_thread_id(),
                 function_to_func_name(function).c_str(),
                 formated_message.c_str());
-		fflush(log_file);
+        fflush(log_file);
     }
 
     if (type >= LOG_WARN) {
@@ -2532,7 +2585,7 @@ void Application::init_globals()
     SSL_load_error_strings();
 
     sw_canvas_init();
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     gl_canvas_init();
 #endif
     quic_init();

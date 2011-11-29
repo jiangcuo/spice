@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "record.h"
@@ -33,9 +36,9 @@ WaveRecorder::WaveRecorder(Platform::RecordClient& client, uint32_t sampels_per_
                            uint32_t bits_per_sample, uint32_t channels)
     : _client (client)
     , _ring (NULL)
-    , _frame (NULL)
     , _head (0)
     , _in_use (0)
+    , _frame (NULL)
 {
     WAVEFORMATEX info;
     uint32_t frame_align;

@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "screen.h"
@@ -236,14 +239,14 @@ void RedScreen::attach_layer(ScreenLayer& layer)
     RecurciveLock lock(_update_lock);
     int order = layer.z_order();
 
-    if ((int)_layes.size() < order + 1) {
-        _layes.resize(order + 1);
+    if ((int)_layers.size() < order + 1) {
+        _layers.resize(order + 1);
     }
-    if (_layes[order]) {
+    if (_layers[order]) {
         THROW("layer in use");
     }
     layer.set_screen(this);
-    _layes[order] = &layer;
+    _layers[order] = &layer;
     ref();
     lock.unlock();
     layer.invalidate();
@@ -265,13 +268,13 @@ void RedScreen::detach_layer(ScreenLayer& layer)
 
     int order = layer.z_order();
 
-    if ((int)_layes.size() < order + 1 || _layes[order] != &layer) {
+    if ((int)_layers.size() < order + 1 || _layers[order] != &layer) {
         THROW("not found");
     }
     QRegion layer_area;
     region_clone(&layer_area, &layer.area());
-    _layes[order]->set_screen(NULL);
-    _layes[order] = NULL;
+    _layers[order]->set_screen(NULL);
+    _layers[order] = NULL;
     lock.unlock();
     invalidate(layer_area);
     region_destroy(&layer_area);
@@ -300,11 +303,11 @@ void RedScreen::composit_to_screen(RedDrawable& win_dc, const QRegion& region)
 
 void RedScreen::notify_new_size()
 {
-    for (int i = 0; i < (int)_layes.size(); i++) {
-        if (!_layes[i]) {
+    for (int i = 0; i < (int)_layers.size(); i++) {
+        if (!_layers[i]) {
             continue;
         }
-        _layes[i]->on_size_changed();
+        _layers[i]->on_size_changed();
     }
 }
 
@@ -333,10 +336,10 @@ inline void RedScreen::begin_update(QRegion& direct_rgn, QRegion& composit_rgn,
     region_and(&direct_rgn, &rect_rgn);
     region_destroy(&rect_rgn);
 
-    for (int i = _layes.size() - 1; i >= 0; i--) {
+    for (int i = _layers.size() - 1; i >= 0; i--) {
         ScreenLayer* layer;
 
-        if (!(layer = _layes[i])) {
+        if (!(layer = _layers[i])) {
             continue;
         }
         layer->begin_update(direct_rgn, composit_rgn);
@@ -345,10 +348,10 @@ inline void RedScreen::begin_update(QRegion& direct_rgn, QRegion& composit_rgn,
 
 inline void RedScreen::update_done()
 {
-    for (unsigned int i = 0; i < _layes.size(); i++) {
+    for (unsigned int i = 0; i < _layers.size(); i++) {
         ScreenLayer* layer;
 
-        if (!(layer = _layes[i])) {
+        if (!(layer = _layers[i])) {
             continue;
         }
         layer->on_update_completion(_update_mark - 1);
@@ -358,10 +361,10 @@ inline void RedScreen::update_done()
 inline void RedScreen::update_composit(QRegion& composit_rgn)
 {
     erase_background(*_composit_area, composit_rgn);
-    for (int i = 0; i < (int)_layes.size(); i++) {
+    for (int i = 0; i < (int)_layers.size(); i++) {
         ScreenLayer* layer;
 
-        if (!(layer = _layes[i])) {
+        if (!(layer = _layers[i])) {
             continue;
         }
         QRegion& dest_region = layer->composit_area();
@@ -380,10 +383,10 @@ inline void RedScreen::draw_direct(RedDrawable& win_dc, QRegion& direct_rgn, QRe
         region_destroy(&frame_rgn);
     }
 
-    for (int i = 0; i < (int)_layes.size(); i++) {
+    for (int i = 0; i < (int)_layers.size(); i++) {
         ScreenLayer* layer;
 
-        if (!(layer = _layes[i])) {
+        if (!(layer = _layers[i])) {
             continue;
         }
         QRegion& dest_region = layer->direct_area();
@@ -563,10 +566,10 @@ void RedScreen::hide_cursor()
 
 ScreenLayer* RedScreen::find_pointer_layer()
 {
-    for (int i = _layes.size() - 1; i >= 0; i--) {
+    for (int i = _layers.size() - 1; i >= 0; i--) {
         ScreenLayer* layer;
 
-        if (!(layer = _layes[i])) {
+        if (!(layer = _layers[i])) {
             continue;
         }
 
@@ -750,21 +753,21 @@ void RedScreen::exit_modal_loop()
 
 void RedScreen::pre_migrate()
 {
-    for (int i = 0; i < (int)_layes.size(); i++) {
-        if (!_layes[i]) {
+    for (int i = 0; i < (int)_layers.size(); i++) {
+        if (!_layers[i]) {
             continue;
         }
-        _layes[i]->pre_migrate();
+        _layers[i]->pre_migrate();
     }
 }
 
 void RedScreen::post_migrate()
 {
-    for (int i = 0; i < (int)_layes.size(); i++) {
-        if (!_layes[i]) {
+    for (int i = 0; i < (int)_layers.size(); i++) {
+        if (!_layers[i]) {
             continue;
         }
-        _layes[i]->post_migrate();
+        _layers[i]->post_migrate();
     }
 }
 
@@ -889,7 +892,7 @@ int RedScreen::get_screen_id()
     return _monitor ? _monitor->get_screen_id() : 0;
 }
 
-#ifdef USE_OGL
+#ifdef USE_OPENGL
 void RedScreen::untouch_context()
 {
     _window.untouch_context();
@@ -920,7 +923,7 @@ void RedScreen::interrupt_update()
     _update_interrupt_trigger->trigger();
 }
 
-#ifdef USE_OGL
+#ifdef USE_OPENGL
 void RedScreen::set_type_gl()
 {
     _window.set_type_gl();
@@ -930,5 +933,5 @@ void RedScreen::unset_type_gl()
 {
     _window.unset_type_gl();
 }
-#endif // USE_OGL
+#endif // USE_OPENGL
 

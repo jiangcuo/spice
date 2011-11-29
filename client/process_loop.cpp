@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "process_loop.h"
@@ -221,7 +224,7 @@ void TimersQueue::deactivate_interval_timer(Timer* timer)
     }
 }
 
-int TimersQueue::get_soonest_timeout()
+unsigned int TimersQueue::get_soonest_timeout()
 {
     RecurciveLock lock(_timers_lock);
     TimersSet::iterator iter;
@@ -392,7 +395,7 @@ void ProcessLoop::deactivate_interval_timer(Timer* timer)
     _timers_queue.deactivate_interval_timer(timer);
 }
 
-int ProcessLoop::get_soonest_timeout()
+unsigned ProcessLoop::get_soonest_timeout()
 {
     return _timers_queue.get_soonest_timeout();
 }

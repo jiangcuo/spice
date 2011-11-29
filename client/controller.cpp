@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "controller.h"
@@ -348,7 +351,9 @@ bool ControllerConnection::handle_message(ControllerMsg *hdr)
 bool ControllerConnection::create_menu(char* resource)
 {
     bool ret = true;
+#ifndef WIN32
     char* item_state = 0;
+#endif
     char* next_item;
     const char* param;
     const char* text;

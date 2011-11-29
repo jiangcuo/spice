@@ -18,19 +18,22 @@
 #ifndef _H_REDS
 #define _H_REDS
 
-#include "mem.h"
-
 #include <stdint.h>
 #include <openssl/ssl.h>
 #include <sys/uio.h>
+#include <spice/vd_agent.h>
+#include <config.h>
 
 #if HAVE_SASL
 #include <sasl/sasl.h>
 #endif
 
-#define SPICE_GNUC_VISIBLE __attribute__ ((visibility ("default")))
+#include "common/marshaller.h"
+#include "common/messages.h"
+#include "spice.h"
+#include "red_channel.h"
 
-typedef struct RedsStream RedsStream;
+#define SPICE_GNUC_VISIBLE __attribute__ ((visibility ("default")))
 
 #if HAVE_SASL
 typedef struct RedsSASL {
@@ -82,33 +85,6 @@ struct RedsStream {
     ssize_t (*writev)(RedsStream *s, const struct iovec *iov, int iovcnt);
 };
 
-typedef struct Channel {
-    struct Channel *next;
-    uint32_t type;
-    uint32_t id;
-    int num_common_caps;
-    uint32_t *common_caps;
-    int num_caps;
-    uint32_t *caps;
-    void (*link)(struct Channel *, RedsStream *peer, int migration, int num_common_caps,
-                 uint32_t *common_caps, int num_caps, uint32_t *caps);
-    void (*shutdown)(struct Channel *);
-    void (*migrate)(struct Channel *);
-    void *data;
-} Channel;
-
-struct SpiceKbdState {
-    int dummy;
-};
-
-struct SpiceMouseState {
-    int dummy;
-};
-
-struct SpiceTabletState {
-    int dummy;
-};
-
 struct QXLState {
     QXLInterface          *qif;
     struct RedDispatcher  *dispatcher;
@@ -123,26 +99,54 @@ struct SpiceMigrateState {
     int dummy;
 };
 
-void reds_channel_dispose(Channel *channel);
+typedef struct RedsMigSpice {
+    char *host;
+    char *cert_subject;
+    int port;
+    int sport;
+} RedsMigSpice;
 
 ssize_t reds_stream_read(RedsStream *s, void *buf, size_t nbyte);
 ssize_t reds_stream_write(RedsStream *s, const void *buf, size_t nbyte);
 ssize_t reds_stream_writev(RedsStream *s, const struct iovec *iov, int iovcnt);
 void reds_stream_free(RedsStream *s);
 
-void reds_desable_mm_timer(void);
+void reds_disable_mm_timer(void);
 void reds_enable_mm_timer(void);
 void reds_update_mm_timer(uint32_t mm_time);
 uint32_t reds_get_mm_time(void);
 void reds_set_client_mouse_allowed(int is_client_mouse_allowed,
                                    int x_res, int y_res);
-void reds_register_channel(Channel *channel);
-void reds_unregister_channel(Channel *channel);
+void reds_register_channel(RedChannel *channel);
+void reds_unregister_channel(RedChannel *channel);
+int reds_get_mouse_mode(void); // used by inputs_channel
+int reds_get_agent_mouse(void); // used by inputs_channel
+int reds_has_vdagent(void); // used by inputs channel
+void reds_handle_agent_mouse_event(const VDAgentMouseState *mouse_state); // used by inputs_channel
 
 extern struct SpiceCoreInterface *core;
-extern uint64_t bitrate_per_sec;
 
-#define IS_LOW_BANDWIDTH() (bitrate_per_sec < 10 * 1024 * 1024)
+// Temporary measures to make splitting reds.c to inputs_channel.c easier
+void reds_client_disconnect(RedClient *client);
 
+// Temporary (?) for splitting main channel
+typedef struct MainMigrateData MainMigrateData;
+void reds_marshall_migrate_data_item(SpiceMarshaller *m, MainMigrateData *data);
+void reds_fill_channels(SpiceMsgChannels *channels_info);
+int reds_num_of_channels(void);
+int reds_num_of_clients(void);
+#ifdef RED_STATISTICS
+void reds_update_stat_value(uint32_t value);
+#endif
+
+/* callbacks from main channel messages */
+
+void reds_on_main_agent_start(void);
+void reds_on_main_agent_data(MainChannelClient *mcc, void *message, size_t size);
+void reds_on_main_migrate_connected(void); //should be called when all the clients
+                                           // are connected to the target
+void reds_on_main_receive_migrate_data(MainMigrateData *data, uint8_t *end);
+void reds_on_main_mouse_mode_request(void *message, size_t size);
+void reds_on_client_migrate_complete(RedClient *client);
 #endif
 

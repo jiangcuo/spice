@@ -112,7 +112,7 @@ enum CanvasOption {
 #ifdef WIN32
     CANVAS_OPTION_GDI,
 #endif
-#ifdef USE_OGL
+#ifdef USE_OPENGL
     CANVAS_OPTION_OGL_FBO,
     CANVAS_OPTION_OGL_PBUFF,
 #endif
@@ -321,7 +321,7 @@ private:
     void send_hotkey_key_set(const HotkeySet& key_set);
     void menu_item_callback(unsigned int item_id);
     int get_menu_item_id(AppMenuItemType type, int32_t conn_ref, uint32_t ext_id);
-    int get_hotkeys_commnad();
+    int get_hotkeys_command();
     bool is_key_set_pressed(const HotkeySet& key_set);
     void do_on_key_up(RedKey key);
     void __remove_key_handler(KeyHandler& handler);

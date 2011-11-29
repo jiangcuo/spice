@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "screen_layer.h"
@@ -22,9 +25,9 @@
 #include "application.h"
 #include "debug.h"
 
-class AttacheLayerEvent: public SyncEvent {
+class AttachLayerEvent: public SyncEvent {
 public:
-    AttacheLayerEvent(ScreenLayer& layer, int screen_id)
+    AttachLayerEvent(ScreenLayer& layer, int screen_id)
         : _layer (layer)
         , _screen_id (screen_id)
     {
@@ -37,16 +40,16 @@ private:
     int _screen_id;
 };
 
-void AttacheLayerEvent::do_response(AbstractProcessLoop& events_loop)
+void AttachLayerEvent::do_response(AbstractProcessLoop& events_loop)
 {
     Application* app = (Application*)(events_loop.get_owner());
     AutoRef<RedScreen> screen(app->get_screen(_screen_id));
     (*screen)->attach_layer(_layer);
 }
 
-class DetacheLayerEvent: public SyncEvent {
+class DetachLayerEvent: public SyncEvent {
 public:
-    DetacheLayerEvent(ScreenLayer& _layer) : _layer (_layer) {}
+    DetachLayerEvent(ScreenLayer& _layer) : _layer (_layer) {}
 
     virtual void do_response(AbstractProcessLoop& events_loop);
 
@@ -54,7 +57,7 @@ private:
     ScreenLayer& _layer;
 };
 
-void DetacheLayerEvent::do_response(AbstractProcessLoop& events_loop)
+void DetachLayerEvent::do_response(AbstractProcessLoop& events_loop)
 {
     _layer.screen()->detach_layer(_layer);
 }
@@ -207,13 +210,13 @@ bool ScreenLayer::contains_point(int x, int y)
     return !!region_contains_point(&_area, x, y);
 }
 
-void ScreenLayer::attach_to_screen(Application& applicaion, int screen_id)
+void ScreenLayer::attach_to_screen(Application& application, int screen_id)
 {
     if (_screen) {
         return;
     }
-    AutoRef<AttacheLayerEvent> event(new AttacheLayerEvent(*this, screen_id));
-    applicaion.push_event(*event);
+    AutoRef<AttachLayerEvent> event(new AttachLayerEvent(*this, screen_id));
+    application.push_event(*event);
     (*event)->wait();
     if (!(*event)->success()) {
         THROW("attach failed");
@@ -221,13 +224,13 @@ void ScreenLayer::attach_to_screen(Application& applicaion, int screen_id)
     ASSERT(_screen);
 }
 
-void ScreenLayer::detach_from_screen(Application& applicaion)
+void ScreenLayer::detach_from_screen(Application& application)
 {
     if (!_screen) {
         return;
     }
-    AutoRef<DetacheLayerEvent> event(new DetacheLayerEvent(*this));
-    applicaion.push_event(*event);
+    AutoRef<DetachLayerEvent> event(new DetachLayerEvent(*this));
+    application.push_event(*event);
     (*event)->wait();
     if (!(*event)->success()) {
         THROW("detach failed");

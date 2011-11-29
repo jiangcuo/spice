@@ -37,7 +37,8 @@ host_triplet = @host@
 noinst_PROGRAMS = test_just_sockets_no_ssl$(EXEEXT) \
 	test_empty_success$(EXEEXT) \
 	test_fail_on_null_core_interface$(EXEEXT) \
-	test_display_no_ssl$(EXEEXT)
+	test_display_no_ssl$(EXEEXT) test_display_streaming$(EXEEXT) \
+	test_playback$(EXEEXT)
 subdir = server/tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -49,42 +50,36 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
+am__dirstamp = $(am__leading_dot)dirstamp
+am__objects_1 = basic_event_loop.$(OBJEXT) \
+	../../common/backtrace.$(OBJEXT)
 am_test_display_no_ssl_OBJECTS = test_display_no_ssl.$(OBJEXT) \
-	basic_event_loop.$(OBJEXT)
+	test_display_base.$(OBJEXT) $(am__objects_1)
 test_display_no_ssl_OBJECTS = $(am_test_display_no_ssl_OBJECTS)
 test_display_no_ssl_LDADD = $(LDADD)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
 am__v_lt_0 = --silent
-test_display_no_ssl_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(AM_CFLAGS) $(CFLAGS) $(test_display_no_ssl_LDFLAGS) \
-	$(LDFLAGS) -o $@
+am_test_display_streaming_OBJECTS = test_display_streaming.$(OBJEXT) \
+	test_display_base.$(OBJEXT) $(am__objects_1)
+test_display_streaming_OBJECTS = $(am_test_display_streaming_OBJECTS)
+test_display_streaming_LDADD = $(LDADD)
 am_test_empty_success_OBJECTS = test_empty_success.$(OBJEXT)
 test_empty_success_OBJECTS = $(am_test_empty_success_OBJECTS)
 test_empty_success_LDADD = $(LDADD)
-test_empty_success_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(AM_CFLAGS) $(CFLAGS) $(test_empty_success_LDFLAGS) \
-	$(LDFLAGS) -o $@
 am_test_fail_on_null_core_interface_OBJECTS =  \
 	test_fail_on_null_core_interface.$(OBJEXT)
 test_fail_on_null_core_interface_OBJECTS =  \
 	$(am_test_fail_on_null_core_interface_OBJECTS)
 test_fail_on_null_core_interface_LDADD = $(LDADD)
-test_fail_on_null_core_interface_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(AM_CFLAGS) $(CFLAGS) \
-	$(test_fail_on_null_core_interface_LDFLAGS) $(LDFLAGS) -o $@
 am_test_just_sockets_no_ssl_OBJECTS =  \
-	test_just_sockets_no_ssl.$(OBJEXT) basic_event_loop.$(OBJEXT)
+	test_just_sockets_no_ssl.$(OBJEXT) $(am__objects_1)
 test_just_sockets_no_ssl_OBJECTS =  \
 	$(am_test_just_sockets_no_ssl_OBJECTS)
 test_just_sockets_no_ssl_LDADD = $(LDADD)
-test_just_sockets_no_ssl_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(AM_CFLAGS) $(CFLAGS) $(test_just_sockets_no_ssl_LDFLAGS) \
-	$(LDFLAGS) -o $@
+am_test_playback_OBJECTS = test_playback.$(OBJEXT) $(am__objects_1)
+test_playback_OBJECTS = $(am_test_playback_OBJECTS)
+test_playback_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -111,17 +106,21 @@ am__v_CCLD_0 = @echo "  CCLD  " $@;
 AM_V_GEN = $(am__v_GEN_$(V))
 am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
 am__v_GEN_0 = @echo "  GEN   " $@;
-SOURCES = $(test_display_no_ssl_SOURCES) $(test_empty_success_SOURCES) \
-	$(test_fail_on_null_core_interface_SOURCES) \
-	$(test_just_sockets_no_ssl_SOURCES)
-DIST_SOURCES = $(test_display_no_ssl_SOURCES) \
+SOURCES = $(test_display_no_ssl_SOURCES) \
+	$(test_display_streaming_SOURCES) \
 	$(test_empty_success_SOURCES) \
 	$(test_fail_on_null_core_interface_SOURCES) \
-	$(test_just_sockets_no_ssl_SOURCES)
+	$(test_just_sockets_no_ssl_SOURCES) $(test_playback_SOURCES)
+DIST_SOURCES = $(test_display_no_ssl_SOURCES) \
+	$(test_display_streaming_SOURCES) \
+	$(test_empty_success_SOURCES) \
+	$(test_fail_on_null_core_interface_SOURCES) \
+	$(test_just_sockets_no_ssl_SOURCES) $(test_playback_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
+ALLOCA = @ALLOCA@
 ALSA_CFLAGS = @ALSA_CFLAGS@
 ALSA_LIBS = @ALSA_LIBS@
 AMTAR = @AMTAR@
@@ -146,6 +145,7 @@ CFLAGS = @CFLAGS@
 CFLAGS_CFLAGS = @CFLAGS_CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CXIMAGE_CFLAGS = @CXIMAGE_CFLAGS@
 CXX = @CXX@
 CXXCPP = @CXXCPP@
 CXXDEPMODE = @CXXDEPMODE@
@@ -220,7 +220,6 @@ SLIRP_LIBS = @SLIRP_LIBS@
 SMARTCARD_CFLAGS = @SMARTCARD_CFLAGS@
 SMARTCARD_LIBS = @SMARTCARD_LIBS@
 SPICEC_STATIC_LINKAGE_BSTATIC = @SPICEC_STATIC_LINKAGE_BSTATIC@
-SPICE_COMMON_SRCDIR = @SPICE_COMMON_SRCDIR@
 SPICE_LT_VERSION = @SPICE_LT_VERSION@
 SPICE_NONPKGCONFIG_CFLAGS = @SPICE_NONPKGCONFIG_CFLAGS@
 SPICE_NONPKGCONFIG_LIBS = @SPICE_NONPKGCONFIG_LIBS@
@@ -231,6 +230,7 @@ STRIP = @STRIP@
 VERSION = @VERSION@
 VISIBILITY_HIDDEN_CFLAGS = @VISIBILITY_HIDDEN_CFLAGS@
 WARN_CFLAGS = @WARN_CFLAGS@
+WINDRES = @WINDRES@
 XFIXES_CFLAGS = @XFIXES_CFLAGS@
 XFIXES_LIBS = @XFIXES_LIBS@
 XRANDR12_CFLAGS = @XRANDR12_CFLAGS@
@@ -283,7 +283,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-red_target = @red_target@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -294,21 +293,22 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 NULL = 
 INCLUDES = \
-	-I$(top_srcdir)/server          \
+	-I$(top_srcdir)                 \
 	-I$(top_srcdir)/common          \
+	-I$(top_srcdir)/server          \
+	-I$(top_srcdir)/server/tests    \
 	$(PROTOCOL_CFLAGS)              \
 	$(SPICE_NONPKGCONFIG_CFLAGS)    \
 	$(NULL)
 
-AM_LDFLAGS = -L../.libs -lspice-server
-test_display_no_ssl_SOURCES = test_display_no_ssl.c basic_event_loop.c basic_event_loop.h test_util.h
-test_display_no_ssl_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS)
-test_just_sockets_no_ssl_SOURCES = test_just_sockets_no_ssl.c basic_event_loop.c basic_event_loop.h test_util.h
-test_just_sockets_no_ssl_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS)
+AM_LDFLAGS = $(top_builddir)/server/libspice-server.la
+COMMON_BASE = basic_event_loop.c basic_event_loop.h test_util.h ../../common/backtrace.c
+test_display_streaming_SOURCES = test_display_streaming.c test_display_base.c test_display_base.h $(COMMON_BASE)
+test_display_no_ssl_SOURCES = test_display_no_ssl.c test_display_base.c test_display_base.h $(COMMON_BASE)
+test_just_sockets_no_ssl_SOURCES = test_just_sockets_no_ssl.c $(COMMON_BASE)
 test_empty_success_SOURCES = test_empty_success.c
-test_empty_success_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS)
 test_fail_on_null_core_interface_SOURCES = test_fail_on_null_core_interface.c
-test_fail_on_null_core_interface_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS)
+test_playback_SOURCES = test_playback.c $(COMMON_BASE)
 all: all-am
 
 .SUFFIXES:
@@ -352,50 +352,72 @@ clean-noinstPROGRAMS:
 	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
 	echo " rm -f" $$list; \
 	rm -f $$list
+../../common/$(am__dirstamp):
+	@$(MKDIR_P) ../../common
+	@: > ../../common/$(am__dirstamp)
+../../common/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) ../../common/$(DEPDIR)
+	@: > ../../common/$(DEPDIR)/$(am__dirstamp)
+../../common/backtrace.$(OBJEXT): ../../common/$(am__dirstamp) \
+	../../common/$(DEPDIR)/$(am__dirstamp)
 test_display_no_ssl$(EXEEXT): $(test_display_no_ssl_OBJECTS) $(test_display_no_ssl_DEPENDENCIES) 
 	@rm -f test_display_no_ssl$(EXEEXT)
-	$(AM_V_CCLD)$(test_display_no_ssl_LINK) $(test_display_no_ssl_OBJECTS) $(test_display_no_ssl_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(test_display_no_ssl_OBJECTS) $(test_display_no_ssl_LDADD) $(LIBS)
+test_display_streaming$(EXEEXT): $(test_display_streaming_OBJECTS) $(test_display_streaming_DEPENDENCIES) 
+	@rm -f test_display_streaming$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_display_streaming_OBJECTS) $(test_display_streaming_LDADD) $(LIBS)
 test_empty_success$(EXEEXT): $(test_empty_success_OBJECTS) $(test_empty_success_DEPENDENCIES) 
 	@rm -f test_empty_success$(EXEEXT)
-	$(AM_V_CCLD)$(test_empty_success_LINK) $(test_empty_success_OBJECTS) $(test_empty_success_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(test_empty_success_OBJECTS) $(test_empty_success_LDADD) $(LIBS)
 test_fail_on_null_core_interface$(EXEEXT): $(test_fail_on_null_core_interface_OBJECTS) $(test_fail_on_null_core_interface_DEPENDENCIES) 
 	@rm -f test_fail_on_null_core_interface$(EXEEXT)
-	$(AM_V_CCLD)$(test_fail_on_null_core_interface_LINK) $(test_fail_on_null_core_interface_OBJECTS) $(test_fail_on_null_core_interface_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(test_fail_on_null_core_interface_OBJECTS) $(test_fail_on_null_core_interface_LDADD) $(LIBS)
 test_just_sockets_no_ssl$(EXEEXT): $(test_just_sockets_no_ssl_OBJECTS) $(test_just_sockets_no_ssl_DEPENDENCIES) 
 	@rm -f test_just_sockets_no_ssl$(EXEEXT)
-	$(AM_V_CCLD)$(test_just_sockets_no_ssl_LINK) $(test_just_sockets_no_ssl_OBJECTS) $(test_just_sockets_no_ssl_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(test_just_sockets_no_ssl_OBJECTS) $(test_just_sockets_no_ssl_LDADD) $(LIBS)
+test_playback$(EXEEXT): $(test_playback_OBJECTS) $(test_playback_DEPENDENCIES) 
+	@rm -f test_playback$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_playback_OBJECTS) $(test_playback_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f ../../common/backtrace.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@../../common/$(DEPDIR)/backtrace.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/basic_event_loop.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_display_base.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_display_no_ssl.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_display_streaming.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_empty_success.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_fail_on_null_core_interface.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_just_sockets_no_ssl.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_playback.Po@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c $<
+@am__fastdepCC_FALSE@	$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+@am__fastdepCC_FALSE@	$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
@@ -514,6 +536,8 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f ../../common/$(DEPDIR)/$(am__dirstamp)
+	-rm -f ../../common/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -524,7 +548,7 @@ clean-am: clean-generic clean-libtool clean-noinstPROGRAMS \
 	mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ../../common/$(DEPDIR) ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -570,7 +594,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ../../common/$(DEPDIR) ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

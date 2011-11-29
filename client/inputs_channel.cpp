@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "inputs_channel.h"
@@ -399,7 +402,7 @@ void InputsChannel::set_local_modifiers()
         modifiers |= Platform::CAPS_LOCK_MODIFIER;
     }
 
-    Platform::set_keyboard_lock_modifiers(_modifiers);
+    Platform::set_keyboard_lock_modifiers(modifiers);
 }
 
 void InputsChannel::on_focus_in()

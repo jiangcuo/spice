@@ -19,8 +19,13 @@
 // Red Hat image compression based on SFALIC by Roman Starosolski
 // http://sun.iinf.polsl.gliwice.pl/~rstaros/sfalic/index.html
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include "quic.h"
 #include <spice/macros.h>
+#include "bitops.h"
 
 //#define DEBUG
 
@@ -246,7 +251,7 @@ static const unsigned int tabrand_chaos[TABRAND_TABSIZE] = {
     0x81474925, 0xa8b6c7ad, 0xee5931de, 0xb2f8158d, 0x59fb7409, 0x2e3dfaed, 0x9af25a3f, 0xe1fed4d5,
 };
 
-static unsigned int stabrand()
+static unsigned int stabrand(void)
 {
     //ASSERT( !(TABRAND_SEEDMASK & TABRAND_TABSIZE));
     //ASSERT( TABRAND_SEEDMASK + 1 == TABRAND_TABSIZE );
@@ -530,7 +535,7 @@ static int J[MELCSTATES] = {
 };
 
 /* creates the bit counting look-up table. */
-static void init_zeroLUT()
+static void init_zeroLUT(void)
 {
     int i, j, k, l;
 
@@ -703,17 +708,6 @@ static int decode_channel_run(Encoder *encoder, Channel *channel)
 
 #else
 
-static INLINE int find_msb(int x)
-{
-    int r;
-
-    __asm__("bsrl %1,%0\n\t"
-            "jnz 1f\n\t"
-            "movl $-1,%0\n"
-            "1:" : "=r" (r) : "rm" (x));
-    return r + 1;
-}
-
 static INLINE void encode_run(Encoder *encoder, unsigned int len)
 {
     int odd = len & 1U;
@@ -721,7 +715,7 @@ static INLINE void encode_run(Encoder *encoder, unsigned int len)
 
     len &= ~1U;
 
-    while ((msb = find_msb(len))) {
+    while ((msb = spice_bit_find_msb(len))) {
         len &= ~(1 << (msb - 1));
         ASSERT(encoder->usr, msb < 32);
         encode(encoder, (1 << (msb)) - 1, msb);

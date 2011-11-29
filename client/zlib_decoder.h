@@ -20,9 +20,11 @@
 #define _H_ZLIB_DECODER
 
 #include "common.h"
-#include "canvas_base.h"
+#include "red_canvas_base.h"
 
-#define ZLIB_WINAPI 
+#ifndef __GNUC__
+#define ZLIB_WINAPI
+#endif
 #include <zlib.h>
 
 

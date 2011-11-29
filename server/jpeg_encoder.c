@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "red_common.h"
 #include "jpeg_encoder.h"
@@ -190,6 +193,10 @@ static void do_jpeg_encode(JpegEncoder *jpeg, uint8_t *lines, unsigned int num_l
         jpeg->cur_image.convert_line_to_RGB24(lines, width, &RGB24_line);
         row_pointer[0] = RGB24_line;
         jpeg_write_scanlines(&jpeg->cinfo, row_pointer, 1);
+    }
+
+    if (jpeg->cur_image.type != JPEG_IMAGE_TYPE_RGB24) {
+        free(RGB24_line);
     }
 }
 

@@ -15,6 +15,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "canvas_utils.h"
 
@@ -27,16 +30,8 @@
 #include "mem.h"
 
 #ifdef WIN32
-extern int gdi_handlers;
+static int gdi_handlers = 0;
 #endif
-
-#ifndef ASSERT
-#define ASSERT(x) if (!(x)) {                               \
-    printf("%s: ASSERT %s failed\n", __FUNCTION__, #x);     \
-    abort();                                                \
-}
-#endif
-
 
 #ifndef CANVAS_ERROR
 #define CANVAS_ERROR(format, ...) {                             \
@@ -105,7 +100,7 @@ spice_pixman_image_get_format(pixman_image_t *image)
     CANVAS_ERROR("Unknown pixman image type");
 }
 
-static inline pixman_image_t *__surface_create_stride(pixman_format_code_t format, int width, int height,
+static INLINE pixman_image_t *__surface_create_stride(pixman_format_code_t format, int width, int height,
                                                       int stride)
 {
     uint8_t *data;

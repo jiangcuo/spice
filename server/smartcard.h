@@ -18,7 +18,7 @@
 #ifndef __SMART_CARD_H__
 #define __SMART_CARD_H__
 
-#include "spice-experimental.h"
+#include "server/spice-experimental.h"
 
 // Maximal length of APDU
 #define APDUBufSize 270
@@ -28,8 +28,6 @@
  */
 int smartcard_device_connect(SpiceCharDeviceInstance *char_device);
 void smartcard_device_disconnect(SpiceCharDeviceInstance *char_device);
-
-void smartcard_channel_init(void);
 
 #endif // __SMART_CARD_H__
 

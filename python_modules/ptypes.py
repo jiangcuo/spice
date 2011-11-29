@@ -37,10 +37,10 @@ class FixedSize:
             new.vals[i] = self.vals[i] + other.vals[i]
 
         for i in range(shared,len(self.vals)):
-            new.vals[i] = self.vals[i];
+            new.vals[i] = self.vals[i]
 
         for i in range(shared,len(other.vals)):
-            new.vals[i] = new.vals[i] + other.vals[i];
+            new.vals[i] = new.vals[i] + other.vals[i]
 
         return new
 
@@ -280,7 +280,7 @@ class EnumType(EnumBaseType):
         return "enum %s" % self.name
 
     def c_define(self, writer):
-        writer.write("enum ")
+        writer.write("typedef enum ")
         writer.write(self.c_name())
         writer.begin_block()
         values = self.names.keys()
@@ -296,7 +296,11 @@ class EnumType(EnumBaseType):
         writer.newline()
         writer.write(codegen.prefix_underscore_upper(self.name.upper(), "ENUM_END"))
         writer.newline()
-        writer.end_block(semicolon=True)
+        writer.end_block(newline=False)
+        writer.write(" ")
+        writer.write(self.c_name())
+        writer.write(";")
+        writer.newline()
         writer.newline()
 
 class FlagsType(EnumBaseType):
@@ -330,7 +334,7 @@ class FlagsType(EnumBaseType):
         return "flags %s" % self.name
 
     def c_define(self, writer):
-        writer.write("enum ")
+        writer.write("typedef enum ")
         writer.write(self.c_name())
         writer.begin_block()
         values = self.names.keys()
@@ -347,7 +351,11 @@ class FlagsType(EnumBaseType):
         writer.write(codegen.prefix_underscore_upper(self.name.upper(), "MASK"))
         writer.write(" = 0x%x" % (mask))
         writer.newline()
-        writer.end_block(semicolon=True)
+        writer.end_block(newline=False)
+        writer.write(" ")
+        writer.write(self.c_name())
+        writer.write(";")
+        writer.newline()
         writer.newline()
 
 class ArrayType(Type):
@@ -681,7 +689,7 @@ class Switch(Containee):
     def get_fixed_nw_size(self):
         if not self.is_fixed_nw_size():
             raise Exception, "Not a fixed size type"
-        size = 0;
+        size = 0
         for c in self.cases:
             size = max(size, c.member.get_fixed_nw_size())
         return size

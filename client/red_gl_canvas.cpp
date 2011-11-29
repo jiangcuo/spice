@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include <stdint.h>
@@ -23,6 +26,12 @@
 #include "region.h"
 #include "red_pixmap_gl.h"
 #include <GL/glx.h>
+
+#define SPICE_CANVAS_INTERNAL
+#define SW_CANVAS_CACHE
+#include "gl_canvas.c"
+#undef SW_CANVAS_CACHE
+#undef SPICE_CANVAS_INTERNAL
 
 GCanvas::GCanvas(int width, int height, uint32_t format, RedWindow *win,
                  RenderType rendertype,

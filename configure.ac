@@ -1,8 +1,8 @@
 AC_PREREQ([2.57])
 
 m4_define([SPICE_MAJOR], 0)
-m4_define([SPICE_MINOR], 8)
-m4_define([SPICE_MICRO], 3)
+m4_define([SPICE_MINOR], 10)
+m4_define([SPICE_MICRO], 0)
 
 AC_INIT(spice, [SPICE_MAJOR.SPICE_MINOR.SPICE_MICRO], [], spice)
 
@@ -10,15 +10,14 @@ AC_CONFIG_MACRO_DIR([m4])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR(.)
 
-AM_INIT_AUTOMAKE([dist-bzip2])
+AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip subdir-objects])
 AM_MAINTAINER_MODE
 
-# Define default SPICE_COMMON_SRCDIR
-SPICE_COMMON_SRCDIR='$(top_srcdir)'/common
-
-AS_IF([test "$CFLAGS" = ""], [], [_cflags_is_set=yes])
 AC_PROG_CC
-AS_IF([test "$CXXFLAGS" = ""], [], [_cxxflags_is_set=yes])
+AC_PROG_CC_C99
+if test x"$ac_cv_prog_cc_c99" = xno; then
+    AC_MSG_ERROR([C99 compiler is required.])
+fi
 AC_PROG_CXX
 AC_PROG_INSTALL
 AC_CANONICAL_HOST
@@ -28,6 +27,8 @@ AC_C_BIGENDIAN
 AC_PATH_PROGS(PYTHON, python2 python)
 
 AC_CHECK_HEADERS([sys/time.h])
+AC_CHECK_HEADERS([execinfo.h])
+AC_FUNC_ALLOCA
 
 SPICE_LT_VERSION=m4_format("%d:%d:%d", 1, 0, 2)
 AC_SUBST(SPICE_LT_VERSION)
@@ -85,7 +86,6 @@ if test "$platform_win32" = yes; then
 else
   red_target=x11
 fi
-AC_SUBST(red_target)
 
 AM_CONDITIONAL(OS_WIN32, test "$os_win32" = "yes")
 AM_CONDITIONAL(OS_UNIX, test "$os_win32" != "yes")
@@ -123,10 +123,16 @@ if test "x$enable_smartcard" = "xyes"; then
    AC_DEFINE(USE_SMARTCARD, [1], [Define if supporting smartcard proxying])
 fi
 
+AC_ARG_ENABLE(client,
+[  --enable-client         Enable spice client],,
+[enable_client="yes"])
+AS_IF([test x"$enable_client" != "xno"], [enable_client="yes"])
+AM_CONDITIONAL(SUPPORT_CLIENT, test "x$enable_client" = "xyes")
+
 dnl =========================================================================
 dnl Check deps
 
-PKG_CHECK_MODULES(PROTOCOL, spice-protocol >= 0.8.2)
+PKG_CHECK_MODULES(PROTOCOL, spice-protocol >= 0.9.1)
 AC_SUBST(PROTOCOL_CFLAGS)
 
 AC_CHECK_LIBM
@@ -138,7 +144,11 @@ AC_CHECK_LIB(rt, clock_gettime,
    )
 AC_SUBST(LIBRT)
 
-SPICE_NONPKGCONFIG_LIBS+=" -pthread $LIBM $LIBRT"
+if test "$red_target" = "windows"; then
+	SPICE_NONPKGCONFIG_LIBS+=" -lpthreadGC2 -lversion -lmsimg32 $LIBM"
+else
+	SPICE_NONPKGCONFIG_LIBS+=" -pthread $LIBM $LIBRT"
+fi
 
 dnl The client needs a yield function
 AC_MSG_CHECKING(for posix yield function)
@@ -150,7 +160,7 @@ for yield_func in pthread_yield pthread_yield_np sched_yield \
 		[$yield_func()],
 		[posix_yield_func="$yield_func"
 		break])
-    CPPFLAGS="spice_save_CPPFLAGS"
+    CPPFLAGS="$spice_save_CPPFLAGS"
 done
 if test x"$posix_yield_func" = xnone; then
     AC_MSG_ERROR([No posix yield function found])
@@ -167,13 +177,13 @@ if test "x$enable_gui" = "xyes"; then
     [
         AC_SUBST(CEGUI06_CFLAGS)
         AC_SUBST(CEGUI06_LIBS)
-        CEGUI06_CFLAGS+="-DUSE_GUI"
+        AC_DEFINE([USE_GUI], [1], [Define to build with CEGUI support])
     ],
     [
         PKG_CHECK_MODULES(CEGUI, CEGUI >= 0.6.0 CEGUI < 0.7.0)
         AC_SUBST(CEGUI_CFLAGS)
         AC_SUBST(CEGUI_LIBS)
-        CEGUI_CFLAGS+="-DUSE_GUI"
+        AC_DEFINE([USE_GUI], [1], [Define to build with CEGUI support])
     ])
 fi
 
@@ -236,7 +246,8 @@ SPICE_REQUIRES+=" openssl"
 if test "x$enable_opengl" = "xyes"; then
    AC_CHECK_LIB(GL, glBlendFunc, GL_LIBS="$GL_LIBS -lGL", enable_opengl=no)
    AC_CHECK_LIB(GLU, gluSphere, GL_LIBS="$GL_LIBS -lGLU", enable_opengl=no)
-   GL_CFLAGS="-DGL_GLEXT_PROTOTYPES -DUSE_OGL"
+   AC_DEFINE([USE_OPENGL], [1], [Define to build with OpenGL support])
+   AC_DEFINE([GL_GLEXT_PROTOTYPES], [], [Enable GLExt prototypes])
 
    if test "x$enable_opengl" = "xno"; then
       AC_MSG_ERROR([GL libraries not available])
@@ -279,16 +290,6 @@ AC_ARG_ENABLE(static-linkage,
 [enable_static_linkage="no"])
 AS_IF([test x"$enable_static_linkage" != "xno"],
 [SPICEC_STATIC_LINKAGE_BSTATIC=["-Wl,-Bstatic"]])
-
-
-AS_IF([test "$_cflags_is_set" = "yes"], [], [
-    CFLAGS="-g -O2"
-])
-
-
-AS_IF([test "$_cxxflags_is_set" = "yes"], [], [
-    CXXFLAGS="-g -O2"
-])
 
 AC_CHECK_LIB(jpeg, jpeg_destroy_decompress,
     AC_MSG_CHECKING([for jpeglib.h])
@@ -344,7 +345,7 @@ if test "x$with_sasl" != "xno"; then
   elif test "x$with_sasl" = "xyes"; then
     SASL_LIBS="$SASL_LIBS -lsasl"
   else
-    AC_MSG_ERROR([You must install the Cyrus SASL development package in order to compile GTK-VNC])
+    AC_MSG_ERROR([Missing required Cyrus SASL development package])
   fi
   CFLAGS="$old_cflags"
   LIBS="$old_libs"
@@ -388,7 +389,11 @@ dnl MAYBE_WARN in an ignorable way (like adding whitespace)
 
 dnl MAYBE_WARN="-Wall -Wno-sign-compare -Werror -Wno-deprecated-declarations"
 
-MAYBE_WARN="-Wall -Wno-sign-compare -Wno-deprecated-declarations"
+if test "$red_target" = "windows"; then
+	MAYBE_WARN="-Wall -Wno-sign-compare -Wno-deprecated-declarations"
+else
+	MAYBE_WARN="-Wall -Wno-sign-compare -Werror -Wno-deprecated-declarations"
+fi
 
 AC_ARG_ENABLE(werror,
 AC_HELP_STRING([--enable-werror], [Use -Werror (if supported)]),
@@ -435,19 +440,32 @@ AC_CACHE_CHECK([for supported warning flags], spice_cv_warn_cflags, [
 WARN_CFLAGS="$spice_cv_warn_cflags"
 SPICE_CFLAGS="$SPICE_CFLAGS $WARN_CFLAGS"
 
-# We only wish to enable attribute(warn_unused_result) if we can prevent
-# gcc from generating thousands of warnings about the misapplication of the
-# attribute to void functions and variables.
-AC_MSG_CHECKING([how to enable unused result warnings])
-warn_unused_result=""
-if echo $WARN_CFLAGS | grep -e '-Wno-attributes' >/dev/null; then
-    AC_TRY_COMPILE([__attribute__((__warn_unused_result__))
-	int f (int i) { return i; }], [],
-	[warn_unused_result="__attribute__((__warn_unused_result__))"])
+# use ximage.h for win32 build if it is found (no package for mingw32 atm)
+if test $os_win32 == "yes" ; then
+    AC_MSG_CHECKING([for cximage])
+    AC_TRY_CPP(
+[#include <ximage.h>
+int main()
+{
+ return CXIMAGE_FORMAT_RAW;
+)}
+],[
+ AC_MSG_RESULT([found])
+ have_cximage="yes"
+]
+,[AC_MSG_RESULT([missing])
+ CXIMAGE_CFLAGS='-DDISABLE_CXIMAGE'
+ have_cximage="no"
+ ]
+)
 fi
-AC_DEFINE_UNQUOTED([WARN_UNUSED_RESULT], [$warn_unused_result],
-	  [Define to the value your compiler uses to support the warn-unused-result attribute])
-AC_MSG_RESULT([$warn_unused_result])
+AC_SUBST(CXIMAGE_CFLAGS)
+
+# check for windres for mingw32 builds
+if test $os_win32 == "yes" ; then
+    AC_CHECK_PROGS(WINDRES,i686-pc-mingw32-windres mingw-windres mingw32-windres,false)
+    AC_SUBST(WINDRES)
+fi
 
 AC_SUBST(WARN_CFLAGS)
 AC_SUBST(CFLAGS_CFLAGS)
@@ -465,13 +483,12 @@ error Need GCC 4.0 for visibility
 int main () { return 0; }
 ])], have_gcc4=yes)
 
-if test "x$have_gcc4" = "xyes"; then
+if test "x$have_gcc4" = "xyes" -a ! "$os_win32" = "yes" ; then
    VISIBILITY_HIDDEN_CFLAGS="-fvisibility=hidden"
 fi
 AC_MSG_RESULT($have_gcc4)
 AC_SUBST(VISIBILITY_HIDDEN_CFLAGS)
 
-AC_SUBST(SPICE_COMMON_SRCDIR)
 AC_SUBST(SPICE_REQUIRES)
 AC_SUBST(SPICE_NONPKGCONFIG_CFLAGS)
 AC_SUBST(SPICE_NONPKGCONFIG_LIBS)
@@ -490,10 +507,6 @@ python_modules/Makefile
 server/Makefile
 server/tests/Makefile
 client/Makefile
-client/x11/Makefile
-client/x11/images/Makefile
-client/gui/Makefile
-client/windows/Makefile
 ])
 
 dnl ==========================================================================
@@ -505,6 +518,8 @@ echo "
         prefix:                   ${prefix}
         c compiler:               ${CC}
         c++ compiler:             ${CXX}
+
+        Build Spice client:       ${enable_client}
 
         Have XRANDR 1.2:          ${have_xrandr12}
 
@@ -519,6 +534,14 @@ echo "
         Smartcard:                ${enable_smartcard}
 
         SASL support:             ${enable_sasl}
+"
 
-        Now type 'make' to build $PACKAGE
+if test $os_win32 == "yes" ; then
+echo \
+"        Copy & Paste Images:     ${have_cximage}
+"
+fi
+
+echo \
+"        Now type 'make' to build $PACKAGE
 "

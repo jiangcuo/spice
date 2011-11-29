@@ -17,6 +17,9 @@
 
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -36,16 +39,7 @@
 #include "mem.h"
 #include "glc.h"
 #include "gl_utils.h"
-
-#define ASSERT(x) if (!(x)) {printf("%s: assert failed %s\n", __FUNCTION__, #x); abort();}
-
-#define WARN_ONCE(x) {      \
-    static int warn = TRUE; \
-    if (warn) {             \
-        printf x;           \
-        warn = FALSE;       \
-    }                       \
-}
+#include "spice_common.h"
 
 #define TESS_VERTEX_ALLOC_BUNCH 20
 
@@ -1014,7 +1008,7 @@ void _glc_fill_mask(GLCCtx glc, int x_dest, int y_dest, int width, int height, i
     ASSERT(ctx && bitmap);
     start_draw(ctx);
     if (ctx->pat) {
-        WARN_ONCE(("%s: unimplemented fill mask with pattern\n", __FUNCTION__));
+        WARN_ONCE("%s: unimplemented fill mask with pattern\n", __FUNCTION__);
     }
     fill_mask(ctx, x_dest, y_dest, width, height, stride, bitmap);
 }

@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include "event_sources.h"
@@ -88,7 +91,7 @@ bool EventSources::wait_events(int timeout_ms)
         THROW("wait failed %d", GetLastError());
     }
 
-    int event_index = wait_res - WAIT_OBJECT_0;
+    size_t event_index = wait_res - WAIT_OBJECT_0;
     if (event_index == _handles.size()) {
         return process_system_events();
     } else if ((event_index >= 0) && (event_index < (int)_handles.size())) {

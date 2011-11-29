@@ -45,7 +45,9 @@ ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 SOFTWARE.
 
 ******************************************************************/
-
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <stdio.h>
 #include <spice/macros.h>
@@ -82,8 +84,7 @@ typedef struct lineGC *GCPtr;
 #define miWideDash spice_canvas_wide_dash_line
 #define miWideLine spice_canvas_wide_line
 
-static int inline
-ICEIL (double x)
+static INLINE int ICEIL (double x)
 {
     int _cTmp = (int)x;
     return ((x == _cTmp) || (x < 0.0)) ? _cTmp : _cTmp + 1;
@@ -1511,7 +1512,7 @@ miZeroLine (GCPtr pGC, int mode,        /* Origin or Previous */
     pspanInit = (DDXPointRec *)xalloc (list_len * sizeof (DDXPointRec));
     pwidthInit = (int *)xalloc (list_len * sizeof (int));
     if (!pspanInit || !pwidthInit)
-        return;
+        goto out;
 
     Nspans = 0;
     new_span = TRUE;
@@ -1685,6 +1686,7 @@ miZeroLine (GCPtr pGC, int mode,        /* Origin or Previous */
     if (Nspans > 0)
         (*pGC->ops->FillSpans) (pGC, Nspans, pspanInit, pwidthInit, FALSE, TRUE);
 
+out:
     xfree (pwidthInit);
     xfree (pspanInit);
 }

@@ -14,6 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include "common.h"
 #include <fstream>
@@ -59,10 +62,10 @@ static void init_version_string()
         return;
     }
     sprintf(_version_string, "%d.%d.%d.%d",
-        file_info->dwFileVersionMS >> 16,
-        file_info->dwFileVersionMS & 0x0ffff,
-        file_info->dwFileVersionLS >> 16,
-        file_info->dwFileVersionLS & 0x0ffff);
+        (int)(file_info->dwFileVersionMS >> 16),
+        (int)(file_info->dwFileVersionMS & 0x0ffff),
+        (int)(file_info->dwFileVersionLS >> 16),
+        (int)(file_info->dwFileVersionLS & 0x0ffff));
     PACKAGE_VERSION = _version_string;
 }
 

@@ -15,6 +15,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -22,12 +25,7 @@
 #include <GL/glx.h>
 
 #include "ogl_ctx.h"
-
-
-#define PANIC(str) {                                \
-    printf("%s: panic: %s", __FUNCTION__, str);     \
-    abort();                                        \
-}
+#include "spice_common.h"
 
 enum {
     OGLCTX_TYPE_PBUF,
