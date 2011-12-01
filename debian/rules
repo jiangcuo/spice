@@ -21,8 +21,6 @@ build-indep: build
 
 build: build-stamp
 build-stamp: build-celt-stamp
-	[ -f celt/config.log ] || rm -f celt/config.log
-	[ -f celt/config.status ] || rm -f celt/config.status
 	CELT051_CFLAGS="-I$(CURDIR)" CELT051_LIBS="-L$(CURDIR)/celt051/.libs -lcelt051 -lm" ./configure --prefix=/usr
 	$(MAKE) 
 	touch build-stamp
@@ -34,17 +32,19 @@ build-celt-stamp:
 	touch build-celt-stamp
 
 clean: clean-patched 
-clean-patched: 
+clean-patched: clean-spice
 	dh_testdir
 	dh_testroot
-	[ ! -f Makefile ] || $(MAKE) distclean
 	[ ! -f celt/Makefile ] || $(MAKE) -C celt distclean
 	-rm celt051 celt/celt051.pc
-	dh_clean 
+	dh_auto_clean 
 
 clean-spice:
-	[ ! -f Makefile ] || $(MAKE) distclean
-	rm build-stamp
+	[ ! -f Makefile ] || $(MAKE) clean
+	[ ! -f server/Makefile ] || $(MAKE) -C server distclean
+	[ ! -f client/Makefile ] || $(MAKE) -C client distclean
+	-rm common/Makefile common/win/Makefile
+	-rm Makefile build-celt-stamp celt051 config.h config.log config.status libtool python_modules/Makefile spice-server.pc
 
 install: install-stamp
 install-stamp: build-stamp
