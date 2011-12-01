@@ -6,6 +6,7 @@ spice (0.10.0-1) unstable; urgency=low
   * Remove fix-typo-in-record-cpp.patch, applied upstream
   * Remove use-requires-private-for-libspice-pkgconfig.patch, applied upstream
   * Change Build-Depends on libspice-protocol-dev to (>= 0.9.1~)
+  * Refresh libspice-server1.symbols
   
  -- Liang Guo <bluestonechina@gmail.com>  Tue, 29 Nov 2011 14:37:08 +0800
   

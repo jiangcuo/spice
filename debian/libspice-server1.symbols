@@ -15,6 +15,7 @@ libcelt051.so.0 libspice-server1 #MINVER#
  celt051_mode_destroy@Base 0.8.2
  celt051_mode_info@Base 0.8.2
 libspice-server.so.1 libspice-server1 #MINVER#
+ SPICE_SERVER_0.10.0@SPICE_SERVER_0.10.0 0.10.0
  SPICE_SERVER_0.6.0@SPICE_SERVER_0.6.0 0.8.2
  SPICE_SERVER_0.6.1@SPICE_SERVER_0.6.1 0.8.2
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
@@ -50,6 +51,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_char_device_wakeup@SPICE_SERVER_0.6.0 0.8.2
  spice_server_destroy@SPICE_SERVER_0.6.0 0.8.2
  spice_server_get_image_compression@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_get_num_clients@SPICE_SERVER_0.10.0 0.10.0
  spice_server_get_peer_info@SPICE_SERVER_0.6.0 0.8.2
  spice_server_get_sock_info@SPICE_SERVER_0.6.0 0.8.2
  spice_server_init@SPICE_SERVER_0.6.0 0.8.2
@@ -63,9 +65,13 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_new@SPICE_SERVER_0.6.0 0.8.2
  spice_server_playback_get_buffer@SPICE_SERVER_0.6.0 0.8.2
  spice_server_playback_put_samples@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_playback_set_mute@SPICE_SERVER_0.10.0 0.10.0
+ spice_server_playback_set_volume@SPICE_SERVER_0.10.0 0.10.0
  spice_server_playback_start@SPICE_SERVER_0.6.0 0.8.2
  spice_server_playback_stop@SPICE_SERVER_0.6.0 0.8.2
  spice_server_record_get_samples@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_record_set_mute@SPICE_SERVER_0.10.0 0.10.0
+ spice_server_record_set_volume@SPICE_SERVER_0.10.0 0.10.0
  spice_server_record_start@SPICE_SERVER_0.6.0 0.8.2
  spice_server_record_stop@SPICE_SERVER_0.6.0 0.8.2
  spice_server_remove_interface@SPICE_SERVER_0.6.0 0.8.2
