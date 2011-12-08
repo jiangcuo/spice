@@ -36,16 +36,16 @@ clean-patched: clean-spice
 	dh_testdir
 	dh_testroot
 	[ ! -f celt/Makefile ] || $(MAKE) -C celt distclean
-	-rm celt051 celt/celt051.pc
-	-rm stamp-h1
+	rm -f celt051 celt/celt051.pc
+	rm -f stamp-h1
 	dh_clean
 
 clean-spice:
 	[ ! -f Makefile ] || $(MAKE) clean
 	[ ! -f server/Makefile ] || $(MAKE) -C server distclean
 	[ ! -f client/Makefile ] || $(MAKE) -C client distclean
-	-rm common/Makefile common/win/Makefile
-	-rm Makefile build-celt-stamp celt051 config.h config.log config.status libtool python_modules/Makefile spice-server.pc
+	rm -f common/Makefile common/win/Makefile
+	rm -f Makefile build-celt-stamp celt051 config.h config.log config.status libtool python_modules/Makefile spice-server.pc
 
 install: install-stamp
 install-stamp: build-stamp
@@ -54,7 +54,7 @@ install-stamp: build-stamp
 	dh_prep
 	dh_installdirs
 	$(MAKE) -C celt install DESTDIR=$(CURDIR)/debian/tmp
-	$(MAKE)  install DESTDIR=$(CURDIR)/debian/tmp
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
 	dh_install --sourcedir=debian/tmp
 	touch install-stamp
 

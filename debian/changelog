@@ -1,5 +1,6 @@
 spice (0.10.0-1) unstable; urgency=low
 
+  [ Liang Guo ]
   * New upstream release (Closes: #651262)
   * Refresh debian/copyright
   * Remove fix-typo-in-cmd_line_parser-cpp.patch, applied upstream
@@ -10,6 +11,9 @@ spice (0.10.0-1) unstable; urgency=low
   * Update debian/rules clean target
   * Ignore common/win/my_getopt-1.5/Makefile change when building package
   * debian/control: set DMUA
+
+  [ Michael Tokarev ]
+  * use `rm -f' instead of `-rm' in debian/rules clean targets
   
  -- Liang Guo <bluestonechina@gmail.com>  Tue, 29 Nov 2011 14:37:08 +0800
   
