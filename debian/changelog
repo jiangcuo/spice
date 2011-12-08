@@ -1,6 +1,6 @@
 spice (0.10.0-1) unstable; urgency=low
 
-  * New upstream release
+  * New upstream release (Closes: #651262)
   * Refresh debian/copyright
   * Remove fix-typo-in-cmd_line_parser-cpp.patch, applied upstream
   * Remove fix-typo-in-record-cpp.patch, applied upstream
