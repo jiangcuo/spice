@@ -8,6 +8,7 @@ spice (0.10.0-1) unstable; urgency=low
   * Change Build-Depends on libspice-protocol-dev to (>= 0.9.1~)
   * Refresh libspice-server1.symbols
   * Update debian/rules clean target
+  * Ignore common/win/my_getopt-1.5/Makefile change when building package
   
  -- Liang Guo <bluestonechina@gmail.com>  Tue, 29 Nov 2011 14:37:08 +0800
   
