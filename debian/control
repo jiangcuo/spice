@@ -2,6 +2,7 @@ Source: spice
 Section: misc
 Priority: optional
 Maintainer: Liang Guo <bluestonechina@gmail.com>
+DM-Upload-Allowed: yes
 Build-Depends: debhelper (>= 7.0.50~),
  libspice-protocol-dev (>= 0.9.1~),
  libpixman-1-dev (>= 0.17.7~),
