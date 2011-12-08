@@ -37,7 +37,8 @@ clean-patched: clean-spice
 	dh_testroot
 	[ ! -f celt/Makefile ] || $(MAKE) -C celt distclean
 	-rm celt051 celt/celt051.pc
-	dh_auto_clean 
+	-rm stamp-h1
+	dh_clean
 
 clean-spice:
 	[ ! -f Makefile ] || $(MAKE) clean
