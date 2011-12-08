@@ -14,6 +14,7 @@ spice (0.10.0-1) unstable; urgency=low
 
   [ Michael Tokarev ]
   * use `rm -f' instead of `-rm' in debian/rules clean targets
+  * remove python_modules/*.pyc in clean target
   
  -- Liang Guo <bluestonechina@gmail.com>  Tue, 29 Nov 2011 14:37:08 +0800
   

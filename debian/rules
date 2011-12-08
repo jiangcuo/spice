@@ -46,6 +46,7 @@ clean-spice:
 	[ ! -f client/Makefile ] || $(MAKE) -C client distclean
 	rm -f common/Makefile common/win/Makefile
 	rm -f Makefile build-celt-stamp celt051 config.h config.log config.status libtool python_modules/Makefile spice-server.pc
+	rm -f python_modules/*.pyc
 
 install: install-stamp
 install-stamp: build-stamp
