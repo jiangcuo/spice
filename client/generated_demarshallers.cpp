@@ -1116,14 +1116,15 @@ static uint8_t * parse_msg_main_migrate_switch_host(uint8_t *message_start, uint
 
 static uint8_t * parse_MainChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[12] =  {
         parse_msg_main_migrate_begin,
@@ -1139,7 +1140,7 @@ static uint8_t * parse_MainChannel_msg(uint8_t *message_start, uint8_t *message_
         parse_msg_main_migrate_switch_host,
         parse_SpiceMsgEmpty
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 113) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
@@ -5515,14 +5516,15 @@ static uint8_t * parse_msg_display_surface_destroy(uint8_t *message_start, uint8
 
 static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[8] =  {
         parse_msg_display_mode,
@@ -5557,7 +5559,7 @@ static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *messa
         parse_msg_display_surface_create,
         parse_msg_display_surface_destroy
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 109) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
@@ -5661,14 +5663,15 @@ static uint8_t * parse_msg_inputs_key_modifiers(uint8_t *message_start, uint8_t 
 
 static uint8_t * parse_InputsChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[2] =  {
         parse_msg_inputs_init,
@@ -5677,7 +5680,7 @@ static uint8_t * parse_InputsChannel_msg(uint8_t *message_start, uint8_t *messag
     static parse_msg_func_t funcs3[1] =  {
         parse_SpiceMsgEmpty
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 103) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
@@ -6021,14 +6024,15 @@ static uint8_t * parse_msg_cursor_inval_one(uint8_t *message_start, uint8_t *mes
 
 static uint8_t * parse_CursorChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[8] =  {
         parse_msg_cursor_init,
@@ -6040,7 +6044,7 @@ static uint8_t * parse_CursorChannel_msg(uint8_t *message_start, uint8_t *messag
         parse_msg_cursor_inval_one,
         parse_SpiceMsgEmpty
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 109) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
@@ -6320,14 +6324,15 @@ static uint8_t * parse_SpiceMsgAudioMute(uint8_t *message_start, uint8_t *messag
 
 static uint8_t * parse_PlaybackChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[6] =  {
         parse_msg_playback_data,
@@ -6337,7 +6342,7 @@ static uint8_t * parse_PlaybackChannel_msg(uint8_t *message_start, uint8_t *mess
         parse_SpiceMsgAudioVolume,
         parse_SpiceMsgAudioMute
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 107) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
@@ -6395,14 +6400,15 @@ static uint8_t * parse_msg_record_start(uint8_t *message_start, uint8_t *message
 
 static uint8_t * parse_RecordChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[4] =  {
         parse_msg_record_start,
@@ -6410,7 +6416,7 @@ static uint8_t * parse_RecordChannel_msg(uint8_t *message_start, uint8_t *messag
         parse_SpiceMsgAudioVolume,
         parse_SpiceMsgAudioMute
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 105) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
@@ -6824,14 +6830,15 @@ static uint8_t * parse_msg_tunnel_socket_token(uint8_t *message_start, uint8_t *
 
 static uint8_t * parse_TunnelChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[8] =  {
         parse_msg_tunnel_init,
@@ -6843,7 +6850,7 @@ static uint8_t * parse_TunnelChannel_msg(uint8_t *message_start, uint8_t *messag
         parse_msg_tunnel_socket_closed_ack,
         parse_msg_tunnel_socket_token
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 109) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
@@ -6855,19 +6862,20 @@ static uint8_t * parse_TunnelChannel_msg(uint8_t *message_start, uint8_t *messag
 
 static uint8_t * parse_SmartcardChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[1] =  {
         parse_SpiceMsgData
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 102) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
@@ -6879,19 +6887,20 @@ static uint8_t * parse_SmartcardChannel_msg(uint8_t *message_start, uint8_t *mes
 
 static uint8_t * parse_UsbredirChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[7] =  {
+    static parse_msg_func_t funcs1[8] =  {
         parse_msg_migrate,
         parse_SpiceMsgData,
         parse_msg_set_ack,
         parse_msg_ping,
         parse_msg_wait_for_channels,
         parse_msg_disconnecting,
-        parse_msg_notify
+        parse_msg_notify,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs2[1] =  {
         parse_SpiceMsgData
     };
-    if (message_type >= 1 && message_type < 8) {
+    if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 101 && message_type < 102) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);

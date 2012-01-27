@@ -30,15 +30,15 @@
 
 #ifdef WIN32
 #define PIPE_NAME "SpiceForeignMenu-%lu"
-#elif defined(__i386__)
+#elif defined(__i386__) || __SIZEOF_LONG__ == 4
 #define PIPE_NAME "/tmp/SpiceForeignMenu-%llu.uds"
 #else
 #define PIPE_NAME "/tmp/SpiceForeignMenu-%lu.uds"
 #endif
 
-ForeignMenu::ForeignMenu(ForeignMenuInterface *handler)
+ForeignMenu::ForeignMenu(ForeignMenuInterface *handler, bool active)
     : _handler (handler)
-    , _active (false)
+    , _active (active)
     , _refs (1)
 {
     char pipe_name[PIPE_NAME_MAX_LEN];
@@ -237,7 +237,7 @@ bool ForeignMenuConnection::read_msgs()
         pos += hdr->size;
     }
     if (nread > 0 && pos != _read_buf) {
-        memcpy(_read_buf, pos, nread);
+        memmove(_read_buf, pos, nread);
     }
     _read_pos = _read_buf + nread;
     return true;

@@ -52,12 +52,40 @@ static inline int to_red_mouse_state(WPARAM wParam)
            ((wParam & MK_RBUTTON) ? SPICE_MOUSE_BUTTON_MASK_RIGHT : 0);
 }
 
-static inline RedKey translate_key(int virtual_key, uint32_t scan, bool escape)
+// Return true if VK_RCONTROL is followed by a VK_RMENU with the same timestamp.
+static bool is_fake_ctrl(UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if ((wParam == VK_CONTROL) && ((HIWORD (lParam) & KF_EXTENDED) == 0)) {
+        UINT next_peek;
+        if (message == WM_KEYDOWN) {
+            next_peek = WM_KEYDOWN;
+        } else if (message == WM_SYSKEYUP) {
+            next_peek = WM_KEYUP;
+        } else {
+            next_peek = WM_NULL;
+        }
+        if (next_peek != WM_NULL) {
+            MSG next_msg;
+            LONG time = GetMessageTime();
+            BOOL msg_exist = PeekMessage(&next_msg, NULL,
+                next_peek, next_peek, PM_NOREMOVE);
+            if ((msg_exist == TRUE) && (next_msg.time == time) &&
+                (next_msg.wParam == VK_MENU) &&
+                (HIWORD (next_msg.lParam) & KF_EXTENDED)) {
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
+static inline RedKey translate_key(UINT message, WPARAM wParam, LPARAM lParam)
+{
+    uint32_t scan = HIWORD(lParam) & 0xff;
     if (scan == 0) {
         return REDKEY_INVALID;
     }
-    switch (virtual_key) {
+    switch (wParam) {
     case VK_PAUSE:
         return REDKEY_PAUSE;
     case VK_SNAPSHOT:
@@ -74,13 +102,23 @@ static inline RedKey translate_key(int virtual_key, uint32_t scan, bool escape)
         } else if (scan == 0xf2) {
             return REDKEY_KOREAN_HANGUL;
         }
-    default:
-        //todo: always use vitrtual key
-        if (escape) {
-            scan += REDKEY_ESCAPE_BASE;
+        break;
+    case VK_CONTROL:
+        // Ignore the fake right ctrl message which is send when alt-gr is
+        // pressed when using a non-US keyboard layout.
+        if (is_fake_ctrl(message, wParam, lParam)) {
+            return REDKEY_INVALID;
         }
-        return (RedKey)scan;
+        break;
+    default:
+        break;
     }
+    // TODO: always use virtual key
+    bool extended = ((HIWORD (lParam) & KF_EXTENDED) != 0);
+    if (extended) {
+        scan += REDKEY_ESCAPE_BASE;
+    }
+    return (RedKey)scan;
 }
 
 static inline void send_filtered_keys(RedWindow* window)
@@ -141,9 +179,8 @@ LRESULT CALLBACK RedWindow_p::WindowProc(HWND hWnd, UINT message, WPARAM wParam,
     switch (message) {
     case WM_PAINT: {
         PAINTSTRUCT ps;
-        HDC hdc;
 
-        hdc = BeginPaint(hWnd, &ps);
+        BeginPaint(hWnd, &ps);
         SpicePoint origin = window->get_origin();
         SpiceRect r;
         r.left = ps.rcPaint.left - origin.x;
@@ -214,7 +251,7 @@ LRESULT CALLBACK RedWindow_p::WindowProc(HWND hWnd, UINT message, WPARAM wParam,
         break;
     case WM_SYSKEYDOWN:
     case WM_KEYDOWN: {
-        RedKey key = translate_key(wParam, HIWORD(lParam) & 0xff, (lParam & (1 << 24)) != 0);
+        RedKey key = translate_key(message, wParam, lParam);
         window->get_listener().on_key_press(key);
 
         BYTE key_state[256];
@@ -237,7 +274,7 @@ LRESULT CALLBACK RedWindow_p::WindowProc(HWND hWnd, UINT message, WPARAM wParam,
     }
     case WM_SYSKEYUP:
     case WM_KEYUP: {
-        RedKey key = translate_key(wParam, HIWORD(lParam) & 0xff, (lParam & (1 << 24)) != 0);
+        RedKey key = translate_key(message, wParam, lParam);
         window->get_listener().on_key_release(key);
         break;
     }
@@ -657,7 +694,7 @@ bool RedWindow::get_mouse_anchor_point(SpicePoint& pt)
     return true;
 }
 
-void RedWindow::cupture_mouse()
+void RedWindow::capture_mouse()
 {
     RECT client_rect;
     POINT origin;
@@ -1026,18 +1063,26 @@ void RedWindow_p::release_menu(Menu* menu)
     }
 }
 
-void RedWindow::set_menu(Menu* menu)
+int RedWindow::set_menu(Menu* menu)
 {
     release_menu(_menu);
     _menu = NULL;
 
     if (!menu) {
-        return;
+        return 0;
     }
-    _menu = menu->ref();
+
     _sys_menu = GetSystemMenu(_win, FALSE);
+    if (! _sys_menu) {
+        return -1;
+    }
+
+    _menu = menu->ref();
+
     insert_separator(_sys_menu);
     insert_menu(_menu, _sys_menu, _commands_map);
+
+    return 0;
 }
 
 static LRESULT CALLBACK MessageFilterProc(int nCode, WPARAM wParam, LPARAM lParam)
@@ -1049,8 +1094,7 @@ static LRESULT CALLBACK MessageFilterProc(int nCode, WPARAM wParam, LPARAM lPara
         switch (msg->message) {
         case WM_SYSKEYUP:
         case WM_KEYUP: {
-            RedKey key = translate_key(msg->wParam, HIWORD(msg->lParam) & 0xff,
-                                       (msg->lParam & (1 << 24)) != 0);
+            RedKey key = translate_key(msg->message, wParam, lParam);
             filtered_up_keys.push_back(key);
             break;
         }

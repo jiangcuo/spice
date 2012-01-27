@@ -1,5 +1,7 @@
+#include <config.h>
 #include <stdlib.h>
 #include <strings.h>
+
 #include <spice.h>
 
 SpiceTimer* timer_add(SpiceTimerFunc func, void *opaque)
@@ -57,4 +59,3 @@ int main(void)
 
     return 0;
 }
-

@@ -87,7 +87,8 @@ RedScreen::RedScreen(Application& owner, int id, const std::string& name, int wi
     , _key_interception (false)
     , _update_by_timer (true)
     , _size_locked (false)
-    , _forec_update_timer (0)
+    , _menu_needs_update (false)
+    , _force_update_timer (0)
     , _update_timer (new UpdateTimer(this))
     , _composit_area (NULL)
     , _update_mark (1)
@@ -401,7 +402,7 @@ void RedScreen::periodic_update()
     if (is_dirty()) {
         need_update = true;
     } else {
-        if (!_forec_update_timer) {
+        if (!_force_update_timer) {
             _owner.deactivate_interval_timer(*_update_timer);
             _periodic_update = false;
         }
@@ -537,7 +538,7 @@ void RedScreen::capture_mouse()
     _mouse_captured = true;
     _window.hide_cursor();
     reset_mouse_pos();
-    _window.cupture_mouse();
+    _window.capture_mouse();
 }
 
 void RedScreen::relase_mouse()
@@ -741,14 +742,14 @@ void RedScreen::on_stop_key_interception()
 
 void RedScreen::enter_modal_loop()
 {
-    _forec_update_timer++;
+    _force_update_timer++;
     activate_timer();
 }
 
 void RedScreen::exit_modal_loop()
 {
-    ASSERT(_forec_update_timer > 0)
-    _forec_update_timer--;
+    ASSERT(_force_update_timer > 0)
+    _force_update_timer--;
 }
 
 void RedScreen::pre_migrate()
@@ -784,6 +785,9 @@ void RedScreen::exit_full_screen()
     _origin.x = _origin.y = 0;
     _window.set_origin(0, 0);
     show();
+    if (_menu_needs_update) {
+        update_menu();
+    }
     _full_screen = false;
     _out_of_sync = false;
     _frame_area = false;
@@ -875,7 +879,8 @@ void RedScreen::external_show()
 void RedScreen::update_menu()
 {
     AutoRef<Menu> menu(_owner.get_app_menu());
-    _window.set_menu(*menu);
+    int ret = _window.set_menu(*menu);
+    _menu_needs_update = (ret != 0); /* try again if menu update failed */
 }
 
 void RedScreen::on_exposed_rect(const SpiceRect& area)
@@ -934,4 +939,3 @@ void RedScreen::unset_type_gl()
     _window.unset_type_gl();
 }
 #endif // USE_OPENGL
-

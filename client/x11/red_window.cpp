@@ -922,7 +922,7 @@ void RedWindow_p::win_proc(XEvent& event)
     case ClientMessage:
         if (event.xclient.message_type == wm_protocol_atom) {
             ASSERT(event.xclient.format == 32);
-            if (event.xclient.data.l[0] == wm_delete_window_atom) {
+            if ((Atom)event.xclient.data.l[0] == wm_delete_window_atom) {
                 DBG(0, "wm_delete_window");
                 Platform::send_quit_request();
             }
@@ -1867,7 +1867,7 @@ void RedWindow::release_mouse()
     sync(true);
 }
 
-void RedWindow::cupture_mouse()
+void RedWindow::capture_mouse()
 {
     int grab_retries = MOUSE_GRAB_RETRIES;
     XLockDisplay(x_display);
@@ -2218,8 +2218,9 @@ void RedWindow::on_pointer_leave()
     }
 }
 
-void RedWindow::set_menu(Menu* menu)
+int RedWindow::set_menu(Menu* menu)
 {
+    return 0;
 }
 
 void RedWindow::init()
@@ -2253,4 +2254,3 @@ void RedWindow::init()
 void RedWindow::cleanup()
 {
 }
-

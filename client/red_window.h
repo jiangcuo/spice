@@ -66,11 +66,11 @@ public:
     void set_cursor(LocalCursor* local_cursor);
     void hide_cursor();
     void show_cursor();
-    void cupture_mouse();
+    void capture_mouse();
     void release_mouse();
     void start_key_interception();
     void stop_key_interception();
-    void set_menu(Menu* menu);
+    int set_menu(Menu* menu);
 
 #ifdef USE_OPENGL
     void untouch_context();
@@ -196,4 +196,3 @@ static bool find_anchor_point(const REGION& region, SpicePoint& pt)
 }
 
 #endif
-

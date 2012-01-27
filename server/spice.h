@@ -22,7 +22,7 @@
 #include <sys/socket.h>
 #include <spice/qxl_dev.h>
 
-#define SPICE_SERVER_VERSION 0x000901 /* release 0.9.1 */
+#define SPICE_SERVER_VERSION 0x000a01 /* release 0.10.1 */
 
 /* interface base type */
 
@@ -424,6 +424,9 @@ int spice_server_set_tls(SpiceServer *s, int port,
                          const char *ca_cert_file, const char *certs_file,
                          const char *private_key_file, const char *key_passwd,
                          const char *dh_key_file, const char *ciphersuite);
+
+int spice_server_add_client(SpiceServer *s, int socket, int skip_auth);
+int spice_server_add_ssl_client(SpiceServer *s, int socket, int skip_auth);
 
 int spice_server_add_interface(SpiceServer *s,
                                SpiceBaseInstance *sin);
