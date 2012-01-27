@@ -168,18 +168,22 @@ const VDAgentMouseState *inputs_get_mouse_state(void)
     return &g_inputs_channel->mouse_state;
 }
 
-static uint8_t *inputs_channel_alloc_msg_rcv_buf(RedChannelClient *rcc, SpiceDataHeader *msg_header)
+static uint8_t *inputs_channel_alloc_msg_rcv_buf(RedChannelClient *rcc,
+                                                 uint16_t type,
+                                                 uint32_t size)
 {
     InputsChannel *inputs_channel = SPICE_CONTAINEROF(rcc->channel, InputsChannel, base);
 
-    if (msg_header->size > RECEIVE_BUF_SIZE) {
+    if (size > RECEIVE_BUF_SIZE) {
         red_printf("error: too large incoming message");
         return NULL;
     }
     return inputs_channel->recv_buf;
 }
 
-static void inputs_channel_release_msg_rcv_buf(RedChannelClient *rcc, SpiceDataHeader *msg_header,
+static void inputs_channel_release_msg_rcv_buf(RedChannelClient *rcc,
+                                               uint16_t type,
+                                               uint32_t size,
                                                uint8_t *msg)
 {
 }
@@ -278,7 +282,8 @@ static void inputs_channel_send_item(RedChannelClient *rcc, PipeItem *base)
     red_channel_client_begin_send_message(rcc);
 }
 
-static int inputs_channel_handle_parsed(RedChannelClient *rcc, uint32_t size, uint16_t type, void *message)
+static int inputs_channel_handle_parsed(RedChannelClient *rcc, uint32_t size, uint16_t type,
+                                        void *message)
 {
     InputsChannel *inputs_channel = (InputsChannel *)rcc->channel;
     InputsChannelClient *icc = (InputsChannelClient *)rcc;
@@ -460,21 +465,17 @@ static void inputs_pipe_add_init(RedChannelClient *rcc)
 
 static int inputs_channel_config_socket(RedChannelClient *rcc)
 {
-    int flags;
     int delay_val = 1;
     RedsStream *stream = red_channel_client_get_stream(rcc);
 
     if (setsockopt(stream->socket, IPPROTO_TCP, TCP_NODELAY,
             &delay_val, sizeof(delay_val)) == -1) {
-        red_printf("setsockopt failed, %s", strerror(errno));
-        return FALSE;
+        if (errno != ENOTSUP) {
+            red_printf("setsockopt failed, %s", strerror(errno));
+            return FALSE;
+        }
     }
 
-    if ((flags = fcntl(stream->socket, F_GETFL)) == -1 ||
-                 fcntl(stream->socket, F_SETFL, flags | O_ASYNC) == -1) {
-        red_printf("fcntl failed, %s", strerror(errno));
-        return FALSE;
-    }
     return TRUE;
 }
 
@@ -564,4 +565,3 @@ void inputs_init(void)
         red_error("key modifiers timer create failed");
     }
 }
-

@@ -92,7 +92,7 @@ libspice_server_la_DEPENDENCIES =  \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__libspice_server_la_SOURCES_DIST = agent-msg-filter.c \
 	agent-msg-filter.h char_device.h demarshallers.h \
 	generated_demarshallers.c generated_marshallers.c \
@@ -317,6 +317,8 @@ WARN_CFLAGS = @WARN_CFLAGS@
 WINDRES = @WINDRES@
 XFIXES_CFLAGS = @XFIXES_CFLAGS@
 XFIXES_LIBS = @XFIXES_LIBS@
+XINERAMA_CFLAGS = @XINERAMA_CFLAGS@
+XINERAMA_LIBS = @XINERAMA_LIBS@
 XRANDR12_CFLAGS = @XRANDR12_CFLAGS@
 XRANDR12_LIBS = @XRANDR12_LIBS@
 XRANDR_CFLAGS = @XRANDR_CFLAGS@
@@ -381,7 +383,6 @@ INCLUDES = \
 	-I$(top_srcdir)				\
 	-I$(top_srcdir)/common			\
 	-DRED_STATISTICS			\
-	$(Z_LIBS)				\
 	$(CELT051_CFLAGS)			\
 	$(PIXMAN_CFLAGS)			\
 	$(PROTOCOL_CFLAGS)			\
@@ -412,6 +413,7 @@ libspice_server_la_LIBADD = \
 	$(SASL_LIBS)					\
 	$(SLIRP_LIBS)					\
 	$(SSL_LIBS)					\
+	$(Z_LIBS)					\
 	$(NULL)
 
 libspice_server_la_SOURCES = agent-msg-filter.c agent-msg-filter.h \

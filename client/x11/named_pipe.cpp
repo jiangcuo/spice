@@ -20,7 +20,6 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/epoll.h>
 #include <sys/un.h>
 #include "named_pipe.h"
 #include "utils.h"
@@ -169,4 +168,3 @@ void LinuxListener::on_event()
         conn_interface.bind((NamedPipe::ConnectionRef)conn);
     }
 }
-

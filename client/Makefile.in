@@ -254,6 +254,7 @@ spicec_DEPENDENCIES = $(top_builddir)/common/libspice-common.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(spicec_resource_LDADD) \
 	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -422,6 +423,8 @@ WARN_CFLAGS = @WARN_CFLAGS@
 WINDRES = @WINDRES@
 XFIXES_CFLAGS = @XFIXES_CFLAGS@
 XFIXES_LIBS = @XFIXES_LIBS@
+XINERAMA_CFLAGS = @XINERAMA_CFLAGS@
+XINERAMA_LIBS = @XINERAMA_LIBS@
 XRANDR12_CFLAGS = @XRANDR12_CFLAGS@
 XRANDR12_LIBS = @XRANDR12_LIBS@
 XRANDR_CFLAGS = @XRANDR_CFLAGS@
@@ -514,9 +517,12 @@ spicec_SOURCES = application.cpp application.h audio_channels.h \
 	$(am__append_1) $(am__append_2) $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6) \
 	$(am__append_7)
+@OS_WIN32_TRUE@spicec_resource_LDADD = windows/redc.o
+@OS_WIN32_FALSE@PLATFORM_INCLUDES = -I$(top_srcdir)/client/x11
+@OS_WIN32_TRUE@PLATFORM_INCLUDES = -I$(top_srcdir)/client/windows
 INCLUDES = \
 	-D__STDC_LIMIT_MACROS				\
-	-I$(top_srcdir)/client/x11			\
+	$(PLATFORM_INCLUDES)				\
 	-I$(top_srcdir)/common				\
 	$(ALSA_CFLAGS)					\
 	$(CEGUI_CFLAGS)					\
@@ -532,6 +538,8 @@ INCLUDES = \
 	$(XRANDR_CFLAGS)				\
 	$(XFIXES_CFLAGS)				\
 	$(WARN_CFLAGS)					\
+	$(XINERAMA_CFLAGS)				\
+	$(CXIMAGE_CFLAGS)				\
 	$(NULL)
 
 spicec_LDFLAGS = $(SPICEC_STATIC_LINKAGE_BSTATIC)
@@ -551,6 +559,8 @@ spicec_LDADD = \
 	$(XFIXES_LIBS)					\
 	$(XRANDR_LIBS)					\
 	$(Z_LIBS)					\
+	$(XINERAMA_LIBS)				\
+	$(spicec_resource_LDADD)			\
 	$(NULL)
 
 EXTRA_DIST = \
@@ -1095,6 +1105,9 @@ generated_marshallers.cpp: $(top_srcdir)/spice.proto
 
 generated_marshallers1.cpp: $(top_srcdir)/spice1.proto
 	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P  --include "common.h" --include messages.h --include marshallers.h --client --prefix 1 --ptrsize 8 $(top_srcdir)/spice1.proto generated_marshallers1.cpp
+
+@OS_WIN32_TRUE@windows/redc.o: windows/redc.rc
+@OS_WIN32_TRUE@	$(WINDRES) $< -o $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
