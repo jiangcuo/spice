@@ -2,6 +2,9 @@ spice (0.10.1-1) unstable; urgency=low
 
   * New upstream release
   * Refresh libspice-server1.symbols
+  * debian/control
+    - Change Build-Depends on libspice-protocol-dev to (>= 0.10.1~)
+    - Add libxinerama-dev to Build-Depends
   
  -- Liang Guo <bluestonechina@gmail.com>  Fri, 27 Jan 2012 23:28:26 +0800
 

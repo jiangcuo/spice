@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Liang Guo <bluestonechina@gmail.com>
 DM-Upload-Allowed: yes
 Build-Depends: debhelper (>= 7.0.50~),
- libspice-protocol-dev (>= 0.9.1~),
+ libspice-protocol-dev (>= 0.10.1~),
  libpixman-1-dev (>= 0.17.7~),
  libxrandr-dev (>= 1.2~),
  pkg-config,
@@ -15,6 +15,7 @@ Build-Depends: debhelper (>= 7.0.50~),
  libgl1-mesa-dev,
  libsasl2-dev,
  libjpeg-dev,
+ libxinerama-dev,
  libogg-dev
 Standards-Version: 3.9.2
 Homepage: http://spice-space.org/
