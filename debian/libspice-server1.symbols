@@ -16,6 +16,7 @@ libcelt051.so.0 libspice-server1 #MINVER#
  celt051_mode_info@Base 0.8.2
 libspice-server.so.1 libspice-server1 #MINVER#
  SPICE_SERVER_0.10.0@SPICE_SERVER_0.10.0 0.10.0
+ SPICE_SERVER_0.10.1@SPICE_SERVER_0.10.1 0.10.1
  SPICE_SERVER_0.6.0@SPICE_SERVER_0.6.0 0.8.2
  SPICE_SERVER_0.6.1@SPICE_SERVER_0.6.1 0.8.2
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
@@ -45,8 +46,10 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_qxl_update_area@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_update_area_async@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_wakeup@SPICE_SERVER_0.8.2 0.8.2
+ spice_server_add_client@SPICE_SERVER_0.10.1 0.10.1
  spice_server_add_interface@SPICE_SERVER_0.6.0 0.8.2
  spice_server_add_renderer@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_add_ssl_client@SPICE_SERVER_0.10.1 0.10.1
  spice_server_char_device_recognized_subtypes@SPICE_SERVER_0.6.0 0.8.2
  spice_server_char_device_wakeup@SPICE_SERVER_0.6.0 0.8.2
  spice_server_destroy@SPICE_SERVER_0.6.0 0.8.2

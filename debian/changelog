@@ -1,3 +1,10 @@
+spice (0.10.1-1) unstable; urgency=low
+
+  * New upstream release
+  * Refresh libspice-server1.symbols
+  
+ -- Liang Guo <bluestonechina@gmail.com>  Fri, 27 Jan 2012 23:28:26 +0800
+
 spice (0.10.0-1) unstable; urgency=low
 
   [ Liang Guo ]
