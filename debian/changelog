@@ -1,3 +1,16 @@
+spice (0.10.1-2) unstable; urgency=low
+
+  * added dependency on libxinerama-dev to
+    libspice-server-dev, temporarily, till
+    either upstream or we will have better
+    solution.  libspice-server does not use
+    xinerama in any way, yet it is listed in
+    the requiriments in the pkg-config file,
+    which is generated at configure time.
+    (Closes: #658173)
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Wed, 01 Feb 2012 01:08:34 +0400
+
 spice (0.10.1-1) unstable; urgency=low
 
   * New upstream release
