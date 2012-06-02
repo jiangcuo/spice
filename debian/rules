@@ -42,7 +42,7 @@ clean:
 	[ ! -f Makefile ] || $(MAKE) clean
 	[ ! -f server/Makefile ] || $(MAKE) -C server distclean
 	[ ! -f client/Makefile ] || $(MAKE) -C client distclean
-	rm -f common/Makefile common/win/Makefile
+	rm -f common/Makefile common/win/Makefile common/win/my_getopt-1.5/Makefile
 	rm -f Makefile config.h config.log config.status libtool python_modules/Makefile spice-server.pc
 	rm -f python_modules/*.pyc
 	rm -f stamp-h1
