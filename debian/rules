@@ -16,17 +16,20 @@ ifeq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 	MAKEFLAGS += -j$(NUMJOBS)
 endif
 
+DEB_HOST_MULTIARCH = $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+configure_opts := --prefix=/usr --libdir=/usr/lib/$(DEB_HOST_MULTIARCH)
+
 build-arch: build
 build-indep: build
 
 build: build-stamp
 build-stamp: build-celt-stamp
-	CELT051_CFLAGS="-I$(CURDIR)" CELT051_LIBS="-L$(CURDIR)/celt051/.libs -lcelt051 -lm" ./configure --prefix=/usr
+	CELT051_CFLAGS="-I$(CURDIR)" CELT051_LIBS="-L$(CURDIR)/celt051/.libs -lcelt051 -lm" ./configure $(configure_opts)
 	$(MAKE) 
 	touch build-stamp
 
 build-celt-stamp:
-	cd celt && ./configure --prefix=/usr && cd ..
+	cd celt && ./configure $(configure_opts) && cd ..
 	$(MAKE) -C celt
 	[ -L celt051 ] || ln -s celt/libcelt celt051
 	touch build-celt-stamp

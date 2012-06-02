@@ -37,6 +37,8 @@ Description: Implements the client side of the SPICE protocol
 Package: libspice-server1
 Section: libs
 Architecture: i386 amd64
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Implements the server side of the SPICE protocol
  The Simple Protocol for Independent Computing Environments (SPICE) is
