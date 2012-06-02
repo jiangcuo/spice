@@ -1,0 +1,27 @@
+commit 351fe52ca741d1e785dece1ab3f860aeb1bfb44f
+Author: Michael Tokarev <mjt@tls.msk.ru>
+Date:   Tue Apr 17 20:05:04 2012 +0400
+
+    fix error-path return in snd_set_record_peer()
+    
+    The error_{1,2} labels in this functions are backwards.
+    
+    Signed-off-by: Michael Tokarev <mjt@tls.msk.ru>
+
+diff --git a/server/snd_worker.c b/server/snd_worker.c
+index 7bdd399..caffe67 100644
+--- a/server/snd_worker.c
++++ b/server/snd_worker.c
+@@ -1420,10 +1420,10 @@ static void snd_set_record_peer(RedChannel *channel, RedClient *client, RedsStre
+     snd_record_send(worker->connection);
+     return;
+ 
+-error_1:
++error_2:
+     celt051_decoder_destroy(celt_decoder);
+ 
+-error_2:
++error_1:
+     celt051_mode_destroy(celt_mode);
+ }
+ 

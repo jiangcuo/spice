@@ -1,0 +1,609 @@
+Backported to 0.10 (with a fix on top)
+from 667e3436f21bc57d78a52bc44d35dbd1fb91a8c0
+From: Michael Tokarev <mjt@tls.msk.ru>
+Date: Sat, 5 May 2012 19:15:49 +0400
+Subject: [PATCH] make celt to be optional
+Forwarded: yes
+
+With this patch applied, celt051 library isn't required
+anymore.  It is still required by default, but there's
+a new configure option, --disable-celt051, which makes
+the configure code to omit checking/finding the celt
+library and makes resulting spice library to not use
+celt codec at all.
+
+The changes in the code - there are relatively many -
+are located in 3 source files (see diffstat):
+
+ client/playback_channel.cpp
+ client/record_channel.cpp
+ server/snd_worker.c
+
+and are local/private to the library (client and server),
+so no external ABI/API is done.
+
+I found and marked hopefully all places where celt
+codec is being touched/referenced.  The patch may
+help future development too, indicating all places
+where codec-specific code is used (just grep source
+for HAVE_CELT051 to see these).
+
+I plan to use this patch in the upcoming Debian
+release, codename wheezy, to get rid of celt
+codec library there, since we decided celt051 is
+not going to be included, but it is obviously not
+a good idea to drop spice entirely.
+
+I did some interoperability tests and the thing
+appears to work -- unpatched client to patched
+server, patched client to unpatched server and
+patched client to patched server.  I didn't check
+old clients and servers, however.  In all cases,
+raw audio stream is being choosen and used.  But
+since I don't really know how spice works internally,
+maybe I didn't perform correct testing.
+
+Please consider applying.
+
+Signed-off-By: Michael Tokarev <mjt@tls.msk.ru>
+Cc: Ron Lee <ron@debian.org>
+Cc: Liang Guo <bluestonechina@gmail.com>
+---
+ client/audio_channels.h     |    8 ++++
+ client/playback_channel.cpp |   25 ++++++++++---
+ client/record_channel.cpp   |   21 +++++++++--
+ configure.ac                |   16 +++++---
+ server/snd_worker.c         |   82 ++++++++++++++++++++++++++++++++++----------
+ 5 files changed, 122 insertions(+), 30 deletions(-)
+
+--- a/client/audio_channels.h
++++ b/client/audio_channels.h
+@@ -18,7 +18,9 @@
+ #ifndef _H_AUDIO_CHANNELS
+ #define _H_AUDIO_CHANNELS
+ 
++#if HAVE_CELT051
+ #include <celt051/celt.h>
++#endif
+ 
+ #include "red_channel.h"
+ #include "debug.h"
+@@ -45,7 +47,9 @@ private:
+     void handle_start(RedPeer::InMessage* message);
+     void handle_stop(RedPeer::InMessage* message);
+     void handle_raw_data(RedPeer::InMessage* message);
++#if HAVE_CELT051
+     void handle_celt_data(RedPeer::InMessage* message);
++#endif
+     void null_handler(RedPeer::InMessage* message);
+     void disable();
+ 
+@@ -57,8 +61,10 @@ private:
+     WavePlaybackAbstract* _wave_player;
+     uint32_t _mode;
+     uint32_t _frame_bytes;
++#if HAVE_CELT051
+     CELTMode *_celt_mode;
+     CELTDecoder *_celt_decoder;
++#endif
+     bool _playing;
+     uint32_t _frame_count;
+ };
+@@ -96,8 +102,10 @@ private:
+     Mutex _messages_lock;
+     std::list<RecordSamplesMessage *> _messages;
+     int _mode;
++#if HAVE_CELT051
+     CELTMode *_celt_mode;
+     CELTEncoder *_celt_encoder;
++#endif
+     uint32_t _frame_bytes;
+ 
+     static int data_mode;
+--- a/client/playback_channel.cpp
++++ b/client/playback_channel.cpp
+@@ -151,8 +151,10 @@ PlaybackChannel::PlaybackChannel(RedClie
+                  Platform::PRIORITY_HIGH)
+     , _wave_player (NULL)
+     , _mode (SPICE_AUDIO_DATA_MODE_INVALID)
++#if HAVE_CELT051
+     , _celt_mode (NULL)
+     , _celt_decoder (NULL)
++#endif
+     , _playing (false)
+ {
+ #ifdef WAVE_CAPTURE
+@@ -169,7 +171,9 @@ PlaybackChannel::PlaybackChannel(RedClie
+ 
+     handler->set_handler(SPICE_MSG_PLAYBACK_MODE, &PlaybackChannel::handle_mode);
+ 
++#if HAVE_CELT051
+     set_capability(SPICE_PLAYBACK_CAP_CELT_0_5_1);
++#endif
+ }
+ 
+ void PlaybackChannel::clear()
+@@ -182,6 +186,7 @@ void PlaybackChannel::clear()
+     }
+     _mode = SPICE_AUDIO_DATA_MODE_INVALID;
+ 
++#if HAVE_CELT051
+     if (_celt_decoder) {
+         celt051_decoder_destroy(_celt_decoder);
+         _celt_decoder = NULL;
+@@ -191,6 +196,7 @@ void PlaybackChannel::clear()
+         celt051_mode_destroy(_celt_mode);
+         _celt_mode = NULL;
+     }
++#endif
+ }
+ 
+ void PlaybackChannel::on_disconnect()
+@@ -214,8 +220,10 @@ void PlaybackChannel::set_data_handler()
+ 
+     if (_mode == SPICE_AUDIO_DATA_MODE_RAW) {
+         handler->set_handler(SPICE_MSG_PLAYBACK_DATA, &PlaybackChannel::handle_raw_data);
++#if HAVE_CELT051
+     } else if (_mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
+         handler->set_handler(SPICE_MSG_PLAYBACK_DATA, &PlaybackChannel::handle_celt_data);
++#endif
+     } else {
+         THROW("invalid mode");
+     }
+@@ -224,8 +232,11 @@ void PlaybackChannel::set_data_handler()
+ void PlaybackChannel::handle_mode(RedPeer::InMessage* message)
+ {
+     SpiceMsgPlaybackMode* playbacke_mode = (SpiceMsgPlaybackMode*)message->data();
+-    if (playbacke_mode->mode != SPICE_AUDIO_DATA_MODE_RAW &&
+-        playbacke_mode->mode != SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
++    if (playbacke_mode->mode != SPICE_AUDIO_DATA_MODE_RAW
++#if HAVE_CELT051
++        && playbacke_mode->mode != SPICE_AUDIO_DATA_MODE_CELT_0_5_1
++#endif
++       ) {
+         THROW("invalid mode");
+     }
+ 
+@@ -265,9 +276,6 @@ void PlaybackChannel::handle_start(RedPe
+     start_wave();
+ #endif
+     if (!_wave_player) {
+-        // for now support only one setting
+-        int celt_mode_err;
+-
+         if (start->format != SPICE_AUDIO_FMT_S16) {
+             THROW("unexpected format");
+         }
+@@ -284,6 +292,10 @@ void PlaybackChannel::handle_start(RedPe
+             return;
+         }
+ 
++#if HAVE_CELT051
++        // for now support only one setting
++        int celt_mode_err;
++
+         if (!(_celt_mode = celt051_mode_create(start->frequency, start->channels,
+                                                frame_size, &celt_mode_err))) {
+             THROW("create celt mode failed %d", celt_mode_err);
+@@ -292,6 +304,7 @@ void PlaybackChannel::handle_start(RedPe
+         if (!(_celt_decoder = celt051_decoder_create(_celt_mode))) {
+             THROW("create celt decoder");
+         }
++#endif
+     }
+     _playing = true;
+     _frame_count = 0;
+@@ -333,6 +346,7 @@ void PlaybackChannel::handle_raw_data(Re
+     _wave_player->write(data);
+ }
+ 
++#if HAVE_CELT051
+ void PlaybackChannel::handle_celt_data(RedPeer::InMessage* message)
+ {
+     SpiceMsgPlaybackPacket* packet = (SpiceMsgPlaybackPacket*)message->data();
+@@ -352,6 +366,7 @@ void PlaybackChannel::handle_celt_data(R
+     }
+     _wave_player->write((uint8_t *)pcm);
+ }
++#endif
+ 
+ class PlaybackFactory: public ChannelFactory {
+ public:
+--- a/client/record_channel.cpp
++++ b/client/record_channel.cpp
+@@ -72,8 +72,10 @@ RecordChannel::RecordChannel(RedClient&
+     : RedChannel(client, SPICE_CHANNEL_RECORD, id, new RecordHandler(*this))
+     , _wave_recorder (NULL)
+     , _mode (SPICE_AUDIO_DATA_MODE_INVALID)
++#if HAVE_CELT051
+     , _celt_mode (NULL)
+     , _celt_encoder (NULL)
++#endif
+ {
+     for (int i = 0; i < NUM_SAMPLES_MESSAGES; i++) {
+         _messages.push_front(new RecordSamplesMessage(*this));
+@@ -142,7 +144,11 @@ void RecordChannel::handle_start(RedPeer
+ 
+     handler->set_handler(SPICE_MSG_RECORD_START, NULL);
+     handler->set_handler(SPICE_MSG_RECORD_STOP, &RecordChannel::handle_stop);
++#if HAVE_CELT051
+     ASSERT(!_wave_recorder && !_celt_mode && !_celt_encoder);
++#else
++    ASSERT(!_wave_recorder);
++#endif
+ 
+     // for now support only one setting
+     if (start->format != SPICE_AUDIO_FMT_S16) {
+@@ -160,8 +166,9 @@ void RecordChannel::handle_start(RedPeer
+     }
+ 
+     int frame_size = 256;
+-    int celt_mode_err;
+     _frame_bytes = frame_size * bits_per_sample * start->channels / 8;
++#if HAVE_CELT051
++    int celt_mode_err;
+     if (!(_celt_mode = celt051_mode_create(start->frequency, start->channels, frame_size,
+                                            &celt_mode_err))) {
+         THROW("create celt mode failed %d", celt_mode_err);
+@@ -170,6 +177,7 @@ void RecordChannel::handle_start(RedPeer
+     if (!(_celt_encoder = celt051_encoder_create(_celt_mode))) {
+         THROW("create celt encoder failed");
+     }
++#endif
+ 
+     send_start_mark();
+     _wave_recorder->start();
+@@ -182,6 +190,7 @@ void RecordChannel::clear()
+         delete _wave_recorder;
+         _wave_recorder = NULL;
+     }
++#if HAVE_CELT051
+     if (_celt_encoder) {
+         celt051_encoder_destroy(_celt_encoder);
+         _celt_encoder = NULL;
+@@ -190,6 +199,7 @@ void RecordChannel::clear()
+         celt051_mode_destroy(_celt_mode);
+         _celt_mode = NULL;
+     }
++#endif
+ }
+ 
+ void RecordChannel::handle_stop(RedPeer::InMessage* message)
+@@ -200,7 +210,9 @@ void RecordChannel::handle_stop(RedPeer:
+     if (!_wave_recorder) {
+         return;
+     }
++#if HAVE_CELT051
+     ASSERT(_celt_mode && _celt_encoder);
++#endif
+     clear();
+ }
+ 
+@@ -254,8 +266,9 @@ void RecordChannel::push_frame(uint8_t *
+         DBG(0, "blocked");
+         return;
+     }
+-    uint8_t celt_buf[CELT_COMPRESSED_FRAME_BYTES];
+     int n;
++#if HAVE_CELT051
++    uint8_t celt_buf[CELT_COMPRESSED_FRAME_BYTES];
+ 
+     if (_mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
+         n = celt051_encode(_celt_encoder, (celt_int16_t *)frame, NULL, celt_buf,
+@@ -264,7 +277,9 @@ void RecordChannel::push_frame(uint8_t *
+             THROW("celt encode failed");
+         }
+         frame = celt_buf;
+-    } else {
++    } else
++#endif
++    {
+         n = _frame_bytes;
+     }
+     RedPeer::OutMessage& peer_message = message->peer_message();
+--- a/configure.ac
++++ b/configure.ac
+@@ -122,6 +122,9 @@ AM_CONDITIONAL(SUPPORT_SMARTCARD, test "
+ if test "x$enable_smartcard" = "xyes"; then
+    AC_DEFINE([USE_SMARTCARD], [1], [Define if supporting smartcard proxying])
+ fi
++AC_ARG_ENABLE(celt051,
++[  --disable-celt051       Disable celt051 audio codec (enabled by default)],,
++[enable_celt051="yes"])
+ 
+ AC_ARG_ENABLE(client,
+ [  --enable-client         Enable spice client],,
+@@ -209,11 +212,14 @@ AC_SUBST(PIXMAN_CFLAGS)
+ AC_SUBST(PIXMAN_LIBS)
+ SPICE_REQUIRES+=" pixman-1 >= 0.17.7"
+ 
+-PKG_CHECK_MODULES(CELT051, celt051 >= 0.5.1.1)
+-AC_SUBST(CELT051_CFLAGS)
+-AC_SUBST(CELT051_LIBS)
+-AC_SUBST(CELT051_LIBDIR)
+-SPICE_REQUIRES+=" celt051 >= 0.5.1.1"
++if test "x$enable_celt051" = "xyes"; then
++    PKG_CHECK_MODULES(CELT051, celt051 >= 0.5.1.1)
++    SPICE_REQUIRES+=" celt051 >= 0.5.1.1"
++    AC_DEFINE([HAVE_CELT051], 1, [Define if we have celt051 codec])
++    AC_SUBST(CELT051_CFLAGS)
++    AC_SUBST(CELT051_LIBS)
++    AC_SUBST(CELT051_LIBDIR)
++fi
+ 
+ if test ! -e client/generated_marshallers.cpp; then
+ AC_MSG_CHECKING([for pyparsing python module])
+--- a/server/snd_worker.c
++++ b/server/snd_worker.c
+@@ -24,7 +24,9 @@
+ #include <sys/socket.h>
+ #include <netinet/ip.h>
+ #include <netinet/tcp.h>
++#if HAVE_CELT051
+ #include <celt051/celt.h>
++#endif
+ 
+ #include "spice.h"
+ #include "red_common.h"
+@@ -132,12 +134,14 @@ typedef struct PlaybackChannel {
+     AudioFrame *free_frames;
+     AudioFrame *in_progress;
+     AudioFrame *pending_frame;
++    uint32_t mode;
++#if HAVE_CELT051
+     CELTMode *celt_mode;
+     CELTEncoder *celt_encoder;
+-    uint32_t mode;
+     struct {
+         uint8_t celt_buf[CELT_COMPRESSED_FRAME_BYTES];
+     } send_data;
++#endif
+ } PlaybackChannel;
+ 
+ struct SndWorker {
+@@ -183,13 +187,21 @@ typedef struct RecordChannel {
+     uint32_t mode;
+     uint32_t mode_time;
+     uint32_t start_time;
++#if HAVE_CELT051
+     CELTDecoder *celt_decoder;
+     CELTMode *celt_mode;
+     uint32_t celt_buf[FRAME_SIZE];
++#endif
+ } RecordChannel;
+ 
+ static SndWorker *workers;
+-static uint32_t playback_compression = SPICE_AUDIO_DATA_MODE_CELT_0_5_1;
++static uint32_t playback_compression =
++#if HAVE_CELT051
++    SPICE_AUDIO_DATA_MODE_CELT_0_5_1
++#else
++    SPICE_AUDIO_DATA_MODE_RAW
++#endif
++    ;
+ 
+ static void snd_receive(void* data);
+ 
+@@ -318,6 +330,7 @@ static int snd_record_handle_write(Recor
+     packet = (SpiceMsgcRecordPacket *)message;
+     size = packet->data_size;
+ 
++#if HAVE_CELT051
+     if (record_channel->mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
+         int celt_err = celt051_decode(record_channel->celt_decoder, packet->data, size,
+                                       (celt_int16_t *)record_channel->celt_buf);
+@@ -327,7 +340,9 @@ static int snd_record_handle_write(Recor
+         }
+         data = record_channel->celt_buf;
+         size = FRAME_SIZE;
+-    } else if (record_channel->mode == SPICE_AUDIO_DATA_MODE_RAW) {
++    } else
++#endif
++    if (record_channel->mode == SPICE_AUDIO_DATA_MODE_RAW) {
+         data = (uint32_t *)packet->data;
+         size = size >> 2;
+         size = MIN(size, RECORD_SAMPLES_SIZE);
+@@ -382,8 +397,11 @@ static int snd_record_handle_message(Snd
+         SpiceMsgcRecordMode *mode = (SpiceMsgcRecordMode *)message;
+         record_channel->mode = mode->mode;
+         record_channel->mode_time = mode->time;
+-        if (record_channel->mode != SPICE_AUDIO_DATA_MODE_CELT_0_5_1 &&
+-                                                  record_channel->mode != SPICE_AUDIO_DATA_MODE_RAW) {
++        if (record_channel->mode != SPICE_AUDIO_DATA_MODE_RAW
++#if HAVE_CELT051
++            && record_channel->mode != SPICE_AUDIO_DATA_MODE_CELT_0_5_1
++#endif
++            ) {
+             red_printf("unsupported mode");
+         }
+         break;
+@@ -775,6 +793,7 @@ static int snd_playback_send_write(Playb
+ 
+     spice_marshall_msg_playback_data(channel->send_data.marshaller, &msg);
+ 
++#if HAVE_CELT051
+     if (playback_channel->mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
+         int n = celt051_encode(playback_channel->celt_encoder, (celt_int16_t *)frame->samples, NULL,
+                                playback_channel->send_data.celt_buf, CELT_COMPRESSED_FRAME_BYTES);
+@@ -785,7 +804,9 @@ static int snd_playback_send_write(Playb
+         }
+         spice_marshaller_add_ref(channel->send_data.marshaller,
+                                  playback_channel->send_data.celt_buf, n);
+-    } else {
++    } else
++#endif
++    {
+         spice_marshaller_add_ref(channel->send_data.marshaller,
+                                  (uint8_t *)frame->samples, sizeof(frame->samples));
+     }
+@@ -1150,8 +1171,10 @@ static void snd_playback_cleanup(SndChan
+         reds_enable_mm_timer();
+     }
+ 
++#if HAVE_CELT051
+     celt051_encoder_destroy(playback_channel->celt_encoder);
+     celt051_mode_destroy(playback_channel->celt_mode);
++#endif
+ }
+ 
+ static void snd_set_playback_peer(RedChannel *channel, RedClient *client, RedsStream *stream,
+@@ -1161,13 +1184,13 @@ static void snd_set_playback_peer(RedCha
+     SndWorker *worker = channel->data;
+     PlaybackChannel *playback_channel;
+     SpicePlaybackState *st = SPICE_CONTAINEROF(worker, SpicePlaybackState, worker);
+-    CELTEncoder *celt_encoder;
+-    CELTMode *celt_mode;
+-    int celt_error;
+-    RedChannelClient *rcc;
+ 
+     snd_disconnect_channel(worker->connection);
+ 
++#if HAVE_CELT051
++    CELTEncoder *celt_encoder;
++    CELTMode *celt_mode;
++    int celt_error;
+     if (!(celt_mode = celt051_mode_create(SPICE_INTERFACE_PLAYBACK_FREQ,
+                                           SPICE_INTERFACE_PLAYBACK_CHAN,
+                                           FRAME_SIZE, &celt_error))) {
+@@ -1179,6 +1202,7 @@ static void snd_set_playback_peer(RedCha
+         red_printf("create celt encoder failed");
+         goto error_1;
+     }
++#endif
+ 
+     if (!(playback_channel = (PlaybackChannel *)__new_channel(worker,
+                                                               sizeof(*playback_channel),
+@@ -1195,16 +1219,20 @@ static void snd_set_playback_peer(RedCha
+         goto error_2;
+     }
+     worker->connection = &playback_channel->base;
+-    rcc = playback_channel->base.channel_client;
+     snd_playback_free_frame(playback_channel, &playback_channel->frames[0]);
+     snd_playback_free_frame(playback_channel, &playback_channel->frames[1]);
+     snd_playback_free_frame(playback_channel, &playback_channel->frames[2]);
+ 
++#if HAVE_CELT051
+     playback_channel->celt_mode = celt_mode;
+     playback_channel->celt_encoder = celt_encoder;
+-    playback_channel->mode = red_channel_client_test_remote_cap(rcc,
+-                                                                SPICE_PLAYBACK_CAP_CELT_0_5_1) ?
++    playback_channel->mode =
++       red_channel_client_test_remote_cap(playback_channel->base.channel_client,
++                                          SPICE_PLAYBACK_CAP_CELT_0_5_1) ?
+         playback_compression : SPICE_AUDIO_DATA_MODE_RAW;
++#else
++    playback_channel->mode = SPICE_AUDIO_DATA_MODE_RAW;
++#endif
+ 
+     on_new_playback_channel(worker);
+     if (worker->active) {
+@@ -1214,10 +1242,13 @@ static void snd_set_playback_peer(RedCha
+     return;
+ 
+ error_2:
++#if HAVE_CELT051
+     celt051_encoder_destroy(celt_encoder);
+ 
+ error_1:
+     celt051_mode_destroy(celt_mode);
++#endif
++    return;
+ }
+ 
+ static void snd_record_migrate_channel_client(RedChannelClient *rcc)
+@@ -1358,10 +1389,12 @@ static void on_new_record_channel(SndWor
+ 
+ static void snd_record_cleanup(SndChannel *channel)
+ {
++#if HAVE_CELT051
+     RecordChannel *record_channel = SPICE_CONTAINEROF(channel, RecordChannel, base);
+ 
+     celt051_decoder_destroy(record_channel->celt_decoder);
+     celt051_mode_destroy(record_channel->celt_mode);
++#endif
+ }
+ 
+ static void snd_set_record_peer(RedChannel *channel, RedClient *client, RedsStream *stream,
+@@ -1371,12 +1404,13 @@ static void snd_set_record_peer(RedChann
+     SndWorker *worker = channel->data;
+     RecordChannel *record_channel;
+     SpiceRecordState *st = SPICE_CONTAINEROF(worker, SpiceRecordState, worker);
+-    CELTDecoder *celt_decoder;
+-    CELTMode *celt_mode;
+-    int celt_error;
+ 
+     snd_disconnect_channel(worker->connection);
+ 
++#if HAVE_CELT051
++    CELTDecoder *celt_decoder;
++    CELTMode *celt_mode;
++    int celt_error;
+     if (!(celt_mode = celt051_mode_create(SPICE_INTERFACE_RECORD_FREQ,
+                                           SPICE_INTERFACE_RECORD_CHAN,
+                                           FRAME_SIZE, &celt_error))) {
+@@ -1388,6 +1422,7 @@ static void snd_set_record_peer(RedChann
+         red_printf("create celt decoder failed");
+         goto error_1;
+     }
++#endif
+ 
+     if (!(record_channel = (RecordChannel *)__new_channel(worker,
+                                                           sizeof(*record_channel),
+@@ -1406,8 +1441,10 @@ static void snd_set_record_peer(RedChann
+ 
+     worker->connection = &record_channel->base;
+ 
++#if HAVE_CELT051
+     record_channel->celt_mode = celt_mode;
+     record_channel->celt_decoder = celt_decoder;
++#endif
+ 
+     on_new_record_channel(worker);
+     if (worker->active) {
+@@ -1417,10 +1454,13 @@ static void snd_set_record_peer(RedChann
+     return;
+ 
+ error_2:
++#if HAVE_CELT051
+     celt051_decoder_destroy(celt_decoder);
+ 
+ error_1:
+     celt051_mode_destroy(celt_mode);
++#endif
++    return;
+ }
+ 
+ static void snd_playback_migrate_channel_client(RedChannelClient *rcc)
+@@ -1476,7 +1516,9 @@ void snd_attach_playback(SpicePlaybackIn
+     client_cbs.migrate = snd_playback_migrate_channel_client;
+     red_channel_register_client_cbs(channel, &client_cbs);
+     red_channel_set_data(channel, playback_worker);
++#if HAVE_CELT051
+     red_channel_set_cap(channel, SPICE_PLAYBACK_CAP_CELT_0_5_1);
++#endif
+     red_channel_set_cap(channel, SPICE_PLAYBACK_CAP_VOLUME);
+ 
+     playback_worker->base_channel = channel;
+@@ -1503,7 +1545,9 @@ void snd_attach_record(SpiceRecordInstan
+     client_cbs.migrate = snd_record_migrate_channel_client;
+     red_channel_register_client_cbs(channel, &client_cbs);
+     red_channel_set_data(channel, record_worker);
++#if HAVE_CELT051
+     red_channel_set_cap(channel, SPICE_RECORD_CAP_CELT_0_5_1);
++#endif
+     red_channel_set_cap(channel, SPICE_RECORD_CAP_VOLUME);
+ 
+     record_worker->base_channel = channel;
+@@ -1550,7 +1594,11 @@ void snd_set_playback_compression(int on
+ {
+     SndWorker *now = workers;
+ 
+-    playback_compression = on ? SPICE_AUDIO_DATA_MODE_CELT_0_5_1 : SPICE_AUDIO_DATA_MODE_RAW;
++    playback_compression =
++#if HAVE_CELT051
++       on ? SPICE_AUDIO_DATA_MODE_CELT_0_5_1 :
++#endif
++       SPICE_AUDIO_DATA_MODE_RAW;
+     for (; now; now = now->next) {
+         if (now->base_channel->type == SPICE_CHANNEL_PLAYBACK && now->connection) {
+             SndChannel* sndchannel = now->connection;
