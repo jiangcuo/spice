@@ -4,6 +4,7 @@ spice (0.10.1-3) UNRELEASED; urgency=low
   * Bump Standards-Version to 3.9.3 (no changes)
   * link-libspice-server-with-libm-libpthread.patch - missing libraries
   * Enable multiarch for libspice-server, bump debhelper compat to 9
+  * do not require root in clean target
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Sat, 02 Jun 2012 16:18:56 +0400
 

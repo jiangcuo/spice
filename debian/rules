@@ -37,7 +37,6 @@ build-celt-stamp:
 clean: clean-patched 
 clean-patched: clean-spice
 	dh_testdir
-	dh_testroot
 	[ ! -f celt/Makefile ] || $(MAKE) -C celt distclean
 	rm -f celt051 celt/celt051.pc
 	rm -f stamp-h1
