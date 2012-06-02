@@ -3,11 +3,11 @@ Section: misc
 Priority: optional
 Maintainer: Liang Guo <bluestonechina@gmail.com>
 Uploaders: Michael Tokarev <mjt@tls.msk.ru>
-Build-Depends: debhelper (>= 9),
+Build-Depends: debhelper (>= 9), pkg-config,
+ autoconf, automake, libtool,
  libspice-protocol-dev (>= 0.10.1~),
  libpixman-1-dev (>= 0.17.7~),
  libxrandr-dev (>= 1.2~),
- pkg-config,
  libasound2-dev,
  libssl-dev,
  libxfixes-dev,
