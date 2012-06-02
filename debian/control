@@ -17,7 +17,7 @@ Build-Depends: debhelper (>= 7.0.50~),
  libjpeg-dev,
  libxinerama-dev,
  libogg-dev
-Standards-Version: 3.9.2
+Standards-Version: 3.9.3
 Homepage: http://spice-space.org/
 Vcs-Git: git://git.debian.org/collab-maint/spice.git
 Vcs-Browser: http://git.debian.org/?p=collab-maint/spice.git;a=summary
