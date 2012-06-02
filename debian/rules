@@ -23,17 +23,11 @@ build-arch: build
 build-indep: build
 
 build: build-stamp
-build-stamp: build-celt-stamp
+build-stamp:
 	dh_autoreconf
-	CELT051_CFLAGS="-I$(CURDIR)" CELT051_LIBS="-L$(CURDIR)/celt051/.libs -lcelt051 -lm" ./configure $(configure_opts)
-	$(MAKE) 
-	touch $@
-
-build-celt-stamp:
-	cd celt && ./configure $(configure_opts) && cd ..
-	$(MAKE) -C celt
-	[ -L celt051 ] || ln -s celt/libcelt celt051
-	touch $@
+	./configure $(configure_opts) --disable-celt051
+	$(MAKE)
+	touch build-stamp
 
 clean:
 	dh_testdir
@@ -48,9 +42,6 @@ clean:
 	rm -f stamp-h1
 	dh_autoreconf_clean
 
-	rm -f build-celt-stamp celt051 celt/celt051.pc
-	[ ! -f celt/Makefile ] || $(MAKE) -C celt distclean
-
 	dh_clean
 
 install: install-stamp
@@ -59,7 +50,6 @@ install-stamp: build-stamp
 	dh_testroot
 	dh_prep
 	dh_installdirs
-	$(MAKE) -C celt install DESTDIR=$(CURDIR)/debian/tmp
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
 	dh_install --sourcedir=debian/tmp
 	touch install-stamp

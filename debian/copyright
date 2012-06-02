@@ -1,7 +1,6 @@
 Format: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=174
 Upstream-Name: spice
 Source: http://www.spice-space.org/
-Comment: celt is downloaded from http://downloads.us.xiph.org/releases/celt/celt-0.5.1.3.tar.gz
 
 Files: *
 Copyright: Copyright (C) 2009,2010,2011 Red Hat, Inc.
@@ -139,36 +138,6 @@ Files: common/lz.h
 Copyright: NOT COPYRIGHTED
 License: MIT
 
-Files: celt/*
-Copyright: 2005-2007 Christopher Montgomery, Jean-Marc Valin, Timothy Terriberry, 
-    CSIRO, and other contributors
-License: BSD-3-clause
-
-Files: celt/libcelt/celt_types.h
-Copyright: 1994-2002 Xiph.Org Foundation
-License: BSD
- THIS FILE IS PART OF THE OggVorbis SOFTWARE CODEC SOURCE CODE.   
- USE, DISTRIBUTION AND REPRODUCTION OF THIS LIBRARY SOURCE IS  
- GOVERNED BY A BSD-STYLE SOURCE LICENSE INCLUDED WITH THIS SOURCE 
- IN 'COPYING'. PLEASE READ THESE TERMS BEFORE DISTRIBUTING.    
- .                 
- THE OggVorbis SOURCE CODE IS (C) COPYRIGHT 1994-2002    
- by the Xiph.Org Foundation http://www.xiph.org/      
-
-Files: celt/libcelt/float_cast.h
-Copyright: Copyright (C) 2001 Erik de Castro Lopo <erikd AT mega-nerd DOT com>
-License: 
- Permission to use, copy, modify, distribute, and sell this file for any 
- purpose is hereby granted without fee, provided that the above copyright 
- and this permission notice appear in all copies.  No representations are
- made about the suitability of this software for any purpose.  It is 
- provided "as is" without express or implied warranty.
-
-Files: celt/tools/etopt1.c celt/tools/getopt.c celt/tools/getopt_win.h
-Copyright: Copyright (C) 1987,88,89,90,91,92,93,94,96,97,98
-  Free Software Foundation, Inc.
-License: LGPL-2.0+
-  
 Files: debian/*
 Copyright: Copyright (C) 2010 Liang Guo <bluestonechina@gmail.com>
 License: LGPL-2.1+
