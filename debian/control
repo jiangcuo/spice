@@ -3,7 +3,7 @@ Section: misc
 Priority: optional
 Maintainer: Liang Guo <bluestonechina@gmail.com>
 Uploaders: Michael Tokarev <mjt@tls.msk.ru>
-Build-Depends: debhelper (>= 7.0.50~),
+Build-Depends: debhelper (>= 9),
  libspice-protocol-dev (>= 0.10.1~),
  libpixman-1-dev (>= 0.17.7~),
  libxrandr-dev (>= 1.2~),
