@@ -26,29 +26,30 @@ build: build-stamp
 build-stamp: build-celt-stamp
 	CELT051_CFLAGS="-I$(CURDIR)" CELT051_LIBS="-L$(CURDIR)/celt051/.libs -lcelt051 -lm" ./configure $(configure_opts)
 	$(MAKE) 
-	touch build-stamp
+	touch $@
 
 build-celt-stamp:
 	cd celt && ./configure $(configure_opts) && cd ..
 	$(MAKE) -C celt
 	[ -L celt051 ] || ln -s celt/libcelt celt051
-	touch build-celt-stamp
+	touch $@
 
-clean: clean-patched 
-clean-patched: clean-spice
+clean:
 	dh_testdir
-	[ ! -f celt/Makefile ] || $(MAKE) -C celt distclean
-	rm -f celt051 celt/celt051.pc
-	rm -f stamp-h1
-	dh_clean
 
-clean-spice:
+	rm -f build-stamp
 	[ ! -f Makefile ] || $(MAKE) clean
 	[ ! -f server/Makefile ] || $(MAKE) -C server distclean
 	[ ! -f client/Makefile ] || $(MAKE) -C client distclean
 	rm -f common/Makefile common/win/Makefile
-	rm -f Makefile build-celt-stamp celt051 config.h config.log config.status libtool python_modules/Makefile spice-server.pc
+	rm -f Makefile config.h config.log config.status libtool python_modules/Makefile spice-server.pc
 	rm -f python_modules/*.pyc
+	rm -f stamp-h1
+
+	rm -f build-celt-stamp celt051 celt/celt051.pc
+	[ ! -f celt/Makefile ] || $(MAKE) -C celt distclean
+
+	dh_clean
 
 install: install-stamp
 install-stamp: build-stamp
