@@ -6,8 +6,7 @@ Upstream makefile apparently forgot to link libspice-server
 with -lm -lpthread -- it uses symbols from these libraries.
 These libs are detected by configure and stored in
 $(SPICE_NONPKGCONFIG_LIBS) make variable, but this variable
-is never referenced.  Add it to server/Makefile.am, and,
-for now, to server/Makefile.in too (the latter is generated).
+is never referenced.  Add it to server/Makefile.am.
 
 
 diff --git a/server/Makefile.am b/server/Makefile.am
@@ -22,15 +21,3 @@ index 1284704..b17b545 100644
  	$(NULL)
  
  libspice_server_la_SOURCES =			\
-diff --git a/server/Makefile.in b/server/Makefile.in
-index 22176b9..bde1a78 100644
---- a/server/Makefile.in
-+++ b/server/Makefile.in
-@@ -414,6 +414,7 @@ libspice_server_la_LIBADD = \
- 	$(SLIRP_LIBS)					\
- 	$(SSL_LIBS)					\
- 	$(Z_LIBS)					\
-+	$(SPICE_NONPKGCONFIG_LIBS)			\
- 	$(NULL)
- 
- libspice_server_la_SOURCES = agent-msg-filter.c agent-msg-filter.h \
