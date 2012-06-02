@@ -1,4 +1,4 @@
-spice (0.10.1-3) UNRELEASED; urgency=low
+spice (0.10.1-3~nocelt) experimental; urgency=low
 
   * Applying for co-maintenance, adding myself to Uploaders (Closes: #671627)
   * Bump Standards-Version to 3.9.3 (no changes)
