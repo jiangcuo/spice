@@ -40,6 +40,9 @@ Architecture: i386 amd64
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Breaks: spice-client-gtk (< 0.12-3), python-spice-client-gtk (< 0.12-3), 
+ libspice-client-glib-2.0-1 (< 0.12-3), libspice-client-gtk-2.0-1 (< 0.12-3), 
+ libspice-client-gtk-3.0-1 (< 0.12-3)
 Description: Implements the server side of the SPICE protocol
  The Simple Protocol for Independent Computing Environments (SPICE) is
  a remote display system built for virtual environments which allows
