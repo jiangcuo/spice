@@ -21,7 +21,7 @@
 #include "canvas.h"
 #define SPICE_CANVAS_INTERNAL
 #define SW_CANVAS_CACHE
-#include "gdi_canvas.h"
+#include "common/gdi_canvas.h"
 #undef SW_CANVAS_CACHE
 #undef SPICE_CANVAS_INTERNAL
 #include "red_pixmap_gdi.h"
@@ -48,8 +48,6 @@ private:
     RedPixmapGdi *_helper_pixmap;
     HDC _dc;
     HBITMAP _prev_bitmap;
-    unsigned long _base;
-    unsigned long _max;
 };
 
 #endif

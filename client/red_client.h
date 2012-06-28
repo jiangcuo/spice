@@ -19,6 +19,7 @@
 #define _H_REDCLIENT
 
 #include <list>
+#include "common/messages.h"
 
 #include "common.h"
 #include "red_peer.h"
@@ -27,7 +28,6 @@
 #include "inputs_channel.h"
 #include "cursor_channel.h"
 #include "audio_channels.h"
-#include "messages.h"
 #include <spice/vd_agent.h>
 #include "process_loop.h"
 
@@ -99,7 +99,7 @@ private:
 
 class GlzDecoderWindowDebug: public GlzDecoderDebug {
 public:
-    virtual void error(const std::string& str)
+    virtual SPICE_GNUC_NORETURN void error(const std::string& str)
     {
         throw Exception(str);
     }
@@ -375,7 +375,7 @@ private:
 
     GlzDecoderWindowDebug _glz_debug;
     GlzDecoderWindow _glz_window;
-    int _glz_window_size; // in pixels
+    unsigned int _glz_window_size; // in pixels
 
     Mutex _mm_clock_lock;
     uint64_t _mm_clock_last_update;

@@ -23,6 +23,10 @@
 #include <io.h>
 #endif
 
+#include "common/quic.h"
+#include "common/mutex.h"
+#include "common/rect.h"
+
 #include "application.h"
 #include "screen.h"
 #include "utils.h"
@@ -38,13 +42,10 @@
 #ifdef USE_OPENGL
 #include "red_gl_canvas.h"
 #endif
-#include "quic.h"
-#include "mutex.h"
 #include "cmd_line_parser.h"
 #ifdef USE_TUNNEL
 #include "tunnel_channel.h"
 #endif
-#include "rect.h"
 #ifdef USE_GUI
 #include "gui/gui.h"
 #endif
@@ -393,21 +394,7 @@ Application::Application()
     Platform::get_app_data_dir(_host_auth_opt.CA_file, app_name);
     Platform::path_append(_host_auth_opt.CA_file, CA_FILE_NAME);
 
-    std::auto_ptr<HotKeysParser> parser(new HotKeysParser("toggle-fullscreen=shift+f11"
-                                                          ",release-cursor=shift+f12"
-#ifdef RED_DEBUG
-                                                          ",connect=shift+f5"
-                                                          ",disconnect=shift+f6"
-#endif
-#ifdef USE_GUI
-                                                          ",show-gui=shift+f7"
-#endif // USE_GUI
-#ifdef USE_SMARTCARD
-                                                          ",smartcard-insert=shift+f8"
-                                                          ",smartcard-remove=shift+f9"
-#endif
-                                                          , _commands_map));
-    _hot_keys = parser->get();
+    this->set_default_hotkeys();
 
     _sticky_info.trace_is_on = false;
     _sticky_info.sticky_mode = false;
@@ -1689,6 +1676,13 @@ void Application::set_title(const std::string& title)
     }
 }
 
+#ifdef USE_SMARTCARD
+void Application::enable_smartcard(bool enable)
+{
+    _smartcard_options->enable = enable;
+}
+#endif
+
 bool Application::is_key_set_pressed(const HotkeySet& key_set)
 {
     HotkeySet::const_iterator iter = key_set.begin();
@@ -1867,10 +1861,36 @@ void Application::hide_me()
     hide();
 }
 
+void Application::set_default_hotkeys(void)
+{
+    const std::string default_hotkeys = "toggle-fullscreen=shift+f11"
+                                        ",release-cursor=shift+f12"
+#ifdef RED_DEBUG
+                                        ",connect=shift+f5"
+                                        ",disconnect=shift+f6"
+#endif
+#ifdef USE_GUI
+                                        ",show-gui=shift+f7"
+#endif // USE_GUI
+#ifdef USE_SMARTCARD
+                                        ",smartcard-insert=shift+f8"
+                                        ",smartcard-remove=shift+f9"
+#endif
+                                        "";
+
+    this->set_hotkeys(default_hotkeys);
+}
+
 void Application::set_hotkeys(const std::string& hotkeys)
 {
-    std::auto_ptr<HotKeysParser> parser(new HotKeysParser(hotkeys, _commands_map));
-    _hot_keys = parser->get();
+
+    try {
+        std::auto_ptr<HotKeysParser> parser(new HotKeysParser(hotkeys, _commands_map));
+        _hot_keys = parser->get();
+    } catch (Exception &e) {
+        LOG_WARN("%s", e.what());
+        this->set_default_hotkeys();
+    }
 }
 
 int Application::get_controller_menu_item_id(int32_t opaque_conn_ref, uint32_t msg_id)
@@ -2339,7 +2359,7 @@ bool Application::process_cmd_line(int argc, char** argv, bool &full_screen)
         case SPICE_OPT_VERSION: {
             std::ostringstream os;
             os << argv[0] << " "<< PACKAGE_VERSION << std::endl;
-            Platform::term_printf(os.str().c_str());
+            Platform::term_printf("%s", os.str().c_str());
             return false;
         }
         case SPICE_OPT_HOST:

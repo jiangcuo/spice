@@ -43,28 +43,24 @@ typedef struct RedMemSlotInfo {
     unsigned long memslot_clean_virt_mask;
 } RedMemSlotInfo;
 
-static inline int get_memslot_id(RedMemSlotInfo *info, unsigned long addr)
+static inline int get_memslot_id(RedMemSlotInfo *info, uint64_t addr)
 {
     return addr >> info->memslot_id_shift;
 }
 
-static inline int get_generation(RedMemSlotInfo *info, unsigned long addr)
+static inline int get_generation(RedMemSlotInfo *info, uint64_t addr)
 {
     return (addr >> info->memslot_gen_shift) & info->memslot_gen_mask;
 }
 
-unsigned long get_virt_delta(RedMemSlotInfo *info, unsigned long addr, int group_id);
-void validate_virt(RedMemSlotInfo *info, unsigned long virt, int slot_id,
-                   uint32_t add_size, uint32_t group_id);
-unsigned long get_virt(RedMemSlotInfo *info, unsigned long addr, uint32_t add_size,
-                       int group_id);
-
-void *validate_chunk (RedMemSlotInfo *info, QXLPHYSICAL data, uint32_t group_id, uint32_t *data_size_out, QXLPHYSICAL *next_out);
-void *cb_get_virt(void *opaque, unsigned long addr,
+unsigned long get_virt_delta(RedMemSlotInfo *info, QXLPHYSICAL addr, int group_id);
+int validate_virt(RedMemSlotInfo *info, unsigned long virt, int slot_id,
                   uint32_t add_size, uint32_t group_id);
-void cb_validate_virt(void *opaque,
-                      unsigned long virt, unsigned long from_addr,
-                      uint32_t add_size, uint32_t group_id);
+unsigned long get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t add_size,
+                       int group_id, int *error);
+
+void *validate_chunk(RedMemSlotInfo *info, QXLPHYSICAL data, uint32_t group_id,
+                     uint32_t *data_size_out, QXLPHYSICAL *next_out, int *error);
 void red_memslot_info_init(RedMemSlotInfo *info,
                            uint32_t num_groups, uint32_t num_slots,
                            uint8_t generation_bits,

@@ -22,16 +22,22 @@
 #ifndef _H_RED_CHANNEL
 #define _H_RED_CHANNEL
 
-#include "red_common.h"
 #include <pthread.h>
-#include "spice.h"
-#include "ring.h"
+#include <limits.h>
+
+#include "common/ring.h"
 #include "common/marshaller.h"
-#include "server/demarshallers.h"
+
+#include "spice.h"
+#include "red_common.h"
+#include "demarshallers.h"
 
 #define MAX_SEND_BUFS 1000
-#define MAX_SEND_VEC 100
 #define CLIENT_ACK_WINDOW 20
+
+#ifndef IOV_MAX
+#define IOV_MAX 1024
+#endif
 
 #define MAX_HEADER_SIZE sizeof(SpiceDataHeader)
 
@@ -109,7 +115,7 @@ typedef struct OutgoingHandlerInterface {
 typedef struct OutgoingHandler {
     OutgoingHandlerInterface *cb;
     void *opaque;
-    struct iovec vec_buf[MAX_SEND_VEC];
+    struct iovec vec_buf[IOV_MAX];
     int vec_size;
     struct iovec *vec;
     int pos;
@@ -219,6 +225,9 @@ struct RedChannelClient {
     RedChannel *channel;
     RedClient  *client;
     RedsStream *stream;
+
+    uint32_t refs;
+
     struct {
         uint32_t generation;
         uint32_t client_generation;
@@ -255,11 +264,14 @@ struct RedChannelClient {
 
     RedChannelCapabilities remote_caps;
     int is_mini_header;
+    int destroying;
 };
 
 struct RedChannel {
     uint32_t type;
     uint32_t id;
+
+    uint32_t refs;
 
     RingItem link; // channels link for reds
 
@@ -424,15 +436,6 @@ int red_channel_client_blocked(RedChannelClient *rcc);
 
 /* helper for channels that have complex logic that can possibly ready a send */
 int red_channel_client_send_message_pending(RedChannelClient *rcc);
-
-/* returns TRUE if item is being sent by one of the channel clients. This will
- * be true if someone called init_send_data but send has not completed (or perhaps
- * hasn't even begun, i.e. no one called begin_send_).
- * However, note that red_channel_client_init_send_data can also be called with
- * item==NULL, thus not all pipe items can be tracked.
- */
-int red_channel_item_being_sent(RedChannel *channel, PipeItem *item);
-int red_channel_client_item_being_sent(RedChannelClient *rcc, PipeItem *item);
 
 int red_channel_no_item_being_sent(RedChannel *channel);
 int red_channel_client_no_item_being_sent(RedChannelClient *rcc);

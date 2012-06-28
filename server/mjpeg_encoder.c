@@ -25,9 +25,8 @@
 #include <jpeglib.h>
 
 struct MJpegEncoder {
-    int width;
-    int height;
     uint8_t *row;
+    uint32_t row_size;
     int first_frame;
     int quality;
 
@@ -38,15 +37,13 @@ struct MJpegEncoder {
     void (*pixel_converter)(uint8_t *src, uint8_t *dest);
 };
 
-MJpegEncoder *mjpeg_encoder_new(int width, int height)
+MJpegEncoder *mjpeg_encoder_new(void)
 {
     MJpegEncoder *enc;
 
     enc = spice_new0(MJpegEncoder, 1);
 
     enc->first_frame = TRUE;
-    enc->width = width;
-    enc->height = height;
     enc->quality = 70;
     enc->cinfo.err = jpeg_std_error(&enc->jerr);
     jpeg_create_compress(&enc->cinfo);
@@ -105,7 +102,6 @@ typedef struct {
 
   unsigned char ** outbuffer;	/* target buffer */
   size_t * outsize;
-  unsigned char * newbuffer;	/* newly allocated buffer */
   uint8_t * buffer;		/* start of buffer */
   size_t bufsize;
 } mem_destination_mgr;
@@ -129,9 +125,7 @@ static boolean empty_mem_output_buffer(j_compress_ptr cinfo)
 
   memcpy(nextbuffer, dest->buffer, dest->bufsize);
 
-  free(dest->newbuffer);
-
-  dest->newbuffer = nextbuffer;
+  free(dest->buffer);
 
   dest->pub.next_output_byte = nextbuffer + dest->bufsize;
   dest->pub.free_in_buffer = dest->bufsize;
@@ -147,7 +141,7 @@ static void term_mem_destination(j_compress_ptr cinfo)
   mem_destination_mgr *dest = (mem_destination_mgr *) cinfo->dest;
 
   *dest->outbuffer = dest->buffer;
-  *dest->outsize = dest->bufsize - dest->pub.free_in_buffer;
+  *dest->outsize = dest->bufsize;
 }
 
 /*
@@ -184,12 +178,10 @@ spice_jpeg_mem_dest(j_compress_ptr cinfo,
   dest->pub.term_destination = term_mem_destination;
   dest->outbuffer = outbuffer;
   dest->outsize = outsize;
-  dest->newbuffer = NULL;
-
   if (*outbuffer == NULL || *outsize == 0) {
     /* Allocate initial buffer */
-    dest->newbuffer = *outbuffer = malloc(OUTPUT_BUF_SIZE);
-    if (dest->newbuffer == NULL)
+    *outbuffer = malloc(OUTPUT_BUF_SIZE);
+    if (*outbuffer == NULL)
       ERREXIT1(cinfo, JERR_OUT_OF_MEMORY, 10);
     *outsize = OUTPUT_BUF_SIZE;
   }
@@ -200,10 +192,13 @@ spice_jpeg_mem_dest(j_compress_ptr cinfo,
 /* end of code from libjpeg */
 
 int mjpeg_encoder_start_frame(MJpegEncoder *encoder, SpiceBitmapFmt format,
+                              int width, int height,
                               uint8_t **dest, size_t *dest_len)
 {
     encoder->cinfo.in_color_space   = JCS_RGB;
     encoder->cinfo.input_components = 3;
+    encoder->pixel_converter = NULL;
+
     switch (format) {
     case SPICE_BITMAP_FMT_32BIT:
     case SPICE_BITMAP_FMT_RGBA:
@@ -228,23 +223,26 @@ int mjpeg_encoder_start_frame(MJpegEncoder *encoder, SpiceBitmapFmt format,
 #endif
         break;
     default:
-        red_printf_some(1000, "unsupported format %d", format);
+        spice_warning("unsupported format %d", format);
         return FALSE;
     }
 
-    if ((encoder->pixel_converter != NULL) && (encoder->row == NULL)) {
-        unsigned int stride = encoder->width * 3;
+    if (encoder->pixel_converter != NULL) {
+        unsigned int stride = width * 3;
         /* check for integer overflow */
-        if (stride < encoder->width) {
+        if (stride < width) {
             return FALSE;
         }
-        encoder->row = spice_malloc(stride);
+        if (encoder->row_size < stride) {
+            encoder->row = spice_realloc(encoder->row, stride);
+            encoder->row_size = stride;
+        }
     }
 
     spice_jpeg_mem_dest(&encoder->cinfo, dest, dest_len);
 
-    encoder->cinfo.image_width      = encoder->width;
-    encoder->cinfo.image_height     = encoder->height;
+    encoder->cinfo.image_width      = width;
+    encoder->cinfo.image_height     = height;
     jpeg_set_defaults(&encoder->cinfo);
     encoder->cinfo.dct_method       = JDCT_IFAST;
     jpeg_set_quality(&encoder->cinfo, encoder->quality, TRUE);

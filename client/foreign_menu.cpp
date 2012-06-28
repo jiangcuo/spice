@@ -44,9 +44,18 @@ ForeignMenu::ForeignMenu(ForeignMenuInterface *handler, bool active)
     char pipe_name[PIPE_NAME_MAX_LEN];
 
     ASSERT(_handler != NULL);
-    snprintf(pipe_name, PIPE_NAME_MAX_LEN, PIPE_NAME, Platform::get_process_id());
-    LOG_INFO("Creating a foreign menu connection %s", pipe_name);
-    _foreign_menu = NamedPipe::create(pipe_name, *this);
+#ifndef WIN32
+    const char *p_socket = getenv("SPICE_FOREIGN_MENU_SOCKET");
+    if (p_socket) {
+        LOG_INFO("Creating a foreign menu connection %s", p_socket);
+        _foreign_menu = NamedPipe::create(p_socket, *this);
+    } else
+#endif
+    {
+        snprintf(pipe_name, PIPE_NAME_MAX_LEN, PIPE_NAME, Platform::get_process_id());
+        LOG_INFO("Creating a foreign menu connection %s", pipe_name);
+        _foreign_menu = NamedPipe::create(pipe_name, *this);
+    }
     if (!_foreign_menu) {
         LOG_ERROR("Failed to create a foreign menu connection");
     }

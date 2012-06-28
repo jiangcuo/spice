@@ -19,18 +19,20 @@
 #ifndef _H_CANVAS
 #define _H_CANVAS
 
+#include <map>
+
+#include "common/region.h"
+#include "common/messages.h"
+#include "common/canvas_utils.h"
+
 #include "common.h"
 #include "debug.h"
-#include "region.h"
-#include "messages.h"
 #include "cache.hpp"
 #include "shared_cache.hpp"
-#include "canvas_utils.h"
 #include "glz_decoded_image.h"
 #include "glz_decoder.h"
 #include "jpeg_decoder.h"
 #include "zlib_decoder.h"
-#include <map>
 
 enum CanvasType {
     CANVAS_TYPE_INVALID,
@@ -250,7 +252,7 @@ public:
 /* TODO: unite with the window debug callbacks? */
 class GlzDecoderCanvasDebug: public GlzDecoderDebug {
 public:
-    virtual void error(const std::string& str)
+    virtual SPICE_GNUC_NORETURN void error(const std::string& str)
     {
         throw Exception(str);
     }
@@ -343,9 +345,6 @@ private:
     ZlibDecoder _zlib_decoder;
 
     SurfacesCache& _surfaces_cache;
-
-    unsigned long _base;
-    unsigned long _max;
 };
 
 

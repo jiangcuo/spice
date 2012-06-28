@@ -20,7 +20,6 @@
 #endif
 
 #include "common.h"
-#include "canvas.h"
 #include "red_pixmap.h"
 #ifdef USE_OPENGL
 #include "red_pixmap_gl.h"
@@ -1420,7 +1419,7 @@ void DisplayChannel::handle_stream_data(RedPeer::InMessage* message)
     SpiceMsgDisplayStreamData* stream_data = (SpiceMsgDisplayStreamData*)message->data();
     VideoStream* stream;
 
-    if (stream_data->id >= _streams.size() || !(stream = _streams[stream_data->id])) {
+    if (stream_data->base.id >= _streams.size() || !(stream = _streams[stream_data->base.id])) {
         THROW("invalid stream");
     }
 
@@ -1428,7 +1427,9 @@ void DisplayChannel::handle_stream_data(RedPeer::InMessage* message)
         THROW("access violation");
     }
 
-    stream->push_data(stream_data->multi_media_time, stream_data->data_size, stream_data->data);
+    stream->push_data(stream_data->base.multi_media_time,
+                      stream_data->data_size,
+                      stream_data->data);
 }
 
 void DisplayChannel::handle_stream_clip(RedPeer::InMessage* message)
