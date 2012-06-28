@@ -7,9 +7,13 @@ spice (0.11.0-1) UNRELEASED; urgency=low
     - Update my e-mail address
     - Add gnulib to Build-Depends
   * debian/patches:
-    - Remove fix-error-path-return-in-snd_set_record_peer.patch, applied upstream
+    - Remove fix-error-path-return-in-snd_set_record_peer.patch, 
+      applied upstream
     - Refresh make-celt-to-be-optional.patch
     - Refresh link-libspice-server-with-libm-libpthread.patch
+  * Simplify debian/rules, celt removed, no reason to use 
+    traditional one
+  * Disable smartcard, not in debian yet
 
  -- Liang Guo <guoliang@debian.org>  Sat, 09 Jun 2012 11:33:05 +0800
 
