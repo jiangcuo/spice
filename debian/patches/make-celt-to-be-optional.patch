@@ -68,7 +68,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  
  #include "red_channel.h"
  #include "debug.h"
-@@ -45,7 +47,9 @@ private:
+@@ -45,7 +47,9 @@
      void handle_start(RedPeer::InMessage* message);
      void handle_stop(RedPeer::InMessage* message);
      void handle_raw_data(RedPeer::InMessage* message);
@@ -78,7 +78,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      void null_handler(RedPeer::InMessage* message);
      void disable();
  
-@@ -57,8 +61,10 @@ private:
+@@ -57,8 +61,10 @@
      WavePlaybackAbstract* _wave_player;
      uint32_t _mode;
      uint32_t _frame_bytes;
@@ -89,7 +89,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      bool _playing;
      uint32_t _frame_count;
  };
-@@ -96,8 +102,10 @@ private:
+@@ -96,8 +102,10 @@
      Mutex _messages_lock;
      std::list<RecordSamplesMessage *> _messages;
      int _mode;
@@ -102,7 +102,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      static int data_mode;
 --- a/client/playback_channel.cpp
 +++ b/client/playback_channel.cpp
-@@ -151,8 +151,10 @@ PlaybackChannel::PlaybackChannel(RedClie
+@@ -151,8 +151,10 @@
                   Platform::PRIORITY_HIGH)
      , _wave_player (NULL)
      , _mode (SPICE_AUDIO_DATA_MODE_INVALID)
@@ -113,7 +113,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      , _playing (false)
  {
  #ifdef WAVE_CAPTURE
-@@ -169,7 +171,9 @@ PlaybackChannel::PlaybackChannel(RedClie
+@@ -169,7 +171,9 @@
  
      handler->set_handler(SPICE_MSG_PLAYBACK_MODE, &PlaybackChannel::handle_mode);
  
@@ -123,7 +123,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  }
  
  void PlaybackChannel::clear()
-@@ -182,6 +186,7 @@ void PlaybackChannel::clear()
+@@ -182,6 +186,7 @@
      }
      _mode = SPICE_AUDIO_DATA_MODE_INVALID;
  
@@ -131,7 +131,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      if (_celt_decoder) {
          celt051_decoder_destroy(_celt_decoder);
          _celt_decoder = NULL;
-@@ -191,6 +196,7 @@ void PlaybackChannel::clear()
+@@ -191,6 +196,7 @@
          celt051_mode_destroy(_celt_mode);
          _celt_mode = NULL;
      }
@@ -139,7 +139,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  }
  
  void PlaybackChannel::on_disconnect()
-@@ -214,8 +220,10 @@ void PlaybackChannel::set_data_handler()
+@@ -214,8 +220,10 @@
  
      if (_mode == SPICE_AUDIO_DATA_MODE_RAW) {
          handler->set_handler(SPICE_MSG_PLAYBACK_DATA, &PlaybackChannel::handle_raw_data);
@@ -150,7 +150,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      } else {
          THROW("invalid mode");
      }
-@@ -224,8 +232,11 @@ void PlaybackChannel::set_data_handler()
+@@ -224,8 +232,11 @@
  void PlaybackChannel::handle_mode(RedPeer::InMessage* message)
  {
      SpiceMsgPlaybackMode* playbacke_mode = (SpiceMsgPlaybackMode*)message->data();
@@ -164,7 +164,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
          THROW("invalid mode");
      }
  
-@@ -265,9 +276,6 @@ void PlaybackChannel::handle_start(RedPe
+@@ -265,9 +276,6 @@
      start_wave();
  #endif
      if (!_wave_player) {
@@ -174,7 +174,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
          if (start->format != SPICE_AUDIO_FMT_S16) {
              THROW("unexpected format");
          }
-@@ -284,6 +292,10 @@ void PlaybackChannel::handle_start(RedPe
+@@ -284,6 +292,10 @@
              return;
          }
  
@@ -185,7 +185,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
          if (!(_celt_mode = celt051_mode_create(start->frequency, start->channels,
                                                 frame_size, &celt_mode_err))) {
              THROW("create celt mode failed %d", celt_mode_err);
-@@ -292,6 +304,7 @@ void PlaybackChannel::handle_start(RedPe
+@@ -292,6 +304,7 @@
          if (!(_celt_decoder = celt051_decoder_create(_celt_mode))) {
              THROW("create celt decoder");
          }
@@ -193,7 +193,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      }
      _playing = true;
      _frame_count = 0;
-@@ -333,6 +346,7 @@ void PlaybackChannel::handle_raw_data(Re
+@@ -333,6 +346,7 @@
      _wave_player->write(data);
  }
  
@@ -201,7 +201,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  void PlaybackChannel::handle_celt_data(RedPeer::InMessage* message)
  {
      SpiceMsgPlaybackPacket* packet = (SpiceMsgPlaybackPacket*)message->data();
-@@ -352,6 +366,7 @@ void PlaybackChannel::handle_celt_data(R
+@@ -352,6 +366,7 @@
      }
      _wave_player->write((uint8_t *)pcm);
  }
@@ -211,7 +211,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  public:
 --- a/client/record_channel.cpp
 +++ b/client/record_channel.cpp
-@@ -72,8 +72,10 @@ RecordChannel::RecordChannel(RedClient&
+@@ -72,8 +72,10 @@
      : RedChannel(client, SPICE_CHANNEL_RECORD, id, new RecordHandler(*this))
      , _wave_recorder (NULL)
      , _mode (SPICE_AUDIO_DATA_MODE_INVALID)
@@ -222,7 +222,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  {
      for (int i = 0; i < NUM_SAMPLES_MESSAGES; i++) {
          _messages.push_front(new RecordSamplesMessage(*this));
-@@ -142,7 +144,11 @@ void RecordChannel::handle_start(RedPeer
+@@ -142,7 +144,11 @@
  
      handler->set_handler(SPICE_MSG_RECORD_START, NULL);
      handler->set_handler(SPICE_MSG_RECORD_STOP, &RecordChannel::handle_stop);
@@ -234,7 +234,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  
      // for now support only one setting
      if (start->format != SPICE_AUDIO_FMT_S16) {
-@@ -160,8 +166,9 @@ void RecordChannel::handle_start(RedPeer
+@@ -160,8 +166,9 @@
      }
  
      int frame_size = 256;
@@ -245,7 +245,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      if (!(_celt_mode = celt051_mode_create(start->frequency, start->channels, frame_size,
                                             &celt_mode_err))) {
          THROW("create celt mode failed %d", celt_mode_err);
-@@ -170,6 +177,7 @@ void RecordChannel::handle_start(RedPeer
+@@ -170,6 +177,7 @@
      if (!(_celt_encoder = celt051_encoder_create(_celt_mode))) {
          THROW("create celt encoder failed");
      }
@@ -253,7 +253,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  
      send_start_mark();
      _wave_recorder->start();
-@@ -182,6 +190,7 @@ void RecordChannel::clear()
+@@ -182,6 +190,7 @@
          delete _wave_recorder;
          _wave_recorder = NULL;
      }
@@ -261,7 +261,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      if (_celt_encoder) {
          celt051_encoder_destroy(_celt_encoder);
          _celt_encoder = NULL;
-@@ -190,6 +199,7 @@ void RecordChannel::clear()
+@@ -190,6 +199,7 @@
          celt051_mode_destroy(_celt_mode);
          _celt_mode = NULL;
      }
@@ -269,7 +269,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  }
  
  void RecordChannel::handle_stop(RedPeer::InMessage* message)
-@@ -200,7 +210,9 @@ void RecordChannel::handle_stop(RedPeer:
+@@ -200,7 +210,9 @@
      if (!_wave_recorder) {
          return;
      }
@@ -279,7 +279,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      clear();
  }
  
-@@ -254,8 +266,9 @@ void RecordChannel::push_frame(uint8_t *
+@@ -254,8 +266,9 @@
          DBG(0, "blocked");
          return;
      }
@@ -290,7 +290,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  
      if (_mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
          n = celt051_encode(_celt_encoder, (celt_int16_t *)frame, NULL, celt_buf,
-@@ -264,7 +277,9 @@ void RecordChannel::push_frame(uint8_t *
+@@ -264,7 +277,9 @@
              THROW("celt encode failed");
          }
          frame = celt_buf;
@@ -303,7 +303,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      RedPeer::OutMessage& peer_message = message->peer_message();
 --- a/configure.ac
 +++ b/configure.ac
-@@ -122,6 +122,9 @@ AM_CONDITIONAL(SUPPORT_SMARTCARD, test "
+@@ -143,6 +143,9 @@
  if test "x$enable_smartcard" = "xyes"; then
     AC_DEFINE([USE_SMARTCARD], [1], [Define if supporting smartcard proxying])
  fi
@@ -313,7 +313,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  
  AC_ARG_ENABLE(client,
  [  --enable-client         Enable spice client],,
-@@ -209,11 +212,14 @@ AC_SUBST(PIXMAN_CFLAGS)
+@@ -238,11 +241,14 @@
  AC_SUBST(PIXMAN_LIBS)
  SPICE_REQUIRES+=" pixman-1 >= 0.17.7"
  
@@ -335,7 +335,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  AC_MSG_CHECKING([for pyparsing python module])
 --- a/server/snd_worker.c
 +++ b/server/snd_worker.c
-@@ -24,7 +24,9 @@
+@@ -25,7 +25,9 @@
  #include <sys/socket.h>
  #include <netinet/ip.h>
  #include <netinet/tcp.h>
@@ -343,9 +343,9 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  #include <celt051/celt.h>
 +#endif
  
- #include "spice.h"
- #include "red_common.h"
-@@ -132,12 +134,14 @@ typedef struct PlaybackChannel {
+ #include "common/marshaller.h"
+ #include "common/generated_server_marshallers.h"
+@@ -136,12 +138,14 @@
      AudioFrame *free_frames;
      AudioFrame *in_progress;
      AudioFrame *pending_frame;
@@ -361,7 +361,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  } PlaybackChannel;
  
  struct SndWorker {
-@@ -183,13 +187,21 @@ typedef struct RecordChannel {
+@@ -187,13 +191,21 @@
      uint32_t mode;
      uint32_t mode_time;
      uint32_t start_time;
@@ -384,7 +384,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  
  static void snd_receive(void* data);
  
-@@ -318,6 +330,7 @@ static int snd_record_handle_write(Recor
+@@ -322,6 +334,7 @@
      packet = (SpiceMsgcRecordPacket *)message;
      size = packet->data_size;
  
@@ -392,7 +392,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      if (record_channel->mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
          int celt_err = celt051_decode(record_channel->celt_decoder, packet->data, size,
                                        (celt_int16_t *)record_channel->celt_buf);
-@@ -327,7 +340,9 @@ static int snd_record_handle_write(Recor
+@@ -331,7 +344,9 @@
          }
          data = record_channel->celt_buf;
          size = FRAME_SIZE;
@@ -403,7 +403,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
          data = (uint32_t *)packet->data;
          size = size >> 2;
          size = MIN(size, RECORD_SAMPLES_SIZE);
-@@ -382,8 +397,11 @@ static int snd_record_handle_message(Snd
+@@ -386,12 +401,14 @@
          SpiceMsgcRecordMode *mode = (SpiceMsgcRecordMode *)message;
          record_channel->mode = mode->mode;
          record_channel->mode_time = mode->time;
@@ -413,11 +413,15 @@ Cc: Liang Guo <bluestonechina@gmail.com>
 +#if HAVE_CELT051
 +            && record_channel->mode != SPICE_AUDIO_DATA_MODE_CELT_0_5_1
 +#endif
-+            ) {
-             red_printf("unsupported mode");
++	)
+             spice_printerr("unsupported mode");
          }
          break;
-@@ -775,6 +793,7 @@ static int snd_playback_send_write(Playb
+-    }
+     case SPICE_MSGC_RECORD_START_MARK: {
+         SpiceMsgcRecordStartMark *mark = (SpiceMsgcRecordStartMark *)message;
+         record_channel->start_time = mark->time;
+@@ -779,6 +796,7 @@
  
      spice_marshall_msg_playback_data(channel->send_data.marshaller, &msg);
  
@@ -425,7 +429,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      if (playback_channel->mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
          int n = celt051_encode(playback_channel->celt_encoder, (celt_int16_t *)frame->samples, NULL,
                                 playback_channel->send_data.celt_buf, CELT_COMPRESSED_FRAME_BYTES);
-@@ -785,7 +804,9 @@ static int snd_playback_send_write(Playb
+@@ -789,7 +807,9 @@
          }
          spice_marshaller_add_ref(channel->send_data.marshaller,
                                   playback_channel->send_data.celt_buf, n);
@@ -436,7 +440,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
          spice_marshaller_add_ref(channel->send_data.marshaller,
                                   (uint8_t *)frame->samples, sizeof(frame->samples));
      }
-@@ -1150,8 +1171,10 @@ static void snd_playback_cleanup(SndChan
+@@ -1157,8 +1177,10 @@
          reds_enable_mm_timer();
      }
  
@@ -447,7 +451,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  }
  
  static void snd_set_playback_peer(RedChannel *channel, RedClient *client, RedsStream *stream,
-@@ -1161,13 +1184,13 @@ static void snd_set_playback_peer(RedCha
+@@ -1168,13 +1190,13 @@
      SndWorker *worker = channel->data;
      PlaybackChannel *playback_channel;
      SpicePlaybackState *st = SPICE_CONTAINEROF(worker, SpicePlaybackState, worker);
@@ -465,15 +469,15 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      if (!(celt_mode = celt051_mode_create(SPICE_INTERFACE_PLAYBACK_FREQ,
                                            SPICE_INTERFACE_PLAYBACK_CHAN,
                                            FRAME_SIZE, &celt_error))) {
-@@ -1179,6 +1202,7 @@ static void snd_set_playback_peer(RedCha
-         red_printf("create celt encoder failed");
+@@ -1186,6 +1208,7 @@
+         spice_printerr("create celt encoder failed");
          goto error_1;
      }
 +#endif
  
      if (!(playback_channel = (PlaybackChannel *)__new_channel(worker,
                                                                sizeof(*playback_channel),
-@@ -1195,16 +1219,20 @@ static void snd_set_playback_peer(RedCha
+@@ -1202,16 +1225,20 @@
          goto error_2;
      }
      worker->connection = &playback_channel->base;
@@ -497,7 +501,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  
      on_new_playback_channel(worker);
      if (worker->active) {
-@@ -1214,10 +1242,13 @@ static void snd_set_playback_peer(RedCha
+@@ -1221,10 +1248,13 @@
      return;
  
  error_2:
@@ -511,7 +515,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  }
  
  static void snd_record_migrate_channel_client(RedChannelClient *rcc)
-@@ -1358,10 +1389,12 @@ static void on_new_record_channel(SndWor
+@@ -1365,10 +1395,12 @@
  
  static void snd_record_cleanup(SndChannel *channel)
  {
@@ -524,7 +528,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  }
  
  static void snd_set_record_peer(RedChannel *channel, RedClient *client, RedsStream *stream,
-@@ -1371,12 +1404,13 @@ static void snd_set_record_peer(RedChann
+@@ -1378,12 +1410,13 @@
      SndWorker *worker = channel->data;
      RecordChannel *record_channel;
      SpiceRecordState *st = SPICE_CONTAINEROF(worker, SpiceRecordState, worker);
@@ -541,15 +545,15 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      if (!(celt_mode = celt051_mode_create(SPICE_INTERFACE_RECORD_FREQ,
                                            SPICE_INTERFACE_RECORD_CHAN,
                                            FRAME_SIZE, &celt_error))) {
-@@ -1388,6 +1422,7 @@ static void snd_set_record_peer(RedChann
-         red_printf("create celt decoder failed");
+@@ -1395,6 +1428,7 @@
+         spice_printerr("create celt decoder failed");
          goto error_1;
      }
 +#endif
  
      if (!(record_channel = (RecordChannel *)__new_channel(worker,
                                                            sizeof(*record_channel),
-@@ -1406,8 +1441,10 @@ static void snd_set_record_peer(RedChann
+@@ -1413,8 +1447,10 @@
  
      worker->connection = &record_channel->base;
  
@@ -560,7 +564,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  
      on_new_record_channel(worker);
      if (worker->active) {
-@@ -1417,10 +1454,13 @@ static void snd_set_record_peer(RedChann
+@@ -1424,10 +1460,13 @@
      return;
  
  error_2:
@@ -574,7 +578,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
  }
  
  static void snd_playback_migrate_channel_client(RedChannelClient *rcc)
-@@ -1476,7 +1516,9 @@ void snd_attach_playback(SpicePlaybackIn
+@@ -1483,7 +1522,9 @@
      client_cbs.migrate = snd_playback_migrate_channel_client;
      red_channel_register_client_cbs(channel, &client_cbs);
      red_channel_set_data(channel, playback_worker);
@@ -584,7 +588,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      red_channel_set_cap(channel, SPICE_PLAYBACK_CAP_VOLUME);
  
      playback_worker->base_channel = channel;
-@@ -1503,7 +1545,9 @@ void snd_attach_record(SpiceRecordInstan
+@@ -1510,7 +1551,9 @@
      client_cbs.migrate = snd_record_migrate_channel_client;
      red_channel_register_client_cbs(channel, &client_cbs);
      red_channel_set_data(channel, record_worker);
@@ -594,7 +598,7 @@ Cc: Liang Guo <bluestonechina@gmail.com>
      red_channel_set_cap(channel, SPICE_RECORD_CAP_VOLUME);
  
      record_worker->base_channel = channel;
-@@ -1550,7 +1594,11 @@ void snd_set_playback_compression(int on
+@@ -1557,7 +1600,11 @@
  {
      SndWorker *now = workers;
  
