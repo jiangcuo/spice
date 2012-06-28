@@ -1,6 +1,8 @@
 libspice-server.so.1 libspice-server1 #MINVER#
  SPICE_SERVER_0.10.0@SPICE_SERVER_0.10.0 0.10.0
  SPICE_SERVER_0.10.1@SPICE_SERVER_0.10.1 0.10.1
+ SPICE_SERVER_0.10.2@SPICE_SERVER_0.10.2 0.11.0
+ SPICE_SERVER_0.10.3@SPICE_SERVER_0.10.3 0.11.0
  SPICE_SERVER_0.6.0@SPICE_SERVER_0.6.0 0.8.2
  SPICE_SERVER_0.6.1@SPICE_SERVER_0.6.1 0.8.2
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
@@ -42,6 +44,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_get_peer_info@SPICE_SERVER_0.6.0 0.8.2
  spice_server_get_sock_info@SPICE_SERVER_0.6.0 0.8.2
  spice_server_init@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_is_server_mouse@SPICE_SERVER_0.10.3 0.11.0
  spice_server_kbd_leds@SPICE_SERVER_0.6.0 0.8.2
  spice_server_migrate_client_state@SPICE_SERVER_0.6.0 0.8.2
  spice_server_migrate_connect@SPICE_SERVER_0.8.3 0.8.3
@@ -69,6 +72,8 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_set_compat_version@SPICE_SERVER_0.6.1 0.8.2
  spice_server_set_image_compression@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_jpeg_compression@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_set_listen_socket_fd@SPICE_SERVER_0.10.2 0.11.0
+ spice_server_set_name@SPICE_SERVER_0.10.2 0.11.0
  spice_server_set_noauth@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_playback_compression@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_port@SPICE_SERVER_0.6.0 0.8.2
@@ -77,4 +82,5 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_set_streaming_video@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_ticket@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_tls@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_set_uuid@SPICE_SERVER_0.10.2 0.11.0
  spice_server_set_zlib_glz_compression@SPICE_SERVER_0.6.0 0.8.2

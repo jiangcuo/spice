@@ -1,6 +1,8 @@
-spice (0.10.1-3~0.1) UNRELEASED; urgency=low
+spice (0.11.0-1) UNRELEASED; urgency=low
 
+  * New upstream release
   * Breaks spice-gtk (<= 0.12-2)
+  * Refresh debian/libspice-server1.symbols
 
  -- Liang Guo <guoliang@debian.org>  Sat, 09 Jun 2012 11:33:05 +0800
 
