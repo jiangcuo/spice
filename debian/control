@@ -17,7 +17,6 @@ Build-Depends: debhelper (>= 9), pkg-config,
  libjpeg-dev,
  libxinerama-dev,
  libogg-dev,
- gnulib,
 Standards-Version: 3.9.3
 Homepage: http://spice-space.org/
 Vcs-Git: git://git.debian.org/collab-maint/spice.git
