@@ -11,6 +11,12 @@
 /* Define to 1 if using `alloca.c'. */
 #undef C_ALLOCA
 
+/* Enable compile-time and run-time bounds-checking, and some warnings. */
+#if __OPTIMIZE__
+# define _FORTIFY_SOURCE 2
+#endif
+
+
 /* Enable GLExt prototypes */
 #undef GL_GLEXT_PROTOTYPES
 
@@ -140,6 +146,9 @@
 #  undef WORDS_BIGENDIAN
 # endif
 #endif
+
+/* Force definition of format macros for C++ */
+#undef __STDC_FORMAT_MACROS
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 #undef size_t

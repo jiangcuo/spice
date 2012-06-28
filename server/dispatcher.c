@@ -1,4 +1,24 @@
+/* -*- Mode: C; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/*
+   Copyright (C) 2009-2012 Red Hat, Inc.
+
+   This library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
+
+   This library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with this library; if not, see <http://www.gnu.org/licenses/>.
+*/
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
+
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
@@ -7,12 +27,11 @@
 #include <fcntl.h>
 #include <poll.h>
 
-#include "mem.h"
-#include "spice_common.h"
-#include "dispatcher.h"
+#define SPICE_LOG_DOMAIN "SpiceDispatcher"
 
-#define DISPATCHER_DEBUG_PRINTF(level, ...) \
-    red_printf_debug(level, "DISP", ##__VA_ARGS__)
+#include "common/mem.h"
+#include "common/spice_common.h"
+#include "dispatcher.h"
 
 //#define DEBUG_DISPATCHER
 
@@ -30,7 +49,7 @@
  *        if 0 poll first, return immediately if no bytes available, otherwise
  *         read size in blocking mode.
  */
-static int read_safe(int fd, void *buf, size_t size, int block)
+static int read_safe(int fd, uint8_t *buf, size_t size, int block)
 {
     int read_size = 0;
     int ret;
@@ -43,10 +62,10 @@ static int read_safe(int fd, void *buf, size_t size, int block)
     if (!block) {
         while ((ret = poll(&pollfd, 1, 0)) == -1) {
             if (errno == EINTR) {
-                DISPATCHER_DEBUG_PRINTF(3, "EINTR in poll");
+                spice_debug("EINTR in poll");
                 continue;
             }
-            red_error("poll failed");
+            spice_error("poll failed");
             return -1;
         }
         if (!(pollfd.revents & POLLIN)) {
@@ -57,13 +76,13 @@ static int read_safe(int fd, void *buf, size_t size, int block)
         ret = read(fd, buf + read_size, size - read_size);
         if (ret == -1) {
             if (errno == EINTR) {
-                DISPATCHER_DEBUG_PRINTF(3, "EINTR in read");
+                spice_debug("EINTR in read");
                 continue;
             }
             return -1;
         }
         if (ret == 0) {
-            red_error("broken pipe on read");
+            spice_error("broken pipe on read");
             return -1;
         }
         read_size += ret;
@@ -75,7 +94,7 @@ static int read_safe(int fd, void *buf, size_t size, int block)
  * write_safe
  * @return -1 for error, otherwise number of written bytes. may be zero.
  */
-static int write_safe(int fd, void *buf, size_t size)
+static int write_safe(int fd, uint8_t *buf, size_t size)
 {
     int written_size = 0;
     int ret;
@@ -84,7 +103,7 @@ static int write_safe(int fd, void *buf, size_t size)
         ret = write(fd, buf + written_size, size - written_size);
         if (ret == -1) {
             if (errno != EINTR) {
-                DISPATCHER_DEBUG_PRINTF(3, "EINTR in write\n");
+                spice_debug("EINTR in write");
                 return -1;
             }
             continue;
@@ -102,8 +121,8 @@ static int dispatcher_handle_single_read(Dispatcher *dispatcher)
     uint8_t *payload = dispatcher->payload;
     uint32_t ack = ACK;
 
-    if ((ret = read_safe(dispatcher->recv_fd, &type, sizeof(type), 0)) == -1) {
-        red_printf("error reading from dispatcher: %d\n", errno);
+    if ((ret = read_safe(dispatcher->recv_fd, (uint8_t*)&type, sizeof(type), 0)) == -1) {
+        spice_printerr("error reading from dispatcher: %d", errno);
         return 0;
     }
     if (ret == 0) {
@@ -112,19 +131,19 @@ static int dispatcher_handle_single_read(Dispatcher *dispatcher)
     }
     msg = &dispatcher->messages[type];
     if (read_safe(dispatcher->recv_fd, payload, msg->size, 1) == -1) {
-        red_printf("error reading from dispatcher: %d\n", errno);
+        spice_printerr("error reading from dispatcher: %d", errno);
         /* TODO: close socketpair? */
         return 0;
     }
     if (msg->handler) {
         msg->handler(dispatcher->opaque, (void *)payload);
     } else {
-        red_printf("error: no handler for message type %d\n", type);
+        spice_printerr("error: no handler for message type %d", type);
     }
     if (msg->ack == DISPATCHER_ACK) {
         if (write_safe(dispatcher->recv_fd,
-                       &ack, sizeof(ack)) == -1) {
-            red_printf("error writing ack for message %d\n", type);
+                       (uint8_t*)&ack, sizeof(ack)) == -1) {
+            spice_printerr("error writing ack for message %d", type);
             /* TODO: close socketpair? */
         }
     } else if (msg->ack == DISPATCHER_ASYNC && dispatcher->handle_async_done) {
@@ -155,21 +174,21 @@ void dispatcher_send_message(Dispatcher *dispatcher, uint32_t message_type,
     assert(dispatcher->messages[message_type].handler);
     msg = &dispatcher->messages[message_type];
     pthread_mutex_lock(&dispatcher->lock);
-    if (write_safe(send_fd, &message_type, sizeof(message_type)) == -1) {
-        red_printf("error: failed to send message type for message %d\n",
+    if (write_safe(send_fd, (uint8_t*)&message_type, sizeof(message_type)) == -1) {
+        spice_printerr("error: failed to send message type for message %d",
                    message_type);
         goto unlock;
     }
     if (write_safe(send_fd, payload, msg->size) == -1) {
-        red_printf("error: failed to send message body for message %d\n",
+        spice_printerr("error: failed to send message body for message %d",
                    message_type);
         goto unlock;
     }
     if (msg->ack == DISPATCHER_ACK) {
-        if (read_safe(send_fd, &ack, sizeof(ack), 1) == -1) {
-            red_printf("error: failed to read ack");
+        if (read_safe(send_fd, (uint8_t*)&ack, sizeof(ack), 1) == -1) {
+            spice_printerr("error: failed to read ack");
         } else if (ack != ACK) {
-            red_printf("error: got wrong ack value in dispatcher "
+            spice_printerr("error: got wrong ack value in dispatcher "
                        "for message %d\n", message_type);
             /* TODO handling error? */
         }
@@ -238,7 +257,7 @@ void dispatcher_init(Dispatcher *dispatcher, size_t max_message_type,
 #endif
     dispatcher->opaque = opaque;
     if (socketpair(AF_LOCAL, SOCK_STREAM, 0, channels) == -1) {
-        red_error("socketpair failed %s", strerror(errno));
+        spice_error("socketpair failed %s", strerror(errno));
         return;
     }
     pthread_mutex_init(&dispatcher->lock, NULL);

@@ -2,27 +2,6 @@ NULL =
 
 bin_PROGRAMS = spicec
 
-BUILT_SOURCES = 			\
-	generated_demarshallers.cpp	\
-	generated_marshallers.cpp	\
-	generated_demarshallers1.cpp	\
-	generated_marshallers1.cpp	\
-	$(NULL)
-
-generated_demarshallers.cpp: $(top_srcdir)/spice.proto
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-demarshallers --client --include common.h --include messages.h $(top_srcdir)/spice.proto generated_demarshallers.cpp
-
-generated_demarshallers1.cpp: $(top_srcdir)/spice1.proto
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-demarshallers --client --include common.h --include messages.h --prefix 1 --ptrsize 8 $(top_srcdir)/spice1.proto generated_demarshallers1.cpp
-
-generated_marshallers.cpp: $(top_srcdir)/spice.proto
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P  --include "common.h" --include messages.h --include marshallers.h --client $(top_srcdir)/spice.proto generated_marshallers.cpp
-
-generated_marshallers1.cpp: $(top_srcdir)/spice1.proto
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P  --include "common.h" --include messages.h --include marshallers.h --client --prefix 1 --ptrsize 8 $(top_srcdir)/spice1.proto generated_marshallers1.cpp
-
-MAINTAINERCLEANFILES = $(BUILT_SOURCES)
-
 spicec_SOURCES =		\
 	application.cpp		\
 	application.h		\
@@ -43,7 +22,6 @@ spicec_SOURCES =		\
 	cursor_channel.cpp	\
 	cursor_channel.h	\
 	debug.h			\
-	demarshallers.h		\
 	display_channel.cpp	\
 	display_channel.h	\
 	event_sources.h		\
@@ -63,7 +41,6 @@ spicec_SOURCES =		\
 	inputs_handler.h	\
 	jpeg_decoder.cpp	\
 	jpeg_decoder.h		\
-	marshallers.h		\
 	menu.cpp		\
 	menu.h			\
 	mjpeg_decoder.cpp	\
@@ -222,7 +199,7 @@ endif
 INCLUDES = \
 	-D__STDC_LIMIT_MACROS				\
 	$(PLATFORM_INCLUDES)				\
-	-I$(top_srcdir)/common				\
+	-I$(top_srcdir)/spice-common			\
 	$(ALSA_CFLAGS)					\
 	$(CEGUI_CFLAGS)					\
 	$(CEGUI06_CFLAGS)				\
@@ -230,37 +207,38 @@ INCLUDES = \
 	$(GL_CFLAGS)					\
 	$(MISC_X_CFLAGS)				\
 	$(PIXMAN_CFLAGS)				\
-	$(PROTOCOL_CFLAGS)				\
+	$(COMMON_CFLAGS)				\
 	$(SPICE_NONPKGCONFIG_CFLAGS)			\
 	$(SMARTCARD_CFLAGS)				\
 	$(SSL_CFLAGS)					\
 	$(XRANDR_CFLAGS)				\
 	$(XFIXES_CFLAGS)				\
-	$(WARN_CFLAGS)					\
+	$(WARN_CXXFLAGS)				\
 	$(XINERAMA_CFLAGS)				\
 	$(CXIMAGE_CFLAGS)				\
 	$(NULL)
 
 spicec_LDFLAGS = $(SPICEC_STATIC_LINKAGE_BSTATIC)
 
-spicec_LDADD =						\
-	$(top_builddir)/common/libspice-common.la	\
-	$(ALSA_LIBS)					\
-	$(CEGUI_LIBS)					\
-	$(CEGUI06_LIBS)					\
-	$(CELT051_LIBS)					\
-	$(GL_LIBS)					\
-	$(JPEG_LIBS)					\
-	$(MISC_X_LIBS)					\
-	$(PIXMAN_LIBS)					\
-	$(SMARTCARD_LIBS)				\
-	$(SPICE_NONPKGCONFIG_LIBS)			\
-	$(SSL_LIBS)					\
-	$(XFIXES_LIBS)					\
-	$(XRANDR_LIBS)					\
-	$(Z_LIBS)					\
-	$(XINERAMA_LIBS)				\
-	$(spicec_resource_LDADD)			\
+spicec_LDADD =								\
+	$(top_builddir)/spice-common/common/libspice-common.la		\
+	$(top_builddir)/spice-common/common/libspice-common-client.la	\
+	$(ALSA_LIBS)							\
+	$(CEGUI_LIBS)							\
+	$(CEGUI06_LIBS)							\
+	$(CELT051_LIBS)							\
+	$(GL_LIBS)							\
+	$(JPEG_LIBS)							\
+	$(MISC_X_LIBS)							\
+	$(PIXMAN_LIBS)							\
+	$(SMARTCARD_LIBS)						\
+	$(SPICE_NONPKGCONFIG_LIBS)					\
+	$(SSL_LIBS)							\
+	$(XFIXES_LIBS)							\
+	$(XRANDR_LIBS)							\
+	$(Z_LIBS)							\
+	$(XINERAMA_LIBS)						\
+	$(spicec_resource_LDADD)					\
 	$(NULL)
 
 EXTRA_DIST =				\

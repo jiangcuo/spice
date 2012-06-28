@@ -22,7 +22,7 @@
 #include <sys/socket.h>
 #include <spice/qxl_dev.h>
 
-#define SPICE_SERVER_VERSION 0x000a01 /* release 0.10.1 */
+#define SPICE_SERVER_VERSION 0x000a03 /* release 0.10.3 */
 
 /* interface base type */
 
@@ -54,6 +54,7 @@ typedef struct SpiceCoreInterface SpiceCoreInterface;
 #define SPICE_CHANNEL_EVENT_DISCONNECTED  3
 
 #define SPICE_CHANNEL_EVENT_FLAG_TLS      (1 << 0)
+#define SPICE_CHANNEL_EVENT_FLAG_ADDR_EXT (1 << 1)
 
 typedef struct SpiceWatch SpiceWatch;
 typedef void (*SpiceWatchFunc)(int fd, int event, void *opaque);
@@ -66,9 +67,14 @@ typedef struct SpiceChannelEventInfo {
     int type;
     int id;
     int flags;
+    /* deprecated, can't hold ipv6 addresses, kept for backward compatibility */
     struct sockaddr laddr;
     struct sockaddr paddr;
     socklen_t llen, plen;
+    /* should be used if (flags & SPICE_CHANNEL_EVENT_FLAG_ADDR_EXT) */
+    struct sockaddr_storage laddr_ext;
+    struct sockaddr_storage paddr_ext;
+    socklen_t llen_ext, plen_ext;
 } SpiceChannelEventInfo;
 
 struct SpiceCoreInterface {
@@ -105,7 +111,7 @@ struct QXLRect;
 struct QXLWorker {
     uint32_t minor_version;
     uint32_t major_version;
-    /* These calls are deprecated. Pleaes use the spice_qxl_* calls instead */
+    /* These calls are deprecated. Please use the spice_qxl_* calls instead */
     void (*wakeup)(QXLWorker *worker);
     void (*oom)(QXLWorker *worker);
     void (*start)(QXLWorker *worker);
@@ -415,6 +421,7 @@ int spice_server_set_compat_version(SpiceServer *s,
                                     spice_compat_version_t version);
 int spice_server_set_port(SpiceServer *s, int port);
 void spice_server_set_addr(SpiceServer *s, const char *addr, int flags);
+int spice_server_set_listen_socket_fd(SpiceServer *s, int listen_fd);
 int spice_server_set_noauth(SpiceServer *s);
 int spice_server_set_sasl(SpiceServer *s, int enabled);
 int spice_server_set_sasl_appname(SpiceServer *s, const char *appname);
@@ -478,6 +485,8 @@ int spice_server_set_agent_copypaste(SpiceServer *s, int enable);
 int spice_server_get_sock_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen);
 int spice_server_get_peer_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen);
 
+int spice_server_is_server_mouse(SpiceServer *s);
+
 /* migration interface */
 #define SPICE_INTERFACE_MIGRATION "migration"
 #define SPICE_INTERFACE_MIGRATION_MAJOR 1
@@ -512,5 +521,8 @@ int spice_server_migrate_connect(SpiceServer *s, const char* dest,
                                  const char* cert_subject);
 int spice_server_migrate_start(SpiceServer *s);
 int spice_server_migrate_end(SpiceServer *s, int completed);
+
+void spice_server_set_name(SpiceServer *s, const char *name);
+void spice_server_set_uuid(SpiceServer *s, const uint8_t uuid[16]);
 
 #endif

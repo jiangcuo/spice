@@ -19,15 +19,15 @@
 #define _H_GLZ_ENCODER_CONFIG
 
 #include <spice/macros.h>
-#include "lz_common.h"
+#include "common/lz_common.h"
 
 typedef void GlzUsrImageContext;
 typedef struct GlzEncoderUsrContext GlzEncoderUsrContext;
 
 struct GlzEncoderUsrContext {
-    void (*error)(GlzEncoderUsrContext *usr, const char *fmt, ...);
-    void (*warn)(GlzEncoderUsrContext *usr, const char *fmt, ...);
-    void (*info)(GlzEncoderUsrContext *usr, const char *fmt, ...);
+    SPICE_GNUC_PRINTF(2, 3) void (*error)(GlzEncoderUsrContext *usr, const char *fmt, ...);
+    SPICE_GNUC_PRINTF(2, 3) void (*warn)(GlzEncoderUsrContext *usr, const char *fmt, ...);
+    SPICE_GNUC_PRINTF(2, 3) void (*info)(GlzEncoderUsrContext *usr, const char *fmt, ...);
     void    *(*malloc)(GlzEncoderUsrContext *usr, int size);
     void (*free)(GlzEncoderUsrContext *usr, void *ptr);
 

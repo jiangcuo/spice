@@ -19,22 +19,26 @@
 #include <config.h>
 #endif
 
-#include "common.h"
+#ifdef WIN32
+#include <winsock2.h>
+#endif
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <spice/protocol.h>
+#include "common/ssl_verify.h"
+
+#include "common.h"
 #include "red_peer.h"
 #include "utils.h"
 #include "debug.h"
 #include "platform_utils.h"
-#include "ssl_verify.h"
 
-static void ssl_error()
+static void SPICE_GNUC_NORETURN ssl_error()
 {
     unsigned long last_error = ERR_peek_last_error();
 
     ERR_print_errors_fp(stderr);
-    THROW_ERR(SPICEC_ERROR_CODE_SSL_ERROR, "SSL Error:", ERR_error_string(last_error, NULL));
+    THROW_ERR(SPICEC_ERROR_CODE_SSL_ERROR, "SSL Error: %s", ERR_error_string(last_error, NULL));
 }
 
 RedPeer::RedPeer()

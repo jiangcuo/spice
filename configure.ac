@@ -1,8 +1,26 @@
 AC_PREREQ([2.57])
 
+# Making releases:
+# 1. Increment SPICE_MICRO if no interface change has been done
+# 2. Increment SPICE_MINOR and zero SPICE_MICRO if new interfaces have been added,
+#    no changes to existing interfaces.
+# 3. Increment SPICE_MAJOR and zero both SPICE_MINOR and SPICE_MICRO if non
+#    backward compatible changes (interface changed or removed).
+#
+# Then change the libtool versions according to libtool manual:
+#  http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+
 m4_define([SPICE_MAJOR], 0)
-m4_define([SPICE_MINOR], 10)
-m4_define([SPICE_MICRO], 1)
+m4_define([SPICE_MINOR], 11)
+m4_define([SPICE_MICRO], 0)
+m4_define([SPICE_CURRENT], [2])
+m4_define([SPICE_REVISION], [0])
+m4_define([SPICE_AGE], [1])
+
+# Note on the library name on linux (SONAME) produced by libtool (for reference, gleaned
+# from looking at libtool 2.4.2)
+#
+#  libspice-servver.so.current-age.age.revision
 
 AC_INIT(spice, [SPICE_MAJOR.SPICE_MINOR.SPICE_MICRO], [], spice)
 
@@ -25,12 +43,15 @@ AC_PROG_LIBTOOL
 AM_PROG_CC_C_O
 AC_C_BIGENDIAN
 AC_PATH_PROGS(PYTHON, python2 python)
+PKG_PROG_PKG_CONFIG
 
 AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_HEADERS([execinfo.h])
 AC_FUNC_ALLOCA
 
-SPICE_LT_VERSION=m4_format("%d:%d:%d", 1, 0, 2)
+AC_DEFINE([__STDC_FORMAT_MACROS],[],[Force definition of format macros for C++])
+
+SPICE_LT_VERSION=m4_format("%d:%d:%d", SPICE_CURRENT, SPICE_REVISION, SPICE_AGE)
 AC_SUBST(SPICE_LT_VERSION)
 
 # Check for the CPU we are using
@@ -129,11 +150,19 @@ AC_ARG_ENABLE(client,
 AS_IF([test x"$enable_client" != "xno"], [enable_client="yes"])
 AM_CONDITIONAL(SUPPORT_CLIENT, test "x$enable_client" = "xyes")
 
+AC_ARG_ENABLE(automated_tests,
+[  --enable-automated-tests     Enable automated tests using snappy (part of spice--gtk)],,
+[enable_automated_tests="no"])
+AS_IF([test x"$enable_automated_tests" != "xno"], [enable_automated_tests="yes"])
+AM_CONDITIONAL(SUPPORT_AUTOMATED_TESTS, test "x$enable_automated_tests" != "xno")
+
+
 dnl =========================================================================
 dnl Check deps
 
-PKG_CHECK_MODULES(PROTOCOL, spice-protocol >= 0.10.1)
-AC_SUBST(PROTOCOL_CFLAGS)
+AC_CONFIG_SUBDIRS([spice-common])
+COMMON_CFLAGS='-I ${top_srcdir}/spice-common/ -I ${top_srcdir}/spice-common/spice-protocol/'
+AC_SUBST(COMMON_CFLAGS)
 
 AC_CHECK_LIBM
 AC_SUBST(LIBM)
@@ -172,7 +201,7 @@ AC_DEFINE_UNQUOTED([POSIX_YIELD_FUNC],$posix_yield_func,[The POSIX RT yield func
 
 SPICE_REQUIRES=""
 
-if test "x$enable_gui" = "xyes"; then
+if test "x$enable_gui" = "xyes" && test "x$enable_client" = "xyes" ; then
     PKG_CHECK_MODULES(CEGUI06, CEGUI-0.6 >= 0.6.0 CEGUI-0.6 < 0.7.0,
     [
         AC_SUBST(CEGUI06_CFLAGS)
@@ -243,7 +272,7 @@ SPICE_REQUIRES+=" openssl"
 # AC_SUBST(GL_LIBS)
 # SPICE_REQUIRES+=" gl glu"
 
-if test "x$enable_opengl" = "xyes"; then
+if test "x$enable_opengl" = "xyes" && test "x$enable_client" = "xyes" ; then
    AC_CHECK_LIB(GL, glBlendFunc, GL_LIBS="$GL_LIBS -lGL", enable_opengl=no)
    AC_CHECK_LIB(GLU, gluSphere, GL_LIBS="$GL_LIBS -lGLU", enable_opengl=no)
    AC_DEFINE([USE_OPENGL], [1], [Define to build with OpenGL support])
@@ -258,11 +287,14 @@ AC_SUBST(GL_CFLAGS)
 AC_SUBST(GL_LIBS)
 SPICE_NONPKGCONFIG_LIBS+=" $GL_LIBS"
 
-if test "$red_target" = "x11"; then
+if test "x$red_target" = "xx11" && test "x$enable_client" = "xyes" ; then
 	PKG_CHECK_MODULES(XRANDR, xrandr)
 	PKG_CHECK_MODULES(XFIXES, xfixes)
+	PKG_CHECK_MODULES(MISC_X, x11 xext xrender)
 	AC_SUBST(XRANDR_CFLAGS)
 	AC_SUBST(XRANDR_LIBS)
+	AC_SUBST(MISC_X_CFLAGS)
+	AC_SUBST(MISC_X_LIBS)
 
 	PKG_CHECK_MODULES(XRANDR12,
 	        xrandr >= 1.2,
@@ -275,12 +307,6 @@ fi
 AM_CONDITIONAL([HAVE_XRANDR12], [test "x$have_xrandr12" = "xyes"])
 if test "x$have_xrandr12" = "xyes" ; then
   AC_DEFINE([HAVE_XRANDR12], [], [Define if we have XRANDR 12])
-fi
-
-if test "$red_target" = "x11"; then
-	PKG_CHECK_MODULES(MISC_X, x11 xext xrender)
-	AC_SUBST(MISC_X_CFLAGS)
-	AC_SUBST(MISC_X_LIBS)
 fi
 
 PKG_CHECK_MODULES(XINERAMA,
@@ -372,86 +398,20 @@ AM_CONDITIONAL([HAVE_SASL], [test "x$with_sasl2" = "xyes" || test "x$with_sasl" 
 AC_SUBST([SASL_CFLAGS])
 AC_SUBST([SASL_LIBS])
 
+if test "x$enable_automated_tests" = "xyes"; then
+    AC_MSG_CHECKING([for snappy])
+    snappy --help >/dev/null 2>&1
+    if test $? -ne 0 ; then
+        AC_MSG_RESULT([not found])
+        AC_MSG_ERROR([snappy was not found, this module is part of spice-gtk andis required to compile this package])
+    fi
+    AC_MSG_RESULT([found])
+fi
+
 dnl ===========================================================================
 dnl check compiler flags
 
-AC_DEFUN([SPICE_CC_TRY_FLAG], [
-  AC_MSG_CHECKING([whether $CC supports $1])
-
-  spice_save_CFLAGS="$CFLAGS"
-  CFLAGS="$CFLAGS $1"
-
-  AC_COMPILE_IFELSE([AC_LANG_SOURCE([ ])], [spice_cc_flag=yes], [spice_cc_flag=no])
-  CFLAGS="$spice_save_CFLAGS"
-
-  if test "x$spice_cc_flag" = "xyes"; then
-    ifelse([$2], , :, [$2])
-  else
-    ifelse([$3], , :, [$3])
-  fi
-  AC_MSG_RESULT([$spice_cc_flag])
-])
-
-
-dnl Use lots of warning flags with with gcc and compatible compilers
-
-dnl Note: if you change the following variable, the cache is automatically
-dnl skipped and all flags rechecked.  So there's no need to do anything
-dnl else.  If for any reason you need to force a recheck, just change
-dnl MAYBE_WARN in an ignorable way (like adding whitespace)
-
-dnl MAYBE_WARN="-Wall -Wno-sign-compare -Werror -Wno-deprecated-declarations"
-
-if test "$red_target" = "windows"; then
-	MAYBE_WARN="-Wall -Wno-sign-compare -Wno-deprecated-declarations"
-else
-	MAYBE_WARN="-Wall -Wno-sign-compare -Werror -Wno-deprecated-declarations"
-fi
-
-AC_ARG_ENABLE(werror,
-AC_HELP_STRING([--enable-werror], [Use -Werror (if supported)]),
-set_werror="$enableval",[
-if test -f $srcdir/GITVERSION; then
-	is_git_version=true
-	set_werror=yes
-else
-	set_werror=no
-fi
-])
-
-
-# invalidate cached value if MAYBE_WARN has changed
-if test "x$spice_cv_warn_maybe" != "x$MAYBE_WARN"; then
-	unset spice_cv_warn_cflags
-fi
-AC_CACHE_CHECK([for supported warning flags], spice_cv_warn_cflags, [
-	echo
-	WARN_CFLAGS=""
-
-	# Some warning options are not supported by all versions of
-	# gcc, so test all desired options against the current
-	# compiler.
-	#
-	# Note that there are some order dependencies
-	# here. Specifically, an option that disables a warning will
-	# have no net effect if a later option then enables that
-	# warnings, (perhaps implicitly). So we put some grouped
-	# options (-Wall and -Wextra) up front and the -Wno options
-	# last.
-
-	for W in $MAYBE_WARN; do
-		SPICE_CC_TRY_FLAG([$W], [WARN_CFLAGS="$WARN_CFLAGS $W"])
-	done
-	if test "$set_werror" != "no"; then
-		SPICE_CC_TRY_FLAG(["-Werror"], [WARN_CFLAGS="$WARN_CFLAGS -Werror"])
-	fi
-
-	spice_cv_warn_cflags=$WARN_CFLAGS
-	spice_cv_warn_maybe=$MAYBE_WARN
-
-	AC_MSG_CHECKING([which warning flags were supported])])
-WARN_CFLAGS="$spice_cv_warn_cflags"
-SPICE_CFLAGS="$SPICE_CFLAGS $WARN_CFLAGS"
+SPICE_COMPILE_WARNINGS
 
 # use ximage.h for win32 build if it is found (no package for mingw32 atm)
 if test $os_win32 == "yes" ; then
@@ -502,6 +462,16 @@ fi
 AC_MSG_RESULT($have_gcc4)
 AC_SUBST(VISIBILITY_HIDDEN_CFLAGS)
 
+dnl ensure linker supports ---version-script option before using it
+AC_CACHE_CHECK([if -Wl,--version-script works], [spice_cv_ld_version_script],
+    [save_LDFLAGS="$LDFLAGS"
+     LDFLAGS="$LDFLAGS -Wl,--version-script=$srcdir/server/spice-server.syms"
+     AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
+        [spice_cv_ld_version_script=yes], [spice_cv_ld_version_script=no])
+     LDFLAGS="$save_LDFLAGS"])
+AM_CONDITIONAL([HAVE_LD_VERSION_SCRIPT],
+    [test x"$spice_cv_ld_version_script" = xyes])
+
 AC_SUBST(SPICE_REQUIRES)
 AC_SUBST(SPICE_NONPKGCONFIG_CFLAGS)
 AC_SUBST(SPICE_NONPKGCONFIG_LIBS)
@@ -513,10 +483,6 @@ m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 AC_OUTPUT([
 Makefile
 spice-server.pc
-common/Makefile
-common/win/Makefile
-common/win/my_getopt-1.5/Makefile
-python_modules/Makefile
 server/Makefile
 server/tests/Makefile
 client/Makefile
@@ -534,22 +500,24 @@ echo "
         python:                   ${PYTHON}
 
         Build Spice client:       ${enable_client}
-
+" ; if test "x$enable_client" == "xyes"; then echo "\
         Have XRANDR 1.2:          ${have_xrandr12}
 
         Have Xinerama:            ${have_xinerama}
-
-        Support tunneling:        ${enable_tunnel}
 
         Red target:               ${red_target}
 
         OpenGL:                   ${enable_opengl}
 
         GUI:                      ${enable_gui}
+" ; fi ; echo "\
+        Support tunneling:        ${enable_tunnel}
 
         Smartcard:                ${enable_smartcard}
 
         SASL support:             ${enable_sasl}
+
+        Automated tests:          ${enable_automated_tests}
 "
 
 if test $os_win32 == "yes" ; then

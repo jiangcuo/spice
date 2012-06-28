@@ -227,6 +227,9 @@ public:
     void external_show();
     void connect();
     void switch_host(const std::string& host, int port, int sport, const std::string& cert_subject);
+#ifdef USE_SMARTCARD
+    void enable_smartcard(bool enable);
+#endif
 
     const PeerConnectionOptMap& get_con_opt_map() {return _peer_con_opt;}
     const RedPeer::HostAuthOptions& get_host_auth_opt() { return _host_auth_opt;}
@@ -250,6 +253,7 @@ public:
     void show_me(bool full_screen);
     void hide_me();
     void set_hotkeys(const std::string& hotkeys);
+    void set_default_hotkeys(void);
     int get_controller_menu_item_id(int32_t opaque_conn_ref, uint32_t msg_id);
     void set_menu(Menu* menu);
     void delete_menu();

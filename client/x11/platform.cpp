@@ -48,20 +48,21 @@
 #include <sys/time.h>
 #endif
 
+#include <spice/vd_agent.h>
+#include "common/rect.h"
+
 #include "platform.h"
 #include "application.h"
 #include "utils.h"
 #include "x_platform.h"
 #include "debug.h"
 #include "monitor.h"
-#include "rect.h"
 #include "record.h"
 #include "playback.h"
 #include "resource.h"
 #include "res.h"
 #include "cursor.h"
 #include "process_loop.h"
-#include <spice/vd_agent.h>
 
 #define DWORD uint32_t
 #define BOOL bool
@@ -127,12 +128,12 @@ struct clipboard_format_info {
 
 static struct clipboard_format_info clipboard_formats[] = {
     { VD_AGENT_CLIPBOARD_UTF8_TEXT, { "UTF8_STRING",
-      "text/plain;charset=UTF-8", "text/plain;charset=utf-8", NULL }, },
-    { VD_AGENT_CLIPBOARD_IMAGE_PNG, { "image/png", NULL }, },
+      "text/plain;charset=UTF-8", "text/plain;charset=utf-8", NULL }, { 0 }, 0},
+    { VD_AGENT_CLIPBOARD_IMAGE_PNG, { "image/png", NULL }, { 0 }, 0},
     { VD_AGENT_CLIPBOARD_IMAGE_BMP, { "image/bmp", "image/x-bmp",
-      "image/x-MS-bmp", "image/x-win-bitmap", NULL }, },
-    { VD_AGENT_CLIPBOARD_IMAGE_TIFF, { "image/tiff", NULL }, },
-    { VD_AGENT_CLIPBOARD_IMAGE_JPG, { "image/jpeg", NULL }, },
+      "image/x-MS-bmp", "image/x-win-bitmap", NULL }, { 0 }, 0},
+    { VD_AGENT_CLIPBOARD_IMAGE_TIFF, { "image/tiff", NULL }, { 0 }, 0},
+    { VD_AGENT_CLIPBOARD_IMAGE_JPG, { "image/jpeg", NULL }, { 0 }, 0},
 };
 
 #define clipboard_format_count ((int)(sizeof(clipboard_formats)/sizeof(clipboard_formats[0])))
@@ -3166,11 +3167,10 @@ static int x_error_handler(Display* display, XErrorEvent* error_event)
     return 0;
 }
 
-static int x_io_error_handler(Display* display)
+static SPICE_GNUC_NORETURN int x_io_error_handler(Display* display)
 {
     LOG_ERROR("x io error on %s", XDisplayString(display));
     _exit(-1);
-    return 0;
 }
 
 static XVisualInfo* get_x_vis_info(int screen)

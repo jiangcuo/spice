@@ -28,9 +28,9 @@
 #include <netinet/in.h> // IPPROTO_TCP
 #include <netinet/tcp.h> // TCP_NODELAY
 
-#include "server/char_device.h"
-#include "server/red_channel.h"
-#include "server/reds.h"
+#include "char_device.h"
+#include "red_channel.h"
+#include "reds.h"
 
 /* 64K should be enough for all but the largest writes + 32 bytes hdr */
 #define BUF_SIZE (64 * 1024 + 32)
@@ -92,8 +92,8 @@ static int spicevmc_red_channel_client_config_socket(RedChannelClient *rcc)
     if (rcc->channel->type == SPICE_CHANNEL_USBREDIR) {
         if (setsockopt(stream->socket, IPPROTO_TCP, TCP_NODELAY,
                 &delay_val, sizeof(delay_val)) != 0) {
-            if (errno != ENOTSUP) {
-                red_printf("setsockopt failed, %s", strerror(errno));
+            if (errno != ENOTSUP && errno != ENOPROTOOPT) {
+                spice_printerr("setsockopt failed, %s", strerror(errno));
                 return FALSE;
             }
         }
@@ -116,9 +116,9 @@ static void spicevmc_red_channel_client_on_disconnect(RedChannelClient *rcc)
     sin = state->chardev_sin;
     sif = SPICE_CONTAINEROF(sin->base.sif, SpiceCharDeviceInterface, base);
 
-    /* Don't destroy the rcc if the entire client is disconnecting, as then
-       red_client_destroy will already do this! */
-    if (!rcc->client->disconnecting)
+    /* Don't destroy the rcc if it is already being destroyed, as then
+       red_client_destroy/red_channel_client_destroy will already do this! */
+    if (!rcc->destroying)
         red_channel_client_destroy(rcc);
 
     state->rcc = NULL;
@@ -223,8 +223,8 @@ static void spicevmc_connect(RedChannel *channel, RedClient *client,
     sif = SPICE_CONTAINEROF(sin->base.sif, SpiceCharDeviceInterface, base);
 
     if (state->rcc) {
-        WARN("channel client %d:%d (%p) already connected, refusing second connection\n",
-             channel->type, channel->id, state->rcc);
+        spice_printerr("channel client %d:%d (%p) already connected, refusing second connection",
+                       channel->type, channel->id, state->rcc);
         // TODO: notify client in advance about the in use channel using
         // SPICE_MSG_MAIN_CHANNEL_IN_USE (for example)
         reds_stream_free(stream);
@@ -255,8 +255,8 @@ void spicevmc_device_connect(SpiceCharDeviceInstance *sin,
 {
     static uint8_t id[256] = { 0, };
     SpiceVmcState *state;
-    ChannelCbs channel_cbs = {0,};
-    ClientCbs client_cbs = {0,};
+    ChannelCbs channel_cbs = { NULL, };
+    ClientCbs client_cbs = { NULL, };
 
     channel_cbs.config_socket = spicevmc_red_channel_client_config_socket;
     channel_cbs.on_disconnect = spicevmc_red_channel_client_on_disconnect;
