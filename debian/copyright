@@ -19,11 +19,12 @@ License:
  DISCLAIMED. This includes but is not limited to warranties of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-Files: common/draw.h common/messages.h server/zlib_encoder.h server/jpeg_encoder.h
+Files: spice-common/common/draw.h spice-common/common/messages.h 
+       server/zlib_encoder.h server/jpeg_encoder.h
 Copyright: Copyright (C) 2009-2010 Red Hat, Inc.
 License: BSD-3-clause
 
-Files: common/lines.h common/lines.c
+Files: spice-common/common/lines.h spice-common/common/lines.c
 Copyright: Copyright 1987, 1998  The Open Group
            Copyright 1987 by Digital Equipment Corporation
 License: 
@@ -69,7 +70,7 @@ License:
  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
  SOFTWARE.
 
-Files: common/win/my_getopt-1.5/*
+Files: client/windows/my_getopt.cpp
 Copyright: Copyright 1997-2001, Benjamin Sittler
 License: 
  Permission is hereby granted, free of charge, to any person
@@ -92,7 +93,8 @@ License:
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  DEALINGS IN THE SOFTWARE.
 
-Files: common/lz_decompress_tmpl.c common/lz.c common/lz_compress_tmpl.c
+Files: spice-common/common/lz_decompress_tmpl.c spice-common/common/lz.c 
+       spice-common/common/lz_compress_tmpl.c
 Copyright: Copyright 2009 Red Hat, Inc. and/or its affiliates
            Copyright (C) 2005, 2006, 2007 Ariya Hidayat (ariya@kde.org)
 License: LGPL-2.1+
@@ -134,7 +136,7 @@ License: LGPL-2.1+
  SOFTWARE.
  .
 
-Files: common/lz.h
+Files: spice-common/common/lz.h
 Copyright: NOT COPYRIGHTED
 License: MIT
 
@@ -162,25 +164,6 @@ License: LGPL-2.1+
  .
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
-
-License: LGPL-2.0+
- The GNU C Library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Library General Public License as
- published by the Free Software Foundation; either version 2 of the
- License, or (at your option) any later version.
- .
- The GNU C Library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Library General Public License for more details.
- .
- You should have received a copy of the GNU Library General Public
- License along with the GNU C Library; see the file COPYING.LIB.  If not,
- write to the Free Software Foundation, Inc., 51 Franklin St, Fifth 
- Floor, Boston, MA 02110-1301, USA.
- .
- On Debian systems, the complete text of the GNU Lesser General
- Public License can be found in "/usr/share/common-licenses/LGPL-2".
 
 License: BSD-3-clause
  Redistribution and use in source and binary forms, with or without

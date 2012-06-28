@@ -13,6 +13,7 @@ spice (0.11.0-1) UNRELEASED; urgency=low
   * Simplify debian/rules, celt removed, no reason to use 
     traditional one
   * Disable smartcard, not in debian yet
+  * Refresh debian/copyright
 
  -- Liang Guo <guoliang@debian.org>  Sat, 09 Jun 2012 11:33:05 +0800
 
