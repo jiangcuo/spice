@@ -21,8 +21,9 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <spice/qxl_dev.h>
+#include <spice/vd_agent.h>
 
-#define SPICE_SERVER_VERSION 0x000a03 /* release 0.10.3 */
+#define SPICE_SERVER_VERSION 0x000c00 /* release 0.12.0 */
 
 /* interface base type */
 
@@ -96,7 +97,7 @@ struct SpiceCoreInterface {
 
 #define SPICE_INTERFACE_QXL "qxl"
 #define SPICE_INTERFACE_QXL_MAJOR 3
-#define SPICE_INTERFACE_QXL_MINOR 1
+#define SPICE_INTERFACE_QXL_MINOR 3
 typedef struct QXLInterface QXLInterface;
 typedef struct QXLInstance QXLInstance;
 typedef struct QXLState QXLState;
@@ -134,8 +135,10 @@ struct QXLWorker {
 
 void spice_qxl_wakeup(QXLInstance *instance);
 void spice_qxl_oom(QXLInstance *instance);
-void spice_qxl_start(QXLInstance *instance);
-void spice_qxl_stop(QXLInstance *instance);
+void spice_qxl_start(QXLInstance *instance); /* deprecated since 0.11.2
+                                                spice_server_vm_start replaces it */
+void spice_qxl_stop(QXLInstance *instance);  /* deprecated since 0.11.2
+                                                spice_server_vm_stop replaces it */
 void spice_qxl_update_area(QXLInstance *instance, uint32_t surface_id,
                    struct QXLRect *area, struct QXLRect *dirty_rects,
                    uint32_t num_dirty_rects, uint32_t clear_dirty_region);
@@ -161,6 +164,9 @@ void spice_qxl_create_primary_surface_async(QXLInstance *instance, uint32_t surf
 void spice_qxl_destroy_surface_async(QXLInstance *instance, uint32_t surface_id, uint64_t cookie);
 /* suspend and resolution change on windows drivers */
 void spice_qxl_flush_surfaces_async(QXLInstance *instance, uint64_t cookie);
+/* since spice 0.12.0 */
+void spice_qxl_monitors_config_async(QXLInstance *instance, QXLPHYSICAL monitors_config,
+                                     int group_id, uint64_t cookie);
 
 typedef struct QXLDrawArea {
     uint8_t *buf;
@@ -234,6 +240,14 @@ struct QXLInterface {
     void (*update_area_complete)(QXLInstance *qin, uint32_t surface_id,
                                  struct QXLRect *updated_rects,
                                  uint32_t num_updated_rects);
+    void (*set_client_capabilities)(QXLInstance *qin,
+                                    uint8_t client_present,
+                                    uint8_t caps[58]);
+    /* returns 1 if the interface is supported, 0 otherwise.
+     * if monitors_config is NULL nothing is done except reporting the
+     * return code. */
+    int (*client_monitors_config)(QXLInstance *qin,
+                                  VDAgentMonitorsConfig *monitors_config);
 };
 
 struct QXLInstance {
@@ -422,6 +436,7 @@ int spice_server_set_compat_version(SpiceServer *s,
 int spice_server_set_port(SpiceServer *s, int port);
 void spice_server_set_addr(SpiceServer *s, const char *addr, int flags);
 int spice_server_set_listen_socket_fd(SpiceServer *s, int listen_fd);
+int spice_server_set_exit_on_disconnect(SpiceServer *s, int flag);
 int spice_server_set_noauth(SpiceServer *s);
 int spice_server_set_sasl(SpiceServer *s, int enabled);
 int spice_server_set_sasl_appname(SpiceServer *s, const char *appname);
@@ -522,7 +537,12 @@ int spice_server_migrate_connect(SpiceServer *s, const char* dest,
 int spice_server_migrate_start(SpiceServer *s);
 int spice_server_migrate_end(SpiceServer *s, int completed);
 
+void spice_server_set_seamless_migration(SpiceServer *s, int enable);
+
 void spice_server_set_name(SpiceServer *s, const char *name);
 void spice_server_set_uuid(SpiceServer *s, const uint8_t uuid[16]);
+
+void spice_server_vm_start(SpiceServer *s);
+void spice_server_vm_stop(SpiceServer *s);
 
 #endif

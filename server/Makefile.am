@@ -43,6 +43,7 @@ libspice_server_la_LIBADD =						\
 libspice_server_la_SOURCES =			\
 	agent-msg-filter.c			\
 	agent-msg-filter.h			\
+	char_device.c				\
 	char_device.h				\
 	demarshallers.h				\
 	glz_encoder.c				\
@@ -71,6 +72,7 @@ libspice_server_la_SOURCES =			\
 	red_dispatcher.h			\
 	main_dispatcher.c			\
 	main_dispatcher.h			\
+	migration_protocol.h		\
 	red_memslots.c				\
 	red_memslots.h				\
 	red_parse_qxl.c				\
@@ -125,3 +127,6 @@ EXTRA_DIST =					\
 	$(NULL)
 
 BUILT_SOURCES = $(spice_built_sources)
+
+dist-hook:
+	if [ -e ./tests/test_spice_version.sh -a ! ./tests/test_spice_version.sh ] ; then exit 1; fi

@@ -112,15 +112,17 @@ void spice_marshall_msg_main_migrate_begin(SpiceMarshaller *m, SpiceMsgMainMigra
     SpiceMsgMainMigrationBegin *src;
     src = (SpiceMsgMainMigrationBegin *)msg;
 
-    spice_marshaller_add_uint16(m, src->port);
-    spice_marshaller_add_uint16(m, src->sport);
-    spice_marshaller_add_uint32(m, src->host_size);
-    m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
-    spice_marshall_array_uint8(m2, src->host_data, src->host_size);
-    spice_marshaller_add_uint32(m, src->cert_subject_size);
-    m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
-    if (src->cert_subject_data != NULL) {
-        spice_marshall_array_uint8(m2, src->cert_subject_data, src->cert_subject_size);
+    /* dst_info */ {
+        spice_marshaller_add_uint16(m, src->dst_info.port);
+        spice_marshaller_add_uint16(m, src->dst_info.sport);
+        spice_marshaller_add_uint32(m, src->dst_info.host_size);
+        m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
+        spice_marshall_array_uint8(m2, src->dst_info.host_data, src->dst_info.host_size);
+        spice_marshaller_add_uint32(m, src->dst_info.cert_subject_size);
+        m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
+        if (src->dst_info.cert_subject_data != NULL) {
+            spice_marshall_array_uint8(m2, src->dst_info.cert_subject_data, src->dst_info.cert_subject_size);
+        }
     }
 }
 
@@ -251,6 +253,36 @@ void spice_marshall_msg_main_uuid(SpiceMarshaller *m, SpiceMsgMainUuid *msg)
         spice_marshaller_add_uint8(m, *uuid__element);
         uuid__element++;
     }
+}
+
+void spice_marshall_msg_main_agent_connected_tokens(SpiceMarshaller *m, SpiceMsgMainAgentConnectedTokens *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgMainAgentConnectedTokens *src;
+    src = (SpiceMsgMainAgentConnectedTokens *)msg;
+
+    spice_marshaller_add_uint32(m, src->num_tokens);
+}
+
+void spice_marshall_msg_main_migrate_begin_seamless(SpiceMarshaller *m, SpiceMsgMainMigrateBeginSeamless *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgMainMigrateBeginSeamless *src;
+    src = (SpiceMsgMainMigrateBeginSeamless *)msg;
+
+    /* dst_info */ {
+        spice_marshaller_add_uint16(m, src->dst_info.port);
+        spice_marshaller_add_uint16(m, src->dst_info.sport);
+        spice_marshaller_add_uint32(m, src->dst_info.host_size);
+        m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
+        spice_marshall_array_uint8(m2, src->dst_info.host_data, src->dst_info.host_size);
+        spice_marshaller_add_uint32(m, src->dst_info.cert_subject_size);
+        m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
+        if (src->dst_info.cert_subject_data != NULL) {
+            spice_marshall_array_uint8(m2, src->dst_info.cert_subject_data, src->dst_info.cert_subject_size);
+        }
+    }
+    spice_marshaller_add_uint32(m, src->src_mig_version);
 }
 
 void spice_marshall_msg_display_mode(SpiceMarshaller *m, SpiceMsgDisplayMode *msg)
@@ -957,6 +989,39 @@ void spice_marshall_msg_display_stream_data_sized(SpiceMarshaller *m, SpiceMsgDi
     /* Don't marshall @nomarshal data */
 }
 
+void spice_marshall_msg_display_monitors_config(SpiceMarshaller *m, SpiceMsgDisplayMonitorsConfig *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgDisplayMonitorsConfig *src;
+    SpiceHead *heads__element;
+    uint32_t i;
+    src = (SpiceMsgDisplayMonitorsConfig *)msg;
+
+    spice_marshaller_add_uint16(m, src->count);
+    spice_marshaller_add_uint16(m, src->max_allowed);
+    heads__element = src->heads;
+    for (i = 0; i < src->count; i++) {
+        SpiceHead *src2;
+        src2 = (SpiceHead *)heads__element;
+
+        spice_marshaller_add_uint32(m, src2->id);
+        spice_marshaller_add_uint32(m, src2->surface_id);
+        spice_marshaller_add_uint32(m, src2->width);
+        spice_marshaller_add_uint32(m, src2->height);
+        spice_marshaller_add_uint32(m, src2->x);
+        spice_marshaller_add_uint32(m, src2->y);
+        spice_marshaller_add_uint32(m, src2->flags);
+        heads__element++;
+    }
+}
+
+void spice_marshall_msg_display_draw_composite(SpiceMarshaller *m, SpiceMsgDisplayDrawComposite *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    *src_bitmap_out = NULL;
+    *mask_bitmap_out = NULL;
+}
+
 void spice_marshall_msg_inputs_init(SpiceMarshaller *m, SpiceMsgInputsInit *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
@@ -1217,7 +1282,7 @@ void spice_marshall_msg_tunnel_socket_token(SpiceMarshaller *m, SpiceMsgTunnelSo
 }
 
 #ifdef USE_SMARTCARD
-void spice_marshall_msg_smartcard_msg(SpiceMarshaller *m, SpiceMsgSmartcard *msg)
+void spice_marshall_msg_smartcard_data(SpiceMarshaller *m, SpiceMsgSmartcard *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
     SpiceMsgSmartcard *src;
@@ -1743,5 +1808,44 @@ void spice_marshall_AlphaBlend(SpiceMarshaller *m, SpiceAlphaBlend *ptr, SpiceMa
         spice_marshaller_add_int32(m, src->src_area.left);
         spice_marshaller_add_int32(m, src->src_area.bottom);
         spice_marshaller_add_int32(m, src->src_area.right);
+    }
+}
+void spice_marshall_Composite(SpiceMarshaller *m, SpiceComposite *ptr, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceComposite *src;
+    *src_bitmap_out = NULL;
+    *mask_bitmap_out = NULL;
+
+    src = (SpiceComposite *)ptr;
+
+    spice_marshaller_add_uint32(m, src->flags);
+    *src_bitmap_out = spice_marshaller_get_ptr_submarshaller(m, 0);
+    if ((src->flags & SPICE_COMPOSITE_HAS_MASK)) {
+        *mask_bitmap_out = spice_marshaller_get_ptr_submarshaller(m, 0);
+    }
+    if ((src->flags & SPICE_COMPOSITE_HAS_SRC_TRANSFORM)) {
+        spice_marshaller_add_uint32(m, src->src_transform.t00);
+        spice_marshaller_add_uint32(m, src->src_transform.t01);
+        spice_marshaller_add_uint32(m, src->src_transform.t02);
+        spice_marshaller_add_uint32(m, src->src_transform.t10);
+        spice_marshaller_add_uint32(m, src->src_transform.t11);
+        spice_marshaller_add_uint32(m, src->src_transform.t12);
+    }
+    if ((src->flags & SPICE_COMPOSITE_HAS_MASK_TRANSFORM)) {
+        spice_marshaller_add_uint32(m, src->mask_transform.t00);
+        spice_marshaller_add_uint32(m, src->mask_transform.t01);
+        spice_marshaller_add_uint32(m, src->mask_transform.t02);
+        spice_marshaller_add_uint32(m, src->mask_transform.t10);
+        spice_marshaller_add_uint32(m, src->mask_transform.t11);
+        spice_marshaller_add_uint32(m, src->mask_transform.t12);
+    }
+    /* src_origin */ {
+        spice_marshaller_add_int16(m, src->src_origin.x);
+        spice_marshaller_add_int16(m, src->src_origin.y);
+    }
+    /* mask_origin */ {
+        spice_marshaller_add_int16(m, src->mask_origin.x);
+        spice_marshaller_add_int16(m, src->mask_origin.y);
     }
 }

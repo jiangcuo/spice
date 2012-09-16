@@ -18,6 +18,8 @@
 #ifndef _H_RED_DISPATCHER
 #define _H_RED_DISPATCHER
 
+#include "red_channel.h"
+
 struct RedChannelClient;
 typedef struct AsyncCommand AsyncCommand;
 
@@ -27,12 +29,16 @@ void red_dispatcher_set_mm_time(uint32_t);
 void red_dispatcher_on_ic_change(void);
 void red_dispatcher_on_sv_change(void);
 void red_dispatcher_set_mouse_mode(uint32_t mode);
+void red_dispatcher_on_vm_stop(void);
+void red_dispatcher_on_vm_start(void);
 int red_dispatcher_count(void);
 int red_dispatcher_add_renderer(const char *name);
 uint32_t red_dispatcher_qxl_ram_size(void);
 int red_dispatcher_qxl_count(void);
 void red_dispatcher_async_complete(struct RedDispatcher *, AsyncCommand *);
 struct Dispatcher *red_dispatcher_get_dispatcher(struct RedDispatcher *);
+int red_dispatcher_use_client_monitors_config(void);
+void red_dispatcher_client_monitors_config(VDAgentMonitorsConfig *monitors_config);
 
 typedef struct RedWorkerMessageDisplayConnect {
     RedClient * client;
@@ -189,5 +195,10 @@ typedef struct RedWorkerMessageDestroySurfaceWaitAsync {
 typedef struct RedWorkerMessageResetMemslots {
 } RedWorkerMessageResetMemslots;
 
+typedef struct RedWorkerMessageMonitorsConfigAsync {
+    RedWorkerMessageAsync base;
+    QXLPHYSICAL monitors_config;
+    int group_id;
+} RedWorkerMessageMonitorsConfigAsync;
 
 #endif

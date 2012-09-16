@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <spice/macros.h>
 #include <spice/vd_agent.h>
+#include <spice/protocol.h>
 
 #include "common/marshaller.h"
 #include "common/messages.h"
@@ -37,6 +38,7 @@
 #include "reds.h"
 #include "red_channel.h"
 #include "inputs_channel.h"
+#include "migration_protocol.h"
 
 // TODO: RECEIVE_BUF_SIZE used to be the same for inputs_channel and main_channel
 // since it was defined once in reds.c which contained both.
@@ -63,20 +65,21 @@ struct SpiceTabletState {
 
 typedef struct InputsChannelClient {
     RedChannelClient base;
-    uint32_t motion_count;
+    uint16_t motion_count;
 } InputsChannelClient;
 
 typedef struct InputsChannel {
     RedChannel base;
     uint8_t recv_buf[RECEIVE_BUF_SIZE];
     VDAgentMouseState mouse_state;
+    int src_during_migrate;
 } InputsChannel;
 
 enum {
-    PIPE_ITEM_INPUTS_INIT = SPICE_MSG_INPUTS_INIT,
-    PIPE_ITEM_MOUSE_MOTION_ACK = SPICE_MSG_INPUTS_MOUSE_MOTION_ACK,
-    PIPE_ITEM_KEY_MODIFIERS = SPICE_MSG_INPUTS_KEY_MODIFIERS,
-    PIPE_ITEM_MIGRATE = SPICE_MSG_MIGRATE,
+    PIPE_ITEM_INPUTS_INIT = PIPE_ITEM_TYPE_CHANNEL_BASE,
+    PIPE_ITEM_MOUSE_MOTION_ACK,
+    PIPE_ITEM_KEY_MODIFIERS,
+    PIPE_ITEM_MIGRATE_DATA,
 };
 
 typedef struct InputsPipeItem {
@@ -242,6 +245,20 @@ static PipeItem *inputs_key_modifiers_item_new(
     return &item->base;
 }
 
+static void inputs_channel_send_migrate_data(RedChannelClient *rcc,
+                                             SpiceMarshaller *m,
+                                             PipeItem *item)
+{
+    InputsChannelClient *icc = SPICE_CONTAINEROF(rcc, InputsChannelClient, base);
+
+    g_inputs_channel->src_during_migrate = FALSE;
+    red_channel_client_init_send_data(rcc, SPICE_MSG_MIGRATE_DATA, item);
+
+    spice_marshaller_add_uint32(m, SPICE_MIGRATE_DATA_INPUTS_MAGIC);
+    spice_marshaller_add_uint32(m, SPICE_MIGRATE_DATA_INPUTS_VERSION);
+    spice_marshaller_add_uint16(m, icc->motion_count);
+}
+
 static void inputs_channel_release_pipe_item(RedChannelClient *rcc,
     PipeItem *base, int item_pushed)
 {
@@ -252,33 +269,35 @@ static void inputs_channel_send_item(RedChannelClient *rcc, PipeItem *base)
 {
     SpiceMarshaller *m = red_channel_client_get_marshaller(rcc);
 
-    red_channel_client_init_send_data(rcc, base->type, base);
     switch (base->type) {
         case PIPE_ITEM_KEY_MODIFIERS:
         {
             SpiceMsgInputsKeyModifiers key_modifiers;
 
+            red_channel_client_init_send_data(rcc, SPICE_MSG_INPUTS_KEY_MODIFIERS, base);
             key_modifiers.modifiers =
                 SPICE_CONTAINEROF(base, KeyModifiersPipeItem, base)->modifiers;
             spice_marshall_msg_inputs_key_modifiers(m, &key_modifiers);
+            break;
         }
         case PIPE_ITEM_INPUTS_INIT:
         {
             SpiceMsgInputsInit inputs_init;
 
+            red_channel_client_init_send_data(rcc, SPICE_MSG_INPUTS_INIT, base);
             inputs_init.keyboard_modifiers =
                 SPICE_CONTAINEROF(base, InputsInitPipeItem, base)->modifiers;
             spice_marshall_msg_inputs_init(m, &inputs_init);
-        }
-        case PIPE_ITEM_MIGRATE:
-        {
-            SpiceMsgMigrate migrate;
-
-            migrate.flags = 0;
-            spice_marshall_msg_migrate(m, &migrate);
             break;
         }
+        case PIPE_ITEM_MOUSE_MOTION_ACK:
+            red_channel_client_init_send_data(rcc, SPICE_MSG_INPUTS_MOUSE_MOTION_ACK, base);
+            break;
+        case PIPE_ITEM_MIGRATE_DATA:
+            inputs_channel_send_migrate_data(rcc, m, base);
+            break;
         default:
+            spice_warning("invalid pipe iten %d", base->type);
             break;
     }
     red_channel_client_begin_send_message(rcc);
@@ -309,11 +328,21 @@ static int inputs_channel_handle_parsed(RedChannelClient *rcc, uint32_t size, ui
         }
         break;
     }
+    case SPICE_MSGC_INPUTS_KEY_SCANCODE: {
+        uint32_t i;
+        uint8_t *code = (uint8_t *)buf;
+        for (i = 0; i < size; i++) {
+            kbd_push_scan(keyboard, code[i]);
+        }
+        break;
+    }
     case SPICE_MSGC_INPUTS_MOUSE_MOTION: {
         SpiceMsgcMouseMotion *mouse_motion = (SpiceMsgcMouseMotion *)buf;
 
-        if (++icc->motion_count % SPICE_INPUT_MOTION_ACK_BUNCH == 0) {
+        if (++icc->motion_count % SPICE_INPUT_MOTION_ACK_BUNCH == 0 &&
+            !g_inputs_channel->src_during_migrate) {
             red_channel_client_pipe_add_type(rcc, PIPE_ITEM_MOUSE_MOTION_ACK);
+            icc->motion_count = 0;
         }
         if (mouse && reds_get_mouse_mode() == SPICE_MOUSE_MODE_SERVER) {
             SpiceMouseInterface *sif;
@@ -327,8 +356,10 @@ static int inputs_channel_handle_parsed(RedChannelClient *rcc, uint32_t size, ui
     case SPICE_MSGC_INPUTS_MOUSE_POSITION: {
         SpiceMsgcMousePosition *pos = (SpiceMsgcMousePosition *)buf;
 
-        if (++icc->motion_count % SPICE_INPUT_MOTION_ACK_BUNCH == 0) {
+        if (++icc->motion_count % SPICE_INPUT_MOTION_ACK_BUNCH == 0 &&
+            !g_inputs_channel->src_during_migrate) {
             red_channel_client_pipe_add_type(rcc, PIPE_ITEM_MOUSE_MOTION_ACK);
+            icc->motion_count = 0;
         }
         if (reds_get_mouse_mode() != SPICE_MOUSE_MODE_CLIENT) {
             break;
@@ -425,8 +456,7 @@ static int inputs_channel_handle_parsed(RedChannelClient *rcc, uint32_t size, ui
     case SPICE_MSGC_DISCONNECTING:
         break;
     default:
-        spice_printerr("unexpected type %d", type);
-        return FALSE;
+        return red_channel_client_handle_message(rcc, size, type, message);
     }
     return TRUE;
 }
@@ -447,12 +477,6 @@ static void inputs_channel_on_disconnect(RedChannelClient *rcc)
         return;
     }
     inputs_relase_keys();
-}
-
-static void inputs_migrate(RedChannelClient *rcc)
-{
-    spice_assert(g_inputs_channel == (InputsChannel *)rcc->channel);
-    red_channel_client_pipe_add_type(rcc, PIPE_ITEM_MIGRATE);
 }
 
 static void inputs_pipe_add_init(RedChannelClient *rcc)
@@ -509,9 +533,16 @@ static void inputs_connect(RedChannel *channel, RedClient *client,
     inputs_pipe_add_init(&icc->base);
 }
 
+static void inputs_migrate(RedChannelClient *rcc)
+{
+    g_inputs_channel->src_during_migrate = TRUE;
+    red_channel_client_default_migrate(rcc);
+}
+
 static void inputs_push_keyboard_modifiers(uint8_t modifiers)
 {
-    if (!g_inputs_channel || !red_channel_is_connected(&g_inputs_channel->base)) {
+    if (!g_inputs_channel || !red_channel_is_connected(&g_inputs_channel->base) ||
+        g_inputs_channel->src_during_migrate) {
         return;
     }
     red_channel_pipes_new_add_push(&g_inputs_channel->base,
@@ -528,6 +559,39 @@ static void key_modifiers_sender(void *opaque)
     inputs_push_keyboard_modifiers(kbd_get_leds(keyboard));
 }
 
+static int inputs_channel_handle_migrate_flush_mark(RedChannelClient *rcc)
+{
+    red_channel_client_pipe_add_type(rcc, PIPE_ITEM_MIGRATE_DATA);
+    return TRUE;
+}
+
+static int inputs_channel_handle_migrate_data(RedChannelClient *rcc,
+                                              uint32_t size,
+                                              void *message)
+{
+    InputsChannelClient *icc = SPICE_CONTAINEROF(rcc, InputsChannelClient, base);
+    SpiceMigrateDataHeader *header;
+    SpiceMigrateDataInputs *mig_data;
+
+    header = (SpiceMigrateDataHeader *)message;
+    mig_data = (SpiceMigrateDataInputs *)(header + 1);
+
+    if (!migration_protocol_validate_header(header,
+                                            SPICE_MIGRATE_DATA_INPUTS_MAGIC,
+                                            SPICE_MIGRATE_DATA_INPUTS_VERSION)) {
+        spice_error("bad header");
+        return FALSE;
+    }
+    key_modifiers_sender(NULL);
+    icc->motion_count = mig_data->motion_count;
+
+    for (; icc->motion_count >= SPICE_INPUT_MOTION_ACK_BUNCH;
+           icc->motion_count -= SPICE_INPUT_MOTION_ACK_BUNCH) {
+        red_channel_client_pipe_add_type(rcc, PIPE_ITEM_MOUSE_MOTION_ACK);
+    }
+    return TRUE;
+}
+
 void inputs_init(void)
 {
     ChannelCbs channel_cbs = { NULL, };
@@ -542,16 +606,18 @@ void inputs_init(void)
     channel_cbs.release_item = inputs_channel_release_pipe_item;
     channel_cbs.alloc_recv_buf = inputs_channel_alloc_msg_rcv_buf;
     channel_cbs.release_recv_buf = inputs_channel_release_msg_rcv_buf;
+    channel_cbs.handle_migrate_data = inputs_channel_handle_migrate_data;
+    channel_cbs.handle_migrate_flush_mark = inputs_channel_handle_migrate_flush_mark;
 
     g_inputs_channel = (InputsChannel *)red_channel_create_parser(
                                     sizeof(InputsChannel),
                                     core,
                                     SPICE_CHANNEL_INPUTS, 0,
-                                    FALSE, // TODO: set migration?
                                     FALSE, /* handle_acks */
                                     spice_get_client_channel_parser(SPICE_CHANNEL_INPUTS, NULL),
                                     inputs_channel_handle_parsed,
-                                    &channel_cbs);
+                                    &channel_cbs,
+                                    SPICE_MIGRATE_NEED_FLUSH | SPICE_MIGRATE_NEED_DATA_TRANSFER);
 
     if (!g_inputs_channel) {
         spice_error("failed to allocate Inputs Channel");
@@ -561,6 +627,7 @@ void inputs_init(void)
     client_cbs.migrate = inputs_migrate;
     red_channel_register_client_cbs(&g_inputs_channel->base, &client_cbs);
 
+    red_channel_set_cap(&g_inputs_channel->base, SPICE_INPUTS_CAP_KEY_SCANCODE);
     reds_register_channel(&g_inputs_channel->base);
 
     if (!(key_modifiers_timer = core->timer_add(key_modifiers_sender, NULL))) {
