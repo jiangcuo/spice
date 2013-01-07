@@ -379,6 +379,15 @@ static void spice_marshall_msgc_smartcard_reader_add(SpiceMarshaller *m, VSCMsgR
 }
 
 #endif /* USE_SMARTCARD */
+static void spice_marshall_msgc_port_event(SpiceMarshaller *m, SpiceMsgcPortEvent *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgcPortEvent *src;
+    src = (SpiceMsgcPortEvent *)msg;
+
+    spice_marshaller_add_uint8(m, src->event);
+}
+
 SpiceMessageMarshallers * spice_message_marshallers_get(void)
 {
     static SpiceMessageMarshallers marshallers = {NULL};
@@ -401,6 +410,7 @@ SpiceMessageMarshallers * spice_message_marshallers_get(void)
     marshallers.msgc_main_migrate_dst_do_seamless = spice_marshall_msgc_main_migrate_dst_do_seamless;
     marshallers.msgc_main_mouse_mode_request = spice_marshall_msgc_main_mouse_mode_request;
     marshallers.msgc_pong = spice_marshall_msgc_pong;
+    marshallers.msgc_port_event = spice_marshall_msgc_port_event;
     marshallers.msgc_record_data = spice_marshall_msgc_record_data;
     marshallers.msgc_record_mode = spice_marshall_msgc_record_mode;
     marshallers.msgc_record_start_mark = spice_marshall_msgc_record_start_mark;

@@ -1295,6 +1295,27 @@ void spice_marshall_msg_smartcard_data(SpiceMarshaller *m, SpiceMsgSmartcard *ms
 }
 
 #endif /* USE_SMARTCARD */
+void spice_marshall_msg_port_init(SpiceMarshaller *m, SpiceMsgPortInit *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgPortInit *src;
+    src = (SpiceMsgPortInit *)msg;
+
+    spice_marshaller_add_uint32(m, src->name_size);
+    m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
+    spice_marshall_array_uint8(m2, src->name, src->name_size);
+    spice_marshaller_add_uint8(m, src->opened);
+}
+
+void spice_marshall_msg_port_event(SpiceMarshaller *m, SpiceMsgPortEvent *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgPortEvent *src;
+    src = (SpiceMsgPortEvent *)msg;
+
+    spice_marshaller_add_uint8(m, src->event);
+}
+
 void spice_marshall_String(SpiceMarshaller *m, SpiceString *ptr)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;

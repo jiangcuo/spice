@@ -1,28 +1,29 @@
 AC_PREREQ([2.57])
 
 # Making releases:
-# 1. Increment SPICE_MICRO if no interface change has been done
-# 2. Increment SPICE_MINOR and zero SPICE_MICRO if new interfaces have been added,
-#    no changes to existing interfaces.
-# 3. Increment SPICE_MAJOR and zero both SPICE_MINOR and SPICE_MICRO if non
-#    backward compatible changes (interface changed or removed).
-#
-# Then change the libtool versions according to libtool manual:
+# 1. The version is SPICE_MAJOR.SPICE_MINOR.SPICE_MICRO
+# 2. It is generated via a two stage process:
+#   1. Create a tag
+#   2. run configure which calls git-version-gen.
+# 3. Follow these rules for setting the next tag (aka tarball version):
+#   1. SPICE_MAJOR remains 0 until a major change is done.
+#   2. Increment SPICE_MINOR to next even value on a significant release,
+#      updating the release schedule: http://www.spice-space.org/page/Releases
+#   3. Increment SPICE_MINOR otherwise.
+# 4. Follow the libtool manual for the so version:
 #  http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 
-m4_define([SPICE_MAJOR], 0)
-m4_define([SPICE_MINOR], 12)
-m4_define([SPICE_MICRO], 0)
-m4_define([SPICE_CURRENT], [6])
+m4_define([SPICE_CURRENT], [7])
 m4_define([SPICE_REVISION], [0])
-m4_define([SPICE_AGE], [5])
+m4_define([SPICE_AGE], [6])
 
 # Note on the library name on linux (SONAME) produced by libtool (for reference, gleaned
 # from looking at libtool 2.4.2)
 #
 #  libspice-servver.so.current-age.age.revision
 
-AC_INIT(spice, [SPICE_MAJOR.SPICE_MINOR.SPICE_MICRO], [], spice)
+AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
+        [spice-devel@lists.freedesktop.org], spice)
 
 AC_CONFIG_MACRO_DIR([m4])
 AM_CONFIG_HEADER([config.h])
@@ -149,7 +150,7 @@ fi
 
 AC_ARG_ENABLE(client,
 [  --enable-client         Enable spice client],,
-[enable_client="yes"])
+[enable_client="no"])
 AS_IF([test x"$enable_client" != "xno"], [enable_client="yes"])
 AM_CONDITIONAL(SUPPORT_CLIENT, test "x$enable_client" = "xyes")
 
@@ -233,8 +234,12 @@ if test "x$enable_smartcard" = "xyes"; then
     SMARTCARD_CFLAGS="$CAC_CARD_CFLAGS"
     AC_SUBST(SMARTCARD_LIBS)
     AC_SUBST(SMARTCARD_CFLAGS)
+    SPICE_REQUIRES+=" libcacard >= 0.1.2"
 fi
 
+
+PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= 2.22])
+SPICE_REQUIRES+=" glib-2.0 >= 2.22"
 
 PKG_CHECK_MODULES(PIXMAN, pixman-1 >= 0.17.7)
 AC_SUBST(PIXMAN_CFLAGS)

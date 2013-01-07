@@ -77,6 +77,8 @@ void spice_marshall_msg_tunnel_socket_token(SpiceMarshaller *m, SpiceMsgTunnelSo
 #ifdef USE_SMARTCARD
 void spice_marshall_msg_smartcard_data(SpiceMarshaller *m, SpiceMsgSmartcard *msg);
 #endif /* USE_SMARTCARD */
+void spice_marshall_msg_port_init(SpiceMarshaller *m, SpiceMsgPortInit *msg);
+void spice_marshall_msg_port_event(SpiceMarshaller *m, SpiceMsgPortEvent *msg);
 void spice_marshall_String(SpiceMarshaller *m, SpiceString *msg);
 void spice_marshall_Rect(SpiceMarshaller *m, SpiceRect *msg);
 void spice_marshall_Point(SpiceMarshaller *m, SpicePoint *msg);

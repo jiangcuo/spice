@@ -7695,9 +7695,186 @@ static uint8_t * parse_UsbredirChannel_msg(uint8_t *message_start, uint8_t *mess
     return NULL;
 }
 
+
+
+static uint8_t * parse_msg_port_init(uint8_t *message_start, uint8_t *message_end, int minor, size_t *size, message_destructor_t *free_message)
+{
+    SPICE_GNUC_UNUSED uint8_t *pos;
+    uint8_t *start = message_start;
+    uint8_t *data = NULL;
+    size_t nw_size;
+    size_t mem_size;
+    uint8_t *in, *end;
+    SPICE_GNUC_UNUSED intptr_t ptr_size;
+    uint32_t n_ptr=0;
+    PointerInfo ptr_info[1];
+    size_t name__extra_size;
+    uint32_t name__array__nelements;
+    SpiceMsgPortInit *out;
+    uint32_t i;
+
+    { /* name */
+        uint32_t name__value;
+        uint32_t name__array__nw_size;
+        uint32_t name__array__mem_size;
+        uint32_t name_size__value;
+        pos = (start + 4);
+        if (SPICE_UNLIKELY(pos + 4 > message_end)) {
+            goto error;
+        }
+        name__value = read_uint32(pos);
+        if (SPICE_UNLIKELY(name__value == 0)) {
+            goto error;
+        }
+        if (SPICE_UNLIKELY(message_start + name__value >= message_end)) {
+            goto error;
+        }
+        pos = start + 0;
+        if (SPICE_UNLIKELY(pos + 4 > message_end)) {
+            goto error;
+        }
+        name_size__value = read_uint32(pos);
+        name__array__nelements = name_size__value;
+
+        name__array__nw_size = name__array__nelements;
+        name__array__mem_size = sizeof(uint8_t) * name__array__nelements;
+        if (SPICE_UNLIKELY(message_start + name__value + name__array__nw_size > message_end)) {
+            goto error;
+        }
+        name__extra_size = name__array__mem_size + /* for alignment */ 3;
+    }
+
+    nw_size = 9;
+    mem_size = sizeof(SpiceMsgPortInit) + name__extra_size;
+
+    /* Check if message fits in reported side */
+    if (start + nw_size > message_end) {
+        return NULL;
+    }
+
+    /* Validated extents and calculated size */
+    data = (uint8_t *)malloc(mem_size);
+    if (SPICE_UNLIKELY(data == NULL)) {
+        goto error;
+    }
+    end = data + sizeof(SpiceMsgPortInit);
+    in = start;
+
+    out = (SpiceMsgPortInit *)data;
+
+    out->name_size = consume_uint32(&in);
+    ptr_info[n_ptr].offset = consume_uint32(&in);
+    ptr_info[n_ptr].parse = parse_array_uint8;
+    ptr_info[n_ptr].dest = (void **)&out->name;
+    ptr_info[n_ptr].nelements = name__array__nelements;
+    n_ptr++;
+    out->opened = consume_uint8(&in);
+
+    assert(in <= message_end);
+
+    for (i = 0; i < n_ptr; i++) {
+        if (ptr_info[i].offset == 0) {
+            *ptr_info[i].dest = NULL;
+        } else {
+            /* Align to 32 bit */
+            end = (uint8_t *)SPICE_ALIGN((size_t)end, 4);
+            *ptr_info[i].dest = (void *)end;
+            end = ptr_info[i].parse(message_start, message_end, end, &ptr_info[i], minor);
+            if (SPICE_UNLIKELY(end == NULL)) {
+                goto error;
+            }
+        }
+    }
+
+    assert(end <= data + mem_size);
+
+    *size = end - data;
+    *free_message = (message_destructor_t) free;
+    return data;
+
+   error:
+    if (data != NULL) {
+        free(data);
+    }
+    return NULL;
+}
+
+static uint8_t * parse_msg_port_event(uint8_t *message_start, uint8_t *message_end, int minor, size_t *size, message_destructor_t *free_message)
+{
+    SPICE_GNUC_UNUSED uint8_t *pos;
+    uint8_t *start = message_start;
+    uint8_t *data = NULL;
+    size_t nw_size;
+    size_t mem_size;
+    uint8_t *in, *end;
+    SpiceMsgPortEvent *out;
+
+    nw_size = 1;
+    mem_size = sizeof(SpiceMsgPortEvent);
+
+    /* Check if message fits in reported side */
+    if (start + nw_size > message_end) {
+        return NULL;
+    }
+
+    /* Validated extents and calculated size */
+    data = (uint8_t *)malloc(mem_size);
+    if (SPICE_UNLIKELY(data == NULL)) {
+        goto error;
+    }
+    end = data + sizeof(SpiceMsgPortEvent);
+    in = start;
+
+    out = (SpiceMsgPortEvent *)data;
+
+    out->event = consume_uint8(&in);
+
+    assert(in <= message_end);
+    assert(end <= data + mem_size);
+
+    *size = end - data;
+    *free_message = (message_destructor_t) free;
+    return data;
+
+   error:
+    if (data != NULL) {
+        free(data);
+    }
+    return NULL;
+}
+
+static uint8_t * parse_PortChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
+{
+    static parse_msg_func_t funcs1[8] =  {
+        parse_msg_migrate,
+        parse_SpiceMsgData,
+        parse_msg_set_ack,
+        parse_msg_ping,
+        parse_msg_wait_for_channels,
+        parse_msg_disconnecting,
+        parse_msg_notify,
+        parse_SpiceMsgData
+    };
+    static parse_msg_func_t funcs2[1] =  {
+        parse_SpiceMsgData
+    };
+    static parse_msg_func_t funcs3[2] =  {
+        parse_msg_port_init,
+        parse_msg_port_event
+    };
+    if (message_type >= 1 && message_type < 9) {
+        return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
+    } else if (message_type >= 101 && message_type < 102) {
+        return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
+    } else if (message_type >= 201 && message_type < 203) {
+        return funcs3[message_type-201](message_start, message_end, minor, size_out, free_message);
+    }
+    return NULL;
+}
+
 spice_parse_channel_func_t spice_get_server_channel_parser(uint32_t channel, unsigned int *max_message_type)
 {
-    static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[10] =  {
+    static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[11] =  {
         { NULL, 0 },
         { parse_MainChannel_msg, 118},
         { parse_DisplayChannel_msg, 318},
@@ -7711,9 +7888,10 @@ spice_parse_channel_func_t spice_get_server_channel_parser(uint32_t channel, uns
 #else /* USE_SMARTCARD */
         { NULL, 0 },
 #endif /* USE_SMARTCARD */
-        { parse_UsbredirChannel_msg, 101}
+        { parse_UsbredirChannel_msg, 101},
+        { parse_PortChannel_msg, 202}
     };
-    if (channel < 10) {
+    if (channel < 11) {
         if (max_message_type != NULL) {
             *max_message_type = channels[channel].max_messages;
         }

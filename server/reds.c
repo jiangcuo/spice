@@ -47,6 +47,8 @@
 #include <sasl/sasl.h>
 #endif
 
+#include <glib.h>
+
 #include <spice/protocol.h>
 #include <spice/vd_agent.h>
 #include <spice/stats.h>
@@ -75,6 +77,8 @@
 #include "smartcard.h"
 #endif
 
+#include "reds-private.h"
+
 SpiceCoreInterface *core = NULL;
 static SpiceCharDeviceInstance *vdagent = NULL;
 static SpiceMigrateInstance *migration_interface = NULL;
@@ -92,6 +96,8 @@ static SpiceMigrateInstance *migration_interface = NULL;
 
 #define REDS_TOKENS_TO_SEND 5
 #define REDS_VDI_PORT_NUM_RECEIVE_BUFFS 5
+
+static TicketAuthentication taTicket;
 
 static int spice_port = -1;
 static int spice_secure_port = -1;
@@ -120,182 +126,6 @@ void *red_tunnel = NULL;
 int agent_mouse = TRUE;
 int agent_copypaste = TRUE;
 static bool exit_on_disconnect = FALSE;
-
-#define MIGRATE_TIMEOUT (1000 * 10) /* 10sec */
-#define MM_TIMER_GRANULARITY_MS (1000 / 30)
-#define MM_TIME_DELTA 400 /*ms*/
-
-typedef struct TicketAuthentication {
-    char password[SPICE_MAX_PASSWORD_LENGTH];
-    time_t expiration_time;
-} TicketAuthentication;
-
-static TicketAuthentication taTicket;
-
-typedef struct TicketInfo {
-    RSA *rsa;
-    int rsa_size;
-    BIGNUM *bn;
-    SpiceLinkEncryptedTicket encrypted_ticket;
-} TicketInfo;
-
-typedef struct MonitorMode {
-    uint32_t x_res;
-    uint32_t y_res;
-} MonitorMode;
-
-typedef struct VDIReadBuf {
-    RingItem link;
-    uint32_t refs;
-
-    int len;
-    uint8_t data[SPICE_AGENT_MAX_DATA_SIZE];
-} VDIReadBuf;
-
-static VDIReadBuf *vdi_port_read_buf_get(void);
-static VDIReadBuf *vdi_port_read_buf_ref(VDIReadBuf *buf);
-static void vdi_port_read_buf_unref(VDIReadBuf *buf);
-
-enum {
-    VDI_PORT_READ_STATE_READ_HEADER,
-    VDI_PORT_READ_STATE_GET_BUFF,
-    VDI_PORT_READ_STATE_READ_DATA,
-};
-
-typedef struct VDIPortState {
-    SpiceCharDeviceState *base;
-    uint32_t plug_generation;
-    int client_agent_started;
-
-    /* write to agent */
-    SpiceCharDeviceWriteBuffer *recv_from_client_buf;
-    int recv_from_client_buf_pushed;
-    AgentMsgFilter write_filter;
-
-    /* read from agent */
-    Ring read_bufs;
-    uint32_t read_state;
-    uint32_t message_recive_len;
-    uint8_t *recive_pos;
-    uint32_t recive_len;
-    VDIReadBuf *current_read_buf;
-    AgentMsgFilter read_filter;
-
-    VDIChunkHeader vdi_chunk_header;
-
-    SpiceMigrateDataMain *mig_data; /* storing it when migration data arrives
-                                       before agent is attached */
-} VDIPortState;
-
-/* messages that are addressed to the agent and are created in the server */
-typedef struct __attribute__ ((__packed__)) VDInternalBuf {
-    VDIChunkHeader chunk_header;
-    VDAgentMessage header;
-    union {
-        VDAgentMouseState mouse_state;
-    }
-    u;
-} VDInternalBuf;
-
-#ifdef RED_STATISTICS
-
-#define REDS_MAX_STAT_NODES 100
-#define REDS_STAT_SHM_SIZE (sizeof(SpiceStat) + REDS_MAX_STAT_NODES * sizeof(SpiceStatNode))
-
-typedef struct RedsStatValue {
-    uint32_t value;
-    uint32_t min;
-    uint32_t max;
-    uint32_t average;
-    uint32_t count;
-} RedsStatValue;
-
-#endif
-
-typedef struct RedsMigPendingLink {
-    RingItem ring_link; // list of links that belongs to the same client
-    SpiceLinkMess *link_msg;
-    RedsStream *stream;
-} RedsMigPendingLink;
-
-typedef struct RedsMigTargetClient {
-    RingItem link;
-    RedClient *client;
-    Ring pending_links;
-} RedsMigTargetClient;
-
-typedef struct RedsMigWaitDisconnectClient {
-    RingItem link;
-    RedClient *client;
-} RedsMigWaitDisconnectClient;
-
-typedef struct SpiceCharDeviceStateItem {
-    RingItem link;
-    SpiceCharDeviceState *st;
-} SpiceCharDeviceStateItem;
-
-/* Intermediate state for on going monitors config message from a single
- * client, being passed to the guest */
-typedef struct RedsClientMonitorsConfig {
-    MainChannelClient *mcc;
-    uint8_t *buffer;
-    int buffer_size;
-    int buffer_pos;
-} RedsClientMonitorsConfig;
-
-typedef struct RedsState {
-    int listen_socket;
-    int secure_listen_socket;
-    SpiceWatch *listen_watch;
-    SpiceWatch *secure_listen_watch;
-    VDIPortState agent_state;
-    int pending_mouse_event;
-    Ring clients;
-    int num_clients;
-    MainChannel *main_channel;
-
-    int mig_wait_connect; /* src waits for clients to establish connection to dest
-                             (before migration starts) */
-    int mig_wait_disconnect; /* src waits for clients to disconnect (after migration completes) */
-    Ring mig_wait_disconnect_clients; /* List of RedsMigWaitDisconnectClient. Holds the clients
-                                         which the src waits for their disconnection */
-
-    int mig_inprogress;
-    int expect_migrate;
-    int src_do_seamless_migrate; /* per migration. Updated after the migration handshake
-                                    between the 2 servers */
-    int dst_do_seamless_migrate; /* per migration. Updated after the migration handshake
-                                    between the 2 servers */
-    Ring mig_target_clients;
-    int num_mig_target_clients;
-    RedsMigSpice *mig_spice;
-
-    int num_of_channels;
-    Ring channels;
-    int mouse_mode;
-    int is_client_mouse_allowed;
-    int dispatcher_allows_client_mouse;
-    MonitorMode monitor_mode;
-    SpiceTimer *mig_timer;
-    SpiceTimer *mm_timer;
-
-    int vm_running;
-    Ring char_devs_states; /* list of SpiceCharDeviceStateItem */
-    int seamless_migration_enabled; /* command line arg */
-
-    SSL_CTX *ctx;
-
-#ifdef RED_STATISTICS
-    char *stat_shm_name;
-    SpiceStat *stat;
-    pthread_mutex_t stat_lock;
-    RedsStatValue roundtrip_stat;
-#endif
-    int peer_minor_version;
-    int allow_multiple_clients;
-
-    RedsClientMonitorsConfig client_monitors_config;
-} RedsState;
 
 static RedsState *reds = NULL;
 
@@ -524,7 +354,7 @@ StatNodeRef stat_add_node(StatNodeRef parent, const char *name, int visible)
     spice_assert(!(node->flags & SPICE_STAT_NODE_FLAG_ENABLED));
     node->value = 0;
     node->flags = SPICE_STAT_NODE_FLAG_ENABLED | (visible ? SPICE_STAT_NODE_FLAG_VISIBLE : 0);
-    strncpy(node->name, name, sizeof(node->name));
+    g_strlcpy(node->name, name, sizeof(node->name));
     insert_stat_node(parent, ref);
     pthread_mutex_unlock(&reds->stat_lock);
     return ref;
@@ -646,7 +476,11 @@ static void reds_reset_vdp(void)
     /* Reset read filter to start with clean state when the agent reconnects */
     agent_msg_filter_init(&state->read_filter, agent_copypaste, TRUE);
     /* Throw away pending chunks from the current (if any) and future
-       messages written by the client */
+     * messages written by the client.
+     * TODO: client should clear its agent messages queue when the agent
+     * is disconnect. Currently, when and agent gets disconnected and reconnected,
+     * messeges that were directed to the previous instance of the agent continues
+     * to be sent from the client. This TODO will require server, protocol, and client changes */
     state->write_filter.result = AGENT_MSG_FILTER_DISCARD;
     state->write_filter.discard_all = TRUE;
     state->client_agent_started = FALSE;
@@ -1168,8 +1002,15 @@ uint8_t *reds_get_agent_data_buffer(MainChannelClient *mcc, size_t size)
     VDIPortState *dev_state = &reds->agent_state;
     RedClient *client;
 
-    if (!dev_state->base) {
-        return NULL;
+    if (!dev_state->client_agent_started) {
+        /*
+         * agent got disconnected, and possibly got reconnected, but we still can receive
+         * msgs that are addressed to the agent's old instance, in case they were
+         * sent by the client before it received the AGENT_DISCONNECTED msg.
+         * In such case, we will receive and discard the msgs (reds_reset_vdp takes care
+         * of setting state->write_filter.result = AGENT_MSG_FILTER_DISCARD).
+         */
+        return spice_malloc(size);
     }
 
     spice_assert(dev_state->recv_from_client_buf == NULL);
@@ -1185,8 +1026,12 @@ void reds_release_agent_data_buffer(uint8_t *buf)
 {
     VDIPortState *dev_state = &reds->agent_state;
 
-    spice_assert(buf == dev_state->recv_from_client_buf->buf + sizeof(VDIChunkHeader));
+    if (!dev_state->recv_from_client_buf) {
+        free(buf);
+        return;
+    }
 
+    spice_assert(buf == dev_state->recv_from_client_buf->buf + sizeof(VDIChunkHeader));
     if (!dev_state->recv_from_client_buf_pushed) {
         spice_char_device_write_buffer_release(reds->agent_state.base,
                                                dev_state->recv_from_client_buf);
@@ -1236,8 +1081,6 @@ void reds_on_main_agent_data(MainChannelClient *mcc, void *message, size_t size)
     VDIChunkHeader *header;
     int res;
 
-    spice_assert(message == reds->agent_state.recv_from_client_buf->buf + sizeof(VDIChunkHeader));
-
     res = agent_msg_filter_process_data(&reds->agent_state.write_filter,
                                         message, size);
     switch (res) {
@@ -1252,6 +1095,9 @@ void reds_on_main_agent_data(MainChannelClient *mcc, void *message, size_t size)
         reds_disconnect();
         return;
     }
+
+    spice_assert(reds->agent_state.recv_from_client_buf);
+    spice_assert(message == reds->agent_state.recv_from_client_buf->buf + sizeof(VDIChunkHeader));
     // TODO - start tracking agent data per channel
     header =  (VDIChunkHeader *)dev_state->recv_from_client_buf->buf;
     header->port = VDP_CLIENT_PORT;
@@ -1343,16 +1189,20 @@ void reds_marshall_migrate_data(SpiceMarshaller *m)
     spice_marshaller_add_uint32(m, SPICE_MIGRATE_DATA_MAIN_VERSION);
 
     if (!vdagent) {
+        uint8_t *null_agent_mig_data;
+
         spice_assert(!agent_state->base); /* MSG_AGENT_CONNECTED_TOKENS is supported by the client
                                              (see spice_server_migrate_connect), so SpiceCharDeviceState
                                              is destroyed when the agent is disconnected and
                                              there is no need to track the client tokens
                                              (see reds_reset_vdp) */
         spice_char_device_state_migrate_data_marshall_empty(m);
-        spice_marshaller_add_ref(m,
-                                 (uint8_t *)&mig_data + sizeof(SpiceMigrateDataCharDevice),
-                                 sizeof(SpiceMigrateDataMain) - sizeof(SpiceMigrateDataCharDevice)
-                                 );
+        null_agent_mig_data = spice_marshaller_reserve_space(m,
+                                                             sizeof(SpiceMigrateDataMain) -
+                                                             sizeof(SpiceMigrateDataCharDevice));
+        memset(null_agent_mig_data,
+               0,
+               sizeof(SpiceMigrateDataMain) - sizeof(SpiceMigrateDataCharDevice));
         return;
     }
 
@@ -1368,7 +1218,7 @@ void reds_marshall_migrate_data(SpiceMarshaller *m)
 
         mig_data.agent2client.msg_header_done = FALSE;
         mig_data.agent2client.msg_header_partial_len = 0;
-        spice_assert(!agent_state->read_filter.msg_data_to_read );
+        spice_assert(!agent_state->read_filter.msg_data_to_read);
     } else {
         mig_data.agent2client.chunk_header_size = sizeof(VDIChunkHeader);
         mig_data.agent2client.chunk_header.size = agent_state->message_recive_len;
@@ -1386,14 +1236,14 @@ void reds_marshall_migrate_data(SpiceMarshaller *m)
         }
     }
     spice_marshaller_add_uint32(m, mig_data.agent2client.chunk_header_size);
-    spice_marshaller_add_ref(m,
-                             (uint8_t *)&mig_data.agent2client.chunk_header,
-                             sizeof(VDIChunkHeader));
+    spice_marshaller_add(m,
+                         (uint8_t *)&mig_data.agent2client.chunk_header,
+                         sizeof(VDIChunkHeader));
     spice_marshaller_add_uint8(m, mig_data.agent2client.msg_header_done);
     spice_marshaller_add_uint32(m, mig_data.agent2client.msg_header_partial_len);
     m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
-    spice_marshaller_add_ref(m2, agent_state->current_read_buf->data,
-                             mig_data.agent2client.msg_header_partial_len);
+    spice_marshaller_add(m2, agent_state->current_read_buf->data,
+                         mig_data.agent2client.msg_header_partial_len);
     spice_marshaller_add_uint32(m, mig_data.agent2client.msg_remaining);
     spice_marshaller_add_uint8(m, mig_data.agent2client.msg_filter_result);
 
@@ -1859,7 +1709,7 @@ static void openssl_init(RedLinkInfo *link)
     link->tiTicketing.bn = BN_new();
 
     if (!link->tiTicketing.bn) {
-        spice_warning("OpenSSL BIGNUMS alloc failed");
+        spice_error("OpenSSL BIGNUMS alloc failed");
     }
 
     BN_set_word(link->tiTicketing.bn, f4);
@@ -3125,6 +2975,7 @@ static int reds_init_socket(const char *addr, int portnr, int family)
     if (rc != 0) {
         spice_warning("getaddrinfo(%s,%s): %s", addr, port,
                       gai_strerror(rc));
+        return -1;
     }
 
     for (e = res; e != NULL; e = e->ai_next) {
@@ -3176,6 +3027,7 @@ static int reds_init_net(void)
                                              reds_accept, NULL);
         if (reds->listen_watch == NULL) {
             spice_warning("set fd handle failed");
+            return -1;
         }
     }
 
@@ -3190,6 +3042,7 @@ static int reds_init_net(void)
                                                     reds_accept_ssl_connection, NULL);
         if (reds->secure_listen_watch == NULL) {
             spice_warning("set fd handle failed");
+            return -1;
         }
     }
 
@@ -3200,30 +3053,36 @@ static int reds_init_net(void)
                                              reds_accept, NULL);
         if (reds->listen_watch == NULL) {
             spice_warning("set fd handle failed");
+            return -1;
         }
     }
     return 0;
 }
 
-static void load_dh_params(SSL_CTX *ctx, char *file)
+static int load_dh_params(SSL_CTX *ctx, char *file)
 {
     DH *ret = 0;
     BIO *bio;
 
     if ((bio = BIO_new_file(file, "r")) == NULL) {
         spice_warning("Could not open DH file");
+        return -1;
     }
 
     ret = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
+    BIO_free(bio);
     if (ret == 0) {
         spice_warning("Could not read DH params");
+        return -1;
     }
 
-    BIO_free(bio);
 
     if (SSL_CTX_set_tmp_dh(ctx, ret) < 0) {
         spice_warning("Could not set DH params");
+        return -1;
     }
+
+    return 0;
 }
 
 /*The password code is not thread safe*/
@@ -3272,7 +3131,7 @@ static void openssl_thread_setup(void)
     CRYPTO_set_locking_callback(pthreads_locking_callback);
 }
 
-static void reds_init_ssl(void)
+static int reds_init_ssl(void)
 {
 #if OPENSSL_VERSION_NUMBER >= 0x10000000L
     const SSL_METHOD *ssl_method;
@@ -3291,6 +3150,7 @@ static void reds_init_ssl(void)
     reds->ctx = SSL_CTX_new(ssl_method);
     if (!reds->ctx) {
         spice_warning("Could not allocate new SSL context");
+        return -1;
     }
 
     /* Limit connection to TLSv1 only */
@@ -3305,6 +3165,7 @@ static void reds_init_ssl(void)
         spice_info("Loaded certificates from %s", ssl_parameters.certs_file);
     } else {
         spice_warning("Could not load certificates from %s", ssl_parameters.certs_file);
+        return -1;
     }
 
     SSL_CTX_set_default_passwd_cb(reds->ctx, ssl_password_cb);
@@ -3315,6 +3176,7 @@ static void reds_init_ssl(void)
         spice_info("Using private key from %s", ssl_parameters.private_key_file);
     } else {
         spice_warning("Could not use private key file");
+        return -1;
     }
 
     /* Load the CAs we trust*/
@@ -3323,6 +3185,7 @@ static void reds_init_ssl(void)
         spice_info("Loaded CA certificates from %s", ssl_parameters.ca_certificate_file);
     } else {
         spice_warning("Could not use CA file %s", ssl_parameters.ca_certificate_file);
+        return -1;
     }
 
 #if (OPENSSL_VERSION_NUMBER < 0x00905100L)
@@ -3330,12 +3193,16 @@ static void reds_init_ssl(void)
 #endif
 
     if (strlen(ssl_parameters.dh_key_file) > 0) {
-        load_dh_params(reds->ctx, ssl_parameters.dh_key_file);
+        if (load_dh_params(reds->ctx, ssl_parameters.dh_key_file) < 0) {
+            return -1;
+        }
     }
 
     SSL_CTX_set_session_id_context(reds->ctx, (const unsigned char *)"SPICE", 5);
     if (strlen(ssl_parameters.ciphersuite) > 0) {
-        SSL_CTX_set_cipher_list(reds->ctx, ssl_parameters.ciphersuite);
+        if (!SSL_CTX_set_cipher_list(reds->ctx, ssl_parameters.ciphersuite)) {
+            return -1;
+        }
     }
 
     openssl_thread_setup();
@@ -3344,6 +3211,8 @@ static void reds_init_ssl(void)
     STACK *cmp_stack = SSL_COMP_get_compression_methods();
     sk_zero(cmp_stack);
 #endif
+
+    return 0;
 }
 
 static void reds_exit(void)
@@ -3675,6 +3544,7 @@ SPICE_GNUC_VISIBLE void spice_server_char_device_wakeup(SpiceCharDeviceInstance*
 #define SUBTYPE_VDAGENT "vdagent"
 #define SUBTYPE_SMARTCARD "smartcard"
 #define SUBTYPE_USBREDIR "usbredir"
+#define SUBTYPE_PORT "port"
 
 const char *spice_server_char_device_recognized_subtypes_list[] = {
     SUBTYPE_VDAGENT,
@@ -3748,6 +3618,10 @@ static int spice_server_char_device_add_interface(SpiceServer *s,
     else if (strcmp(char_device->subtype, SUBTYPE_USBREDIR) == 0) {
         dev_state = spicevmc_device_connect(char_device, SPICE_CHANNEL_USBREDIR);
     }
+    else if (strcmp(char_device->subtype, SUBTYPE_PORT) == 0) {
+        dev_state = spicevmc_device_connect(char_device, SPICE_CHANNEL_PORT);
+    }
+
     if (dev_state) {
         spice_assert(char_device->st);
         /* setting the char_device state to "started" for backward compatibily with
@@ -3758,6 +3632,7 @@ static int spice_server_char_device_add_interface(SpiceServer *s,
         reds_char_device_add_state(char_device->st);
     } else {
         spice_warning("failed to create device state for %s", char_device->subtype);
+        return -1;
     }
     return 0;
 }
@@ -3778,9 +3653,13 @@ static void spice_server_char_device_remove_interface(SpiceBaseInstance *sin)
         smartcard_device_disconnect(char_device);
     }
 #endif
-    else if (strcmp(char_device->subtype, SUBTYPE_USBREDIR) == 0) {
+    else if (strcmp(char_device->subtype, SUBTYPE_USBREDIR) == 0 ||
+             strcmp(char_device->subtype, SUBTYPE_PORT) == 0) {
         spicevmc_device_disconnect(char_device);
+    } else {
+        spice_warning("failed to remove char device %s", char_device->subtype);
     }
+
     char_device->st = NULL;
 }
 
@@ -4012,7 +3891,9 @@ static int do_spice_init(SpiceCoreInterface *core_interface)
         goto err;
     }
     if (reds->secure_listen_socket != -1) {
-        reds_init_ssl();
+        if (reds_init_ssl() < 0) {
+            goto err;
+        }
     }
 #if HAVE_SASL
     int saslerr;
@@ -4103,7 +3984,7 @@ SPICE_GNUC_VISIBLE int spice_server_set_port(SpiceServer *s, int port)
 SPICE_GNUC_VISIBLE void spice_server_set_addr(SpiceServer *s, const char *addr, int flags)
 {
     spice_assert(reds == s);
-    strncpy(spice_addr, addr, sizeof(spice_addr));
+    g_strlcpy(spice_addr, addr, sizeof(spice_addr));
     if (flags & SPICE_ADDR_FLAG_IPV4_ONLY) {
         spice_family = PF_INET;
     }
@@ -4194,7 +4075,7 @@ SPICE_GNUC_VISIBLE int spice_server_set_ticket(SpiceServer *s,
         taTicket.expiration_time = now + lifetime;
     }
     if (passwd != NULL) {
-        strncpy(taTicket.password, passwd, sizeof(taTicket.password));
+        g_strlcpy(taTicket.password, passwd, sizeof(taTicket.password));
     } else {
         memset(taTicket.password, 0, sizeof(taTicket.password));
         taTicket.expiration_time = 0;
@@ -4218,24 +4099,24 @@ SPICE_GNUC_VISIBLE int spice_server_set_tls(SpiceServer *s, int port,
     memset(&ssl_parameters, 0, sizeof(ssl_parameters));
 
     spice_secure_port = port;
-    strncpy(ssl_parameters.ca_certificate_file, ca_cert_file,
-            sizeof(ssl_parameters.ca_certificate_file)-1);
-    strncpy(ssl_parameters.certs_file, certs_file,
-            sizeof(ssl_parameters.certs_file)-1);
-    strncpy(ssl_parameters.private_key_file, private_key_file,
-            sizeof(ssl_parameters.private_key_file)-1);
+    g_strlcpy(ssl_parameters.ca_certificate_file, ca_cert_file,
+              sizeof(ssl_parameters.ca_certificate_file));
+    g_strlcpy(ssl_parameters.certs_file, certs_file,
+              sizeof(ssl_parameters.certs_file));
+    g_strlcpy(ssl_parameters.private_key_file, private_key_file,
+              sizeof(ssl_parameters.private_key_file));
 
     if (key_passwd) {
-        strncpy(ssl_parameters.keyfile_password, key_passwd,
-                sizeof(ssl_parameters.keyfile_password)-1);
+        g_strlcpy(ssl_parameters.keyfile_password, key_passwd,
+                  sizeof(ssl_parameters.keyfile_password));
     }
     if (ciphersuite) {
-        strncpy(ssl_parameters.ciphersuite, ciphersuite,
-                sizeof(ssl_parameters.ciphersuite)-1);
+        g_strlcpy(ssl_parameters.ciphersuite, ciphersuite,
+                  sizeof(ssl_parameters.ciphersuite));
     }
     if (dh_key_file) {
-        strncpy(ssl_parameters.dh_key_file, dh_key_file,
-                sizeof(ssl_parameters.dh_key_file)-1);
+        g_strlcpy(ssl_parameters.dh_key_file, dh_key_file,
+                  sizeof(ssl_parameters.dh_key_file));
     }
     return 0;
 }

@@ -102,6 +102,7 @@
 #define CHANNEL_PUSH_SLEEP_DURATION 10000 //micro
 
 #define DISPLAY_CLIENT_TIMEOUT 15000000000ULL //nano
+#define DISPLAY_CLIENT_MIGRATE_DATA_TIMEOUT 10000000000ULL //nano, 10 sec
 #define DISPLAY_CLIENT_RETRY_INTERVAL 10000 //micro
 
 #define DISPLAY_FREE_LIST_DEFAULT_SIZE 128
@@ -127,6 +128,29 @@
 #define MIN_GLZ_SIZE_FOR_ZLIB 100
 
 typedef int64_t red_time_t;
+
+#define VALIDATE_SURFACE_RET(worker, surface_id) \
+    if (!validate_surface(worker, surface_id)) { \
+        rendering_incorrect(__func__); \
+        return; \
+    }
+
+#define VALIDATE_SURFACE_RETVAL(worker, surface_id, ret) \
+    if (!validate_surface(worker, surface_id)) { \
+        rendering_incorrect(__func__); \
+        return ret; \
+    }
+
+#define VALIDATE_SURFACE_BREAK(worker, surface_id) \
+    if (!validate_surface(worker, surface_id)) { \
+        rendering_incorrect(__func__); \
+        break; \
+    }
+
+static void rendering_incorrect(const char *msg)
+{
+    spice_warning("rendering incorrect from now on: %s", msg);
+}
 
 static inline red_time_t timespec_to_red_time(struct timespec *time)
 {
@@ -897,7 +921,6 @@ typedef struct RedWorker {
     RedSurface surfaces[NUM_SURFACES];
     uint32_t n_surfaces;
     SpiceImageSurfaces image_surfaces;
-    uint32_t primary_surface_generation;
 
     MonitorsConfig *monitors_config;
 
@@ -974,6 +997,7 @@ typedef struct RedWorker {
 #endif
 
     int driver_has_monitors_config;
+    int set_client_capabilities_pending;
 } RedWorker;
 
 typedef enum {
@@ -1231,7 +1255,7 @@ static inline void __validate_surface(RedWorker *worker, uint32_t surface_id)
     spice_warn_if(surface_id >= worker->n_surfaces);
 }
 
-static inline void validate_surface(RedWorker *worker, uint32_t surface_id)
+static inline int validate_surface(RedWorker *worker, uint32_t surface_id)
 {
     spice_warn_if(surface_id >= worker->n_surfaces);
     if (!worker->surfaces[surface_id].context.canvas) {
@@ -1239,7 +1263,9 @@ static inline void validate_surface(RedWorker *worker, uint32_t surface_id)
                    &(worker->surfaces[surface_id].context.canvas), surface_id);
         spice_warning("failed on %d", surface_id);
         spice_warn_if(!worker->surfaces[surface_id].context.canvas);
+        return 0;
     }
+    return 1;
 }
 
 static const char *draw_type_to_str(uint8_t type)
@@ -1571,12 +1597,24 @@ static uint8_t *common_alloc_recv_buf(RedChannelClient *rcc, uint16_t type, uint
 {
     CommonChannel *common = SPICE_CONTAINEROF(rcc->channel, CommonChannel, base);
 
+    /* SPICE_MSGC_MIGRATE_DATA is the only client message whose size is dynamic */
+    if (type == SPICE_MSGC_MIGRATE_DATA) {
+        return spice_malloc(size);
+    }
+
+    if (size > RECIVE_BUF_SIZE) {
+        spice_critical("unexpected message size %u (max is %d)", size, RECIVE_BUF_SIZE);
+        return NULL;
+    }
     return common->recv_buf;
 }
 
 static void common_release_recv_buf(RedChannelClient *rcc, uint16_t type, uint32_t size,
                                     uint8_t* msg)
 {
+    if (type == SPICE_MSGC_MIGRATE_DATA) {
+        free(msg);
+    }
 }
 
 #define CLIENT_PIXMAPS_CACHE
@@ -2042,7 +2080,6 @@ static void red_clear_surface_drawables_from_pipe(DisplayChannelClient *dcc, int
 }
 
 static void red_wait_outgoing_item(RedChannelClient *rcc);
-static void red_wait_outgoing_items(RedChannel *channel);
 
 static void red_clear_surface_drawables_from_pipes(RedWorker *worker, int surface_id,
     int force, int wait_for_outgoing_item)
@@ -3782,7 +3819,8 @@ static void free_one_drawable(RedWorker *worker, int force_glz_free)
 }
 
 static Drawable *get_drawable(RedWorker *worker, uint8_t effect, RedDrawable *red_drawable,
-                              uint32_t group_id) {
+                              uint32_t group_id)
+{
     Drawable *drawable;
     struct timespec time;
     int x;
@@ -3812,11 +3850,11 @@ static Drawable *get_drawable(RedWorker *worker, uint8_t effect, RedDrawable *re
     drawable->group_id = group_id;
 
     drawable->surface_id = red_drawable->surface_id;
-    validate_surface(worker, drawable->surface_id);
+    VALIDATE_SURFACE_RETVAL(worker, drawable->surface_id, NULL)
     for (x = 0; x < 3; ++x) {
         drawable->surfaces_dest[x] = red_drawable->surfaces_dest[x];
         if (drawable->surfaces_dest[x] != -1) {
-            validate_surface(worker, drawable->surfaces_dest[x]);
+            VALIDATE_SURFACE_RETVAL(worker, drawable->surfaces_dest[x], NULL)
         }
     }
     ring_init(&drawable->pipes);
@@ -3903,7 +3941,10 @@ static inline void red_process_drawable(RedWorker *worker, RedDrawable *drawable
     int surface_id;
     Drawable *item = get_drawable(worker, drawable->effect, drawable, group_id);
 
-    spice_assert(item);
+    if (!item) {
+        rendering_incorrect("failed to get_drawable");
+        return;
+    }
 
     surface_id = item->surface_id;
 
@@ -4022,7 +4063,7 @@ static SpiceCanvas *image_surfaces_get(SpiceImageSurfaces *surfaces,
     RedWorker *worker;
 
     worker = SPICE_CONTAINEROF(surfaces, RedWorker, image_surfaces);
-    validate_surface(worker, surface_id);
+    VALIDATE_SURFACE_RETVAL(worker, surface_id, NULL);
 
     return worker->surfaces[surface_id].context.canvas;
 }
@@ -4862,13 +4903,7 @@ static int red_process_commands(RedWorker *worker, uint32_t max_pipe_size, int *
     int n = 0;
     uint64_t start = red_now();
 
-    /* we don't process the command ring if we are at the migration target and we
-     * are expecting migration data. The migration data includes the list
-     * of surfaces that are held by the client. We need to have it before
-     * processing commands in order not to render and send surfaces unnecessarily
-     */
-    if (!worker->running || (worker->display_channel &&
-        red_channel_waits_for_migrate_data(&worker->display_channel->common.base))) {
+    if (!worker->running) {
         *ring_is_empty = TRUE;
         return n;
     }
@@ -4913,7 +4948,10 @@ static int red_process_commands(RedWorker *worker, uint32_t max_pipe_size, int *
                                    &update, ext_cmd.cmd.data)) {
                 break;
             }
-            validate_surface(worker, update.surface_id);
+            if (!validate_surface(worker, update.surface_id)) {
+                rendering_incorrect("QXL_CMD_UPDATE");
+                break;
+            }
             red_update_area(worker, &update.area, update.surface_id);
             worker->qxl->st->qif->notify_update(worker->qxl, update.update_id);
             release_info_ext.group_id = ext_cmd.group_id;
@@ -5027,7 +5065,7 @@ static ImageItem *red_add_surface_area_image(DisplayChannelClient *dcc, int surf
     width = area->right - area->left;
     height = area->bottom - area->top;
     bpp = SPICE_SURFACE_FMT_DEPTH(surface->context.format) / 8;
-    stride = SPICE_ALIGN(width * bpp, 4);
+    stride = width * bpp;
 
     item = (ImageItem *)spice_malloc_n_m(height, stride, sizeof(ImageItem));
 
@@ -6053,16 +6091,14 @@ static inline int red_lz_compress_image(DisplayChannelClient *dcc,
         o_comp_data->comp_buf = lz_data->data.bufs_head;
         o_comp_data->comp_buf_size = size;
     } else {
-        if (!src->palette) {
-            spice_warning("bad guest: missing palette\n");
-            return FALSE;
-        }
+        /* masks are 1BIT bitmaps without palettes, but they are not compressed
+         * (see fill_mask) */
+        spice_assert(src->palette);
         dest->descriptor.type = SPICE_IMAGE_TYPE_LZ_PLT;
         dest->u.lz_plt.data_size = size;
         dest->u.lz_plt.flags = src->flags & SPICE_BITMAP_FLAGS_TOP_DOWN;
         dest->u.lz_plt.palette = src->palette;
         dest->u.lz_plt.palette_id = src->palette->unique;
-
         o_comp_data->comp_buf = lz_data->data.bufs_head;
         o_comp_data->comp_buf_size = size;
 
@@ -6509,7 +6545,10 @@ static FillBitsType fill_bits(DisplayChannelClient *dcc, SpiceMarshaller *m,
         RedSurface *surface;
 
         surface_id = simage->u.surface.surface_id;
-        validate_surface(worker, surface_id);
+        if (!validate_surface(worker, surface_id)) {
+            rendering_incorrect("SPICE_IMAGE_TYPE_SURFACE");
+            return FILL_BITS_TYPE_SURFACE;
+        }
 
         surface = &worker->surfaces[surface_id];
         image.descriptor.type = SPICE_IMAGE_TYPE_SURFACE;
@@ -6668,7 +6707,7 @@ static int is_surface_area_lossy(DisplayChannelClient *dcc, uint32_t surface_id,
     QRegion lossy_region;
     RedWorker *worker = dcc->common.worker;
 
-    validate_surface(worker, surface_id);
+    VALIDATE_SURFACE_RETVAL(worker, surface_id, FALSE);
     surface = &worker->surfaces[surface_id];
     surface_lossy_region = &dcc->surface_client_lossy_region[surface_id];
 
@@ -8403,7 +8442,7 @@ static void display_channel_marshall_migrate_data_surfaces(DisplayChannelClient 
     *num_surfaces_created = 0;
     for (i = 0; i < NUM_SURFACES; i++) {
         SpiceRect lossy_rect;
-        SpiceMigrateDataRect lossy_rect_marshall;
+
         if (!dcc->surface_client_created[i]) {
             continue;
         }
@@ -8414,11 +8453,10 @@ static void display_channel_marshall_migrate_data_surfaces(DisplayChannelClient 
             continue;
         }
         region_extents(&dcc->surface_client_lossy_region[i], &lossy_rect);
-        lossy_rect_marshall.left = lossy_rect.left;
-        lossy_rect_marshall.top = lossy_rect.top;
-        lossy_rect_marshall.right = lossy_rect.right;
-        lossy_rect_marshall.bottom = lossy_rect.bottom;
-        spice_marshaller_add_ref(m2, (uint8_t *)&lossy_rect_marshall, sizeof(lossy_rect_marshall));
+        spice_marshaller_add_int32(m2, lossy_rect.left);
+        spice_marshaller_add_int32(m2, lossy_rect.top);
+        spice_marshaller_add_int32(m2, lossy_rect.right);
+        spice_marshaller_add_int32(m2, lossy_rect.bottom);
     }
 }
 
@@ -8567,20 +8605,20 @@ static void red_marshall_image(RedChannelClient *rcc, SpiceMarshaller *m, ImageI
 
     comp_mode = display_channel->common.worker->image_compression;
 
-    if ((comp_mode == SPICE_IMAGE_COMPRESS_AUTO_LZ) ||
-        (comp_mode == SPICE_IMAGE_COMPRESS_AUTO_GLZ)) {
+    if (((comp_mode == SPICE_IMAGE_COMPRESS_AUTO_LZ) ||
+        (comp_mode == SPICE_IMAGE_COMPRESS_AUTO_GLZ)) && !_stride_is_extra(&bitmap)) {
+
         if (BITMAP_FMT_HAS_GRADUALITY(item->image_format)) {
-            if (!_stride_is_extra(&bitmap)) {
-                BitmapGradualType grad_level;
-                grad_level = _get_bitmap_graduality_level(display_channel->common.worker,
-                                                          &bitmap,
-                                                          worker->mem_slots.internal_groupslot_id);
-                if (grad_level == BITMAP_GRADUAL_HIGH) {
-                    // if we use lz for alpha, the stride can't be extra
-                    lossy_comp = display_channel->enable_jpeg && item->can_lossy;
-                } else {
-                    lz_comp = TRUE;
-                }
+            BitmapGradualType grad_level;
+
+            grad_level = _get_bitmap_graduality_level(display_channel->common.worker,
+                                                      &bitmap,
+                                                      worker->mem_slots.internal_groupslot_id);
+            if (grad_level == BITMAP_GRADUAL_HIGH) {
+                // if we use lz for alpha, the stride can't be extra
+                lossy_comp = display_channel->enable_jpeg && item->can_lossy;
+            } else {
+                lz_comp = TRUE;
             }
         } else {
             lz_comp = TRUE;
@@ -9270,9 +9308,6 @@ static inline void red_create_surface(RedWorker *worker, uint32_t surface_id, ui
     RedSurface *surface = &worker->surfaces[surface_id];
     uint32_t i;
 
-    if (stride >= 0) {
-        spice_critical("Untested path stride >= 0");
-    }
     spice_warn_if(surface->context.canvas);
 
     surface->context.canvas_draws_on_surface = FALSE;
@@ -9478,11 +9513,6 @@ static void on_new_display_channel_client(DisplayChannelClient *dcc)
     }
     red_channel_client_ack_zero_messages_window(&dcc->common.base);
     if (worker->surfaces[0].context.canvas) {
-        int ring_is_empty;
-
-        while (red_process_commands(worker, MAX_PIPE_SIZE, &ring_is_empty)) {
-        }
-        
         red_current_flush(worker, 0);
         push_new_primary_surface(dcc);
         red_push_surface_image(dcc, 0);
@@ -9738,23 +9768,12 @@ static uint64_t display_channel_handle_migrate_data_get_serial(
     return migrate_data->message_serial;
 }
 
-static int display_channel_client_restore_surface(DisplayChannelClient *dcc, uint32_t surface_id)
+static void display_channel_client_restore_surface(DisplayChannelClient *dcc, uint32_t surface_id)
 {
-    if (surface_id == 0) {
-        if (dcc->common.worker->primary_surface_generation <= 1) {
-            dcc->surface_client_created[surface_id] = TRUE;
-            return TRUE;
-        } else {
-            /* red_create_surface_item already updated the client */
-            return FALSE;
-        }
-    } else {
-        /* we don't process commands till we receive the migration data, thus,
-         * we should have not created any off-screen surface */
-        spice_assert(!dcc->surface_client_created[surface_id]);
-        dcc->surface_client_created[surface_id] = TRUE;
-        return TRUE;
-    }
+    /* we don't process commands till we receive the migration data, thus,
+     * we should have not sent any surface to the client. */
+    spice_assert(!dcc->surface_client_created[surface_id]);
+    dcc->surface_client_created[surface_id] = TRUE;
 }
 
 static void display_channel_client_restore_surfaces_lossless(DisplayChannelClient *dcc,
@@ -9778,21 +9797,19 @@ static void display_channel_client_restore_surfaces_lossy(DisplayChannelClient *
     spice_debug(NULL);
     for (i = 0; i < mig_surfaces->num_surfaces; i++) {
         uint32_t surface_id = mig_surfaces->surfaces[i].id;
+        SpiceMigrateDataRect *mig_lossy_rect;
+        SpiceRect lossy_rect;
 
-        if (display_channel_client_restore_surface(dcc, surface_id)) {
-            SpiceMigrateDataRect *mig_lossy_rect;
-            SpiceRect lossy_rect;
+        display_channel_client_restore_surface(dcc, surface_id);
+        spice_assert(dcc->surface_client_created[surface_id]);
 
-            spice_assert(dcc->surface_client_created[surface_id]);
-
-            mig_lossy_rect = &mig_surfaces->surfaces[i].lossy_rect;
-            lossy_rect.left = mig_lossy_rect->left;
-            lossy_rect.top = mig_lossy_rect->top;
-            lossy_rect.right = mig_lossy_rect->right;
-            lossy_rect.bottom = mig_lossy_rect->bottom;
-            region_init(&dcc->surface_client_lossy_region[surface_id]);
-            region_add(&dcc->surface_client_lossy_region[surface_id], &lossy_rect);
-        }
+        mig_lossy_rect = &mig_surfaces->surfaces[i].lossy_rect;
+        lossy_rect.left = mig_lossy_rect->left;
+        lossy_rect.top = mig_lossy_rect->top;
+        lossy_rect.right = mig_lossy_rect->right;
+        lossy_rect.bottom = mig_lossy_rect->bottom;
+        region_init(&dcc->surface_client_lossy_region[surface_id]);
+        region_add(&dcc->surface_client_lossy_region[surface_id], &lossy_rect);
     }
 }
 static int display_channel_handle_migrate_data(RedChannelClient *rcc, uint32_t size,
@@ -10295,6 +10312,54 @@ static void display_channel_create(RedWorker *worker, int migrate)
     stat_compress_init(&display_channel->jpeg_alpha_stat, jpeg_alpha_stat_name);
 }
 
+static void guest_set_client_capabilities(RedWorker *worker)
+{
+    int i;
+    DisplayChannelClient *dcc;
+    RedChannelClient *rcc;
+    RingItem *link;
+    uint8_t caps[58] = { 0 };
+    int caps_available[] = {
+        SPICE_DISPLAY_CAP_SIZED_STREAM,
+        SPICE_DISPLAY_CAP_MONITORS_CONFIG,
+        SPICE_DISPLAY_CAP_COMPOSITE,
+        SPICE_DISPLAY_CAP_A8_SURFACE,
+    };
+
+    if (worker->qxl->st->qif->base.major_version < 3 ||
+        (worker->qxl->st->qif->base.major_version == 3 &&
+        worker->qxl->st->qif->base.minor_version < 2) ||
+        !worker->qxl->st->qif->set_client_capabilities) {
+        return;
+    }
+#define SET_CAP(a,c)                                                    \
+        ((a)[(c) / 8] |= (1 << ((c) % 8)))
+
+#define CLEAR_CAP(a,c)                                                  \
+        ((a)[(c) / 8] &= ~(1 << ((c) % 8)))
+
+    if (!worker->running) {
+        worker->set_client_capabilities_pending = 1;
+        return;
+    }
+    if (worker->display_channel->common.base.clients_num == 0) {
+        worker->qxl->st->qif->set_client_capabilities(worker->qxl, FALSE, caps);
+    } else {
+        // Take least common denominator
+        for (i = 0 ; i < sizeof(caps_available) / sizeof(caps_available[0]); ++i) {
+            SET_CAP(caps, caps_available[i]);
+        }
+        DCC_FOREACH(link, dcc, &worker->display_channel->common.base) {
+            rcc = (RedChannelClient *)dcc;
+            for (i = 0 ; i < sizeof(caps_available) / sizeof(caps_available[0]); ++i) {
+                if (!red_channel_client_test_remote_cap(rcc, caps_available[i]))
+                    CLEAR_CAP(caps, caps_available[i]);
+            }
+        }
+        worker->qxl->st->qif->set_client_capabilities(worker->qxl, TRUE, caps);
+    }
+    worker->set_client_capabilities_pending = 0;
+}
 
 static void handle_new_display_channel(RedWorker *worker, RedClient *client, RedsStream *stream,
                                        int migrate,
@@ -10349,26 +10414,7 @@ static void handle_new_display_channel(RedWorker *worker, RedClient *client, Red
     spice_info("jpeg %s", display_channel->enable_jpeg ? "enabled" : "disabled");
     spice_info("zlib-over-glz %s", display_channel->enable_zlib_glz_wrap ? "enabled" : "disabled");
 
-    if (worker->qxl->st->qif->base.major_version == 3 &&
-        worker->qxl->st->qif->base.minor_version >= 2 &&
-        worker->qxl->st->qif->set_client_capabilities) {
-        RedChannelClient *rcc = (RedChannelClient *)dcc;
-        uint8_t caps[58] = { 0 };
-
-#define SET_CAP(a,c)                                                    \
-        ((a)[(c) / 8] |= (1 << ((c) % 8)))
-
-        if (red_channel_client_test_remote_cap(rcc, SPICE_DISPLAY_CAP_SIZED_STREAM))
-            SET_CAP(caps, SPICE_DISPLAY_CAP_SIZED_STREAM);
-        if (red_channel_client_test_remote_cap(rcc, SPICE_DISPLAY_CAP_MONITORS_CONFIG))
-            SET_CAP(caps, SPICE_DISPLAY_CAP_MONITORS_CONFIG);
-        if (red_channel_client_test_remote_cap(rcc, SPICE_DISPLAY_CAP_COMPOSITE))
-            SET_CAP(caps, SPICE_DISPLAY_CAP_COMPOSITE);
-        if (red_channel_client_test_remote_cap(rcc, SPICE_DISPLAY_CAP_A8_SURFACE))
-            SET_CAP(caps, SPICE_DISPLAY_CAP_A8_SURFACE);
-
-        worker->qxl->st->qif->set_client_capabilities(worker->qxl, TRUE, caps);
-    }
+    guest_set_client_capabilities(worker);
     
     // todo: tune level according to bandwidth
     display_channel->zlib_level = ZLIB_DEFAULT_COMPRESSION_LEVEL;
@@ -10563,37 +10609,39 @@ static void red_wait_outgoing_item(RedChannelClient *rcc)
     }
 }
 
-static void rcc_shutdown_if_blocked(RedChannelClient *rcc)
+static void rcc_shutdown_if_pending_send(RedChannelClient *rcc)
 {
-    if (red_channel_client_blocked(rcc)) {
+    if (red_channel_client_blocked(rcc) || rcc->pipe_size > 0) {
         red_channel_client_shutdown(rcc);
     } else {
         spice_assert(red_channel_client_no_item_being_sent(rcc));
     }
 }
 
-static void red_wait_outgoing_items(RedChannel *channel)
+static void red_wait_all_sent(RedChannel *channel)
 {
     uint64_t end_time;
-    int blocked;
-
-    if (!red_channel_any_blocked(channel)) {
-        return;
-    }
+    uint32_t max_pipe_size;
+    int blocked = FALSE;
 
     end_time = red_now() + DETACH_TIMEOUT;
-    spice_info("blocked");
 
-    do {
+    red_channel_push(channel);
+    while (((max_pipe_size = red_channel_max_pipe_size(channel)) || 
+           (blocked = red_channel_any_blocked(channel))) &&
+           red_now() < end_time) {
+        spice_debug("pipe-size %u blocked %d", max_pipe_size, blocked);
         usleep(DETACH_SLEEP_DURATION);
         red_channel_receive(channel);
         red_channel_send(channel);
-    } while ((blocked = red_channel_any_blocked(channel)) && red_now() < end_time);
+        red_channel_push(channel);
+    }
 
-    if (blocked) {
-        spice_warning("timeout");
-        red_channel_apply_clients(channel, rcc_shutdown_if_blocked);
-    } else {
+    if (max_pipe_size || blocked) {
+        spice_printerr("timeout: pending out messages exist (pipe-size %u, blocked %d)",
+                       max_pipe_size, blocked);
+        red_channel_apply_clients(channel, rcc_shutdown_if_pending_send);
+    } else { 
         spice_assert(red_channel_no_item_being_sent(channel));
     }
 }
@@ -10674,7 +10722,7 @@ void handle_dev_update_async(void *opaque, void *payload)
 
     spice_assert(worker->running);
 
-    validate_surface(worker, surface_id);
+    VALIDATE_SURFACE_RET(worker, surface_id);
     red_update_area(worker, &rect, surface_id);
     if (!worker->qxl->st->qif->update_area_complete) {
         return;
@@ -10710,8 +10758,11 @@ void handle_dev_update(void *opaque, void *payload)
 
     spice_assert(worker->running);
 
-    validate_surface(worker, surface_id);
-    red_update_area(worker, rect, surface_id);
+    if (validate_surface(worker, surface_id)) {
+        red_update_area(worker, rect, surface_id);
+    } else {
+        rendering_incorrect(__func__);
+    }
     free(rect);
 
     surface_dirty_region_to_rects(surface, qxl_dirty_rects, num_dirty_rects,
@@ -10798,7 +10849,7 @@ static inline void red_cursor_reset(RedWorker *worker)
         if (!worker->cursor_channel->common.during_target_migrate) {
             red_pipes_add_verb(&worker->cursor_channel->common.base, SPICE_MSG_CURSOR_RESET);
         }
-        red_wait_outgoing_items(&worker->cursor_channel->common.base);
+        red_wait_all_sent(&worker->cursor_channel->common.base);
     }
 }
 
@@ -10983,11 +11034,6 @@ static void dev_create_primary_surface(RedWorker *worker, uint32_t surface_id,
         line_0 -= (int32_t)(surface.stride * (surface.height -1));
     }
 
-    if (!worker->display_channel->common.during_target_migrate) {
-        worker->primary_surface_generation++;
-    } else {
-         worker->primary_surface_generation = 1;
-    }
     red_create_surface(worker, 0, surface.width, surface.height, surface.stride, surface.format,
                        line_0, surface.flags & QXL_SURF_FLAG_KEEP_DATA, TRUE);
     set_monitors_config_to_primary(worker);
@@ -11068,8 +11114,6 @@ static void dev_flush_surfaces(RedWorker *worker)
 {
     flush_all_qxl_commands(worker);
     flush_all_surfaces(worker);
-    red_wait_outgoing_items(&worker->display_channel->common.base);
-    red_wait_outgoing_items(&worker->cursor_channel->common.base);
 }
 
 void handle_dev_flush_surfaces(void *opaque, void *payload)
@@ -11095,8 +11139,44 @@ void handle_dev_stop(void *opaque, void *payload)
     worker->running = FALSE;
     red_display_clear_glz_drawables(worker->display_channel);
     flush_all_surfaces(worker);
-    red_wait_outgoing_items(&worker->display_channel->common.base);
-    red_wait_outgoing_items(&worker->cursor_channel->common.base);
+    /* todo: when the waiting is expected to take long (slow connection and
+     * overloaded pipe), don't wait, and in case of migration, 
+     * purge the pipe, send destroy_all_surfaces
+     * to the client (there is no such message right now), and start
+     * from scratch on the destination side */
+    red_wait_all_sent(&worker->display_channel->common.base);
+    red_wait_all_sent(&worker->cursor_channel->common.base);
+}
+
+static int display_channel_wait_for_migrate_data(DisplayChannel *display)
+{
+    uint64_t end_time = red_now() + DISPLAY_CLIENT_MIGRATE_DATA_TIMEOUT;
+    RedChannel *channel = &display->common.base;
+    RedChannelClient *rcc;
+
+    spice_debug(NULL);
+    spice_assert(channel->clients_num == 1);
+
+    rcc = SPICE_CONTAINEROF(ring_get_head(&channel->clients), RedChannelClient, channel_link);
+    spice_assert(red_channel_client_waits_for_migrate_data(rcc));
+
+    for (;;) {
+        red_channel_client_receive(rcc);
+        if (!red_channel_client_is_connected(rcc)) {
+            break;
+        }
+
+        if (!red_channel_client_waits_for_migrate_data(rcc)) {
+            return TRUE;
+        }
+        if (red_now() > end_time) {
+            spice_warning("timeout");
+            red_channel_client_disconnect(rcc);
+            break;
+        }
+        usleep(DISPLAY_CLIENT_RETRY_INTERVAL);
+    }
+    return FALSE;
 }
 
 void handle_dev_start(void *opaque, void *payload)
@@ -11109,8 +11189,12 @@ void handle_dev_start(void *opaque, void *payload)
     }
     if (worker->display_channel) {
         worker->display_channel->common.during_target_migrate = FALSE;
+        if (red_channel_waits_for_migrate_data(&worker->display_channel->common.base)) {
+            display_channel_wait_for_migrate_data(worker->display_channel);
+        }
     }
     worker->running = TRUE;
+    guest_set_client_capabilities(worker);
 }
 
 void handle_dev_wakeup(void *opaque, void *payload)
@@ -11229,12 +11313,7 @@ void handle_dev_display_disconnect(void *opaque, void *payload)
     spice_info("disconnect display client");
     spice_assert(rcc);
 
-    if (worker->qxl->st->qif->base.major_version == 3 &&
-        worker->qxl->st->qif->base.minor_version >= 2 &&
-        worker->qxl->st->qif->set_client_capabilities) {
-        uint8_t caps[58] = { 0 };
-        worker->qxl->st->qif->set_client_capabilities(worker->qxl, FALSE, caps);
-    }
+    guest_set_client_capabilities(worker);
 
     red_channel_client_disconnect(rcc);
 }

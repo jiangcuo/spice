@@ -5,6 +5,7 @@ AM_CPPFLAGS =					\
 	-DRED_STATISTICS			\
 	$(CELT051_CFLAGS)			\
 	$(COMMON_CFLAGS)			\
+	$(GLIB2_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
 	$(SASL_CFLAGS)				\
 	$(SLIRP_CFLAGS)				\
@@ -31,6 +32,7 @@ libspice_server_la_LIBADD =						\
 	$(top_builddir)/spice-common/common/libspice-common-server.la	\
 	$(CELT051_LIBS)							\
 	$(GL_LIBS)							\
+	$(GLIB2_LIBS)							\
 	$(JPEG_LIBS)							\
 	$(LIBRT)							\
 	$(PIXMAN_LIBS)							\
@@ -81,6 +83,7 @@ libspice_server_la_SOURCES =			\
 	red_worker.h				\
 	reds.c					\
 	reds.h					\
+	reds-private.h				\
 	reds_sw_canvas.c			\
 	reds_sw_canvas.h			\
 	snd_worker.c				\
