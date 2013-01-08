@@ -3,6 +3,10 @@ libspice-server.so.1 libspice-server1 #MINVER#
  SPICE_SERVER_0.10.1@SPICE_SERVER_0.10.1 0.10.1
  SPICE_SERVER_0.10.2@SPICE_SERVER_0.10.2 0.11.0
  SPICE_SERVER_0.10.3@SPICE_SERVER_0.10.3 0.11.0
+ SPICE_SERVER_0.10.4@SPICE_SERVER_0.10.4 0.12.2
+ SPICE_SERVER_0.11.2@SPICE_SERVER_0.11.2 0.12.2
+ SPICE_SERVER_0.11.4@SPICE_SERVER_0.11.4 0.12.2
+ SPICE_SERVER_0.12.2@SPICE_SERVER_0.12.2 0.12.2
  SPICE_SERVER_0.6.0@SPICE_SERVER_0.6.0 0.8.2
  SPICE_SERVER_0.6.1@SPICE_SERVER_0.6.1 0.8.2
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
@@ -23,6 +27,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_qxl_destroy_surfaces_async@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_flush_surfaces_async@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_loadvm_commands@SPICE_SERVER_0.8.2 0.8.2
+ spice_qxl_monitors_config_async@SPICE_SERVER_0.10.4 0.12.2
  spice_qxl_oom@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_reset_cursor@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_reset_image_cache@SPICE_SERVER_0.8.2 0.8.2
@@ -59,6 +64,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_playback_set_volume@SPICE_SERVER_0.10.0 0.10.0
  spice_server_playback_start@SPICE_SERVER_0.6.0 0.8.2
  spice_server_playback_stop@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_port_event@SPICE_SERVER_0.12.2 0.12.2
  spice_server_record_get_samples@SPICE_SERVER_0.6.0 0.8.2
  spice_server_record_set_mute@SPICE_SERVER_0.10.0 0.10.0
  spice_server_record_set_volume@SPICE_SERVER_0.10.0 0.10.0
@@ -70,6 +76,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_set_agent_mouse@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_channel_security@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_compat_version@SPICE_SERVER_0.6.1 0.8.2
+ spice_server_set_exit_on_disconnect@SPICE_SERVER_0.11.4 0.12.2
  spice_server_set_image_compression@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_jpeg_compression@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_listen_socket_fd@SPICE_SERVER_0.10.2 0.11.0
@@ -79,8 +86,11 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_set_port@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_sasl@SPICE_SERVER_0.8.2 0.8.2
  spice_server_set_sasl_appname@SPICE_SERVER_0.8.2 0.8.2
+ spice_server_set_seamless_migration@SPICE_SERVER_0.11.2 0.12.2
  spice_server_set_streaming_video@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_ticket@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_tls@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_uuid@SPICE_SERVER_0.10.2 0.11.0
  spice_server_set_zlib_glz_compression@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_vm_start@SPICE_SERVER_0.11.2 0.12.2
+ spice_server_vm_stop@SPICE_SERVER_0.11.2 0.12.2

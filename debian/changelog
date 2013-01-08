@@ -6,6 +6,7 @@ spice (0.12.2-1) experimental; urgency=low
      - Refresh link-libspice-server-with-libm-libpthread.patch
   * Refresh debian/cpyright, new files added
   * Build client, upstream don't build client by default
+  * Refresh libspice-server1.symbols
 
  -- Liang Guo <guoliang@debian.org>  Tue, 08 Jan 2013 22:18:26 +0800
 
