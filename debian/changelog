@@ -4,6 +4,7 @@ spice (0.12.2+nocelt-1) experimental; urgency=low
   * debian/patches:
      - Refresh make-celt-to-be-optional.patch
      - Refresh link-libspice-server-with-libm-libpthread.patch
+  * Refresh debian/cpyright, new files added
 
  -- Liang Guo <guoliang@debian.org>  Tue, 08 Jan 2013 22:18:26 +0800
 
