@@ -24,27 +24,6 @@
 #include "reds.h"
 #include "red_channel.h"
 
-/* This is a temporary measure for reds/main split - should not be in a header,
- * but private (although only reds.c includes main_channel.h) */
-struct MainMigrateData {
-    uint32_t version;
-    uint32_t serial;
-    uint32_t ping_id;
-
-    uint32_t agent_connected;
-    uint32_t client_agent_started;
-    uint32_t num_client_tokens;
-    uint32_t send_tokens;
-
-    uint32_t read_state;
-    VDIChunkHeader vdi_chunk_header;
-    uint32_t recive_len;
-    uint32_t message_recive_len;
-    uint32_t read_buf_len;
-
-    uint32_t write_queue_size;
-};
-
 // TODO: Defines used to calculate receive buffer size, and also by reds.c
 // other options: is to make a reds_main_consts.h, to duplicate defines.
 #define REDS_AGENT_WINDOW_SIZE 10
@@ -72,9 +51,9 @@ void main_channel_close(MainChannel *main_chan); // not destroy, just socket clo
 void main_channel_push_mouse_mode(MainChannel *main_chan, int current_mode, int is_client_mouse_allowed);
 void main_channel_push_agent_connected(MainChannel *main_chan);
 void main_channel_push_agent_disconnected(MainChannel *main_chan);
-void main_channel_push_tokens(MainChannel *main_chan, uint32_t num_tokens);
-void main_channel_push_agent_data(MainChannel *main_chan, uint8_t* data, size_t len,
-           spice_marshaller_item_free_func free_data, void *opaque);
+void main_channel_client_push_agent_tokens(MainChannelClient *mcc, uint32_t num_tokens);
+void main_channel_client_push_agent_data(MainChannelClient *mcc, uint8_t* data, size_t len,
+                                         spice_marshaller_item_free_func free_data, void *opaque);
 void main_channel_client_start_net_test(MainChannelClient *mcc);
 // TODO: huge. Consider making a reds_* interface for these functions
 // and calling from main.
@@ -82,7 +61,6 @@ void main_channel_push_init(MainChannelClient *mcc, int display_channels_hint,
     int current_mouse_mode, int is_client_mouse_allowed, int multi_media_time,
     int ram_hint);
 void main_channel_push_notify(MainChannel *main_chan, uint8_t *mess, const int mess_len);
-void main_channel_push_migrate(MainChannel *main_chan);
 void main_channel_push_multi_media_time(MainChannel *main_chan, int time);
 int main_channel_getsockname(MainChannel *main_chan, struct sockaddr *sa, socklen_t *salen);
 int main_channel_getpeername(MainChannel *main_chan, struct sockaddr *sa, socklen_t *salen);
@@ -98,11 +76,14 @@ void main_channel_migrate_switch(MainChannel *main_chan, RedsMigSpice *mig_targe
 
 /* semi seamless migration */
 
-/* returns the number of clients that we are waiting for their connection */
-int main_channel_migrate_connect(MainChannel *main_channel, RedsMigSpice *mig_target);
+/* returns the number of clients that we are waiting for their connection.
+ * try_seamless = 'true' when the seamless-migration=on in qemu command line */
+int main_channel_migrate_connect(MainChannel *main_channel, RedsMigSpice *mig_target,
+                                 int try_seamless);
 void main_channel_migrate_cancel_wait(MainChannel *main_chan);
 /* returns the number of clients for which SPICE_MSG_MAIN_MIGRATE_END was sent*/
-int main_channel_migrate_complete(MainChannel *main_chan, int success);
+int main_channel_migrate_src_complete(MainChannel *main_chan, int success);
+void main_channel_migrate_dst_complete(MainChannelClient *mcc);
 void main_channel_push_name(MainChannelClient *mcc, const char *name);
 void main_channel_push_uuid(MainChannelClient *mcc, const uint8_t uuid[16]);
 

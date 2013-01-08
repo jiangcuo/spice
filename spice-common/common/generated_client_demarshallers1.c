@@ -505,40 +505,46 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
     size_t nw_size;
     size_t mem_size;
     uint8_t *in, *end;
-    size_t host_data__nw_size;
-    uint32_t host_data__nelements;
-    size_t pub_key_data__nw_size;
-    uint32_t pub_key_data__nelements;
+    size_t dst_info__nw_size;
     SpiceMsgMainMigrationBegin *out;
 
-    { /* host_data */
-        uint32_t host_size__value;
-        pos = start + 8;
-        if (SPICE_UNLIKELY(pos + 4 > message_end)) {
-            goto error;
-        }
-        host_size__value = read_uint32(pos);
-        host_data__nelements = host_size__value;
+    { /* dst_info */
+        SPICE_GNUC_UNUSED uint8_t *start2 = (start + 0);
+        size_t host_data__nw_size;
+        uint32_t host_data__nelements;
+        size_t pub_key_data__nw_size;
+        uint32_t pub_key_data__nelements;
+        { /* host_data */
+            uint32_t host_size__value;
+            pos = start2 + 8;
+            if (SPICE_UNLIKELY(pos + 4 > message_end)) {
+                goto error;
+            }
+            host_size__value = read_uint32(pos);
+            host_data__nelements = host_size__value;
 
-        host_data__nw_size = host_data__nelements;
+            host_data__nw_size = host_data__nelements;
+        }
+
+        if (minor >= 1) { /* pub_key_data */
+            uint32_t pub_key_size__value;
+            pos = start2 + 12 + ((minor >= 1)?6:0);
+            if (SPICE_UNLIKELY(pos + 4 > message_end)) {
+                goto error;
+            }
+            pub_key_size__value = read_uint32(pos);
+            pub_key_data__nelements = pub_key_size__value;
+
+            pub_key_data__nw_size = pub_key_data__nelements;
+        } else { /* minor < 1 */
+            pub_key_data__nelements = 0;
+            pub_key_data__nw_size = 0;
+        }
+
+        dst_info__nw_size = 12 + ((minor >= 1)?10:0) + host_data__nw_size + pub_key_data__nw_size;
     }
 
-    if (minor >= 1) { /* pub_key_data */
-        uint32_t pub_key_size__value;
-        pos = start + 12 + ((minor >= 1)?6:0);
-        if (SPICE_UNLIKELY(pos + 4 > message_end)) {
-            goto error;
-        }
-        pub_key_size__value = read_uint32(pos);
-        pub_key_data__nelements = pub_key_size__value;
-
-        pub_key_data__nw_size = pub_key_data__nelements;
-    } else { /* minor < 1 */
-        pub_key_data__nelements = 0;
-        pub_key_data__nw_size = 0;
-    }
-
-    nw_size = 12 + ((minor >= 1)?10:0) + host_data__nw_size + pub_key_data__nw_size;
+    nw_size = 0 + dst_info__nw_size;
     mem_size = sizeof(SpiceMsgMainMigrationBegin);
 
     /* Check if message fits in reported side */
@@ -556,31 +562,37 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
 
     out = (SpiceMsgMainMigrationBegin *)data;
 
-    out->port = consume_uint16(&in);
-    out->sport = consume_uint16(&in);
-    consume_uint32(&in);
-    out->host_size = consume_uint32(&in);
-    if (minor >= 1) {
-        out->pub_key_type = consume_uint16(&in);
-    } else {
-        out->pub_key_type = 0;
-    }
-    if (minor >= 1) {
+    /* dst_info */ {
+        uint32_t host_data__nelements;
+        uint32_t pub_key_data__nelements;
+        out->dst_info.port = consume_uint16(&in);
+        out->dst_info.sport = consume_uint16(&in);
         consume_uint32(&in);
-    } else {
-    }
-    if (minor >= 1) {
-        out->pub_key_size = consume_uint32(&in);
-    } else {
-        out->pub_key_size = 0;
-    }
-    /* use array as pointer */
-    out->host_data = (uint8_t *)in;
-    in += host_data__nelements;
-    if (minor >= 1) {
+        out->dst_info.host_size = consume_uint32(&in);
+        if (minor >= 1) {
+            out->dst_info.pub_key_type = consume_uint16(&in);
+        } else {
+            out->dst_info.pub_key_type = 0;
+        }
+        if (minor >= 1) {
+            consume_uint32(&in);
+        } else {
+        }
+        if (minor >= 1) {
+            out->dst_info.pub_key_size = consume_uint32(&in);
+        } else {
+            out->dst_info.pub_key_size = 0;
+        }
+        host_data__nelements = out->dst_info.host_size;
         /* use array as pointer */
-        out->pub_key_data = (uint8_t *)in;
-        in += pub_key_data__nelements;
+        out->dst_info.host_data = (uint8_t *)in;
+        in += host_data__nelements;
+        if (minor >= 1) {
+            pub_key_data__nelements = out->dst_info.pub_key_size;
+            /* use array as pointer */
+            out->dst_info.pub_key_data = (uint8_t *)in;
+            in += pub_key_data__nelements;
+        }
     }
 
     assert(in <= message_end);

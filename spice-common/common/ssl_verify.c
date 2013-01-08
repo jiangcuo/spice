@@ -166,6 +166,8 @@ static int verify_hostname(X509* cert, const char *hostname)
     int cn_match = 0;
     X509_NAME* subject;
 
+    spice_return_val_if_fail(hostname != NULL, 0);
+
     if (!cert) {
         spice_debug("warning: no cert!");
         return 0;
@@ -269,6 +271,9 @@ static X509_NAME* subject_to_x509_name(const char *subject, int *nentries)
         KEY,
         VALUE
     } state;
+
+    spice_return_val_if_fail(subject != NULL, NULL);
+    spice_return_val_if_fail(nentries != NULL, NULL);
 
     key = (char*)alloca(strlen(subject));
     val = (char*)alloca(strlen(subject));
@@ -408,6 +413,7 @@ static int openssl_verify(int preverify_ok, X509_STORE_CTX *ctx)
     SSL *ssl;
     X509* cert;
     char buf[256];
+    unsigned int failed_verifications;
 
     ssl = (SSL*)X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
     v = (SpiceOpenSSLVerify*)SSL_get_app_data(ssl);
@@ -428,6 +434,9 @@ static int openssl_verify(int preverify_ok, X509_STORE_CTX *ctx)
                 v->verifyop & SPICE_SSL_VERIFY_OP_PUBKEY)
                 return 1;
 
+            if (err == X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN)
+                spice_debug("server certificate not being signed by the provided CA");
+
             return 0;
         } else
             return 1;
@@ -439,20 +448,45 @@ static int openssl_verify(int preverify_ok, X509_STORE_CTX *ctx)
         return 0;
     }
 
-    if (v->verifyop & SPICE_SSL_VERIFY_OP_PUBKEY &&
-        verify_pubkey(cert, v->pubkey, v->pubkey_size))
-        return 1;
+    failed_verifications = 0;
+    if (v->verifyop & SPICE_SSL_VERIFY_OP_PUBKEY) {
+        if (verify_pubkey(cert, v->pubkey, v->pubkey_size))
+            return 1;
+        else
+            failed_verifications |= SPICE_SSL_VERIFY_OP_PUBKEY;
+    }
 
     if (!v->all_preverify_ok || !preverify_ok)
         return 0;
 
-    if (v->verifyop & SPICE_SSL_VERIFY_OP_HOSTNAME &&
-        verify_hostname(cert, v->hostname))
-        return 1;
+    if (v->verifyop & SPICE_SSL_VERIFY_OP_HOSTNAME) {
+       if (verify_hostname(cert, v->hostname))
+           return 1;
+        else
+            failed_verifications |= SPICE_SSL_VERIFY_OP_HOSTNAME;
+    }
 
-    if (v->verifyop & SPICE_SSL_VERIFY_OP_SUBJECT &&
-        verify_subject(cert, v))
-        return 1;
+
+    if (v->verifyop & SPICE_SSL_VERIFY_OP_SUBJECT) {
+        if (verify_subject(cert, v))
+            return 1;
+        else
+            failed_verifications |= SPICE_SSL_VERIFY_OP_SUBJECT;
+    }
+
+    /* If we reach this code, this means all the tests failed, thus
+     * verification failed
+     */
+    if (failed_verifications & SPICE_SSL_VERIFY_OP_PUBKEY)
+        spice_warning("ssl: pubkey verification failed");
+
+    if (failed_verifications & SPICE_SSL_VERIFY_OP_HOSTNAME)
+        spice_warning("ssl: hostname '%s' verification failed", v->hostname);
+
+    if (failed_verifications & SPICE_SSL_VERIFY_OP_SUBJECT)
+        spice_warning("ssl: subject '%s' verification failed", v->subject);
+
+    spice_warning("ssl: verification failed");
 
     return 0;
 }

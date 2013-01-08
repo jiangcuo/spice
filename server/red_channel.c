@@ -36,6 +36,12 @@
 #include "stat.h"
 #include "red_channel.h"
 #include "reds.h"
+#include "main_dispatcher.h"
+
+typedef struct EmptyMsgPipeItem {
+    PipeItem base;
+    int msg;
+} EmptyMsgPipeItem;
 
 static void red_channel_client_event(int fd, int event, void *data);
 static void red_client_add_channel(RedClient *client, RedChannelClient *rcc);
@@ -452,6 +458,29 @@ static void red_channel_client_send_set_ack(RedChannelClient *rcc)
     red_channel_client_begin_send_message(rcc);
 }
 
+static void red_channel_client_send_migrate(RedChannelClient *rcc)
+{
+    SpiceMsgMigrate migrate;
+
+    red_channel_client_init_send_data(rcc, SPICE_MSG_MIGRATE, NULL);
+    migrate.flags = rcc->channel->migration_flags;
+    spice_marshall_msg_migrate(rcc->send_data.marshaller, &migrate);
+    if (rcc->channel->migration_flags & SPICE_MIGRATE_NEED_FLUSH) {
+        rcc->wait_migrate_flush_mark = TRUE;
+    }
+
+    red_channel_client_begin_send_message(rcc);
+}
+
+
+static void red_channel_client_send_empty_msg(RedChannelClient *rcc, PipeItem *base)
+{
+    EmptyMsgPipeItem *msg_pipe_item = SPICE_CONTAINEROF(base, EmptyMsgPipeItem, base);
+
+    red_channel_client_init_send_data(rcc, msg_pipe_item->msg, NULL);
+    red_channel_client_begin_send_message(rcc);
+}
+
 static void red_channel_client_send_item(RedChannelClient *rcc, PipeItem *item)
 {
     int handled = TRUE;
@@ -461,6 +490,15 @@ static void red_channel_client_send_item(RedChannelClient *rcc, PipeItem *item)
     switch (item->type) {
         case PIPE_ITEM_TYPE_SET_ACK:
             red_channel_client_send_set_ack(rcc);
+            free(item);
+            break;
+        case PIPE_ITEM_TYPE_MIGRATE:
+            red_channel_client_send_migrate(rcc);
+            free(item);
+            break;
+        case PIPE_ITEM_TYPE_EMPTY_MSG:
+            red_channel_client_send_empty_msg(rcc, item);
+            free(item);
             break;
         default:
             handled = FALSE;
@@ -560,6 +598,34 @@ int red_channel_client_test_remote_cap(RedChannelClient *rcc, uint32_t cap)
                           cap);
 }
 
+int red_channel_test_remote_common_cap(RedChannel *channel, uint32_t cap)
+{
+    RingItem *link;
+
+    RING_FOREACH(link, &channel->clients) {
+        RedChannelClient *rcc = SPICE_CONTAINEROF(link, RedChannelClient, channel_link);
+
+        if (!red_channel_client_test_remote_common_cap(rcc, cap)) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+int red_channel_test_remote_cap(RedChannel *channel, uint32_t cap)
+{
+    RingItem *link;
+
+    RING_FOREACH(link, &channel->clients) {
+        RedChannelClient *rcc = SPICE_CONTAINEROF(link, RedChannelClient, channel_link);
+
+        if (!red_channel_client_test_remote_cap(rcc, cap)) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 static int red_channel_client_pre_create_validate(RedChannel *channel, RedClient  *client)
 {
     if (red_client_get_channel(client, channel->type, channel->id)) {
@@ -641,6 +707,46 @@ error:
     return NULL;
 }
 
+static void red_channel_client_seamless_migration_done(RedChannelClient *rcc)
+{
+    rcc->wait_migrate_data = FALSE;
+
+    pthread_mutex_lock(&rcc->client->lock);
+    rcc->client->num_migrated_channels--;
+
+    /* we assume we always have at least one channel who has migration data transfer,
+     * otherwise, this flag will never be set back to FALSE*/
+    if (!rcc->client->num_migrated_channels) {
+        rcc->client->during_target_migrate = FALSE;
+        rcc->client->seamless_migrate = FALSE;
+        /* migration completion might have been triggered from a different thread
+         * than the main thread */
+        main_dispatcher_seamless_migrate_dst_complete(rcc->client);
+    }
+    pthread_mutex_unlock(&rcc->client->lock);
+}
+
+int red_channel_client_waits_for_migrate_data(RedChannelClient *rcc)
+{
+    return rcc->wait_migrate_data;
+}
+
+int red_channel_waits_for_migrate_data(RedChannel *channel)
+{
+    RedChannelClient *rcc;
+
+    if (!red_channel_is_connected(channel)) {
+        return FALSE;
+    }
+
+    if (channel->clients_num > 1) {
+        return FALSE;
+    }
+    spice_assert(channel->clients_num == 1);
+    rcc = SPICE_CONTAINEROF(ring_get_head(&channel->clients), RedChannelClient, channel_link);
+    return red_channel_client_waits_for_migrate_data(rcc);
+}
+
 static void red_channel_client_default_connect(RedChannel *channel, RedClient *client,
                                                RedsStream *stream,
                                                int migration,
@@ -655,16 +761,18 @@ static void red_channel_client_default_disconnect(RedChannelClient *base)
     red_channel_client_disconnect(base);
 }
 
-static void red_channel_client_default_migrate(RedChannelClient *base)
+void red_channel_client_default_migrate(RedChannelClient *rcc)
 {
+    red_channel_client_pipe_add_type(rcc, PIPE_ITEM_TYPE_MIGRATE);
 }
 
 RedChannel *red_channel_create(int size,
                                SpiceCoreInterface *core,
                                uint32_t type, uint32_t id,
-                               int migrate, int handle_acks,
+                               int handle_acks,
                                channel_handle_message_proc handle_message,
-                               ChannelCbs *channel_cbs)
+                               ChannelCbs *channel_cbs,
+                               uint32_t migration_flags)
 {
     RedChannel *channel;
     ClientCbs client_cbs = { NULL, };
@@ -672,15 +780,17 @@ RedChannel *red_channel_create(int size,
     spice_assert(size >= sizeof(*channel));
     spice_assert(channel_cbs->config_socket && channel_cbs->on_disconnect && handle_message &&
            channel_cbs->alloc_recv_buf && channel_cbs->release_item);
+    spice_assert(channel_cbs->handle_migrate_data ||
+                 !(migration_flags & SPICE_MIGRATE_NEED_DATA_TRANSFER));
     channel = spice_malloc0(size);
     channel->type = type;
     channel->id = id;
     channel->refs = 1;
     channel->handle_acks = handle_acks;
+    channel->migration_flags = migration_flags;
     memcpy(&channel->channel_cbs, channel_cbs, sizeof(ChannelCbs));
 
     channel->core = core;
-    channel->migrate = migrate;
     ring_init(&channel->clients);
 
     // TODO: send incoming_cb as parameters instead of duplicating?
@@ -769,15 +879,17 @@ static int do_nothing_handle_message(RedChannelClient *rcc,
 RedChannel *red_channel_create_parser(int size,
                                SpiceCoreInterface *core,
                                uint32_t type, uint32_t id,
-                               int migrate, int handle_acks,
+                               int handle_acks,
                                spice_parse_channel_func_t parser,
                                channel_handle_parsed_proc handle_parsed,
-                               ChannelCbs *channel_cbs)
+                               ChannelCbs *channel_cbs,
+                               uint32_t migration_flags)
 {
     RedChannel *channel = red_channel_create(size, core, type, id,
-                                             migrate, handle_acks,
+                                             handle_acks,
                                              do_nothing_handle_message,
-                                             channel_cbs);
+                                             channel_cbs,
+                                             migration_flags);
 
     if (channel == NULL) {
         return NULL;
@@ -789,7 +901,7 @@ RedChannel *red_channel_create_parser(int size,
 
 void red_channel_register_client_cbs(RedChannel *channel, ClientCbs *client_cbs)
 {
-    spice_assert(client_cbs->connect);
+    spice_assert(client_cbs->connect || channel->type == SPICE_CHANNEL_MAIN);
     channel->client_cbs.connect = client_cbs->connect;
 
     if (client_cbs->disconnect) {
@@ -886,9 +998,7 @@ static void red_channel_client_unref(RedChannelClient *rcc)
 void red_channel_client_destroy(RedChannelClient *rcc)
 {
     rcc->destroying = 1;
-    if (red_channel_client_is_connected(rcc)) {
-        red_channel_client_disconnect(rcc);
-    }
+    red_channel_client_disconnect(rcc);
     red_client_remove_channel(rcc);
     red_channel_client_unref(rcc);
 }
@@ -1031,13 +1141,21 @@ static void red_channel_handle_migrate_flush_mark(RedChannelClient *rcc)
 // So need to make all the handlers work with per channel/client data (what data exactly?)
 static void red_channel_handle_migrate_data(RedChannelClient *rcc, uint32_t size, void *message)
 {
+    spice_debug("channel type %d id %d rcc %p size %u",
+                rcc->channel->type, rcc->channel->id, rcc, size);
     if (!rcc->channel->channel_cbs.handle_migrate_data) {
         return;
     }
-    spice_assert(red_channel_client_get_message_serial(rcc) == 0);
-    red_channel_client_set_message_serial(rcc,
-        rcc->channel->channel_cbs.handle_migrate_data_get_serial(rcc, size, message));
+    if (!red_channel_client_waits_for_migrate_data(rcc)) {
+        spice_error("unexcpected");
+        return;
+    }
+    if (rcc->channel->channel_cbs.handle_migrate_data_get_serial) {
+        red_channel_client_set_message_serial(rcc,
+            rcc->channel->channel_cbs.handle_migrate_data_get_serial(rcc, size, message));
+    }
     rcc->channel->channel_cbs.handle_migrate_data(rcc, size, message);
+    red_channel_client_seamless_migration_done(rcc);
 }
 
 int red_channel_client_handle_message(RedChannelClient *rcc, uint32_t size,
@@ -1060,7 +1178,12 @@ int red_channel_client_handle_message(RedChannelClient *rcc, uint32_t size,
     case SPICE_MSGC_DISCONNECTING:
         break;
     case SPICE_MSGC_MIGRATE_FLUSH_MARK:
+        if (!rcc->wait_migrate_flush_mark) {
+            spice_error("unexpected flush mark");
+            return FALSE;
+        }
         red_channel_handle_migrate_flush_mark(rcc);
+        rcc->wait_migrate_flush_mark = FALSE;
         break;
     case SPICE_MSGC_MIGRATE_DATA:
         red_channel_handle_migrate_data(rcc, size, message);
@@ -1147,6 +1270,7 @@ uint64_t red_channel_client_get_message_serial(RedChannelClient *rcc)
 
 void red_channel_client_set_message_serial(RedChannelClient *rcc, uint64_t serial)
 {
+    rcc->send_data.last_sent_serial = serial;
     rcc->send_data.serial = serial;
 }
 
@@ -1222,9 +1346,34 @@ void red_channel_pipes_add_type(RedChannel *channel, int pipe_item_type)
     }
 }
 
+void red_channel_client_pipe_add_empty_msg(RedChannelClient *rcc, int msg_type)
+{
+    EmptyMsgPipeItem *item = spice_new(EmptyMsgPipeItem, 1);
+
+    red_channel_pipe_item_init(rcc->channel, &item->base, PIPE_ITEM_TYPE_EMPTY_MSG);
+    item->msg = msg_type;
+    red_channel_client_pipe_add(rcc, &item->base);
+    red_channel_client_push(rcc);
+}
+
+void red_channel_pipes_add_empty_msg(RedChannel *channel, int msg_type)
+{
+    RingItem *link;
+
+    RING_FOREACH(link, &channel->clients) {
+        red_channel_client_pipe_add_empty_msg(
+            SPICE_CONTAINEROF(link, RedChannelClient, channel_link),
+            msg_type);
+    }
+}
+
 int red_channel_client_is_connected(RedChannelClient *rcc)
 {
-    return rcc->stream != NULL;
+    if (!rcc->dummy) {
+        return rcc->stream != NULL;
+    } else {
+        return rcc->dummy_connected;
+    }
 }
 
 int red_channel_is_connected(RedChannel *channel)
@@ -1283,10 +1432,23 @@ static void red_client_remove_channel(RedChannelClient *rcc)
     pthread_mutex_unlock(&rcc->client->lock);
 }
 
+static void red_channel_client_disconnect_dummy(RedChannelClient *rcc)
+{
+    spice_assert(rcc->dummy);
+    if (ring_item_is_linked(&rcc->channel_link)) {
+        red_channel_remove_client(rcc);
+    }
+    rcc->dummy_connected = FALSE;
+}
+
 void red_channel_client_disconnect(RedChannelClient *rcc)
 {
     spice_printerr("%p (channel %p type %d id %d)", rcc, rcc->channel,
                                                 rcc->channel->type, rcc->channel->id);
+    if (rcc->dummy) {
+        red_channel_client_disconnect_dummy(rcc);
+        return;
+    }
     if (!red_channel_client_is_connected(rcc)) {
         return;
     }
@@ -1344,20 +1506,17 @@ RedChannelClient *red_channel_client_create_dummy(int size,
 
     rcc->incoming.header.data = rcc->incoming.header_buf;
     rcc->incoming.serial = 1;
+    ring_init(&rcc->pipe);
 
+    rcc->dummy = TRUE;
+    rcc->dummy_connected = TRUE;
     red_channel_add_client(channel, rcc);
+    red_client_add_channel(client, rcc);
     pthread_mutex_unlock(&client->lock);
     return rcc;
 error:
     pthread_mutex_unlock(&client->lock);
     return NULL;
-}
-
-void red_channel_client_destroy_dummy(RedChannelClient *rcc)
-{
-    red_channel_remove_client(rcc);
-    red_channel_client_destroy_remote_caps(rcc);
-    free(rcc);
 }
 
 void red_channel_apply_clients(RedChannel *channel, channel_client_callback cb)
@@ -1496,9 +1655,36 @@ RedClient *red_client_new(int migrated)
     ring_init(&client->channels);
     pthread_mutex_init(&client->lock, NULL);
     client->thread_id = pthread_self();
-    client->migrated = migrated;
+    client->during_target_migrate = migrated;
 
     return client;
+}
+
+/* client mutex should be locked before this call */
+static void red_channel_client_set_migration_seamless(RedChannelClient *rcc)
+{
+    spice_assert(rcc->client->during_target_migrate && rcc->client->seamless_migrate);
+
+    if (rcc->channel->migration_flags & SPICE_MIGRATE_NEED_DATA_TRANSFER) {
+        rcc->wait_migrate_data = TRUE;
+        rcc->client->num_migrated_channels++;
+    }
+    spice_debug("channel type %d id %d rcc %p wait data %d", rcc->channel->type, rcc->channel->id, rcc,
+        rcc->wait_migrate_data);
+}
+
+void red_client_set_migration_seamless(RedClient *client) // dest
+{
+    RingItem *link;
+    pthread_mutex_lock(&client->lock);
+    client->seamless_migrate = TRUE;
+    /* update channel clients that got connected before the migration
+     * type was set. red_client_add_channel will handle newer channel clients */
+    RING_FOREACH(link, &client->channels) {
+        RedChannelClient *rcc = SPICE_CONTAINEROF(link, RedChannelClient, client_link);
+        red_channel_client_set_migration_seamless(rcc);
+    }
+    pthread_mutex_unlock(&client->lock);
 }
 
 void red_client_migrate(RedClient *client)
@@ -1566,6 +1752,9 @@ static void red_client_add_channel(RedClient *client, RedChannelClient *rcc)
 {
     spice_assert(rcc && client);
     ring_add(&client->channels, &rcc->client_link);
+    if (client->during_target_migrate && client->seamless_migrate) {
+        red_channel_client_set_migration_seamless(rcc);
+    }
     client->channels_num++;
 }
 
@@ -1577,16 +1766,27 @@ void red_client_set_main(RedClient *client, MainChannelClient *mcc) {
     client->mcc = mcc;
 }
 
-void red_client_migrate_complete(RedClient *client)
+void red_client_semi_seamless_migrate_complete(RedClient *client)
 {
-    spice_assert(client->migrated);
-    client->migrated = FALSE;
-    reds_on_client_migrate_complete(client);
+    pthread_mutex_lock(&client->lock);
+    if (!client->during_target_migrate || client->seamless_migrate) {
+        spice_error("unexpected");
+        pthread_mutex_unlock(&client->lock);
+        return;
+    }
+    client->during_target_migrate = FALSE;
+    pthread_mutex_unlock(&client->lock);
+    reds_on_client_semi_seamless_migrate_complete(client);
 }
 
+/* should be called only from the main thread */
 int red_client_during_migrate_at_target(RedClient *client)
 {
-    return client->migrated;
+    int ret;
+    pthread_mutex_lock(&client->lock);
+    ret = client->during_target_migrate;
+    pthread_mutex_unlock(&client->lock);
+    return ret;
 }
 
 /*

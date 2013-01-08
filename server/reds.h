@@ -32,6 +32,7 @@
 #include "common/messages.h"
 #include "spice.h"
 #include "red_channel.h"
+#include "migration_protocol.h"
 
 #define SPICE_GNUC_VISIBLE __attribute__ ((visibility ("default")))
 
@@ -135,7 +136,7 @@ void reds_client_disconnect(RedClient *client);
 
 // Temporary (?) for splitting main channel
 typedef struct MainMigrateData MainMigrateData;
-void reds_marshall_migrate_data_item(SpiceMarshaller *m, MainMigrateData *data);
+void reds_marshall_migrate_data(SpiceMarshaller *m);
 void reds_fill_channels(SpiceMsgChannels *channels_info);
 int reds_num_of_channels(void);
 int reds_num_of_clients(void);
@@ -145,12 +146,22 @@ void reds_update_stat_value(uint32_t value);
 
 /* callbacks from main channel messages */
 
-void reds_on_main_agent_start(void);
+void reds_on_main_agent_start(MainChannelClient *mcc, uint32_t num_tokens);
+void reds_on_main_agent_tokens(MainChannelClient *mcc, uint32_t num_tokens);
+uint8_t *reds_get_agent_data_buffer(MainChannelClient *mcc, size_t size);
+void reds_release_agent_data_buffer(uint8_t *buf);
 void reds_on_main_agent_data(MainChannelClient *mcc, void *message, size_t size);
-void reds_on_main_migrate_connected(void); //should be called when all the clients
-                                           // are connected to the target
-void reds_on_main_receive_migrate_data(MainMigrateData *data, uint8_t *end);
+void reds_on_main_migrate_connected(int seamless); //should be called when all the clients
+                                                   // are connected to the target
+int reds_handle_migrate_data(MainChannelClient *mcc,
+                             SpiceMigrateDataMain *mig_data, uint32_t size);
 void reds_on_main_mouse_mode_request(void *message, size_t size);
-void reds_on_client_migrate_complete(RedClient *client);
+/* migration dest side: returns whether it can support seamless migration
+ * with the given src migration protocol version */
+int reds_on_migrate_dst_set_seamless(MainChannelClient *mcc, uint32_t src_version);
+void reds_on_client_semi_seamless_migrate_complete(RedClient *client);
+void reds_on_client_seamless_migrate_complete(RedClient *client);
+void reds_on_main_channel_migrate(MainChannelClient *mcc);
+void reds_on_char_device_state_destroy(SpiceCharDeviceState *dev);
 
 #endif

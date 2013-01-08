@@ -1,32 +1,36 @@
 AC_PREREQ([2.57])
 
 # Making releases:
-# 1. Increment SPICE_MICRO if no interface change has been done
-# 2. Increment SPICE_MINOR and zero SPICE_MICRO if new interfaces have been added,
-#    no changes to existing interfaces.
-# 3. Increment SPICE_MAJOR and zero both SPICE_MINOR and SPICE_MICRO if non
-#    backward compatible changes (interface changed or removed).
-#
-# Then change the libtool versions according to libtool manual:
+# 1. The version is SPICE_MAJOR.SPICE_MINOR.SPICE_MICRO
+# 2. It is generated via a two stage process:
+#   1. Create a tag
+#   2. run configure which calls git-version-gen.
+# 3. Follow these rules for setting the next tag (aka tarball version):
+#   1. SPICE_MAJOR remains 0 until a major change is done.
+#   2. Increment SPICE_MINOR to next even value on a significant release,
+#      updating the release schedule: http://www.spice-space.org/page/Releases
+#   3. Increment SPICE_MINOR otherwise.
+# 4. Follow the libtool manual for the so version:
 #  http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 
-m4_define([SPICE_MAJOR], 0)
-m4_define([SPICE_MINOR], 11)
-m4_define([SPICE_MICRO], 0)
-m4_define([SPICE_CURRENT], [2])
+m4_define([SPICE_CURRENT], [7])
 m4_define([SPICE_REVISION], [0])
-m4_define([SPICE_AGE], [1])
+m4_define([SPICE_AGE], [6])
 
 # Note on the library name on linux (SONAME) produced by libtool (for reference, gleaned
 # from looking at libtool 2.4.2)
 #
 #  libspice-servver.so.current-age.age.revision
 
-AC_INIT(spice, [SPICE_MAJOR.SPICE_MINOR.SPICE_MICRO], [], spice)
+AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
+        [spice-devel@lists.freedesktop.org], spice)
 
 AC_CONFIG_MACRO_DIR([m4])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR(.)
+
+# For automake >= 1.12
+m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
 AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip subdir-objects])
 AM_MAINTAINER_MODE
@@ -56,9 +60,9 @@ AC_SUBST(SPICE_LT_VERSION)
 
 # Check for the CPU we are using
 #
-AC_MSG_CHECKING(for x86 or x86-64 platform)
+AC_MSG_CHECKING(for x86, x86-64 or armv6+ platform)
 case $host_cpu in
-  i386|i486|i586|i686|i786|k6|k7|arm|armv7)
+  i386|i486|i586|i686|i786|k6|k7|armv6|armv6l|armv6hl|armv7|armv7l|armv7hl)
 	variant=32
         ;;
   x86_64)
@@ -146,7 +150,7 @@ fi
 
 AC_ARG_ENABLE(client,
 [  --enable-client         Enable spice client],,
-[enable_client="yes"])
+[enable_client="no"])
 AS_IF([test x"$enable_client" != "xno"], [enable_client="yes"])
 AM_CONDITIONAL(SUPPORT_CLIENT, test "x$enable_client" = "xyes")
 
@@ -230,8 +234,12 @@ if test "x$enable_smartcard" = "xyes"; then
     SMARTCARD_CFLAGS="$CAC_CARD_CFLAGS"
     AC_SUBST(SMARTCARD_LIBS)
     AC_SUBST(SMARTCARD_CFLAGS)
+    SPICE_REQUIRES+=" libcacard >= 0.1.2"
 fi
 
+
+PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= 2.22])
+SPICE_REQUIRES+=" glib-2.0 >= 2.22"
 
 PKG_CHECK_MODULES(PIXMAN, pixman-1 >= 0.17.7)
 AC_SUBST(PIXMAN_CFLAGS)
@@ -272,7 +280,7 @@ SPICE_REQUIRES+=" openssl"
 # AC_SUBST(GL_LIBS)
 # SPICE_REQUIRES+=" gl glu"
 
-if test "x$enable_opengl" = "xyes" && test "x$enable_client" = "xyes" ; then
+if test "x$enable_opengl" = "xyes"; then
    AC_CHECK_LIB(GL, glBlendFunc, GL_LIBS="$GL_LIBS -lGL", enable_opengl=no)
    AC_CHECK_LIB(GLU, gluSphere, GL_LIBS="$GL_LIBS -lGLU", enable_opengl=no)
    AC_DEFINE([USE_OPENGL], [1], [Define to build with OpenGL support])
@@ -309,10 +317,23 @@ if test "x$have_xrandr12" = "xyes" ; then
   AC_DEFINE([HAVE_XRANDR12], [], [Define if we have XRANDR 12])
 fi
 
-PKG_CHECK_MODULES(XINERAMA,
+# Add parameter for libXinerama
+AC_ARG_ENABLE([xinerama],
+    [AS_HELP_STRING([--disable-xinerama],
+        [disable Xinerama library @<:@default=no@:>@])])
+
+if test "x$enable_xinerama" != "xno"; then
+    PKG_CHECK_MODULES(XINERAMA,
         xinerama >= 1.0,
         have_xinerama=yes,
         have_xinerama=no)
+else
+    have_xinerama=no
+fi
+
+if test "x$enable_xinerama" = "xyes" && test "x$have_xinerama" = "xno"; then
+    AC_MSG_ERROR([Requested Xinerama library was not found])
+fi
 
 AM_CONDITIONAL([HAVE_XINERAMA], [test "x$have_xinerama" = "xyes"])
 if test "x$have_xinerama" = "xyes" ; then

@@ -514,6 +514,50 @@ static uint8_t * parse_msgc_main_agent_token(uint8_t *message_start, uint8_t *me
     return NULL;
 }
 
+static uint8_t * parse_msgc_main_migrate_dst_do_seamless(uint8_t *message_start, uint8_t *message_end, int minor, size_t *size, message_destructor_t *free_message)
+{
+    SPICE_GNUC_UNUSED uint8_t *pos;
+    uint8_t *start = message_start;
+    uint8_t *data = NULL;
+    size_t nw_size;
+    size_t mem_size;
+    uint8_t *in, *end;
+    SpiceMsgcMainMigrateDstDoSeamless *out;
+
+    nw_size = 4;
+    mem_size = sizeof(SpiceMsgcMainMigrateDstDoSeamless);
+
+    /* Check if message fits in reported side */
+    if (start + nw_size > message_end) {
+        return NULL;
+    }
+
+    /* Validated extents and calculated size */
+    data = (uint8_t *)malloc(mem_size);
+    if (SPICE_UNLIKELY(data == NULL)) {
+        goto error;
+    }
+    end = data + sizeof(SpiceMsgcMainMigrateDstDoSeamless);
+    in = start;
+
+    out = (SpiceMsgcMainMigrateDstDoSeamless *)data;
+
+    out->src_version = consume_uint32(&in);
+
+    assert(in <= message_end);
+    assert(end <= data + mem_size);
+
+    *size = end - data;
+    *free_message = (message_destructor_t) free;
+    return data;
+
+   error:
+    if (data != NULL) {
+        free(data);
+    }
+    return NULL;
+}
+
 static uint8_t * parse_MainChannel_msgc(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
     static parse_msg_func_t funcs1[6] =  {
@@ -524,7 +568,7 @@ static uint8_t * parse_MainChannel_msgc(uint8_t *message_start, uint8_t *message
         parse_SpiceMsgData,
         parse_msgc_disconnecting
     };
-    static parse_msg_func_t funcs2[9] =  {
+    static parse_msg_func_t funcs2[11] =  {
         parse_msgc_main_client_info,
         parse_SpiceMsgEmpty,
         parse_SpiceMsgEmpty,
@@ -533,11 +577,13 @@ static uint8_t * parse_MainChannel_msgc(uint8_t *message_start, uint8_t *message
         parse_msgc_main_agent_start,
         parse_SpiceMsgData,
         parse_msgc_main_agent_token,
+        parse_SpiceMsgEmpty,
+        parse_msgc_main_migrate_dst_do_seamless,
         parse_SpiceMsgEmpty
     };
     if (message_type >= 1 && message_type < 7) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
-    } else if (message_type >= 101 && message_type < 110) {
+    } else if (message_type >= 101 && message_type < 112) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
     }
     return NULL;
@@ -940,10 +986,11 @@ static uint8_t * parse_InputsChannel_msgc(uint8_t *message_start, uint8_t *messa
         parse_SpiceMsgData,
         parse_msgc_disconnecting
     };
-    static parse_msg_func_t funcs2[3] =  {
+    static parse_msg_func_t funcs2[4] =  {
         parse_msgc_inputs_key_down,
         parse_msgc_inputs_key_up,
-        parse_msgc_inputs_key_modifiers
+        parse_msgc_inputs_key_modifiers,
+        parse_SpiceMsgData
     };
     static parse_msg_func_t funcs3[4] =  {
         parse_msgc_inputs_mouse_motion,
@@ -953,7 +1000,7 @@ static uint8_t * parse_InputsChannel_msgc(uint8_t *message_start, uint8_t *messa
     };
     if (message_type >= 1 && message_type < 7) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
-    } else if (message_type >= 101 && message_type < 104) {
+    } else if (message_type >= 101 && message_type < 105) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
     } else if (message_type >= 111 && message_type < 115) {
         return funcs3[message_type-111](message_start, message_end, minor, size_out, free_message);
@@ -1830,11 +1877,83 @@ static uint8_t * parse_UsbredirChannel_msgc(uint8_t *message_start, uint8_t *mes
     return NULL;
 }
 
+
+
+static uint8_t * parse_msgc_port_event(uint8_t *message_start, uint8_t *message_end, int minor, size_t *size, message_destructor_t *free_message)
+{
+    SPICE_GNUC_UNUSED uint8_t *pos;
+    uint8_t *start = message_start;
+    uint8_t *data = NULL;
+    size_t nw_size;
+    size_t mem_size;
+    uint8_t *in, *end;
+    SpiceMsgcPortEvent *out;
+
+    nw_size = 1;
+    mem_size = sizeof(SpiceMsgcPortEvent);
+
+    /* Check if message fits in reported side */
+    if (start + nw_size > message_end) {
+        return NULL;
+    }
+
+    /* Validated extents and calculated size */
+    data = (uint8_t *)malloc(mem_size);
+    if (SPICE_UNLIKELY(data == NULL)) {
+        goto error;
+    }
+    end = data + sizeof(SpiceMsgcPortEvent);
+    in = start;
+
+    out = (SpiceMsgcPortEvent *)data;
+
+    out->event = consume_uint8(&in);
+
+    assert(in <= message_end);
+    assert(end <= data + mem_size);
+
+    *size = end - data;
+    *free_message = (message_destructor_t) free;
+    return data;
+
+   error:
+    if (data != NULL) {
+        free(data);
+    }
+    return NULL;
+}
+
+static uint8_t * parse_PortChannel_msgc(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
+{
+    static parse_msg_func_t funcs1[6] =  {
+        parse_msgc_ack_sync,
+        parse_SpiceMsgEmpty,
+        parse_msgc_pong,
+        parse_SpiceMsgEmpty,
+        parse_SpiceMsgData,
+        parse_msgc_disconnecting
+    };
+    static parse_msg_func_t funcs2[1] =  {
+        parse_SpiceMsgData
+    };
+    static parse_msg_func_t funcs3[1] =  {
+        parse_msgc_port_event
+    };
+    if (message_type >= 1 && message_type < 7) {
+        return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
+    } else if (message_type >= 101 && message_type < 102) {
+        return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
+    } else if (message_type >= 201 && message_type < 202) {
+        return funcs3[message_type-201](message_start, message_end, minor, size_out, free_message);
+    }
+    return NULL;
+}
+
 spice_parse_channel_func_t spice_get_client_channel_parser(uint32_t channel, unsigned int *max_message_type)
 {
-    static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[10] =  {
+    static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[11] =  {
         { NULL, 0 },
-        { parse_MainChannel_msgc, 109},
+        { parse_MainChannel_msgc, 111},
         { parse_DisplayChannel_msgc, 101},
         { parse_InputsChannel_msgc, 114},
         { parse_CursorChannel_msgc, 6},
@@ -1846,9 +1965,10 @@ spice_parse_channel_func_t spice_get_client_channel_parser(uint32_t channel, uns
 #else /* USE_SMARTCARD */
         { NULL, 0 },
 #endif /* USE_SMARTCARD */
-        { parse_UsbredirChannel_msgc, 101}
+        { parse_UsbredirChannel_msgc, 101},
+        { parse_PortChannel_msgc, 201}
     };
-    if (channel < 10) {
+    if (channel < 11) {
         if (max_message_type != NULL) {
             *max_message_type = channels[channel].max_messages;
         }

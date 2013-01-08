@@ -67,7 +67,7 @@ typedef struct SpiceMsgMainMultiMediaTime {
     uint32_t time;
 } SpiceMsgMainMultiMediaTime;
 
-typedef struct SpiceMsgMainMigrationBegin {
+typedef struct SpiceMigrationDstInfo {
     uint16_t port;
     uint16_t sport;
     uint32_t host_size;
@@ -77,7 +77,20 @@ typedef struct SpiceMsgMainMigrationBegin {
     uint8_t *pub_key_data;
     uint32_t cert_subject_size;
     uint8_t *cert_subject_data;
+} SpiceMigrationDstInfo;
+
+typedef struct SpiceMsgMainMigrationBegin {
+    SpiceMigrationDstInfo dst_info;
 } SpiceMsgMainMigrationBegin;
+
+typedef struct SpiceMsgMainMigrateBeginSeamless {
+    SpiceMigrationDstInfo dst_info;
+    uint32_t src_mig_version;
+} SpiceMsgMainMigrateBeginSeamless;
+
+typedef struct SpiceMsgcMainMigrateDstDoSeamless {
+    uint32_t src_version;
+} SpiceMsgcMainMigrateDstDoSeamless;
 
 typedef struct SpiceMsgMainMigrationSwitchHost {
     uint16_t port;
@@ -189,6 +202,8 @@ typedef struct SpiceMsgMainAgentTokens {
     uint32_t num_tokens;
 } SpiceMsgMainAgentTokens, SpiceMsgcMainAgentTokens, SpiceMsgcMainAgentStart;
 
+typedef struct SpiceMsgMainAgentTokens SpiceMsgMainAgentConnectedTokens;
+
 typedef struct SpiceMsgcClientInfo {
     uint64_t cache_size;
 } SpiceMsgcClientInfo;
@@ -252,6 +267,11 @@ typedef struct SpiceMsgDisplayDrawAlphaBlend {
     SpiceMsgDisplayBase base;
     SpiceAlphaBlend data;
 } SpiceMsgDisplayDrawAlphaBlend;
+
+typedef struct SpiceMsgDisplayDrawComposite {
+    SpiceMsgDisplayBase base;
+    SpiceComposite data;
+} SpiceMsgDisplayDrawComposite;
 
 typedef struct SpiceMsgDisplayCopyBits {
     SpiceMsgDisplayBase base;
@@ -557,6 +577,36 @@ typedef struct SpiceMsgcSmartcard {
     };
 } SpiceMsgcSmartcard;
 #endif
+
+typedef struct SpiceMsgDisplayHead {
+    uint32_t id;
+    uint32_t surface_id;
+    uint32_t width;
+    uint32_t height;
+    uint32_t x;
+    uint32_t y;
+    uint32_t flags;
+} SpiceHead;
+
+typedef struct SpiceMsgDisplayMonitorsConfig {
+    uint16_t count;
+    uint16_t max_allowed;
+    SpiceHead heads[0];
+} SpiceMsgDisplayMonitorsConfig;
+
+typedef struct SpiceMsgPortInit {
+    uint32_t name_size;
+    uint8_t *name;
+    uint8_t opened;
+} SpiceMsgPortInit;
+
+typedef struct SpiceMsgPortEvent {
+    uint8_t event;
+} SpiceMsgPortEvent;
+
+typedef struct SpiceMsgcPortEvent {
+    uint8_t event;
+} SpiceMsgcPortEvent;
 
 SPICE_END_DECLS
 

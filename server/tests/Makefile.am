@@ -33,6 +33,15 @@ noinst_PROGRAMS =						\
 	test_just_sockets_no_ssl			\
 	test_playback						\
 	test_display_resolution_changes		\
+	test_two_servers					\
+	test_vdagent						\
+	$(NULL)
+
+test_vdagent_SOURCES =		\
+	$(COMMON_BASE)				\
+	test_display_base.c			\
+	test_display_base.h			\
+	test_vdagent.c		\
 	$(NULL)
 
 test_display_streaming_SOURCES =		\
@@ -73,3 +82,12 @@ test_empty_success_SOURCES =			\
 test_fail_on_null_core_interface_SOURCES =	\
 	test_fail_on_null_core_interface.c	\
 	$(NULL)
+
+test_two_servers_SOURCES =			\
+	$(COMMON_BASE)				\
+	test_display_base.c			\
+	test_display_base.h			\
+	test_two_servers.c 			\
+	$(NULL)
+
+

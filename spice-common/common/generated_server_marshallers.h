@@ -23,6 +23,8 @@ void spice_marshall_msg_main_agent_token(SpiceMarshaller *m, SpiceMsgMainAgentTo
 void spice_marshall_msg_main_migrate_switch_host(SpiceMarshaller *m, SpiceMsgMainMigrationSwitchHost *msg);
 void spice_marshall_msg_main_name(SpiceMarshaller *m, SpiceMsgMainName *msg);
 void spice_marshall_msg_main_uuid(SpiceMarshaller *m, SpiceMsgMainUuid *msg);
+void spice_marshall_msg_main_agent_connected_tokens(SpiceMarshaller *m, SpiceMsgMainAgentConnectedTokens *msg);
+void spice_marshall_msg_main_migrate_begin_seamless(SpiceMarshaller *m, SpiceMsgMainMigrateBeginSeamless *msg);
 void spice_marshall_msg_display_mode(SpiceMarshaller *m, SpiceMsgDisplayMode *msg);
 void spice_marshall_msg_display_copy_bits(SpiceMarshaller *m, SpiceMsgDisplayCopyBits *msg);
 void spice_marshall_msg_display_inval_list(SpiceMarshaller *m, SpiceResourceList *msg);
@@ -49,6 +51,8 @@ void spice_marshall_msg_display_draw_alpha_blend(SpiceMarshaller *m, SpiceMsgDis
 void spice_marshall_msg_display_surface_create(SpiceMarshaller *m, SpiceMsgSurfaceCreate *msg);
 void spice_marshall_msg_display_surface_destroy(SpiceMarshaller *m, SpiceMsgSurfaceDestroy *msg);
 void spice_marshall_msg_display_stream_data_sized(SpiceMarshaller *m, SpiceMsgDisplayStreamDataSized *msg);
+void spice_marshall_msg_display_monitors_config(SpiceMarshaller *m, SpiceMsgDisplayMonitorsConfig *msg);
+void spice_marshall_msg_display_draw_composite(SpiceMarshaller *m, SpiceMsgDisplayDrawComposite *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_msg_inputs_init(SpiceMarshaller *m, SpiceMsgInputsInit *msg);
 void spice_marshall_msg_inputs_key_modifiers(SpiceMarshaller *m, SpiceMsgInputsKeyModifiers *msg);
 void spice_marshall_msg_cursor_init(SpiceMarshaller *m, SpiceMsgCursorInit *msg);
@@ -71,8 +75,10 @@ void spice_marshall_msg_tunnel_socket_data(SpiceMarshaller *m, SpiceMsgTunnelSoc
 void spice_marshall_msg_tunnel_socket_closed_ack(SpiceMarshaller *m, SpiceMsgTunnelSocketClosedAck *msg);
 void spice_marshall_msg_tunnel_socket_token(SpiceMarshaller *m, SpiceMsgTunnelSocketTokens *msg);
 #ifdef USE_SMARTCARD
-void spice_marshall_msg_smartcard_msg(SpiceMarshaller *m, SpiceMsgSmartcard *msg);
+void spice_marshall_msg_smartcard_data(SpiceMarshaller *m, SpiceMsgSmartcard *msg);
 #endif /* USE_SMARTCARD */
+void spice_marshall_msg_port_init(SpiceMarshaller *m, SpiceMsgPortInit *msg);
+void spice_marshall_msg_port_event(SpiceMarshaller *m, SpiceMsgPortEvent *msg);
 void spice_marshall_String(SpiceMarshaller *m, SpiceString *msg);
 void spice_marshall_Rect(SpiceMarshaller *m, SpiceRect *msg);
 void spice_marshall_Point(SpiceMarshaller *m, SpicePoint *msg);
@@ -90,4 +96,5 @@ void spice_marshall_Path(SpiceMarshaller *m, SpicePath *msg);
 void spice_marshall_Text(SpiceMarshaller *m, SpiceText *msg, SpiceMarshaller **fore_brush_pat_out, SpiceMarshaller **back_brush_pat_out);
 void spice_marshall_Transparent(SpiceMarshaller *m, SpiceTransparent *msg, SpiceMarshaller **src_bitmap_out);
 void spice_marshall_AlphaBlend(SpiceMarshaller *m, SpiceAlphaBlend *msg, SpiceMarshaller **src_bitmap_out);
+void spice_marshall_Composite(SpiceMarshaller *m, SpiceComposite *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out);
 #endif

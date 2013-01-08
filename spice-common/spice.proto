@@ -26,6 +26,15 @@ struct Rect {
     int32 right;
 };
 
+struct Transform {
+    uint32 t00;
+    uint32 t01;
+    uint32 t02;
+    uint32 t10;
+    uint32 t11;
+    uint32 t12;
+};
+
 enum32 link_err {
     OK,
     ERROR,
@@ -51,6 +60,28 @@ flags32 migrate_flags {
     NEED_FLUSH,
     NEED_DATA_TRANSFER
 } @prefix(SPICE_MIGRATE_);
+
+flags32 composite_flags {
+    OP0, OP1, OP2, OP3, OP4, OP5, OP6, OP7,
+    SRC_FILTER0, SRC_FILTER1, SRC_FILTER2,
+    MASK_FILTER0, MASK_FITLER1, MASK_FILTER2,
+
+    SRC_REPEAT0, SRC_REPEAT1,
+    MASK_REPEAT0, MASK_REPEAT1,
+    COMPONENT_ALPHA,
+
+    HAS_MASK,
+    HAS_SRC_TRANSFORM,
+    HAS_MASK_TRANSFORM,
+
+    /* These are used to override the formats given in the images. For
+     * example, if the mask image has format a8r8g8b8, but MASK_OPAQUE
+     * is set, the image should be treated as if it were x8r8g8b8
+     */
+    SOURCE_OPAQUE,
+    MASK_OPAQUE,
+    DEST_OPAQUE,
+} @prefix(SPICE_COMPOSITE_);
 
 enum32 notify_severity {
     INFO,
@@ -162,15 +193,19 @@ struct ChannelId {
     uint8 id;
 };
 
-channel MainChannel : BaseChannel {
- server:
-     message {
+struct DstInfo {
 	uint16 port;
 	uint16 sport;
 	uint32 host_size;
 	uint8 *host_data[host_size] @zero_terminated @marshall @nonnull;
 	uint32 cert_subject_size;
 	uint8 *cert_subject_data[cert_subject_size] @zero_terminated @marshall;
+} @ctype(SpiceMigrationDstInfo);
+
+channel MainChannel : BaseChannel {
+ server:
+     message {
+        DstInfo dst_info;
     } @ctype(SpiceMsgMainMigrationBegin) migrate_begin = 101;
 
     Empty migrate_cancel;
@@ -232,6 +267,18 @@ channel MainChannel : BaseChannel {
        uint8 uuid[16];
     } uuid;
 
+    message {
+        uint32 num_tokens;
+    } agent_connected_tokens;
+
+    message {
+        DstInfo dst_info;
+        uint32 src_mig_version;
+    } migrate_begin_seamless;
+
+    Empty migrate_dst_seamless_ack;
+    Empty migrate_dst_seamless_nack;
+
  client:
     message {
 	uint64 cache_size;
@@ -258,6 +305,12 @@ channel MainChannel : BaseChannel {
     } @ctype(SpiceMsgcMainAgentTokens) agent_token;
 
     Empty migrate_end;
+
+    message {
+        uint32 src_version;
+    } migrate_dst_do_seamless;
+
+    Empty migrate_connected_seamless;
 };
 
 enum8 clip_type {
@@ -321,7 +374,8 @@ enum8 bitmap_fmt {
     16BIT, /* 0555 mode */
     24BIT /* 3 byte, brg */,
     32BIT /* 4 byte, xrgb in little endian format */,
-    RGBA /* 4 byte, argb in little endian format */
+    RGBA /* 4 byte, argb in little endian format */,
+    8BIT_A /* 1 byte, alpha */
 };
 
 flags8 bitmap_flags {
@@ -596,6 +650,16 @@ struct StreamDataHeader {
 	uint32 multi_media_time;
 };
 
+struct Head {
+    uint32 id;
+    uint32 surface_id;
+    uint32 width;
+    uint32 height;
+    uint32 x;
+    uint32 y;
+    uint32 flags;
+};
+
 channel DisplayChannel : BaseChannel {
  server:
     message {
@@ -798,6 +862,34 @@ channel DisplayChannel : BaseChannel {
 	uint8 data[data_size] @end @nomarshal;
     } stream_data_sized;
 
+    message {
+	uint16 count;
+    uint16 max_allowed;
+	Head heads[count] @end;
+    } monitors_config;
+
+    message {
+    	DisplayBase base;
+	struct Composite {
+	    composite_flags flags;
+	    Image *src_bitmap;
+	    switch (flags) {
+	    case HAS_MASK:
+	        Image *mask_bitmap;
+            } a @anon;
+	    switch (flags) {
+	    case HAS_SRC_TRANSFORM:
+	        Transform src_transform;
+            } b @anon;
+	    switch (flags) {
+	    case HAS_MASK_TRANSFORM:
+	        Transform mask_transform;
+            } c @anon;
+	    Point16 src_origin;
+	    Point16 mask_origin;
+	} data;
+    } draw_composite;
+
  client:
     message {
 	uint8 pixmap_cache_id;
@@ -841,6 +933,8 @@ channel InputsChannel : BaseChannel {
     message {
 	keyboard_modifier_flags modifiers;
     } @ctype(SpiceMsgcKeyModifiers) key_modifiers;
+
+    Data key_scancode;
 
     message {
 	int32 dx;
@@ -1139,7 +1233,7 @@ enum32 vsc_message_type {
     APDU,
     Flush,
     FlushComplete
-} @prefix(VSC_);
+};
 
 struct VscMessageHeader {
     vsc_message_type type;
@@ -1170,7 +1264,7 @@ channel SmartcardChannel : BaseChannel {
 	uint32 reader_id;
 	uint32 length;
 	uint8 data[] @end;
-    } @ctype(SpiceMsgSmartcard) msg = 101;
+    } @ctype(SpiceMsgSmartcard) data = 101;
 
  client:
     message {
@@ -1184,7 +1278,7 @@ channel SmartcardChannel : BaseChannel {
 	case Error:
 	    VscMessageError error;
 	} u @anon;
-    } @ctype(SpiceMsgcSmartcard) msg = 101;
+    } @ctype(SpiceMsgcSmartcard) data = 101;
 
     message {
 	vsc_message_type type;
@@ -1215,6 +1309,22 @@ client:
 channel UsbredirChannel : SpicevmcChannel {
 };
 
+channel PortChannel : SpicevmcChannel {
+ client:
+    message {
+	uint8 event;
+    } event = 201;
+ server:
+    message {
+	uint32 name_size;
+	uint8 *name[name_size] @zero_terminated @marshall @nonnull;
+	uint8 opened;
+    } init = 201;
+    message {
+	uint8 event;
+    } event;
+};
+
 protocol Spice {
     MainChannel main = 1;
     DisplayChannel display;
@@ -1225,4 +1335,5 @@ protocol Spice {
     TunnelChannel tunnel;
     SmartcardChannel smartcard;
     UsbredirChannel usbredir;
+    PortChannel port;
 };

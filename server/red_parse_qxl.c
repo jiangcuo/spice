@@ -21,6 +21,7 @@
 
 #include <stdbool.h>
 #include <inttypes.h>
+#include "common/lz_common.h"
 #include "red_common.h"
 #include "red_memslots.h"
 #include "red_parse_qxl.h"
@@ -242,7 +243,6 @@ static SpicePath *red_get_path(RedMemSlotInfo *slots, int group_id,
     }
     /* Ensure guest didn't tamper with segment count */
     spice_assert(n_segments == red->num_segments);
-    return NULL;
 
     if (free_data) {
         free(data);
@@ -328,12 +328,51 @@ static SpiceChunks *red_get_image_data_chunked(RedMemSlotInfo *slots, int group_
     return data;
 }
 
+static const char *bitmap_format_to_string(int format)
+{
+    switch (format) {
+    case SPICE_BITMAP_FMT_INVALID: return "SPICE_BITMAP_FMT_INVALID";
+    case SPICE_BITMAP_FMT_1BIT_LE: return "SPICE_BITMAP_FMT_1BIT_LE";
+    case SPICE_BITMAP_FMT_1BIT_BE: return "SPICE_BITMAP_FMT_1BIT_BE";
+    case SPICE_BITMAP_FMT_4BIT_LE: return "SPICE_BITMAP_FMT_4BIT_LE";
+    case SPICE_BITMAP_FMT_4BIT_BE: return "SPICE_BITMAP_FMT_4BIT_BE";
+    case SPICE_BITMAP_FMT_8BIT: return "SPICE_BITMAP_FMT_8BIT";
+    case SPICE_BITMAP_FMT_16BIT: return "SPICE_BITMAP_FMT_16BIT";
+    case SPICE_BITMAP_FMT_24BIT: return "SPICE_BITMAP_FMT_24BIT";
+    case SPICE_BITMAP_FMT_32BIT: return "SPICE_BITMAP_FMT_32BIT";
+    case SPICE_BITMAP_FMT_RGBA: return "SPICE_BITMAP_FMT_RGBA";
+    case SPICE_BITMAP_FMT_8BIT_A: return "SPICE_BITMAP_FMT_8BIT_A";
+    }
+    return "unknown";
+}
+
+static const int MAP_BITMAP_FMT_TO_BITS_PER_PIXEL[] = {0, 1, 1, 4, 4, 8, 16, 24, 32, 32, 8};
+
+static int bitmap_consistent(SpiceBitmap *bitmap)
+{
+    int bpp = MAP_BITMAP_FMT_TO_BITS_PER_PIXEL[bitmap->format];
+
+    if (bitmap->stride < ((bitmap->x * bpp + 7) / 8)) {
+        spice_error("image stride too small for width: %d < ((%d * %d + 7) / 8) (%s=%d)\n",
+                    bitmap->stride, bitmap->x, bpp,
+                    bitmap_format_to_string(bitmap->format),
+                    bitmap->format);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+// This is based on SPICE_BITMAP_FMT_*, copied from server/red_worker.c
+// to avoid a possible unoptimization from making it non static.
+static const int BITMAP_FMT_IS_RGB[] = {0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1};
+
 static SpiceImage *red_get_image(RedMemSlotInfo *slots, int group_id,
-                                 QXLPHYSICAL addr, uint32_t flags)
+                                 QXLPHYSICAL addr, uint32_t flags, int is_mask)
 {
     RedDataChunk chunks;
     QXLImage *qxl;
-    SpiceImage *red;
+    SpiceImage *red = NULL;
+    SpicePalette *rp = NULL;
     size_t bitmap_size, size;
     uint8_t qxl_flags;
     int error;
@@ -362,6 +401,15 @@ static SpiceImage *red_get_image(RedMemSlotInfo *slots, int group_id,
     switch (red->descriptor.type) {
     case SPICE_IMAGE_TYPE_BITMAP:
         red->u.bitmap.format = qxl->bitmap.format;
+        if (!bitmap_fmt_is_rgb(qxl->bitmap.format) && !qxl->bitmap.palette && !is_mask) {
+            spice_warning("guest error: missing palette on bitmap format=%d\n",
+                          red->u.bitmap.format);
+            goto error;
+        }
+        if (qxl->bitmap.x == 0 || qxl->bitmap.y == 0) {
+            spice_warning("guest error: zero area bitmap\n");
+            goto error;
+        }
         qxl_flags = qxl->bitmap.flags;
         if (qxl_flags & QXL_BITMAP_TOP_DOWN) {
             red->u.bitmap.flags = SPICE_BITMAP_FLAGS_TOP_DOWN;
@@ -369,20 +417,22 @@ static SpiceImage *red_get_image(RedMemSlotInfo *slots, int group_id,
         red->u.bitmap.x      = qxl->bitmap.x;
         red->u.bitmap.y      = qxl->bitmap.y;
         red->u.bitmap.stride = qxl->bitmap.stride;
+        if (!bitmap_consistent(&red->u.bitmap)) {
+            goto error;
+        }
         if (qxl->bitmap.palette) {
             QXLPalette *qp;
-            SpicePalette *rp;
             int i, num_ents;
             qp = (QXLPalette *)get_virt(slots, qxl->bitmap.palette,
                                         sizeof(*qp), group_id, &error);
             if (error) {
-                return NULL;
+                goto error;
             }
             num_ents = qp->num_ents;
             if (!validate_virt(slots, (intptr_t)qp->ents,
                                get_memslot_id(slots, qxl->bitmap.palette),
                                num_ents * sizeof(qp->ents[0]), group_id)) {
-                return NULL;
+                goto error;
             }
             rp = spice_malloc_n_m(num_ents, sizeof(rp->ents[0]), sizeof(*rp));
             rp->unique   = qp->unique;
@@ -409,7 +459,7 @@ static SpiceImage *red_get_image(RedMemSlotInfo *slots, int group_id,
                                        &chunks, qxl->bitmap.data);
             spice_assert(size == bitmap_size);
             if (size != bitmap_size) {
-                return NULL;
+                goto error;
             }
             red->u.bitmap.data = red_get_image_data_chunked(slots, group_id,
                                                             &chunks);
@@ -429,7 +479,7 @@ static SpiceImage *red_get_image(RedMemSlotInfo *slots, int group_id,
                                        &chunks, (QXLDataChunk *)qxl->quic.data);
         spice_assert(size == red->u.quic.data_size);
         if (size != red->u.quic.data_size) {
-            return NULL;
+            goto error;
         }
         red->u.quic.data = red_get_image_data_chunked(slots, group_id,
                                                       &chunks);
@@ -439,6 +489,14 @@ static SpiceImage *red_get_image(RedMemSlotInfo *slots, int group_id,
         spice_error("unknown type %d", red->descriptor.type);
     }
     return red;
+error:
+    if (red) {
+        free(red);
+    }
+    if (rp) {
+        free(rp);
+    }
+    return NULL;
 }
 
 void red_put_image(SpiceImage *red)
@@ -471,8 +529,7 @@ static void red_get_brush_ptr(RedMemSlotInfo *slots, int group_id,
         }
         break;
     case SPICE_BRUSH_TYPE_PATTERN:
-        red->u.pattern.pat = red_get_image(slots, group_id, qxl->u.pattern.pat, flags);
-        red_get_point_ptr(&red->u.pattern.pos, &qxl->u.pattern.pos);
+        red->u.pattern.pat = red_get_image(slots, group_id, qxl->u.pattern.pat, flags, FALSE);
         break;
     }
 }
@@ -491,7 +548,7 @@ static void red_get_qmask_ptr(RedMemSlotInfo *slots, int group_id,
 {
     red->flags  = qxl->flags;
     red_get_point_ptr(&red->pos, &qxl->pos);
-    red->bitmap = red_get_image(slots, group_id, qxl->bitmap, flags);
+    red->bitmap = red_get_image(slots, group_id, qxl->bitmap, flags, TRUE);
 }
 
 static void red_put_qmask(SpiceQMask *red)
@@ -516,7 +573,7 @@ static void red_put_fill(SpiceFill *red)
 static void red_get_opaque_ptr(RedMemSlotInfo *slots, int group_id,
                                SpiceOpaque *red, QXLOpaque *qxl, uint32_t flags)
 {
-    red->src_bitmap     = red_get_image(slots, group_id, qxl->src_bitmap, flags);
+    red->src_bitmap     = red_get_image(slots, group_id, qxl->src_bitmap, flags, FALSE);
    red_get_rect_ptr(&red->src_area, &qxl->src_area);
    red_get_brush_ptr(slots, group_id, &red->brush, &qxl->brush, flags);
    red->rop_descriptor = qxl->rop_descriptor;
@@ -534,7 +591,7 @@ static void red_put_opaque(SpiceOpaque *red)
 static int red_get_copy_ptr(RedMemSlotInfo *slots, int group_id,
                             SpiceCopy *red, QXLCopy *qxl, uint32_t flags)
 {
-    red->src_bitmap      = red_get_image(slots, group_id, qxl->src_bitmap, flags);
+    red->src_bitmap      = red_get_image(slots, group_id, qxl->src_bitmap, flags, FALSE);
     if (!red->src_bitmap) {
         return 1;
     }
@@ -554,7 +611,7 @@ static void red_put_copy(SpiceCopy *red)
 static void red_get_blend_ptr(RedMemSlotInfo *slots, int group_id,
                              SpiceBlend *red, QXLBlend *qxl, uint32_t flags)
 {
-    red->src_bitmap      = red_get_image(slots, group_id, qxl->src_bitmap, flags);
+    red->src_bitmap      = red_get_image(slots, group_id, qxl->src_bitmap, flags, FALSE);
    red_get_rect_ptr(&red->src_area, &qxl->src_area);
    red->rop_descriptor  = qxl->rop_descriptor;
    red->scale_mode      = qxl->scale_mode;
@@ -571,7 +628,7 @@ static void red_get_transparent_ptr(RedMemSlotInfo *slots, int group_id,
                                     SpiceTransparent *red, QXLTransparent *qxl,
                                     uint32_t flags)
 {
-    red->src_bitmap      = red_get_image(slots, group_id, qxl->src_bitmap, flags);
+    red->src_bitmap      = red_get_image(slots, group_id, qxl->src_bitmap, flags, FALSE);
    red_get_rect_ptr(&red->src_area, &qxl->src_area);
    red->src_color       = qxl->src_color;
    red->true_color      = qxl->true_color;
@@ -588,7 +645,7 @@ static void red_get_alpha_blend_ptr(RedMemSlotInfo *slots, int group_id,
 {
     red->alpha_flags = qxl->alpha_flags;
     red->alpha       = qxl->alpha;
-    red->src_bitmap  = red_get_image(slots, group_id, qxl->src_bitmap, flags);
+    red->src_bitmap  = red_get_image(slots, group_id, qxl->src_bitmap, flags, FALSE);
     red_get_rect_ptr(&red->src_area, &qxl->src_area);
 }
 
@@ -597,7 +654,7 @@ static void red_get_alpha_blend_ptr_compat(RedMemSlotInfo *slots, int group_id,
                                            uint32_t flags)
 {
     red->alpha       = qxl->alpha;
-    red->src_bitmap  = red_get_image(slots, group_id, qxl->src_bitmap, flags);
+    red->src_bitmap  = red_get_image(slots, group_id, qxl->src_bitmap, flags, FALSE);
     red_get_rect_ptr(&red->src_area, &qxl->src_area);
 }
 
@@ -606,10 +663,61 @@ static void red_put_alpha_blend(SpiceAlphaBlend *red)
     red_put_image(red->src_bitmap);
 }
 
+static bool get_transform(RedMemSlotInfo *slots,
+                          int group_id,
+                          QXLPHYSICAL qxl_transform,
+                          SpiceTransform *dst_transform)
+                                                    
+{
+    const uint32_t *t = NULL;
+    int error;
+
+    if (qxl_transform == 0)
+        return FALSE;
+    
+    t = (uint32_t *)get_virt(slots, qxl_transform, sizeof(*dst_transform), group_id, &error);
+
+    if (!t || error)
+        return FALSE;
+
+    memcpy(dst_transform, t, sizeof(*dst_transform));
+    return TRUE;
+}
+
+static void red_get_composite_ptr(RedMemSlotInfo *slots, int group_id,
+                                  SpiceComposite *red, QXLComposite *qxl, uint32_t flags)
+{
+    red->flags = qxl->flags;
+
+    red->src_bitmap = red_get_image(slots, group_id, qxl->src, flags, FALSE);
+    if (get_transform(slots, group_id, qxl->src_transform, &red->src_transform))
+        red->flags |= SPICE_COMPOSITE_HAS_SRC_TRANSFORM;
+    
+    if (qxl->mask) {
+        red->mask_bitmap = red_get_image(slots, group_id, qxl->mask, flags, FALSE);
+        red->flags |= SPICE_COMPOSITE_HAS_MASK;
+        if (get_transform(slots, group_id, qxl->mask_transform, &red->mask_transform))
+            red->flags |= SPICE_COMPOSITE_HAS_MASK_TRANSFORM;
+    } else {
+        red->mask_bitmap = NULL;
+    }
+    red->src_origin.x = qxl->src_origin.x;
+    red->src_origin.y = qxl->src_origin.y;
+    red->mask_origin.x = qxl->mask_origin.x;
+    red->mask_origin.y = qxl->mask_origin.y;
+}
+
+static void red_put_composite(SpiceComposite *red)
+{
+    red_put_image(red->src_bitmap);
+    if (red->mask_bitmap)
+        red_put_image(red->mask_bitmap);
+}
+
 static void red_get_rop3_ptr(RedMemSlotInfo *slots, int group_id,
                              SpiceRop3 *red, QXLRop3 *qxl, uint32_t flags)
 {
-    red->src_bitmap = red_get_image(slots, group_id, qxl->src_bitmap, flags);
+   red->src_bitmap = red_get_image(slots, group_id, qxl->src_bitmap, flags, FALSE);
    red_get_rect_ptr(&red->src_area, &qxl->src_area);
    red_get_brush_ptr(slots, group_id, &red->brush, &qxl->brush, flags);
    red->rop3       = qxl->rop3;
@@ -880,6 +988,9 @@ static int red_get_native_drawable(RedMemSlotInfo *slots, int group_id,
     case QXL_DRAW_ROP3:
         red_get_rop3_ptr(slots, group_id, &red->u.rop3, &qxl->u.rop3, flags);
         break;
+    case QXL_DRAW_COMPOSITE:
+        red_get_composite_ptr(slots, group_id, &red->u.composite, &qxl->u.composite, flags);
+        break;
     case QXL_DRAW_STROKE:
         error = red_get_stroke_ptr(slots, group_id, &red->u.stroke, &qxl->u.stroke, flags);
         break;
@@ -1031,6 +1142,9 @@ void red_put_drawable(RedDrawable *red)
         break;
     case QXL_DRAW_ROP3:
         red_put_rop3(&red->u.rop3);
+        break;
+    case QXL_DRAW_COMPOSITE:
+        red_put_composite(&red->u.composite);
         break;
     case QXL_DRAW_STROKE:
         red_put_stroke(&red->u.stroke);

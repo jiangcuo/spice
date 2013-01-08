@@ -142,6 +142,9 @@ typedef struct MainChannelClient MainChannelClient;
  * */
 enum {
     PIPE_ITEM_TYPE_SET_ACK=1,
+    PIPE_ITEM_TYPE_MIGRATE,
+    PIPE_ITEM_TYPE_EMPTY_MSG,
+
     PIPE_ITEM_TYPE_CHANNEL_BASE=101,
 };
 
@@ -168,7 +171,7 @@ typedef void (*channel_on_incoming_error_proc)(RedChannelClient *rcc);
 typedef void (*channel_on_outgoing_error_proc)(RedChannelClient *rcc);
 
 typedef int (*channel_handle_migrate_flush_mark_proc)(RedChannelClient *base);
-typedef uint64_t (*channel_handle_migrate_data_proc)(RedChannelClient *base,
+typedef int (*channel_handle_migrate_data_proc)(RedChannelClient *base,
                                                 uint32_t size, void *message);
 typedef uint64_t (*channel_handle_migrate_data_get_serial_proc)(RedChannelClient *base,
                                             uint32_t size, void *message);
@@ -225,6 +228,8 @@ struct RedChannelClient {
     RedChannel *channel;
     RedClient  *client;
     RedsStream *stream;
+    int dummy;
+    int dummy_connected;
 
     uint32_t refs;
 
@@ -265,6 +270,9 @@ struct RedChannelClient {
     RedChannelCapabilities remote_caps;
     int is_mini_header;
     int destroying;
+
+    int wait_migrate_data;
+    int wait_migrate_flush_mark;
 };
 
 struct RedChannel {
@@ -276,7 +284,6 @@ struct RedChannel {
     RingItem link; // channels link for reds
 
     SpiceCoreInterface *core;
-    int migrate;
     int handle_acks;
 
     // RedChannel will hold only connected channel clients (logic - when pushing pipe item to all channel clients, there
@@ -296,6 +303,7 @@ struct RedChannel {
     ClientCbs client_cbs;
 
     RedChannelCapabilities local_caps;
+    uint32_t migration_flags;
 
     void *data;
 
@@ -311,19 +319,21 @@ struct RedChannel {
 RedChannel *red_channel_create(int size,
                                SpiceCoreInterface *core,
                                uint32_t type, uint32_t id,
-                               int migrate, int handle_acks,
+                               int handle_acks,
                                channel_handle_message_proc handle_message,
-                               ChannelCbs *channel_cbs);
+                               ChannelCbs *channel_cbs,
+                               uint32_t migration_flags);
 
 /* alternative constructor, meant for marshaller based (inputs,main) channels,
  * will become default eventually */
 RedChannel *red_channel_create_parser(int size,
                                SpiceCoreInterface *core,
                                uint32_t type, uint32_t id,
-                               int migrate, int handle_acks,
+                               int handle_acks,
                                spice_parse_channel_func_t parser,
                                channel_handle_parsed_proc handle_parsed,
-                               ChannelCbs *channel_cbs);
+                               ChannelCbs *channel_cbs,
+                               uint32_t migration_flags);
 
 void red_channel_register_client_cbs(RedChannel *channel, ClientCbs *client_cbs);
 // caps are freed when the channel is destroyed
@@ -344,11 +354,16 @@ RedChannelClient *red_channel_client_create_dummy(int size,
                                                   RedClient  *client,
                                                   int num_common_caps, uint32_t *common_caps,
                                                   int num_caps, uint32_t *caps);
-void red_channel_client_destroy_dummy(RedChannelClient *rcc);
-
 
 int red_channel_is_connected(RedChannel *channel);
 int red_channel_client_is_connected(RedChannelClient *rcc);
+
+void red_channel_client_default_migrate(RedChannelClient *rcc);
+int red_channel_client_waits_for_migrate_data(RedChannelClient *rcc);
+/* seamless migration is supported for only one client. This routine
+ * checks if the only channel client associated with channel is
+ * waiting for migration data */
+int red_channel_waits_for_migrate_data(RedChannel *channel);
 
 /*
  * the disconnect callback is called from the channel's thread,
@@ -362,6 +377,10 @@ void red_channel_destroy(RedChannel *channel);
 
 int red_channel_client_test_remote_common_cap(RedChannelClient *rcc, uint32_t cap);
 int red_channel_client_test_remote_cap(RedChannelClient *rcc, uint32_t cap);
+
+/* return true if all the channel clients support the cap */
+int red_channel_test_remote_common_cap(RedChannel *channel, uint32_t cap);
+int red_channel_test_remote_cap(RedChannel *channel, uint32_t cap);
 
 /* shutdown is the only safe thing to do out of the client/channel
  * thread. It will not touch the rings, just shutdown the socket.
@@ -418,6 +437,9 @@ void red_channel_client_pipe_add_tail(RedChannelClient *rcc, PipeItem *item);
 /* for types that use this routine -> the pipe item should be freed */
 void red_channel_client_pipe_add_type(RedChannelClient *rcc, int pipe_item_type);
 void red_channel_pipes_add_type(RedChannel *channel, int pipe_item_type);
+
+void red_channel_client_pipe_add_empty_msg(RedChannelClient *rcc, int msg_type);
+void red_channel_pipes_add_empty_msg(RedChannel *channel, int msg_type);
 
 void red_channel_client_ack_zero_messages_window(RedChannelClient *rcc);
 void red_channel_client_ack_set_client_window(RedChannelClient *rcc, int client_window);
@@ -501,14 +523,31 @@ struct RedClient {
     pthread_t thread_id;
 
     int disconnecting;
-    int migrated;
+    /* Note that while semi-seamless migration is conducted by the main thread, seamless migration
+     * involves all channels, and thus the related varaibles can be accessed from different
+     * threads */
+    int during_target_migrate; /* if seamless=TRUE, migration_target is turned off when all
+                                  the clients received their migration data. Otherwise (semi-seamless),
+                                  it is turned off, when red_client_semi_seamless_migrate_complete
+                                  is called */
+    int seamless_migrate;
+    int num_migrated_channels; /* for seamless - number of channels that wait for migrate data*/
 };
 
 RedClient *red_client_new(int migrated);
+
 MainChannelClient *red_client_get_main(RedClient *client);
 // main should be set once before all the other channels are created
 void red_client_set_main(RedClient *client, MainChannelClient *mcc);
-void red_client_migrate_complete(RedClient *client);
+
+/* called when the migration handshake results in seamless migration (dst side).
+ * By default we assume semi-seamless */
+void red_client_set_migration_seamless(RedClient *client);
+void red_client_semi_seamless_migrate_complete(RedClient *client); /* dst side */
+/* TRUE if the migration is seamless and there are still channels that wait from migration data.
+ * Or, during semi-seamless migration, and the main channel still waits for MIGRATE_END
+ * from the client.
+ * Note: Call it only from the main thread */
 int red_client_during_migrate_at_target(RedClient *client);
 
 void red_client_migrate(RedClient *client);

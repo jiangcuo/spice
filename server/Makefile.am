@@ -5,6 +5,7 @@ AM_CPPFLAGS =					\
 	-DRED_STATISTICS			\
 	$(CELT051_CFLAGS)			\
 	$(COMMON_CFLAGS)			\
+	$(GLIB2_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
 	$(SASL_CFLAGS)				\
 	$(SLIRP_CFLAGS)				\
@@ -31,6 +32,7 @@ libspice_server_la_LIBADD =						\
 	$(top_builddir)/spice-common/common/libspice-common-server.la	\
 	$(CELT051_LIBS)							\
 	$(GL_LIBS)							\
+	$(GLIB2_LIBS)							\
 	$(JPEG_LIBS)							\
 	$(LIBRT)							\
 	$(PIXMAN_LIBS)							\
@@ -43,6 +45,7 @@ libspice_server_la_LIBADD =						\
 libspice_server_la_SOURCES =			\
 	agent-msg-filter.c			\
 	agent-msg-filter.h			\
+	char_device.c				\
 	char_device.h				\
 	demarshallers.h				\
 	glz_encoder.c				\
@@ -71,6 +74,7 @@ libspice_server_la_SOURCES =			\
 	red_dispatcher.h			\
 	main_dispatcher.c			\
 	main_dispatcher.h			\
+	migration_protocol.h		\
 	red_memslots.c				\
 	red_memslots.h				\
 	red_parse_qxl.c				\
@@ -79,6 +83,7 @@ libspice_server_la_SOURCES =			\
 	red_worker.h				\
 	reds.c					\
 	reds.h					\
+	reds-private.h				\
 	reds_sw_canvas.c			\
 	reds_sw_canvas.h			\
 	snd_worker.c				\
@@ -125,3 +130,6 @@ EXTRA_DIST =					\
 	$(NULL)
 
 BUILT_SOURCES = $(spice_built_sources)
+
+dist-hook:
+	if [ -e ./tests/test_spice_version.sh -a ! ./tests/test_spice_version.sh ] ; then exit 1; fi
