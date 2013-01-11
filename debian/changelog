@@ -1,13 +1,17 @@
-spice (0.12.2-1) experimental; urgency=low
+spice (0.12.2-1) UNRELEASED; urgency=low
 
+  [ Liang Guo ]
   * New upstream release
   * debian/patches:
      - Refresh make-celt-to-be-optional.patch
-     - Refresh link-libspice-server-with-libm-libpthread.patch
   * Refresh debian/cpyright, new files added
   * Build client, upstream don't build client by default
   * Refresh libspice-server1.symbols
   * Add libglib2.0-dev to Build-Depends
+
+  [ Michael Tokarev ]
+  * remove link-libspice-server-with-libm-libpthread.patch
+    (included upstream)
 
  -- Liang Guo <guoliang@debian.org>  Tue, 08 Jan 2013 22:18:26 +0800
 
