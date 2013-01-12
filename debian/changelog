@@ -12,6 +12,8 @@ spice (0.12.2-1) UNRELEASED; urgency=low
   * refresh make-celt-to-be-optional.patch (minor context diff)
   * do not build-depend on libspice-protocol-dev
     (upstream always uses included copy)
+  * do not build-depend on mesa libs (OpenGL is not enabled by default
+    and is not recommended by upstream)
   * do not build-depend on libogg-dev
 
  -- Liang Guo <guoliang@debian.org>  Tue, 08 Jan 2013 22:18:26 +0800

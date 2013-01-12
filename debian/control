@@ -13,8 +13,9 @@ Build-Depends: debhelper (>= 9), pkg-config,
  libasound2-dev,
  libssl-dev,
  libxfixes-dev,
- libglu1-mesa-dev,
- libgl1-mesa-dev,
+# these might be required for opengl support
+# which has to be enabled explicitly and is not recommended
+# libglu1-mesa-dev, libgl1-mesa-dev,
  libsasl2-dev,
  libjpeg-dev,
  libxinerama-dev,
