@@ -18,7 +18,6 @@ Build-Depends: debhelper (>= 9), pkg-config,
  libsasl2-dev,
  libjpeg-dev,
  libxinerama-dev,
- libogg-dev,
  python-pyparsing,
  libglib2.0-dev,
 Standards-Version: 3.9.3
