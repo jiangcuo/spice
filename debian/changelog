@@ -15,6 +15,8 @@ spice (0.12.2-1) UNRELEASED; urgency=low
   * do not build-depend on mesa libs (OpenGL is not enabled by default
     and is not recommended by upstream)
   * do not build-depend on libogg-dev
+  * configure with --disable-silent-rules, so that the compiler command
+    line is visible (this fixes the lintian warnings about hardening flags)
 
  -- Liang Guo <guoliang@debian.org>  Tue, 08 Jan 2013 22:18:26 +0800
 

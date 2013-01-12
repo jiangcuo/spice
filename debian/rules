@@ -2,6 +2,6 @@
 %:
 	dh $@  --with autoreconf
 override_dh_auto_configure:
-	dh_auto_configure --  --disable-celt051 \
+	dh_auto_configure --  --disable-celt051 --disable-silent-rules \
 		--disable-smartcard --enable-client
 
