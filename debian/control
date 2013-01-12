@@ -5,7 +5,9 @@ Maintainer: Liang Guo <guoliang@debian.org>
 Uploaders: Michael Tokarev <mjt@tls.msk.ru>
 Build-Depends: debhelper (>= 9), pkg-config,
  dh-autoreconf, python,
- libspice-protocol-dev (>= 0.10.1~),
+# libspice-protocol is actually not needed for build,
+# 0.12 always uses included definitions
+# libspice-protocol-dev (>= 0.10.1~),
  libpixman-1-dev (>= 0.17.7~),
  libxrandr-dev (>= 1.2~),
  libasound2-dev,
