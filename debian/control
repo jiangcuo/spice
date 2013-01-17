@@ -60,7 +60,7 @@ Description: Implements the server side of the SPICE protocol
 Package: libspice-server-dev
 Section: libdevel
 Architecture: i386 amd64
-Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libpixman-1-dev (>= 0.17.7~), libssl-dev, libxinerama-dev
+Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libpixman-1-dev (>= 0.17.7~), libssl-dev, libxinerama-dev, libspice-protocol-dev (>= 0.12.0~)
 Suggests: pkg-config
 Description: Header files and development documentation for spice-server
  The Simple Protocol for Independent Computing Environments (SPICE) is
