@@ -1,4 +1,4 @@
-spice (0.12.2-1) UNRELEASED; urgency=low
+spice (0.12.2-0nocelt1exp) experimental; urgency=low
 
   * New upstream release
   * debian/patches:
@@ -21,7 +21,7 @@ spice (0.12.2-1) UNRELEASED; urgency=low
   * configure with --disable-silent-rules, so that the compiler command
     line is visible (this fixes the lintian warnings about hardening flags)
 
- -- Liang Guo <guoliang@debian.org>  Tue, 08 Jan 2013 22:18:26 +0800
+ -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 17 Jan 2013 19:19:30 +0400
 
 spice (0.11.0-1) unstable; urgency=low
 
