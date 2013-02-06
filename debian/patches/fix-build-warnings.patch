@@ -1,0 +1,75 @@
+Subject: Fix numerous compiler warnings due to wrong types and remove useless typecasts
+From: Serge Hallyn <serge.hallyn@ubuntu.com>
+Forwarded: no
+
+--- a/server/tests/basic_event_loop.c
++++ b/server/tests/basic_event_loop.c
+@@ -115,7 +115,7 @@ static void watch_remove(SpiceWatch *wat
+ 
+ static void channel_event(int event, SpiceChannelEventInfo *info)
+ {
+-    DPRINTF(0, "channel event con, type, id, event: %ld, %d, %d, %d",
++    DPRINTF(0, "channel event con, type, id, event: %d, %d, %d, %d",
+             info->connection_id, info->type, info->id, event);
+ }
+ 
+@@ -215,8 +215,8 @@ void basic_event_loop_mainloop(void)
+         if ((next_timer = get_next_timer()) != NULL) {
+             calc_next_timeout(next_timer, &next_timer_timeout);
+             timeout = &next_timer_timeout;
+-            DPRINTF(2, "timeout of %zd.%06zd",
+-                    timeout->tv_sec, timeout->tv_usec);
++            DPRINTF(2, "timeout of %d.%06d",
++                    (int) timeout->tv_sec, (int) timeout->tv_usec);
+         } else {
+             timeout = NULL;
+         }
+--- a/server/tests/test_display_base.c
++++ b/server/tests/test_display_base.c
+@@ -42,7 +42,7 @@ static void test_spice_destroy_update(Si
+         return;
+     }
+     if (update->drawable.clip.type != SPICE_CLIP_TYPE_NONE) {
+-        free((uint8_t*)update->drawable.clip.data);
++        free(update->drawable.clip.data);
+     }
+     free(update->bitmap);
+     free(update);
+@@ -89,10 +89,11 @@ static void regression_test(void)
+     pid = fork();
+     if (pid == 0) {
+         char buf[PATH_MAX];
++	char *argp[] = {NULL};
+         char *envp[] = {buf, NULL};
+ 
+         snprintf(buf, sizeof(buf), "PATH=%s", getenv("PATH"));
+-        execve("regression_test.py", NULL, envp);
++        execve("regression_test.py", argp, envp);
+     } else if (pid > 0) {
+         return;
+     }
+@@ -359,7 +360,7 @@ static void create_primary_surface(Test
+     surface.flags      = 0;
+     surface.type       = 0;    /* unused by red_worker */
+     surface.position   = 0;    /* unused by red_worker */
+-    surface.mem        = (uint64_t)&test->primary_surface;
++    surface.mem        = &test->primary_surface;
+     surface.group_id   = MEM_SLOT_GROUP_ID;
+ 
+     test->width = width;
+@@ -701,13 +702,14 @@ static int flush_resources(QXLInstance *
+     return TRUE;
+ }
+ 
+-static void client_monitors_config(QXLInstance *qin, VDAgentMonitorsConfig *monitors_config)
++static int client_monitors_config(QXLInstance *qin, VDAgentMonitorsConfig *monitors_config)
+ {
+     if (!monitors_config) {
+         printf("%s: NULL monitors_config\n", __func__);
+     } else {
+         printf("%s: %d\n", __func__, monitors_config->num_of_monitors);
+     }
++    return 0;
+ }
+ 
+ QXLInterface display_sif = {

@@ -1,2 +1,4 @@
 link-libspice-server-with-libm-libpthread.patch
+fix-build-warning-PIXEL.patch
+fix-build-warnings.patch
 make-celt-to-be-optional.patch
