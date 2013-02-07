@@ -1,6 +1,6 @@
 Subject: Fix numerous compiler warnings due to wrong types and remove useless typecasts
 From: Serge Hallyn <serge.hallyn@ubuntu.com>
-Forwarded: no
+Forwarded: yes
 
 --- a/server/tests/basic_event_loop.c
 +++ b/server/tests/basic_event_loop.c
