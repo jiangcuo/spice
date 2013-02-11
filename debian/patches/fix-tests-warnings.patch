@@ -1,10 +1,22 @@
-Subject: Fix numerous compiler warnings due to wrong types and remove useless typecasts
+Date: Mon, 11 Feb 2013 08:49:58 -0600
 From: Serge Hallyn <serge.hallyn@ubuntu.com>
+Subject: [PATCH (v2)] Small cleanups to address compiler warnings
+Message-ID: <20130211144958.GA6481@sergelap>
 Forwarded: yes
 
+Changelog: Feb 11: Address feedback by Marc-André:
+
+Signed-off-by: Serge Hallyn <serge.hallyn@ubuntu.com>
+---
+ server/tests/basic_event_loop.c  | 4 ++--
+ server/tests/test_display_base.c | 8 +++++---
+ 2 files changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/server/tests/basic_event_loop.c b/server/tests/basic_event_loop.c
+index c6f6698..57303a2 100644
 --- a/server/tests/basic_event_loop.c
 +++ b/server/tests/basic_event_loop.c
-@@ -115,7 +115,7 @@ static void watch_remove(SpiceWatch *wat
+@@ -115,7 +115,7 @@ static void watch_remove(SpiceWatch *watch)
  
  static void channel_event(int event, SpiceChannelEventInfo *info)
  {
@@ -13,20 +25,20 @@ Forwarded: yes
              info->connection_id, info->type, info->id, event);
  }
  
-@@ -215,8 +215,8 @@ void basic_event_loop_mainloop(void)
+@@ -215,7 +215,7 @@ void basic_event_loop_mainloop(void)
          if ((next_timer = get_next_timer()) != NULL) {
              calc_next_timeout(next_timer, &next_timer_timeout);
              timeout = &next_timer_timeout;
 -            DPRINTF(2, "timeout of %zd.%06zd",
--                    timeout->tv_sec, timeout->tv_usec);
-+            DPRINTF(2, "timeout of %d.%06d",
-+                    (int) timeout->tv_sec, (int) timeout->tv_usec);
++            DPRINTF(2, "timeout of %ld.%06ld",
+                     timeout->tv_sec, timeout->tv_usec);
          } else {
              timeout = NULL;
-         }
+diff --git a/server/tests/test_display_base.c b/server/tests/test_display_base.c
+index 588e960..bc01398 100644
 --- a/server/tests/test_display_base.c
 +++ b/server/tests/test_display_base.c
-@@ -42,7 +42,7 @@ static void test_spice_destroy_update(Si
+@@ -42,7 +42,7 @@ static void test_spice_destroy_update(SimpleSpiceUpdate *update)
          return;
      }
      if (update->drawable.clip.type != SPICE_CLIP_TYPE_NONE) {
@@ -39,7 +51,7 @@ Forwarded: yes
      pid = fork();
      if (pid == 0) {
          char buf[PATH_MAX];
-+	char *argp[] = {NULL};
++        char *argp[] = {NULL};
          char *envp[] = {buf, NULL};
  
          snprintf(buf, sizeof(buf), "PATH=%s", getenv("PATH"));
@@ -48,16 +60,7 @@ Forwarded: yes
      } else if (pid > 0) {
          return;
      }
-@@ -359,7 +360,7 @@ static void create_primary_surface(Test
-     surface.flags      = 0;
-     surface.type       = 0;    /* unused by red_worker */
-     surface.position   = 0;    /* unused by red_worker */
--    surface.mem        = (uint64_t)&test->primary_surface;
-+    surface.mem        = &test->primary_surface;
-     surface.group_id   = MEM_SLOT_GROUP_ID;
- 
-     test->width = width;
-@@ -701,13 +702,14 @@ static int flush_resources(QXLInstance *
+@@ -701,13 +702,14 @@ static int flush_resources(QXLInstance *qin)
      return TRUE;
  }
  
@@ -69,7 +72,10 @@ Forwarded: yes
      } else {
          printf("%s: %d\n", __func__, monitors_config->num_of_monitors);
      }
-+    return 0;
++    return 1;
  }
  
  QXLInterface display_sif = {
+-- 
+1.8.1.2
+

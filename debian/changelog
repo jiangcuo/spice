@@ -2,6 +2,7 @@ spice (0.12.2-0nocelt2exp) UNRELEASED; urgency=low
 
   * added two patches from Serge Hallyn to fix numerous compiler warnings:
      fix-build-warning-PIXEL.patch
+     fix-tests-warnings.patch
   * spice-common-remove-version-construction.patch - to stop spice-common
     from produce a ton of `build-aux/git-version-gen: not found' errors
     during autoreconf.
