@@ -1,3 +1,9 @@
+spice (0.12.2-0nocelt3) unstable; urgency=low
+
+  * Upload to unstable
+
+ -- Liang Guo <guoliang@debian.org>  Fri, 10 May 2013 09:10:16 +0800
+
 spice (0.12.2-0nocelt2exp) experimental; urgency=low
 
   * added two patches from Serge Hallyn to fix numerous compiler warnings:
