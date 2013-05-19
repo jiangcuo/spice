@@ -172,6 +172,7 @@ static void reds_mig_cleanup_wait_disconnect(void);
 static void reds_mig_remove_wait_disconnect_client(RedClient *client);
 static void reds_char_device_add_state(SpiceCharDeviceState *st);
 static void reds_char_device_remove_state(SpiceCharDeviceState *st);
+static void reds_send_mm_time(void);
 
 static ChannelSecurityOptions *channels_security = NULL;
 static int default_channel_security =
@@ -188,11 +189,19 @@ static ChannelSecurityOptions *find_channel_security(int id)
     return now;
 }
 
-static void reds_stream_channel_event(RedsStream *s, int event)
+static void reds_stream_push_channel_event(RedsStream *s, int event)
 {
-    if (core->base.minor_version < 3 || core->channel_event == NULL)
-        return;
     main_dispatcher_channel_event(event, s->info);
+}
+
+void reds_handle_channel_event(int event, SpiceChannelEventInfo *info)
+{
+    if (core->base.minor_version >= 3 && core->channel_event != NULL)
+        core->channel_event(event, info);
+
+    if (event == SPICE_CHANNEL_EVENT_DISCONNECTED) {
+        free(info);
+    }
 }
 
 static ssize_t stream_write_cb(RedsStream *s, const void *buf, size_t size)
@@ -563,7 +572,29 @@ void reds_client_disconnect(RedClient *client)
    // TODO: we need to handle agent properly for all clients!!!! (e.g., cut and paste, how? Maybe throw away messages
    // if we are in the middle of one from another client)
     if (reds->num_clients == 0) {
-       /* Reset write filter to start with clean state on client reconnect */
+        /* Let the agent know the client is disconnected */
+        if (reds->agent_state.base) {
+            SpiceCharDeviceWriteBuffer *char_dev_buf;
+            VDInternalBuf *internal_buf;
+            uint32_t total_msg_size;
+
+            total_msg_size = sizeof(VDIChunkHeader) + sizeof(VDAgentMessage);
+            char_dev_buf = spice_char_device_write_buffer_get_server_no_token(
+                               reds->agent_state.base, total_msg_size);
+            char_dev_buf->buf_used = total_msg_size;
+            internal_buf = (VDInternalBuf *)char_dev_buf->buf;
+            internal_buf->chunk_header.port = VDP_SERVER_PORT;
+            internal_buf->chunk_header.size = sizeof(VDAgentMessage);
+            internal_buf->header.protocol = VD_AGENT_PROTOCOL;
+            internal_buf->header.type = VD_AGENT_CLIENT_DISCONNECTED;
+            internal_buf->header.opaque = 0;
+            internal_buf->header.size = 0;
+
+            spice_char_device_write_buffer_add(reds->agent_state.base,
+                                               char_dev_buf);
+        }
+
+        /* Reset write filter to start with clean state on client reconnect */
         agent_msg_filter_init(&reds->agent_state.write_filter, agent_copypaste,
                               TRUE);
 
@@ -1338,6 +1369,14 @@ int reds_handle_migrate_data(MainChannelClient *mcc, SpiceMigrateDataMain *mig_d
 {
     VDIPortState *agent_state = &reds->agent_state;
 
+    /*
+     * Now that the client has switched to the target server, if main_channel
+     * controls the mm-time, we update the client's mm-time.
+     * (MSG_MAIN_INIT is not sent for a migrating connection)
+     */
+    if (reds->mm_timer_enabled) {
+        reds_send_mm_time();
+    }
     if (mig_data->agent_base.connected) {
         if (agent_state->base) { // agent was attached before migration data has arrived
             if (!vdagent) {
@@ -1493,7 +1532,7 @@ static void reds_info_new_channel(RedLinkInfo *link, int connection_id)
     link->stream->info->connection_id = connection_id;
     link->stream->info->type = link->link_mess->channel_type;
     link->stream->info->id   = link->link_mess->channel_id;
-    reds_stream_channel_event(link->stream, SPICE_CHANNEL_EVENT_INITIALIZED);
+    reds_stream_push_channel_event(link->stream, SPICE_CHANNEL_EVENT_INITIALIZED);
 }
 
 static void reds_send_link_result(RedLinkInfo *link, uint32_t error)
@@ -1724,12 +1763,6 @@ static void reds_channel_do_link(RedChannel *channel, RedClient *client,
     spice_assert(channel);
     spice_assert(link_msg);
     spice_assert(stream);
-
-    if (link_msg->channel_type == SPICE_CHANNEL_INPUTS && !stream->ssl) {
-        const char *mess = "keyboard channel is insecure";
-        const int mess_len = strlen(mess);
-        main_channel_push_notify(reds->main_channel, (uint8_t*)mess, mess_len);
-    }
 
     caps = (uint32_t *)((uint8_t *)link_msg + link_msg->caps_offset);
     channel->client_cbs.connect(channel, client, stream,
@@ -2820,7 +2853,7 @@ static RedLinkInfo *reds_init_client_connection(int socket)
     getpeername(stream->socket, (struct sockaddr*)(&stream->info->paddr_ext),
                 &stream->info->plen_ext);
 
-    reds_stream_channel_event(stream, SPICE_CHANNEL_EVENT_CONNECTED);
+    reds_stream_push_channel_event(stream, SPICE_CHANNEL_EVENT_CONNECTED);
 
     openssl_init(link);
 
@@ -3013,6 +3046,33 @@ listen:
         return -1;
     }
     return slisten;
+}
+
+static void reds_send_mm_time(void)
+{
+    if (!reds_main_channel_connected()) {
+        return;
+    }
+    spice_debug(NULL);
+    main_channel_push_multi_media_time(reds->main_channel,
+                                       reds_get_mm_time() - reds->mm_time_latency);
+}
+
+void reds_set_client_mm_time_latency(RedClient *client, uint32_t latency)
+{
+    // TODO: multi-client support for mm_time
+    if (reds->mm_timer_enabled) {
+        // TODO: consider network latency
+        if (latency > reds->mm_time_latency) {
+            reds->mm_time_latency = latency;
+            reds_send_mm_time();
+        } else {
+            spice_debug("new latency %u is smaller than existing %u",
+                        latency, reds->mm_time_latency);
+        }
+    } else {
+        snd_set_playback_latency(client, latency);
+    }
 }
 
 static int reds_init_net(void)
@@ -3444,15 +3504,15 @@ void reds_update_mm_timer(uint32_t mm_time)
 void reds_enable_mm_timer(void)
 {
     core->timer_start(reds->mm_timer, MM_TIMER_GRANULARITY_MS);
-    if (!reds_main_channel_connected()) {
-        return;
-    }
-    main_channel_push_multi_media_time(reds->main_channel, reds_get_mm_time() - MM_TIME_DELTA);
+    reds->mm_timer_enabled = TRUE;
+    reds->mm_time_latency = MM_TIME_DELTA;
+    reds_send_mm_time();
 }
 
 void reds_disable_mm_timer(void)
 {
     core->timer_cancel(reds->mm_timer);
+    reds->mm_timer_enabled = FALSE;
 }
 
 static void mm_timer_proc(void *opaque)
@@ -3885,7 +3945,7 @@ static int do_spice_init(SpiceCoreInterface *core_interface)
     if (!(reds->mm_timer = core->timer_add(mm_timer_proc, NULL))) {
         spice_error("mm timer create failed");
     }
-    core->timer_start(reds->mm_timer, MM_TIMER_GRANULARITY_MS);
+    reds_enable_mm_timer();
 
     if (reds_init_net() < 0) {
         goto err;
@@ -4521,7 +4581,7 @@ void reds_stream_free(RedsStream *s)
         return;
     }
 
-    reds_stream_channel_event(s, SPICE_CHANNEL_EVENT_DISCONNECTED);
+    reds_stream_push_channel_event(s, SPICE_CHANNEL_EVENT_DISCONNECTED);
 
 #if HAVE_SASL
     if (s->sasl.conn) {

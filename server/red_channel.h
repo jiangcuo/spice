@@ -144,6 +144,7 @@ enum {
     PIPE_ITEM_TYPE_SET_ACK=1,
     PIPE_ITEM_TYPE_MIGRATE,
     PIPE_ITEM_TYPE_EMPTY_MSG,
+    PIPE_ITEM_TYPE_PING,
 
     PIPE_ITEM_TYPE_CHANNEL_BASE=101,
 };
@@ -222,6 +223,17 @@ typedef struct RedChannelCapabilities {
 
 int test_capabilty(uint32_t *caps, int num_caps, uint32_t cap);
 
+typedef struct RedChannelClientLatencyMonitor {
+    int state;
+    uint64_t last_pong_time;
+    SpiceTimer *timer;
+    uint32_t id;
+    int tcp_nodelay;
+    int warmup_was_sent;
+
+    int64_t roundtrip;
+} RedChannelClientLatencyMonitor;
+
 struct RedChannelClient {
     RingItem channel_link;
     RingItem client_link;
@@ -273,6 +285,8 @@ struct RedChannelClient {
 
     int wait_migrate_data;
     int wait_migrate_flush_mark;
+
+    RedChannelClientLatencyMonitor latency_monitor;
 };
 
 struct RedChannel {
@@ -314,6 +328,17 @@ struct RedChannel {
 #endif
 };
 
+/*
+ * When an error occurs over a channel, we treat it as a warning
+ * for spice-server and shutdown the channel.
+ */
+#define spice_channel_client_error(rcc, format, ...)                                     \
+    do {                                                                                 \
+        spice_warning("rcc %p type %u id %u: " format, rcc,                              \
+                    rcc->channel->type, rcc->channel->id, ## __VA_ARGS__);               \
+        red_channel_client_shutdown(rcc);                                                \
+    } while (0)
+
 /* if one of the callbacks should cause disconnect, use red_channel_shutdown and don't
  * explicitly destroy the channel */
 RedChannel *red_channel_create(int size,
@@ -343,6 +368,7 @@ void red_channel_set_data(RedChannel *channel, void *data);
 
 RedChannelClient *red_channel_client_create(int size, RedChannel *channel, RedClient *client,
                                             RedsStream *stream,
+                                            int monitor_latency,
                                             int num_common_caps, uint32_t *common_caps,
                                             int num_caps, uint32_t *caps);
 // TODO: tmp, for channels that don't use RedChannel yet (e.g., snd channel), but
@@ -416,6 +442,9 @@ void red_channel_client_begin_send_message(RedChannelClient *rcc);
  * return: the urgent send data marshaller
  */
 SpiceMarshaller *red_channel_client_switch_to_urgent_sender(RedChannelClient *rcc);
+
+/* returns -1 if we don't have an estimation */
+int red_channel_client_get_roundtrip_ms(RedChannelClient *rcc);
 
 void red_channel_pipe_item_init(RedChannel *channel, PipeItem *item, int type);
 

@@ -1022,6 +1022,18 @@ void spice_marshall_msg_display_draw_composite(SpiceMarshaller *m, SpiceMsgDispl
     *mask_bitmap_out = NULL;
 }
 
+void spice_marshall_msg_display_stream_activate_report(SpiceMarshaller *m, SpiceMsgDisplayStreamActivateReport *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgDisplayStreamActivateReport *src;
+    src = (SpiceMsgDisplayStreamActivateReport *)msg;
+
+    spice_marshaller_add_uint32(m, src->stream_id);
+    spice_marshaller_add_uint32(m, src->unique_id);
+    spice_marshaller_add_uint32(m, src->max_window_size);
+    spice_marshaller_add_uint32(m, src->timeout_ms);
+}
+
 void spice_marshall_msg_inputs_init(SpiceMarshaller *m, SpiceMsgInputsInit *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
@@ -1179,6 +1191,15 @@ void spice_marshall_SpiceMsgAudioMute(SpiceMarshaller *m, SpiceMsgAudioMute *msg
     src = (SpiceMsgAudioMute *)msg;
 
     spice_marshaller_add_uint8(m, src->mute);
+}
+
+void spice_marshall_msg_playback_latency(SpiceMarshaller *m, SpiceMsgPlaybackLatency *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgPlaybackLatency *src;
+    src = (SpiceMsgPlaybackLatency *)msg;
+
+    spice_marshaller_add_uint32(m, src->latency_ms);
 }
 
 void spice_marshall_msg_record_start(SpiceMarshaller *m, SpiceMsgRecordStart *msg)

@@ -72,6 +72,7 @@ enum {
     WRITE_BUFFER_ORIGIN_NONE,
     WRITE_BUFFER_ORIGIN_CLIENT,
     WRITE_BUFFER_ORIGIN_SERVER,
+    WRITE_BUFFER_ORIGIN_SERVER_NO_TOKEN,
 };
 
 /* Holding references for avoiding access violation if the char device was
@@ -319,8 +320,10 @@ static int spice_char_device_read_from_device(SpiceCharDeviceState *dev)
         max_send_tokens--;
     }
     dev->during_read_from_device = 0;
+    if (dev->running) {
+        dev->active = dev->active || did_read;
+    }
     spice_char_device_state_unref(dev);
-    dev->active = dev->active || did_read;
     return did_read;
 }
 
@@ -437,7 +440,7 @@ static int spice_char_device_write_to_device(SpiceCharDeviceState *dev)
     core->timer_cancel(dev->write_to_dev_timer);
 
     sif = SPICE_CONTAINEROF(dev->sin->base.sif, SpiceCharDeviceInterface, base);
-    while (1) {
+    while (dev->running) {
         uint32_t write_len;
 
         if (!dev->cur_write_buf) {
@@ -453,9 +456,6 @@ static int spice_char_device_write_to_device(SpiceCharDeviceState *dev)
         write_len = dev->cur_write_buf->buf + dev->cur_write_buf->buf_used -
                     dev->cur_write_buf_pos;
         n = sif->write(dev->sin, dev->cur_write_buf_pos, write_len);
-        if (!dev->running) {
-            break;
-        }
         if (n <= 0) {
             break;
         }
@@ -470,13 +470,16 @@ static int spice_char_device_write_to_device(SpiceCharDeviceState *dev)
         dev->cur_write_buf_pos += n;
     }
     /* retry writing as long as the write queue is not empty */
-    if (dev->cur_write_buf) {
-        core->timer_start(dev->write_to_dev_timer, CHAR_DEVICE_WRITE_TO_TIMEOUT);
-    } else {
-        spice_assert(ring_is_empty(&dev->write_queue));
+    if (dev->running) {
+        if (dev->cur_write_buf) {
+            core->timer_start(dev->write_to_dev_timer,
+                              CHAR_DEVICE_WRITE_TO_TIMEOUT);
+        } else {
+            spice_assert(ring_is_empty(&dev->write_queue));
+        }
+        dev->active = dev->active || total;
     }
     spice_char_device_state_unref(dev);
-    dev->active = dev->active || total;
     return total;
 }
 
@@ -488,16 +491,14 @@ static void spice_char_dev_write_retry(void *opaque)
     spice_char_device_write_to_device(dev);
 }
 
-static SpiceCharDeviceWriteBuffer *__spice_char_device_write_buffer_get(SpiceCharDeviceState *dev,
-                                                                        RedClient *client,
-                                                                        int size,
-                                                                        int migrated_data_tokens)
+static SpiceCharDeviceWriteBuffer *__spice_char_device_write_buffer_get(
+    SpiceCharDeviceState *dev, RedClient *client,
+    int size, int origin, int migrated_data_tokens)
 {
     RingItem *item;
     SpiceCharDeviceWriteBuffer *ret;
 
-    if (!client && !dev->num_self_tokens) {
-        spice_printerr("internal buf is not available");
+    if (origin == WRITE_BUFFER_ORIGIN_SERVER && !dev->num_self_tokens) {
         return NULL;
     }
 
@@ -514,8 +515,10 @@ static SpiceCharDeviceWriteBuffer *__spice_char_device_write_buffer_get(SpiceCha
         ret->buf = spice_realloc(ret->buf, size);
         ret->buf_size = size;
     }
+    ret->origin = origin;
 
-    if (client) {
+    if (origin == WRITE_BUFFER_ORIGIN_CLIENT) {
+       spice_assert(client);
        SpiceCharDeviceClientState *dev_client = spice_char_device_client_find(dev, client);
        if (dev_client) {
             if (!migrated_data_tokens &&
@@ -524,7 +527,6 @@ static SpiceCharDeviceWriteBuffer *__spice_char_device_write_buffer_get(SpiceCha
                 spice_char_device_handle_client_overflow(dev_client);
                 goto error;
             }
-            ret->origin = WRITE_BUFFER_ORIGIN_CLIENT;
             ret->client = client;
             if (!migrated_data_tokens && dev_client->do_flow_control) {
                 dev_client->num_client_tokens--;
@@ -535,8 +537,7 @@ static SpiceCharDeviceWriteBuffer *__spice_char_device_write_buffer_get(SpiceCha
             spice_printerr("client not found: dev %p client %p", dev, client);
             goto error;
         }
-    } else {
-        ret->origin = WRITE_BUFFER_ORIGIN_SERVER;
+    } else if (origin == WRITE_BUFFER_ORIGIN_SERVER) {
         dev->num_self_tokens--;
     }
 
@@ -552,7 +553,16 @@ SpiceCharDeviceWriteBuffer *spice_char_device_write_buffer_get(SpiceCharDeviceSt
                                                                RedClient *client,
                                                                int size)
 {
-   return  __spice_char_device_write_buffer_get(dev, client, size, 0);
+   return  __spice_char_device_write_buffer_get(dev, client, size, 
+             client ? WRITE_BUFFER_ORIGIN_CLIENT : WRITE_BUFFER_ORIGIN_SERVER,
+             0);
+}
+
+SpiceCharDeviceWriteBuffer *spice_char_device_write_buffer_get_server_no_token(
+    SpiceCharDeviceState *dev, int size)
+{
+   return  __spice_char_device_write_buffer_get(dev, NULL, size, 
+             WRITE_BUFFER_ORIGIN_SERVER_NO_TOKEN, 0);
 }
 
 static SpiceCharDeviceWriteBuffer *spice_char_device_write_buffer_ref(SpiceCharDeviceWriteBuffer *write_buf)
@@ -946,12 +956,14 @@ int spice_char_device_state_restore(SpiceCharDeviceState *dev,
 
     if (mig_data->write_size > 0) {
         if (mig_data->write_num_client_tokens) {
-            dev->cur_write_buf = __spice_char_device_write_buffer_get(dev, client_state->client,
-                                                                      mig_data->write_size,
-                                                                      mig_data->write_num_client_tokens);
+            dev->cur_write_buf =
+                __spice_char_device_write_buffer_get(dev, client_state->client,
+                    mig_data->write_size, WRITE_BUFFER_ORIGIN_CLIENT,
+                    mig_data->write_num_client_tokens);
         } else {
-            dev->cur_write_buf = __spice_char_device_write_buffer_get(dev, NULL, mig_data->write_size,
-                                                                      0);
+            dev->cur_write_buf =
+                __spice_char_device_write_buffer_get(dev, NULL,
+                    mig_data->write_size, WRITE_BUFFER_ORIGIN_SERVER, 0);
         }
         /* the first write buffer contains all the data that was saved for migration */
         memcpy(dev->cur_write_buf->buf,

@@ -80,6 +80,8 @@
 #include "dispatcher.h"
 #include "main_channel.h"
 #include "migration_protocol.h"
+#include "spice_timer_queue.h"
+#include "main_dispatcher.h"
 
 //#define COMPRESS_STAT
 //#define DUMP_BITMAP
@@ -108,19 +110,22 @@
 #define DISPLAY_FREE_LIST_DEFAULT_SIZE 128
 
 #define RED_STREAM_DETACTION_MAX_DELTA ((1000 * 1000 * 1000) / 5) // 1/5 sec
-#define RED_STREAM_CONTINUS_MAX_DELTA ((1000 * 1000 * 1000) / 2) // 1/2 sec
+#define RED_STREAM_CONTINUS_MAX_DELTA (1000 * 1000 * 1000)
 #define RED_STREAM_TIMOUT (1000 * 1000 * 1000)
 #define RED_STREAM_FRAMES_START_CONDITION 20
 #define RED_STREAM_GRADUAL_FRAMES_START_CONDITION 0.2
 #define RED_STREAM_FRAMES_RESET_CONDITION 100
 #define RED_STREAM_MIN_SIZE (96 * 96)
+#define RED_STREAM_INPUT_FPS_TIMEOUT (5 * 1000) // 5 sec
+#define RED_STREAM_CHANNEL_CAPACITY 0.8
+/* the client's stream report frequency is the minimum of the 2 values below */
+#define RED_STREAM_CLIENT_REPORT_WINDOW 5 // #frames
+#define RED_STREAM_CLIENT_REPORT_TIMEOUT 1000 // milliseconds
+#define RED_STREAM_DEFAULT_HIGH_START_BIT_RATE (10 * 1024 * 1024) // 10Mbps
+#define RED_STREAM_DEFAULT_LOW_START_BIT_RATE (2.5 * 1024 * 1024) // 2.5Mbps
 
 #define FPS_TEST_INTERVAL 1
 #define MAX_FPS 30
-
-//best bit rate per pixel base on 13000000 bps for frame size 720x576 pixels and 25 fps
-#define BEST_BIT_RATE_PER_PIXEL 38
-#define WORST_BIT_RATE_PER_PIXEL 4
 
 #define RED_COMPRESS_BUF_SIZE (1024 * 64)
 
@@ -293,6 +298,7 @@ enum {
     PIPE_ITEM_TYPE_CREATE_SURFACE,
     PIPE_ITEM_TYPE_DESTROY_SURFACE,
     PIPE_ITEM_TYPE_MONITORS_CONFIG,
+    PIPE_ITEM_TYPE_STREAM_ACTIVATE_REPORT,
 };
 
 typedef struct VerbItem {
@@ -351,6 +357,11 @@ typedef struct MonitorsConfigItem {
     PipeItem pipe_item;
     MonitorsConfig *monitors_config;
 } MonitorsConfigItem;
+
+typedef struct StreamActivateReportItem {
+    PipeItem pipe_item;
+    uint32_t stream_id;
+} StreamActivateReportItem;
 
 typedef struct CursorItem {
     uint32_t group_id;
@@ -413,6 +424,9 @@ typedef struct ImageItem {
 
 typedef struct Drawable Drawable;
 
+typedef struct DisplayChannel DisplayChannel;
+typedef struct DisplayChannelClient DisplayChannelClient;
+
 enum {
     STREAM_FRAME_NONE,
     STREAM_FRAME_NATIVE,
@@ -427,12 +441,29 @@ struct Stream {
     int width;
     int height;
     SpiceRect dest_area;
-    MJpegEncoder *mjpeg_encoder;
     int top_down;
     Stream *next;
     RingItem link;
-    int bit_rate;
+
+    SpiceTimer *input_fps_timer;
+    uint32_t num_input_frames;
+    uint64_t input_fps_timer_start;
+    uint32_t input_fps;
 };
+
+#define STREAM_STATS
+#ifdef STREAM_STATS
+typedef struct StreamStats {
+   uint64_t num_drops_pipe;
+   uint64_t num_drops_fps;
+   uint64_t num_frames_sent;
+   uint64_t num_input_frames;
+   uint64_t size_sent;
+
+   uint64_t start;
+   uint64_t end;
+} StreamStats;
+#endif
 
 typedef struct StreamAgent {
     QRegion vis_region; /* the part of the surface area that is currently occupied by video
@@ -448,10 +479,18 @@ typedef struct StreamAgent {
     PipeItem destroy_item;
     Stream *stream;
     uint64_t last_send_time;
+    MJpegEncoder *mjpeg_encoder;
+    DisplayChannelClient *dcc;
 
     int frames;
     int drops;
     int fps;
+
+    uint32_t report_id;
+    uint32_t client_required_latency;
+#ifdef STREAM_STATS
+    StreamStats stats;
+#endif
 } StreamAgent;
 
 typedef struct StreamClipItem {
@@ -518,9 +557,6 @@ typedef struct FreeList {
     uint64_t sync[MAX_CACHE_CLIENTS];
     WaitForChannels wait;
 } FreeList;
-
-typedef struct DisplayChannel DisplayChannel;
-typedef struct DisplayChannelClient DisplayChannelClient;
 
 typedef struct  {
     DisplayChannelClient *dcc;
@@ -631,6 +667,7 @@ typedef struct CommonChannelClient {
     RedChannelClient base;
     uint32_t id;
     struct RedWorker *worker;
+    int is_low_bandwidth;
 } CommonChannelClient;
 
 /* Each drawable can refer to at most 3 images: src, brush and mask */
@@ -674,6 +711,9 @@ struct DisplayChannelClient {
     QRegion surface_client_lossy_region[NUM_SURFACES];
 
     StreamAgent stream_agents[NUM_STREAMS];
+    int use_mjpeg_encoder_rate_control;
+    uint32_t streams_max_latency;
+    uint64_t streams_max_bit_rate;
 };
 
 struct DisplayChannel {
@@ -830,6 +870,8 @@ struct Drawable {
 
     int surface_id;
     int surfaces_dest[3];
+
+    uint32_t process_commands_generation;
 };
 
 typedef struct _Drawable _Drawable;
@@ -967,6 +1009,7 @@ typedef struct RedWorker {
     Ring streams;
     ItemTrace items_trace[NUM_TRACE_ITEMS];
     uint32_t next_item_trace;
+    uint64_t streams_size_total;
 
     QuicData quic_data;
     QuicContext *quic;
@@ -980,6 +1023,7 @@ typedef struct RedWorker {
     ZlibData zlib_data;
     ZlibEncoder *zlib;
 
+    uint32_t process_commands_generation;
 #ifdef PIPE_DEBUG
     uint32_t last_id;
 #endif
@@ -996,7 +1040,7 @@ typedef struct RedWorker {
     uint64_t *command_counter;
 #endif
 
-    int driver_has_monitors_config;
+    int driver_cap_monitors_config;
     int set_client_capabilities_pending;
 } RedWorker;
 
@@ -1022,6 +1066,8 @@ static void red_current_flush(RedWorker *worker, int surface_id);
 #else
 static void red_draw_drawable(RedWorker *worker, Drawable *item);
 static void red_update_area(RedWorker *worker, const SpiceRect *area, int surface_id);
+static void red_update_area_till(RedWorker *worker, const SpiceRect *area, int surface_id,
+                                 Drawable *last);
 #endif
 static void red_release_cursor(RedWorker *worker, CursorItem *cursor);
 static inline void release_drawable(RedWorker *worker, Drawable *item);
@@ -1040,7 +1086,6 @@ static int red_display_free_some_independent_glz_drawables(DisplayChannelClient 
 static void red_display_free_glz_drawable(DisplayChannelClient *dcc, RedGlzDrawable *drawable);
 static ImageItem *red_add_surface_area_image(DisplayChannelClient *dcc, int surface_id,
                                              SpiceRect *area, PipeItem *pos, int can_lossy);
-static void reset_rate(DisplayChannelClient *dcc, StreamAgent *stream_agent);
 static BitmapGradualType _get_bitmap_graduality_level(RedWorker *worker, SpiceBitmap *bitmap,
                                                       uint32_t group_id);
 static inline int _stride_is_extra(SpiceBitmap *bitmap);
@@ -1060,6 +1105,7 @@ static void dump_bitmap(RedWorker *worker, SpiceBitmap *bitmap, uint32_t group_i
 #endif
 
 static void red_push_monitors_config(DisplayChannelClient *dcc);
+static inline uint64_t red_now(void);
 
 /*
  * Macros to make iterating over stuff easier
@@ -1233,12 +1279,14 @@ static MonitorsConfig *monitors_config_getref(MonitorsConfig *monitors_config)
 
 static void monitors_config_decref(MonitorsConfig *monitors_config)
 {
+    if (!monitors_config) {
+        return;
+    }
     if (--monitors_config->refs > 0) {
         return;
     }
 
-    spice_debug("removing worker monitors config");
-    monitors_config->worker->monitors_config = NULL;
+    spice_debug("freeing monitors config");
     free(monitors_config);
 }
 
@@ -2475,6 +2523,9 @@ static int is_same_drawable(RedWorker *worker, Drawable *d1, Drawable *d2)
 
 static inline void red_free_stream(RedWorker *worker, Stream *stream)
 {
+    if (stream->input_fps_timer) {
+        spice_timer_remove(stream->input_fps_timer);
+    }
     stream->next = worker->free_streams;
     worker->free_streams = stream;
 }
@@ -2483,9 +2534,6 @@ static void red_release_stream(RedWorker *worker, Stream *stream)
 {
     if (!--stream->refs) {
         spice_assert(!ring_item_is_linked(&stream->link));
-        if (stream->mjpeg_encoder) {
-            mjpeg_encoder_destroy(stream->mjpeg_encoder);
-        }
         red_free_stream(worker, stream);
         worker->stream_count--;
     }
@@ -2556,6 +2604,7 @@ static void red_attach_stream(RedWorker *worker, Drawable *drawable, Stream *str
     stream->current = drawable;
     drawable->stream = stream;
     stream->last_time = drawable->creation_time;
+    stream->num_input_frames++;
 
     WORKER_FOREACH_DCC(worker, item, dcc) {
         StreamAgent *agent;
@@ -2573,7 +2622,38 @@ static void red_attach_stream(RedWorker *worker, Drawable *drawable, Stream *str
             region_or(&agent->clip, &drawable->tree_item.base.rgn);
             push_stream_clip(dcc, agent);
         }
+#ifdef STREAM_STATS
+        agent->stats.num_input_frames++;
+#endif
     }
+}
+
+static void red_print_stream_stats(DisplayChannelClient *dcc, StreamAgent *agent)
+{
+#ifdef STREAM_STATS
+    StreamStats *stats = &agent->stats;
+    double passed_mm_time = (stats->end - stats->start) / 1000.0;
+
+    spice_debug("stream %ld (%dx%d): #frames-in %lu, #in-avg-fps %.2f, #frames-sent %lu, "
+                "#drops %lu (pipe %lu, fps %lu), avg_fps %.2f, "
+                "ratio(#frames-out/#frames-in) %.2f, "
+                "passed-mm-time %.2f (sec), size-total %.2f (MB), size-per-sec %.2f (Mbps), "
+                "size-per-frame %.2f (KBpf)",
+                agent - dcc->stream_agents, agent->stream->width, agent->stream->height,
+                stats->num_input_frames,
+                stats->num_input_frames / passed_mm_time,
+                stats->num_frames_sent,
+                stats->num_drops_pipe +
+                stats->num_drops_fps,
+                stats->num_drops_pipe,
+                stats->num_drops_fps,
+                stats->num_frames_sent / passed_mm_time,
+                (stats->num_frames_sent + 0.0) / stats->num_input_frames,
+                passed_mm_time,
+                stats->size_sent / 1024.0 / 1024.0,
+                ((stats->size_sent * 8.0) / (1024.0 * 1024)) / passed_mm_time,
+                stats->size_sent / 1000.0 / stats->num_frames_sent);
+#endif
 }
 
 static void red_stop_stream(RedWorker *worker, Stream *stream)
@@ -2586,13 +2666,26 @@ static void red_stop_stream(RedWorker *worker, Stream *stream)
     spice_debug("stream %d", get_stream_id(worker, stream));
     WORKER_FOREACH_DCC(worker, item, dcc) {
         StreamAgent *stream_agent;
+
         stream_agent = &dcc->stream_agents[get_stream_id(worker, stream)];
         region_clear(&stream_agent->vis_region);
         region_clear(&stream_agent->clip);
         spice_assert(!pipe_item_is_linked(&stream_agent->destroy_item));
+        if (stream_agent->mjpeg_encoder && dcc->use_mjpeg_encoder_rate_control) {
+            uint64_t stream_bit_rate = mjpeg_encoder_get_bit_rate(stream_agent->mjpeg_encoder);
+
+            if (stream_bit_rate > dcc->streams_max_bit_rate) {
+                spice_debug("old max-bit-rate=%.2f new=%.2f",
+                dcc->streams_max_bit_rate / 8.0 / 1024.0 / 1024.0,
+                stream_bit_rate / 8.0 / 1024.0 / 1024.0);
+                dcc->streams_max_bit_rate = stream_bit_rate;
+            }
+        }
         stream->refs++;
         red_channel_client_pipe_add(&dcc->common.base, &stream_agent->destroy_item);
+        red_print_stream_stats(dcc, stream_agent);
     }
+    worker->streams_size_total -= stream->width * stream->height;
     ring_remove(&stream->link);
     red_release_stream(worker, stream);
 }
@@ -2615,7 +2708,9 @@ static int red_display_drawable_is_in_pipe(DisplayChannelClient *dcc, Drawable *
  * after red_display_detach_stream_gracefully is called for all the display channel clients,
  * red_detach_stream should be called. See comment (1).
  */
-static inline void red_display_detach_stream_gracefully(DisplayChannelClient *dcc, Stream *stream)
+static inline void red_display_detach_stream_gracefully(DisplayChannelClient *dcc,
+                                                        Stream *stream,
+                                                        Drawable *update_area_limit)
 {
     int stream_id = get_stream_id(dcc->common.worker, stream);
     StreamAgent *agent = &dcc->stream_agents[stream_id];
@@ -2642,7 +2737,7 @@ static inline void red_display_detach_stream_gracefully(DisplayChannelClient *dc
             spice_debug("stream %d: upgrade by linked drawable. sized %d, box ==>",
                         stream_id, stream->current->sized_stream != NULL);
             rect_debug(&stream->current->red_drawable->bbox);
-            return;
+            goto clear_vis_region;
         }
         spice_debug("stream %d: upgrade by drawable. sized %d, box ==>",
                     stream_id, stream->current->sized_stream != NULL);
@@ -2669,27 +2764,42 @@ static inline void red_display_detach_stream_gracefully(DisplayChannelClient *dc
         spice_debug("stream %d: upgrade by screenshot. has current %d. box ==>",
                     stream_id, stream->current != NULL);
         rect_debug(&upgrade_area);
-        red_update_area(dcc->common.worker, &upgrade_area, 0);
+        if (update_area_limit) {
+            red_update_area_till(dcc->common.worker, &upgrade_area, 0, update_area_limit);
+        } else {
+            red_update_area(dcc->common.worker, &upgrade_area, 0);
+        }
         red_add_surface_area_image(dcc, 0, &upgrade_area, NULL, FALSE);
     }
-
+clear_vis_region:
+    region_clear(&agent->vis_region);
 }
 
-static inline void red_detach_stream_gracefully(RedWorker *worker, Stream *stream)
+static inline void red_detach_stream_gracefully(RedWorker *worker, Stream *stream,
+                                                Drawable *update_area_limit)
 {
     RingItem *item;
     DisplayChannelClient *dcc;
 
     WORKER_FOREACH_DCC(worker, item, dcc) {
-        red_display_detach_stream_gracefully(dcc, stream);
+        red_display_detach_stream_gracefully(dcc, stream, update_area_limit);
     }
     if (stream->current) {
         red_detach_stream(worker, stream, TRUE);
     }
 }
 
-// region should be a primary surface region
-static void red_detach_streams_behind(RedWorker *worker, QRegion *region)
+/*
+ * region  : a primary surface region. Streams that intersects with the given
+ *           region will be detached.
+ * drawable: If detaching the stream is triggered by the addition of a new drawable
+ *           that is dependent on the given region, and the drawable is already a part
+ *           of the "current tree", the drawable parameter should be set with
+ *           this drawable, otherwise, it should be NULL. Then, if detaching the stream
+ *           involves sending an upgrade image to the client, this drawable won't be rendered
+ *           (see red_display_detach_stream_gracefully).
+ */
+static void red_detach_streams_behind(RedWorker *worker, QRegion *region, Drawable *drawable)
 {
     Ring *ring = &worker->streams;
     RingItem *item = ring_get_head(ring);
@@ -2706,7 +2816,7 @@ static void red_detach_streams_behind(RedWorker *worker, QRegion *region)
             StreamAgent *agent = &dcc->stream_agents[get_stream_id(worker, stream)];
 
             if (region_intersects(&agent->vis_region, region)) {
-                red_display_detach_stream_gracefully(dcc, stream);
+                red_display_detach_stream_gracefully(dcc, stream, drawable);
                 detach_stream = 1;
                 spice_debug("stream %d", get_stream_id(worker, stream));
             }
@@ -2798,7 +2908,7 @@ static inline void red_handle_streams_timout(RedWorker *worker)
         Stream *stream = SPICE_CONTAINEROF(item, Stream, link);
         item = ring_next(ring, item);
         if (now >= (stream->last_time + RED_STREAM_TIMOUT)) {
-            red_detach_stream_gracefully(worker, stream);
+            red_detach_stream_gracefully(worker, stream, NULL);
             red_stop_stream(worker, stream);
         }
     }
@@ -2821,38 +2931,130 @@ static inline Stream *red_alloc_stream(RedWorker *worker)
     return stream;
 }
 
-static int get_bit_rate(DisplayChannelClient *dcc,
-    int width, int height)
+static uint64_t red_stream_get_initial_bit_rate(DisplayChannelClient *dcc,
+                                                Stream *stream)
 {
-    uint64_t bit_rate = width * height * BEST_BIT_RATE_PER_PIXEL;
-    MainChannelClient *mcc;
-    int is_low_bandwidth = 0;
+    char *env_bit_rate_str;
+    uint64_t bit_rate = 0;
 
-    if (dcc) {
-        mcc = red_client_get_main(dcc->common.base.client);
-        is_low_bandwidth = main_channel_client_is_low_bandwidth(mcc);
-    }
+    env_bit_rate_str = getenv("SPICE_BIT_RATE");
+    if (env_bit_rate_str != NULL) {
+        double env_bit_rate;
 
-    if (is_low_bandwidth) {
-        bit_rate = MIN(main_channel_client_get_bitrate_per_sec(mcc) * 70 / 100, bit_rate);
-        bit_rate = MAX(bit_rate, width * height * WORST_BIT_RATE_PER_PIXEL);
-    }
-    return bit_rate;
-}
-
-static int get_minimal_bit_rate(RedWorker *worker, int width, int height)
-{
-    RingItem *item;
-    DisplayChannelClient *dcc;
-    int ret = INT_MAX;
-
-    WORKER_FOREACH_DCC(worker, item, dcc) {
-        int bit_rate = get_bit_rate(dcc, width, height);
-        if (bit_rate < ret) {
-            ret = bit_rate;
+        errno = 0;
+        env_bit_rate = strtod(env_bit_rate_str, NULL);
+        if (errno == 0) {
+            bit_rate = env_bit_rate * 1024 * 1024;
+        } else {
+            spice_warning("error parsing SPICE_BIT_RATE: %s", strerror(errno));
         }
     }
-    return ret;
+
+    if (!bit_rate) {
+        MainChannelClient *mcc;
+        uint64_t net_test_bit_rate;
+
+        mcc = red_client_get_main(dcc->common.base.client);
+        net_test_bit_rate = main_channel_client_is_network_info_initialized(mcc) ?
+                                main_channel_client_get_bitrate_per_sec(mcc) :
+                                0;
+        bit_rate = MAX(dcc->streams_max_bit_rate, net_test_bit_rate);
+        if (bit_rate == 0) {
+            /*
+             * In case we are after a spice session migration,
+             * the low_bandwidth flag is retrieved from migration data.
+             * If the network info is not initialized due to another reason,
+             * the low_bandwidth flag is FALSE.
+             */
+            bit_rate = dcc->common.is_low_bandwidth ?
+                RED_STREAM_DEFAULT_LOW_START_BIT_RATE :
+                RED_STREAM_DEFAULT_HIGH_START_BIT_RATE;
+        }
+    }
+
+    spice_debug("base-bit-rate %.2f (Mbps)", bit_rate / 1024.0 / 1024.0);
+    /* dividing the available bandwidth among the active streams, and saving
+     * (1-RED_STREAM_CHANNEL_CAPACITY) of it for other messages */
+    return (RED_STREAM_CHANNEL_CAPACITY * bit_rate *
+           stream->width * stream->height) / dcc->common.worker->streams_size_total;
+}
+
+static uint32_t red_stream_mjpeg_encoder_get_roundtrip(void *opaque)
+{
+    StreamAgent *agent = opaque;
+    int roundtrip;
+
+    spice_assert(agent);
+    roundtrip = red_channel_client_get_roundtrip_ms(&agent->dcc->common.base);
+    if (roundtrip < 0) {
+        MainChannelClient *mcc = red_client_get_main(agent->dcc->common.base.client);
+
+        /*
+         * the main channel client roundtrip might not have been
+         * calculated (e.g., after migration). In such case,
+         * main_channel_client_get_roundtrip_ms returns 0.
+         */
+        roundtrip = main_channel_client_get_roundtrip_ms(mcc);
+    }
+
+    return roundtrip;
+}
+
+static uint32_t red_stream_mjpeg_encoder_get_source_fps(void *opaque)
+{
+    StreamAgent *agent = opaque;
+
+    spice_assert(agent);
+    return agent->stream->input_fps;
+}
+
+static void red_display_update_streams_max_latency(DisplayChannelClient *dcc, StreamAgent *remove_agent)
+{
+    uint32_t new_max_latency = 0;
+    int i;
+
+    if (dcc->streams_max_latency != remove_agent->client_required_latency) {
+        return;
+    }
+
+    dcc->streams_max_latency = 0;
+    if (dcc->common.worker->stream_count == 1) {
+        return;
+    }
+    for (i = 0; i < NUM_STREAMS; i++) {
+        StreamAgent *other_agent = &dcc->stream_agents[i];
+        if (other_agent == remove_agent || !other_agent->mjpeg_encoder) {
+            continue;
+        }
+        if (other_agent->client_required_latency > new_max_latency) {
+            new_max_latency = other_agent->client_required_latency;
+        }
+    }
+    dcc->streams_max_latency = new_max_latency;
+}
+
+static void red_display_stream_agent_stop(DisplayChannelClient *dcc, StreamAgent *agent)
+{
+    red_display_update_streams_max_latency(dcc, agent);
+    if (agent->mjpeg_encoder) {
+        mjpeg_encoder_destroy(agent->mjpeg_encoder);
+        agent->mjpeg_encoder = NULL;
+    }
+}
+
+static void red_stream_update_client_playback_latency(void *opaque, uint32_t delay_ms)
+{
+    StreamAgent *agent = opaque;
+    DisplayChannelClient *dcc = agent->dcc;
+
+    red_display_update_streams_max_latency(dcc, agent);
+
+    agent->client_required_latency = delay_ms;
+    if (delay_ms > agent->dcc->streams_max_latency) {
+         agent->dcc->streams_max_latency = delay_ms;
+    }
+    spice_debug("reseting client latency: %u", agent->dcc->streams_max_latency);
+    main_dispatcher_set_mm_time_latency(agent->dcc->common.base.client, agent->dcc->streams_max_latency);
 }
 
 static void red_display_create_stream(DisplayChannelClient *dcc, Stream *stream)
@@ -2870,20 +3072,64 @@ static void red_display_create_stream(DisplayChannelClient *dcc, Stream *stream)
     }
     agent->drops = 0;
     agent->fps = MAX_FPS;
-    reset_rate(dcc, agent);
+    agent->dcc = dcc;
+
+    if (dcc->use_mjpeg_encoder_rate_control) {
+        MJpegEncoderRateControlCbs mjpeg_cbs;
+        uint64_t initial_bit_rate;
+
+        mjpeg_cbs.get_roundtrip_ms = red_stream_mjpeg_encoder_get_roundtrip;
+        mjpeg_cbs.get_source_fps = red_stream_mjpeg_encoder_get_source_fps;
+        mjpeg_cbs.update_client_playback_delay = red_stream_update_client_playback_latency;
+
+        initial_bit_rate = red_stream_get_initial_bit_rate(dcc, stream);
+        agent->mjpeg_encoder = mjpeg_encoder_new(TRUE, initial_bit_rate, &mjpeg_cbs, agent);
+    } else {
+        agent->mjpeg_encoder = mjpeg_encoder_new(FALSE, 0, NULL, NULL);
+    }
     red_channel_client_pipe_add(&dcc->common.base, &agent->create_item);
+
+    if (red_channel_client_test_remote_cap(&dcc->common.base, SPICE_DISPLAY_CAP_STREAM_REPORT)) {
+        StreamActivateReportItem *report_pipe_item = spice_malloc0(sizeof(*report_pipe_item));
+
+        agent->report_id = rand();
+        red_channel_pipe_item_init(dcc->common.base.channel, &report_pipe_item->pipe_item,
+                                   PIPE_ITEM_TYPE_STREAM_ACTIVATE_REPORT);
+        report_pipe_item->stream_id = get_stream_id(dcc->common.worker, stream);
+        red_channel_client_pipe_add(&dcc->common.base, &report_pipe_item->pipe_item);
+    }
+#ifdef STREAM_STATS
+    memset(&agent->stats, 0, sizeof(StreamStats));
+    if (stream->current) {
+        agent->stats.start = stream->current->red_drawable->mm_time;
+    }
+#endif
 }
 
-/* TODO: we create the stream even if dcc is NULL, i.e. no client - or
- * maybe we can't reach this function in that case? question: do we want to? */
+static void red_stream_input_fps_timer_cb(void *opaque)
+{
+    Stream *stream = opaque;
+    uint64_t now = red_now();
+    double duration_sec;
+
+    spice_assert(opaque);
+    if (now == stream->input_fps_timer_start) {
+        spice_warning("timer start and expiry time are equal");
+        return;
+    }
+    duration_sec = (now - stream->input_fps_timer_start)/(1000.0*1000*1000);
+    stream->input_fps = stream->num_input_frames / duration_sec;
+    spice_debug("input-fps=%u", stream->input_fps);
+    stream->num_input_frames = 0;
+    stream->input_fps_timer_start = now;
+}
+
 static void red_create_stream(RedWorker *worker, Drawable *drawable)
 {
     DisplayChannelClient *dcc;
     RingItem *dcc_ring_item;
     Stream *stream;
     SpiceRect* src_rect;
-    int stream_width;
-    int stream_height;
 
     spice_assert(!drawable->stream);
 
@@ -2893,10 +3139,6 @@ static void red_create_stream(RedWorker *worker, Drawable *drawable)
 
     spice_assert(drawable->red_drawable->type == QXL_DRAW_COPY);
     src_rect = &drawable->red_drawable->u.copy.src_area;
-    stream_width = src_rect->right - src_rect->left;
-    stream_height = src_rect->bottom - src_rect->top;
-
-    stream->mjpeg_encoder = mjpeg_encoder_new();
 
     ring_add(&worker->streams, &stream->link);
     stream->current = drawable;
@@ -2905,18 +3147,23 @@ static void red_create_stream(RedWorker *worker, Drawable *drawable)
     stream->height = src_rect->bottom - src_rect->top;
     stream->dest_area = drawable->red_drawable->bbox;
     stream->refs = 1;
-    stream->bit_rate = get_minimal_bit_rate(worker, stream_width, stream_height);
     SpiceBitmap *bitmap = &drawable->red_drawable->u.copy.src_bitmap->u.bitmap;
     stream->top_down = !!(bitmap->flags & SPICE_BITMAP_FLAGS_TOP_DOWN);
     drawable->stream = stream;
-
+    stream->input_fps_timer = spice_timer_queue_add(red_stream_input_fps_timer_cb, stream);
+    spice_assert(stream->input_fps_timer);
+    spice_timer_set(stream->input_fps_timer, RED_STREAM_INPUT_FPS_TIMEOUT);
+    stream->num_input_frames = 0;
+    stream->input_fps_timer_start = red_now();
+    stream->input_fps = MAX_FPS;
+    worker->streams_size_total += stream->width * stream->height;
+    worker->stream_count++;
     WORKER_FOREACH_DCC(worker, dcc_ring_item, dcc) {
         red_display_create_stream(dcc, stream);
     }
-    worker->stream_count++;
     spice_debug("stream %d %dx%d (%d, %d) (%d, %d)", (int)(stream - worker->streams_buf), stream->width,
-    stream->height, stream->dest_area.left, stream->dest_area.top,
-    stream->dest_area.right, stream->dest_area.bottom);
+                stream->height, stream->dest_area.left, stream->dest_area.top,
+                stream->dest_area.right, stream->dest_area.bottom);
     return;
 }
 
@@ -2945,9 +3192,11 @@ static void red_display_client_init_streams(DisplayChannelClient *dcc)
         red_channel_pipe_item_init(channel, &agent->create_item, PIPE_ITEM_TYPE_STREAM_CREATE);
         red_channel_pipe_item_init(channel, &agent->destroy_item, PIPE_ITEM_TYPE_STREAM_DESTROY);
     }
+    dcc->use_mjpeg_encoder_rate_control =
+        red_channel_client_test_remote_cap(&dcc->common.base, SPICE_DISPLAY_CAP_STREAM_REPORT);
 }
 
-static void red_display_destroy_streams(DisplayChannelClient *dcc)
+static void red_display_destroy_streams_agents(DisplayChannelClient *dcc)
 {
     int i;
 
@@ -2955,6 +3204,10 @@ static void red_display_destroy_streams(DisplayChannelClient *dcc)
         StreamAgent *agent = &dcc->stream_agents[i];
         region_destroy(&agent->vis_region);
         region_destroy(&agent->clip);
+        if (agent->mjpeg_encoder) {
+            mjpeg_encoder_destroy(agent->mjpeg_encoder);
+            agent->mjpeg_encoder = NULL;
+        }
     }
 }
 
@@ -3056,26 +3309,7 @@ static inline int red_is_next_stream_frame(RedWorker *worker, const Drawable *ca
                                       FALSE);
 }
 
-static void reset_rate(DisplayChannelClient *dcc, StreamAgent *stream_agent)
-{
-    Stream *stream = stream_agent->stream;
-    int rate;
-
-    rate = get_bit_rate(dcc, stream->width, stream->height);
-    if (rate == stream->bit_rate) {
-        return;
-    }
-
-    /* MJpeg has no rate limiting anyway, so do nothing */
-}
-
-static int display_channel_client_is_low_bandwidth(DisplayChannelClient *dcc)
-{
-    return main_channel_client_is_low_bandwidth(
-        red_client_get_main(red_channel_client_get_client(&dcc->common.base)));
-}
-
-static inline void pre_stream_item_swap(RedWorker *worker, Stream *stream)
+static inline void pre_stream_item_swap(RedWorker *worker, Stream *stream, Drawable *new_frame)
 {
     DrawablePipeItem *dpi;
     DisplayChannelClient *dcc;
@@ -3089,33 +3323,58 @@ static inline void pre_stream_item_swap(RedWorker *worker, Stream *stream)
         return;
     }
 
+    if (new_frame->process_commands_generation == stream->current->process_commands_generation) {
+        spice_debug("ignoring drop, same process_commands_generation as previous frame");
+        return;
+    }
+
     index = get_stream_id(worker, stream);
     DRAWABLE_FOREACH_DPI(stream->current, ring_item, dpi) {
         dcc = dpi->dcc;
-        if (!display_channel_client_is_low_bandwidth(dcc)) {
-            continue;
-        }
         agent = &dcc->stream_agents[index];
 
-        if (pipe_item_is_linked(&dpi->dpi_pipe_item)) {
-            ++agent->drops;
+        if (!dcc->use_mjpeg_encoder_rate_control &&
+            !dcc->common.is_low_bandwidth) {
+            continue;
         }
 
+        if (pipe_item_is_linked(&dpi->dpi_pipe_item)) {
+#ifdef STREAM_STATS
+            agent->stats.num_drops_pipe++;
+#endif
+            if (dcc->use_mjpeg_encoder_rate_control) {
+                mjpeg_encoder_notify_server_frame_drop(agent->mjpeg_encoder);
+            } else {
+                ++agent->drops;
+            }
+        }
+    }
+
+
+    WORKER_FOREACH_DCC(worker, ring_item, dcc) {
+        double drop_factor;
+
+        agent = &dcc->stream_agents[index];
+
+        if (dcc->use_mjpeg_encoder_rate_control) {
+            continue;
+        }
         if (agent->frames / agent->fps < FPS_TEST_INTERVAL) {
             agent->frames++;
-            return;
+            continue;
         }
-
-        double drop_factor = ((double)agent->frames - (double)agent->drops) /
-                             (double)agent->frames;
-
+        drop_factor = ((double)agent->frames - (double)agent->drops) /
+            (double)agent->frames;
+        spice_debug("stream %d: #frames %u #drops %u", index, agent->frames, agent->drops);
         if (drop_factor == 1) {
             if (agent->fps < MAX_FPS) {
                 agent->fps++;
+                spice_debug("stream %d: fps++ %u", index, agent->fps);
             }
         } else if (drop_factor < 0.9) {
             if (agent->fps > 1) {
                 agent->fps--;
+                spice_debug("stream %d: fps--%u", index, agent->fps);
             }
         }
         agent->frames = 1;
@@ -3205,7 +3464,7 @@ static inline void red_stream_maintenance(RedWorker *worker, Drawable *candidate
                                                        stream,
                                                        TRUE);
         if (is_next_frame != STREAM_FRAME_NONE) {
-            pre_stream_item_swap(worker, stream);
+            pre_stream_item_swap(worker, stream, candidate);
             red_detach_stream(worker, stream, FALSE);
             prev->streamable = FALSE; //prevent item trace
             red_attach_stream(worker, candidate, stream);
@@ -3358,7 +3617,7 @@ static inline void red_use_stream_trace(RedWorker *worker, Drawable *drawable)
         if (is_next_frame != STREAM_FRAME_NONE) {
             if (stream->current) {
                 stream->current->streamable = FALSE; //prevent item trace
-                pre_stream_item_swap(worker, stream);
+                pre_stream_item_swap(worker, stream, drawable);
                 red_detach_stream(worker, stream, FALSE);
             }
             red_attach_stream(worker, drawable, stream);
@@ -3507,13 +3766,24 @@ static inline int red_current_add(RedWorker *worker, Ring *ring, Drawable *drawa
         exclude_region(worker, ring, exclude_base, &exclude_rgn, NULL, drawable);
         red_use_stream_trace(worker, drawable);
         red_streams_update_visible_region(worker, drawable);
+        /*
+         * Performing the insertion after exclude_region for
+         * safety (todo: Not sure if exclude_region can affect the drawable
+         * if it is added to the tree before calling exclude_region).
+         */
+        __current_add_drawable(worker, drawable, ring);
     } else {
+        /*
+         * red_detach_streams_behind can affect the current tree since it may
+         * trigger calls to update_area. Thus, the drawable should be added to the tree
+         * before calling red_detach_streams_behind
+         */
+        __current_add_drawable(worker, drawable, ring);
         if (drawable->surface_id == 0) {
-            red_detach_streams_behind(worker, &drawable->tree_item.base.rgn);
+            red_detach_streams_behind(worker, &drawable->tree_item.base.rgn, drawable);
         }
     }
     region_destroy(&exclude_rgn);
-    __current_add_drawable(worker, drawable, ring);
     stat_add(&worker->add_stat, start_time);
     return TRUE;
 }
@@ -3567,7 +3837,7 @@ static inline int red_current_add_with_shadow(RedWorker *worker, Ring *ring, Dra
 
     // only primary surface streams are supported
     if (is_primary_surface(worker, item->surface_id)) {
-        red_detach_streams_behind(worker, &shadow->base.rgn);
+        red_detach_streams_behind(worker, &shadow->base.rgn, NULL);
     }
     ring_add(ring, &shadow->base.siblings_link);
     __current_add_drawable(worker, item, ring);
@@ -3579,7 +3849,7 @@ static inline int red_current_add_with_shadow(RedWorker *worker, Ring *ring, Dra
         red_streams_update_visible_region(worker, item);
     } else {
         if (item->surface_id == 0) {
-            red_detach_streams_behind(worker, &item->tree_item.base.rgn);
+            red_detach_streams_behind(worker, &item->tree_item.base.rgn, item);
         }
     }
     stat_add(&worker->add_stat, start_time);
@@ -3860,6 +4130,7 @@ static Drawable *get_drawable(RedWorker *worker, uint8_t effect, RedDrawable *re
     ring_init(&drawable->pipes);
     ring_init(&drawable->glz_ring);
 
+    drawable->process_commands_generation = worker->process_commands_generation;
     return drawable;
 }
 
@@ -3911,7 +4182,7 @@ static inline int red_handle_surfaces_dependencies(RedWorker *worker, Drawable *
                 QRegion depend_region;
                 region_init(&depend_region);
                 region_add(&depend_region, &drawable->red_drawable->surfaces_rects[x]);
-                red_detach_streams_behind(worker, &depend_region);
+                red_detach_streams_behind(worker, &depend_region, NULL);
             }
         }
     }
@@ -4908,6 +5179,7 @@ static int red_process_commands(RedWorker *worker, uint32_t max_pipe_size, int *
         return n;
     }
 
+    worker->process_commands_generation++;
     *ring_is_empty = FALSE;
     while (!display_is_connected(worker) ||
            // TODO: change to average pipe size?
@@ -8240,7 +8512,7 @@ static inline void display_begin_send_message(RedChannelClient *rcc)
     red_channel_client_begin_send_message(rcc);
 }
 
-static inline uint8_t *red_get_image_line(RedWorker *worker, SpiceChunks *chunks, size_t *offset,
+static inline uint8_t *red_get_image_line(SpiceChunks *chunks, size_t *offset,
                                           int *chunk_nr, int stride)
 {
     uint8_t *ret;
@@ -8266,13 +8538,14 @@ static inline uint8_t *red_get_image_line(RedWorker *worker, SpiceChunks *chunks
     return ret;
 }
 
-static int encode_frame (RedWorker *worker, const SpiceRect *src,
-                         const SpiceBitmap *image, Stream *stream)
+static int encode_frame(DisplayChannelClient *dcc, const SpiceRect *src,
+                        const SpiceBitmap *image, Stream *stream)
 {
     SpiceChunks *chunks;
     uint32_t image_stride;
     size_t offset;
     int i, chunk;
+    StreamAgent *agent = &dcc->stream_agents[stream - dcc->common.worker->streams_buf];
 
     chunks = image->data;
     offset = 0;
@@ -8281,7 +8554,7 @@ static int encode_frame (RedWorker *worker, const SpiceRect *src,
 
     const int skip_lines = stream->top_down ? src->top : image->y - (src->bottom - 0);
     for (i = 0; i < skip_lines; i++) {
-        red_get_image_line(worker, chunks, &offset, &chunk, image_stride);
+        red_get_image_line(chunks, &offset, &chunk, image_stride);
     }
 
     const unsigned int stream_height = src->bottom - src->top;
@@ -8289,14 +8562,14 @@ static int encode_frame (RedWorker *worker, const SpiceRect *src,
 
     for (i = 0; i < stream_height; i++) {
         uint8_t *src_line =
-            (uint8_t *)red_get_image_line(worker, chunks, &offset, &chunk, image_stride);
+            (uint8_t *)red_get_image_line(chunks, &offset, &chunk, image_stride);
 
         if (!src_line) {
             return FALSE;
         }
 
-        src_line += src->left * mjpeg_encoder_get_bytes_per_pixel(stream->mjpeg_encoder);
-        if (mjpeg_encoder_encode_scanline(stream->mjpeg_encoder, src_line, stream_width) == 0)
+        src_line += src->left * mjpeg_encoder_get_bytes_per_pixel(agent->mjpeg_encoder);
+        if (mjpeg_encoder_encode_scanline(agent->mjpeg_encoder, src_line, stream_width) == 0)
             return FALSE;
     }
 
@@ -8311,8 +8584,10 @@ static inline int red_marshall_stream_data(RedChannelClient *rcc,
     Stream *stream = drawable->stream;
     SpiceImage *image;
     RedWorker *worker = dcc->common.worker;
+    uint32_t frame_mm_time;
     int n;
     int width, height;
+    int ret;
 
     if (!stream) {
         spice_assert(drawable->sized_stream);
@@ -8344,23 +8619,48 @@ static inline int red_marshall_stream_data(RedChannelClient *rcc,
     StreamAgent *agent = &dcc->stream_agents[get_stream_id(worker, stream)];
     uint64_t time_now = red_now();
     size_t outbuf_size;
-    if (time_now - agent->last_send_time < (1000 * 1000 * 1000) / agent->fps) {
-        agent->frames--;
-        return TRUE;
+
+    if (!dcc->use_mjpeg_encoder_rate_control) {
+        if (time_now - agent->last_send_time < (1000 * 1000 * 1000) / agent->fps) {
+            agent->frames--;
+#ifdef STREAM_STATS
+            agent->stats.num_drops_fps++;
+#endif
+            return TRUE;
+        }
     }
 
+    /* workaround for vga streams */
+    frame_mm_time =  drawable->red_drawable->mm_time ?
+                        drawable->red_drawable->mm_time :
+                        reds_get_mm_time();
     outbuf_size = dcc->send_data.stream_outbuf_size;
-    if (!mjpeg_encoder_start_frame(stream->mjpeg_encoder, image->u.bitmap.format,
-                                   width, height,
-                                   &dcc->send_data.stream_outbuf,
-                                   &outbuf_size)) {
+    ret = mjpeg_encoder_start_frame(agent->mjpeg_encoder, image->u.bitmap.format,
+                                    width, height,
+                                    &dcc->send_data.stream_outbuf,
+                                    &outbuf_size,
+                                    frame_mm_time);
+    switch (ret) {
+    case MJPEG_ENCODER_FRAME_DROP:
+        spice_assert(dcc->use_mjpeg_encoder_rate_control);
+#ifdef STREAM_STATS
+        agent->stats.num_drops_fps++;
+#endif
+        return TRUE;
+    case MJPEG_ENCODER_FRAME_UNSUPPORTED:
+        return FALSE;
+    case MJPEG_ENCODER_FRAME_ENCODE_START:
+        break;
+    default:
+        spice_error("bad return value (%d) from mjpeg_encoder_start_frame", ret);
         return FALSE;
     }
-    if (!encode_frame(worker, &drawable->red_drawable->u.copy.src_area,
+
+    if (!encode_frame(dcc, &drawable->red_drawable->u.copy.src_area,
                       &image->u.bitmap, stream)) {
         return FALSE;
     }
-    n = mjpeg_encoder_end_frame(stream->mjpeg_encoder);
+    n = mjpeg_encoder_end_frame(agent->mjpeg_encoder);
     dcc->send_data.stream_outbuf_size = outbuf_size;
 
     if (!drawable->sized_stream) {
@@ -8369,7 +8669,7 @@ static inline int red_marshall_stream_data(RedChannelClient *rcc,
         red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_DATA, NULL);
 
         stream_data.base.id = get_stream_id(worker, stream);
-        stream_data.base.multi_media_time = drawable->red_drawable->mm_time;
+        stream_data.base.multi_media_time = frame_mm_time;
         stream_data.data_size = n;
 
         spice_marshall_msg_display_stream_data(base_marshaller, &stream_data);
@@ -8379,7 +8679,7 @@ static inline int red_marshall_stream_data(RedChannelClient *rcc,
         red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_DATA_SIZED, NULL);
 
         stream_data.base.id = get_stream_id(worker, stream);
-        stream_data.base.multi_media_time = drawable->red_drawable->mm_time;
+        stream_data.base.multi_media_time = frame_mm_time;
         stream_data.data_size = n;
         stream_data.width = width;
         stream_data.height = height;
@@ -8392,6 +8692,12 @@ static inline int red_marshall_stream_data(RedChannelClient *rcc,
     spice_marshaller_add_ref(base_marshaller,
                              dcc->send_data.stream_outbuf, n);
     agent->last_send_time = time_now;
+#ifdef STREAM_STATS
+    agent->stats.num_frames_sent++;
+    agent->stats.size_sent += n;
+    agent->stats.end = frame_mm_time;
+#endif
+
     return TRUE;
 }
 
@@ -8478,7 +8784,7 @@ static void display_channel_marshall_migrate_data(RedChannelClient *rcc,
                  MIGRATE_DATA_DISPLAY_MAX_CACHE_CLIENTS == MAX_CACHE_CLIENTS);
 
     display_data.message_serial = red_channel_client_get_message_serial(rcc);
-    display_data.low_bandwidth_setting = display_channel_client_is_low_bandwidth(dcc);
+    display_data.low_bandwidth_setting = dcc->common.is_low_bandwidth;
 
     display_data.pixmap_cache_freezer = pixmap_cache_freeze(dcc->pixmap_cache);
     display_data.pixmap_cache_id = dcc->pixmap_cache->id;
@@ -8763,7 +9069,7 @@ static void red_display_marshall_stream_end(RedChannelClient *rcc,
 
     red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_DESTROY, NULL);
     destroy.id = get_stream_id(dcc->common.worker, agent->stream);
-
+    red_display_stream_agent_stop(dcc, agent);
     spice_marshall_msg_display_stream_destroy(base_marshaller, &destroy);
 }
 
@@ -8906,6 +9212,22 @@ static void red_marshall_monitors_config(RedChannelClient *rcc, SpiceMarshaller 
     free(msg);
 }
 
+static void red_marshall_stream_activate_report(RedChannelClient *rcc,
+                                                SpiceMarshaller *base_marshaller,
+                                                uint32_t stream_id)
+{
+    DisplayChannelClient *dcc = RCC_TO_DCC(rcc);
+    StreamAgent *agent = &dcc->stream_agents[stream_id];
+    SpiceMsgDisplayStreamActivateReport msg;
+
+    red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_ACTIVATE_REPORT, NULL);
+    msg.stream_id = stream_id;
+    msg.unique_id = agent->report_id;
+    msg.max_window_size = RED_STREAM_CLIENT_REPORT_WINDOW;
+    msg.timeout_ms = RED_STREAM_CLIENT_REPORT_TIMEOUT;
+    spice_marshall_msg_display_stream_activate_report(base_marshaller, &msg);
+}
+
 static void display_channel_send_item(RedChannelClient *rcc, PipeItem *pipe_item)
 {
     SpiceMarshaller *m = red_channel_client_get_marshaller(rcc);
@@ -8974,6 +9296,13 @@ static void display_channel_send_item(RedChannelClient *rcc, PipeItem *pipe_item
         MonitorsConfigItem *monconf_item = SPICE_CONTAINEROF(pipe_item,
                                                              MonitorsConfigItem, pipe_item);
         red_marshall_monitors_config(rcc, m, monconf_item->monitors_config);
+        break;
+    }
+    case PIPE_ITEM_TYPE_STREAM_ACTIVATE_REPORT: {
+        StreamActivateReportItem *report_item = SPICE_CONTAINEROF(pipe_item,
+                                                                  StreamActivateReportItem,
+                                                                  pipe_item);
+        red_marshall_stream_activate_report(rcc, m, report_item->stream_id);
         break;
     }
     default:
@@ -9120,7 +9449,7 @@ static void display_channel_client_on_disconnect(RedChannelClient *rcc)
     free(dcc->send_data.stream_outbuf);
     red_display_reset_compress_buf(dcc);
     free(dcc->send_data.free_list.res);
-    red_display_destroy_streams(dcc);
+    red_display_destroy_streams_agents(dcc);
 
     // this was the last channel client
     if (!red_channel_is_connected(rcc->channel)) {
@@ -9142,10 +9471,33 @@ void red_disconnect_all_display_TODO_remove_me(RedChannel *channel)
     red_channel_apply_clients(channel, red_channel_client_disconnect);
 }
 
+static void red_destroy_streams(RedWorker *worker)
+{
+    RingItem *stream_item;
+
+    spice_debug(NULL);
+    while ((stream_item = ring_get_head(&worker->streams))) {
+        Stream *stream = SPICE_CONTAINEROF(stream_item, Stream, link);
+
+        red_detach_stream_gracefully(worker, stream, NULL);
+        red_stop_stream(worker, stream);
+    }
+}
+
 static void red_migrate_display(RedWorker *worker, RedChannelClient *rcc)
 {
+    /* We need to stop the streams, and to send upgrade_items to the client.
+     * Otherwise, (1) the client might display lossy regions that we don't track
+     * (streams are not part of the migration data) (2) streams_timeout may occur
+     * after the MIGRATE message has been sent. This can result in messages
+     * being sent to the client after MSG_MIGRATE and before MSG_MIGRATE_DATA (e.g.,
+     * STREAM_CLIP, STREAM_DESTROY, DRAW_COPY)
+     * No message besides MSG_MIGRATE_DATA should be sent after MSG_MIGRATE.
+     * Notice that red_destroy_streams won't lead to any dev ram changes, since
+     * handle_dev_stop already took care of releasing all the dev ram resources.
+     */
+    red_destroy_streams(worker);
     if (red_channel_client_is_connected(rcc)) {
-        red_pipe_add_verb(rcc, SPICE_MSG_DISPLAY_STREAM_DESTROY_ALL);
         red_channel_client_default_migrate(rcc);
     }
 }
@@ -9768,16 +10120,20 @@ static uint64_t display_channel_handle_migrate_data_get_serial(
     return migrate_data->message_serial;
 }
 
-static void display_channel_client_restore_surface(DisplayChannelClient *dcc, uint32_t surface_id)
+static int display_channel_client_restore_surface(DisplayChannelClient *dcc, uint32_t surface_id)
 {
     /* we don't process commands till we receive the migration data, thus,
      * we should have not sent any surface to the client. */
-    spice_assert(!dcc->surface_client_created[surface_id]);
+    if (dcc->surface_client_created[surface_id]) {
+        spice_warning("surface %u is already marked as client_created", surface_id);
+        return FALSE;
+    }
     dcc->surface_client_created[surface_id] = TRUE;
+    return TRUE;
 }
 
-static void display_channel_client_restore_surfaces_lossless(DisplayChannelClient *dcc,
-                                                             MigrateDisplaySurfacesAtClientLossless *mig_surfaces)
+static int display_channel_client_restore_surfaces_lossless(DisplayChannelClient *dcc,
+                                                            MigrateDisplaySurfacesAtClientLossless *mig_surfaces)
 {
     uint32_t i;
 
@@ -9785,11 +10141,14 @@ static void display_channel_client_restore_surfaces_lossless(DisplayChannelClien
     for (i = 0; i < mig_surfaces->num_surfaces; i++) {
         uint32_t surface_id = mig_surfaces->surfaces[i].id;
 
-        display_channel_client_restore_surface(dcc, surface_id);
+        if (!display_channel_client_restore_surface(dcc, surface_id)) {
+            return FALSE;
+        }
     }
+    return TRUE;
 }
 
-static void display_channel_client_restore_surfaces_lossy(DisplayChannelClient *dcc,
+static int display_channel_client_restore_surfaces_lossy(DisplayChannelClient *dcc,
                                                           MigrateDisplaySurfacesAtClientLossy *mig_surfaces)
 {
     uint32_t i;
@@ -9800,7 +10159,9 @@ static void display_channel_client_restore_surfaces_lossy(DisplayChannelClient *
         SpiceMigrateDataRect *mig_lossy_rect;
         SpiceRect lossy_rect;
 
-        display_channel_client_restore_surface(dcc, surface_id);
+        if (!display_channel_client_restore_surface(dcc, surface_id)) {
+            return FALSE;
+        }
         spice_assert(dcc->surface_client_created[surface_id]);
 
         mig_lossy_rect = &mig_surfaces->surfaces[i].lossy_rect;
@@ -9811,6 +10172,7 @@ static void display_channel_client_restore_surfaces_lossy(DisplayChannelClient *
         region_init(&dcc->surface_client_lossy_region[surface_id]);
         region_add(&dcc->surface_client_lossy_region[surface_id], &lossy_rect);
     }
+    return TRUE;
 }
 static int display_channel_handle_migrate_data(RedChannelClient *rcc, uint32_t size,
                                                void *message)
@@ -9820,6 +10182,7 @@ static int display_channel_handle_migrate_data(RedChannelClient *rcc, uint32_t s
     DisplayChannel *display_channel = SPICE_CONTAINEROF(rcc->channel, DisplayChannel, common.base);
     DisplayChannelClient *dcc = RCC_TO_DCC(rcc);
     uint8_t *surfaces;
+    int surfaces_restored = FALSE;
     int i;
 
     spice_debug(NULL);
@@ -9868,6 +10231,9 @@ static int display_channel_handle_migrate_data(RedChannelClient *rcc, uint32_t s
     } else {
         spice_critical("restoring global lz dictionary failed");
     }
+
+    dcc->common.is_low_bandwidth = migrate_data->low_bandwidth_setting;
+
     if (migrate_data->low_bandwidth_setting) {
         red_channel_client_ack_set_client_window(rcc, WIDE_CLIENT_ACK_WINDOW);
         if (dcc->common.worker->jpeg_state == SPICE_WAN_COMPRESSION_AUTO) {
@@ -9880,16 +10246,50 @@ static int display_channel_handle_migrate_data(RedChannelClient *rcc, uint32_t s
 
     surfaces = (uint8_t *)message + migrate_data->surfaces_at_client_ptr;
     if (display_channel->enable_jpeg) {
-        display_channel_client_restore_surfaces_lossy(dcc,
-            (MigrateDisplaySurfacesAtClientLossy *)surfaces);
+        surfaces_restored = display_channel_client_restore_surfaces_lossy(dcc,
+                                (MigrateDisplaySurfacesAtClientLossy *)surfaces);
     } else {
-            display_channel_client_restore_surfaces_lossless(dcc,
-            (MigrateDisplaySurfacesAtClientLossless*)surfaces);
+        surfaces_restored = display_channel_client_restore_surfaces_lossless(dcc,
+                                (MigrateDisplaySurfacesAtClientLossless*)surfaces);
     }
 
+    if (!surfaces_restored) {
+        return FALSE;
+    }
     red_channel_client_pipe_add_type(rcc, PIPE_ITEM_TYPE_INVAL_PALLET_CACHE);
     /* enable sending messages */
     red_channel_client_ack_zero_messages_window(rcc);
+    return TRUE;
+}
+
+static int display_channel_handle_stream_report(DisplayChannelClient *dcc,
+                                                SpiceMsgcDisplayStreamReport *stream_report)
+{
+    StreamAgent *stream_agent;
+
+    if (stream_report->stream_id >= NUM_STREAMS) {
+        spice_warning("stream_report: invalid stream id %u", stream_report->stream_id);
+        return FALSE;
+    }
+    stream_agent = &dcc->stream_agents[stream_report->stream_id];
+    if (!stream_agent->mjpeg_encoder) {
+        spice_info("stream_report: no encoder for stream id %u."
+                    "Probably the stream has been destroyed", stream_report->stream_id);
+        return TRUE;
+    }
+
+    if (stream_report->unique_id != stream_agent->report_id) {
+        spice_warning("local reoprt-id (%u) != msg report-id (%u)",
+                      stream_agent->report_id, stream_report->unique_id);
+        return TRUE;
+    }
+    mjpeg_encoder_client_stream_report(stream_agent->mjpeg_encoder,
+                                       stream_report->num_frames,
+                                       stream_report->num_drops,
+                                       stream_report->start_frame_mm_time,
+                                       stream_report->end_frame_mm_time,
+                                       stream_report->last_frame_delay,
+                                       stream_report->audio_delay);
     return TRUE;
 }
 
@@ -9906,6 +10306,9 @@ static int display_channel_handle_message(RedChannelClient *rcc, uint32_t size, 
         }
         dcc->expect_init = FALSE;
         return display_channel_init(dcc, (SpiceMsgcDisplayInit *)message);
+    case SPICE_MSGC_DISPLAY_STREAM_REPORT:
+        return display_channel_handle_stream_report(dcc,
+                                                    (SpiceMsgcDisplayStreamReport *)message);
     default:
         return red_channel_client_handle_message(rcc, size, type, message);
     }
@@ -9916,6 +10319,7 @@ static int common_channel_config_socket(RedChannelClient *rcc)
     RedClient *client = red_channel_client_get_client(rcc);
     MainChannelClient *mcc = red_client_get_main(client);
     RedsStream *stream = red_channel_client_get_stream(rcc);
+    CommonChannelClient *ccc = SPICE_CONTAINEROF(rcc, CommonChannelClient, base);
     int flags;
     int delay_val;
 
@@ -9930,7 +10334,14 @@ static int common_channel_config_socket(RedChannelClient *rcc)
     }
 
     // TODO - this should be dynamic, not one time at channel creation
-    delay_val = main_channel_client_is_low_bandwidth(mcc) ? 0 : 1;
+    ccc->is_low_bandwidth = main_channel_client_is_low_bandwidth(mcc);
+    delay_val = ccc->is_low_bandwidth ? 0 : 1;
+    /* FIXME: Using Nagle's Algorithm can lead to apparent delays, depending
+     * on the delayed ack timeout on the other side.
+     * Instead of using Nagle's, we need to implement message buffering on
+     * the application level.
+     * see: http://www.stuartcheshire.org/papers/NagleDelayedAck/
+     */
     if (setsockopt(stream->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val,
                    sizeof(delay_val)) == -1) {
         if (errno != ENOTSUP) {
@@ -10011,6 +10422,11 @@ static void worker_watch_remove(SpiceWatch *watch)
 }
 
 SpiceCoreInterface worker_core = {
+    .timer_add = spice_timer_queue_add,
+    .timer_start = spice_timer_set,
+    .timer_cancel = spice_timer_cancel,
+    .timer_remove = spice_timer_remove,
+
     .watch_update_mask = worker_watch_update_mask,
     .watch_add = worker_watch_add,
     .watch_remove = worker_watch_remove,
@@ -10021,14 +10437,14 @@ static CommonChannelClient *common_channel_client_create(int size,
                                                          RedClient *client,
                                                          RedsStream *stream,
                                                          int mig_target,
+                                                         int monitor_latency,
                                                          uint32_t *common_caps,
                                                          int num_common_caps,
                                                          uint32_t *caps,
                                                          int num_caps)
 {
-    MainChannelClient *mcc = red_client_get_main(client);
     RedChannelClient *rcc =
-        red_channel_client_create(size, &common->base, client, stream,
+        red_channel_client_create(size, &common->base, client, stream, monitor_latency,
                                   num_common_caps, common_caps, num_caps, caps);
     if (!rcc) {
         return NULL;
@@ -10040,7 +10456,7 @@ static CommonChannelClient *common_channel_client_create(int size,
 
     // TODO: move wide/narrow ack setting to red_channel.
     red_channel_client_ack_set_client_window(rcc,
-        main_channel_client_is_low_bandwidth(mcc) ?
+        common_cc->is_low_bandwidth ?
         WIDE_CLIENT_ACK_WINDOW : NARROW_CLIENT_ACK_WINDOW);
     return common_cc;
 }
@@ -10056,6 +10472,7 @@ DisplayChannelClient *display_channel_client_create(CommonChannel *common,
         (DisplayChannelClient*)common_channel_client_create(
             sizeof(DisplayChannelClient), common, client, stream,
             mig_target,
+            TRUE,
             common_caps, num_common_caps,
             caps, num_caps);
 
@@ -10077,6 +10494,7 @@ CursorChannelClient *cursor_channel_create_rcc(CommonChannel *common,
         (CursorChannelClient*)common_channel_client_create(
             sizeof(CursorChannelClient), common, client, stream,
             mig_target,
+            FALSE,
             common_caps,
             num_common_caps,
             caps,
@@ -10247,6 +10665,7 @@ static void display_channel_client_release_item_before_push(DisplayChannelClient
     case PIPE_ITEM_TYPE_PIXMAP_SYNC:
     case PIPE_ITEM_TYPE_PIXMAP_RESET:
     case PIPE_ITEM_TYPE_INVAL_PALLET_CACHE:
+    case PIPE_ITEM_TYPE_STREAM_ACTIVATE_REPORT:
         free(item);
         break;
     default:
@@ -10342,7 +10761,8 @@ static void guest_set_client_capabilities(RedWorker *worker)
         worker->set_client_capabilities_pending = 1;
         return;
     }
-    if (worker->display_channel->common.base.clients_num == 0) {
+    if ((worker->display_channel == NULL) ||
+        (worker->display_channel->common.base.clients_num == 0)) {
         worker->qxl->st->qif->set_client_capabilities(worker->qxl, FALSE, caps);
     } else {
         // Take least common denominator
@@ -10369,7 +10789,6 @@ static void handle_new_display_channel(RedWorker *worker, RedClient *client, Red
     DisplayChannel *display_channel;
     DisplayChannelClient *dcc;
     size_t stream_buf_size;
-    int is_low_bandwidth = main_channel_client_is_low_bandwidth(red_client_get_main(client));
 
     if (!worker->display_channel) {
         spice_warning("Display channel was not created");
@@ -10396,7 +10815,7 @@ static void handle_new_display_channel(RedWorker *worker, RedClient *client, Red
     dcc->send_data.free_list.res_size = DISPLAY_FREE_LIST_DEFAULT_SIZE;
 
     if (worker->jpeg_state == SPICE_WAN_COMPRESSION_AUTO) {
-        display_channel->enable_jpeg = is_low_bandwidth;
+        display_channel->enable_jpeg = dcc->common.is_low_bandwidth;
     } else {
         display_channel->enable_jpeg = (worker->jpeg_state == SPICE_WAN_COMPRESSION_ALWAYS);
     }
@@ -10405,7 +10824,7 @@ static void handle_new_display_channel(RedWorker *worker, RedClient *client, Red
     display_channel->jpeg_quality = 85;
 
     if (worker->zlib_glz_state == SPICE_WAN_COMPRESSION_AUTO) {
-        display_channel->enable_zlib_glz_wrap = is_low_bandwidth;
+        display_channel->enable_zlib_glz_wrap = dcc->common.is_low_bandwidth;
     } else {
         display_channel->enable_zlib_glz_wrap = (worker->zlib_glz_state ==
                                                  SPICE_WAN_COMPRESSION_ALWAYS);
@@ -10415,7 +10834,7 @@ static void handle_new_display_channel(RedWorker *worker, RedClient *client, Red
     spice_info("zlib-over-glz %s", display_channel->enable_zlib_glz_wrap ? "enabled" : "disabled");
 
     guest_set_client_capabilities(worker);
-    
+
     // todo: tune level according to bandwidth
     display_channel->zlib_level = ZLIB_DEFAULT_COMPRESSION_LEVEL;
     red_display_client_init_streams(dcc);
@@ -10921,12 +11340,9 @@ static void worker_update_monitors_config(RedWorker *worker,
 {
     int heads_size;
     MonitorsConfig *monitors_config;
-    int real_count = 0;
     int i;
 
-    if (worker->monitors_config) {
-        monitors_config_decref(worker->monitors_config);
-    }
+    monitors_config_decref(worker->monitors_config);
 
     spice_debug("monitors config %d(%d)",
                 dev_monitors_config->count,
@@ -10938,19 +11354,7 @@ static void worker_update_monitors_config(RedWorker *worker,
                     dev_monitors_config->heads[i].width,
                     dev_monitors_config->heads[i].height);
     }
-
-    // Ignore any empty sized monitors at the end of the config.
-    // 4: {w1,h1},{w2,h2},{0,0},{0,0} -> 2: {w1,h1},{w2,h2}
-    for (i = dev_monitors_config->count ; i > 0 ; --i) {
-        if (dev_monitors_config->heads[i - 1].width > 0 &&
-            dev_monitors_config->heads[i - 1].height > 0) {
-            real_count = i;
-            break;
-        }
-    }
-    heads_size = real_count * sizeof(QXLHead);
-    spice_debug("new working monitor config (count: %d, real: %d)",
-                dev_monitors_config->count, real_count);
+    heads_size = dev_monitors_config->count * sizeof(QXLHead);
     worker->monitors_config = monitors_config =
         spice_malloc(sizeof(*monitors_config) + heads_size);
     monitors_config->refs = 1;
@@ -10964,7 +11368,10 @@ static void red_push_monitors_config(DisplayChannelClient *dcc)
 {
     MonitorsConfig *monitors_config = DCC_TO_WORKER(dcc)->monitors_config;
 
-    spice_return_if_fail(monitors_config != NULL);
+    if (monitors_config == NULL) {
+        spice_warning("monitors_config is NULL");
+        return;
+    }
 
     if (!red_channel_client_test_remote_cap(&dcc->common.base,
                                             SPICE_DISPLAY_CAP_MONITORS_CONFIG)) {
@@ -10990,12 +11397,10 @@ static void set_monitors_config_to_primary(RedWorker *worker)
     DrawContext *context;
 
     if (!worker->surfaces[0].context.canvas) {
-        spice_warning("%s: no primary surface", __FUNCTION__);
+        spice_warning("no primary surface");
         return;
     }
-    if (worker->monitors_config) {
-        monitors_config_decref(worker->monitors_config);
-    }
+    monitors_config_decref(worker->monitors_config);
     context = &worker->surfaces[0].context;
     worker->monitors_config =
         spice_malloc(sizeof(*worker->monitors_config) + sizeof(QXLHead));
@@ -11039,7 +11444,9 @@ static void dev_create_primary_surface(RedWorker *worker, uint32_t surface_id,
     set_monitors_config_to_primary(worker);
 
     if (display_is_connected(worker) && !worker->display_channel->common.during_target_migrate) {
-        if (!worker->driver_has_monitors_config) {
+        /* guest created primary, so it will (hopefully) send a monitors_config
+         * now, don't send our own temporary one */
+        if (!worker->driver_cap_monitors_config) {
             red_worker_push_monitors_config(worker);
         }
         red_pipes_add_verb(&worker->display_channel->common.base,
@@ -11343,7 +11750,7 @@ static void handle_dev_monitors_config_async(void *opaque, void *payload)
         /* TODO: raise guest bug (requires added QXL interface) */
         return;
     }
-    worker->driver_has_monitors_config = 1;
+    worker->driver_cap_monitors_config = 1;
     if (dev_monitors_config->count == 0) {
         spice_warning("ignoring an empty monitors config message from driver");
         return;
@@ -11493,6 +11900,13 @@ void handle_dev_reset_memslots(void *opaque, void *payload)
     RedWorker *worker = opaque;
 
     red_memslot_info_reset(&worker->mem_slots);
+}
+
+void handle_dev_driver_unload(void *opaque, void *payload)
+{
+    RedWorker *worker = opaque;
+
+    worker->driver_cap_monitors_config = 0;
 }
 
 void handle_dev_loadvm_commands(void *opaque, void *payload)
@@ -11718,6 +12132,11 @@ static void register_callbacks(Dispatcher *dispatcher)
                                 handle_dev_monitors_config_async,
                                 sizeof(RedWorkerMessageMonitorsConfigAsync),
                                 DISPATCHER_ASYNC);
+    dispatcher_register_handler(dispatcher,
+                                RED_WORKER_MESSAGE_DRIVER_UNLOAD,
+                                handle_dev_driver_unload,
+                                sizeof(RedWorkerMessageDriverUnload),
+                                DISPATCHER_NONE);
 }
 
 
@@ -11756,7 +12175,7 @@ static void red_init(RedWorker *worker, WorkerInitData *init_data)
     worker->jpeg_state = init_data->jpeg_state;
     worker->zlib_glz_state = init_data->zlib_glz_state;
     worker->streaming_video = init_data->streaming_video;
-    worker->driver_has_monitors_config = 0;
+    worker->driver_cap_monitors_config = 0;
     ring_init(&worker->current_list);
     image_cache_init(&worker->image_cache);
     image_surface_init(worker);
@@ -11793,6 +12212,11 @@ static void red_init(RedWorker *worker, WorkerInitData *init_data)
     spice_warn_if(init_data->n_surfaces > NUM_SURFACES);
     worker->n_surfaces = init_data->n_surfaces;
 
+    if (!spice_timer_queue_create()) {
+        spice_error("failed to create timer queue");
+    }
+    srand(time(NULL));
+
     message = RED_WORKER_MESSAGE_READY;
     write_message(worker->channel, &message);
 }
@@ -11826,10 +12250,14 @@ SPICE_GNUC_NORETURN void *red_worker_main(void *arg)
     worker->event_timeout = INF_EVENT_WAIT;
     for (;;) {
         int i, num_events;
+        unsigned int timers_queue_timeout;
 
+        timers_queue_timeout = spice_timer_queue_get_timeout_ms();
         worker->event_timeout = MIN(red_get_streams_timout(worker), worker->event_timeout);
+        worker->event_timeout = MIN(timers_queue_timeout, worker->event_timeout);
         num_events = poll(worker->poll_fds, MAX_EVENT_SOURCES, worker->event_timeout);
         red_handle_streams_timout(worker);
+        spice_timer_queue_cb();
 
         if (worker->display_channel) {
             /* during migration, in the dest, the display channel can be initialized

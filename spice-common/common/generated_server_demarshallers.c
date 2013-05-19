@@ -638,6 +638,57 @@ static uint8_t * parse_msgc_display_init(uint8_t *message_start, uint8_t *messag
     return NULL;
 }
 
+static uint8_t * parse_msgc_display_stream_report(uint8_t *message_start, uint8_t *message_end, int minor, size_t *size, message_destructor_t *free_message)
+{
+    SPICE_GNUC_UNUSED uint8_t *pos;
+    uint8_t *start = message_start;
+    uint8_t *data = NULL;
+    size_t nw_size;
+    size_t mem_size;
+    uint8_t *in, *end;
+    SpiceMsgcDisplayStreamReport *out;
+
+    nw_size = 32;
+    mem_size = sizeof(SpiceMsgcDisplayStreamReport);
+
+    /* Check if message fits in reported side */
+    if (start + nw_size > message_end) {
+        return NULL;
+    }
+
+    /* Validated extents and calculated size */
+    data = (uint8_t *)malloc(mem_size);
+    if (SPICE_UNLIKELY(data == NULL)) {
+        goto error;
+    }
+    end = data + sizeof(SpiceMsgcDisplayStreamReport);
+    in = start;
+
+    out = (SpiceMsgcDisplayStreamReport *)data;
+
+    out->stream_id = consume_uint32(&in);
+    out->unique_id = consume_uint32(&in);
+    out->start_frame_mm_time = consume_uint32(&in);
+    out->end_frame_mm_time = consume_uint32(&in);
+    out->num_frames = consume_uint32(&in);
+    out->num_drops = consume_uint32(&in);
+    out->last_frame_delay = consume_int32(&in);
+    out->audio_delay = consume_uint32(&in);
+
+    assert(in <= message_end);
+    assert(end <= data + mem_size);
+
+    *size = end - data;
+    *free_message = (message_destructor_t) free;
+    return data;
+
+   error:
+    if (data != NULL) {
+        free(data);
+    }
+    return NULL;
+}
+
 static uint8_t * parse_DisplayChannel_msgc(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, int minor, size_t *size_out, message_destructor_t *free_message)
 {
     static parse_msg_func_t funcs1[6] =  {
@@ -648,12 +699,13 @@ static uint8_t * parse_DisplayChannel_msgc(uint8_t *message_start, uint8_t *mess
         parse_SpiceMsgData,
         parse_msgc_disconnecting
     };
-    static parse_msg_func_t funcs2[1] =  {
-        parse_msgc_display_init
+    static parse_msg_func_t funcs2[2] =  {
+        parse_msgc_display_init,
+        parse_msgc_display_stream_report
     };
     if (message_type >= 1 && message_type < 7) {
         return funcs1[message_type-1](message_start, message_end, minor, size_out, free_message);
-    } else if (message_type >= 101 && message_type < 102) {
+    } else if (message_type >= 101 && message_type < 103) {
         return funcs2[message_type-101](message_start, message_end, minor, size_out, free_message);
     }
     return NULL;
@@ -1954,7 +2006,7 @@ spice_parse_channel_func_t spice_get_client_channel_parser(uint32_t channel, uns
     static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[11] =  {
         { NULL, 0 },
         { parse_MainChannel_msgc, 111},
-        { parse_DisplayChannel_msgc, 101},
+        { parse_DisplayChannel_msgc, 102},
         { parse_InputsChannel_msgc, 114},
         { parse_CursorChannel_msgc, 6},
         { parse_PlaybackChannel_msgc, 6},

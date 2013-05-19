@@ -131,8 +131,7 @@ typedef struct UuidPipeItem {
 
 typedef struct NotifyPipeItem {
     PipeItem base;
-    uint8_t *mess;
-    int mess_len;
+    char *msg;
 } NotifyPipeItem;
 
 typedef struct MultiMediaTimePipeItem {
@@ -165,6 +164,7 @@ enum NetTestStage {
     NET_TEST_STAGE_WARMUP,
     NET_TEST_STAGE_LATENCY,
     NET_TEST_STAGE_RATE,
+    NET_TEST_STAGE_COMPLETE,
 };
 
 static void main_channel_release_pipe_item(RedChannelClient *rcc,
@@ -305,20 +305,14 @@ static PipeItem *main_uuid_item_new(MainChannelClient *mcc, const uint8_t uuid[1
     return &item->base;
 }
 
-typedef struct NotifyPipeInfo {
-    uint8_t *mess;
-    int mess_len;
-} NotifyPipeInfo;
-
 static PipeItem *main_notify_item_new(RedChannelClient *rcc, void *data, int num)
 {
     NotifyPipeItem *item = spice_malloc(sizeof(NotifyPipeItem));
-    NotifyPipeInfo *info = data;
+    const char *msg = data;
 
     red_channel_pipe_item_init(rcc->channel, &item->base,
                                PIPE_ITEM_TYPE_MAIN_NOTIFY);
-    item->mess = info->mess;
-    item->mess_len = info->mess_len;
+    item->msg = spice_strdup(msg);
     return &item->base;
 }
 
@@ -582,16 +576,16 @@ void main_channel_push_uuid(MainChannelClient *mcc, const uint8_t uuid[16])
     red_channel_client_pipe_add_push(&mcc->base, item);
 }
 
-// TODO - some notifications are new client only (like "keyboard is insecure" on startup)
-void main_channel_push_notify(MainChannel *main_chan, uint8_t *mess, const int mess_len)
+void main_channel_push_notify(MainChannel *main_chan, const char *msg)
 {
-    NotifyPipeInfo info = {
-        .mess = mess,
-        .mess_len = mess_len,
-    };
-
     red_channel_pipes_new_add_push(&main_chan->base,
-        main_notify_item_new, &info);
+        main_notify_item_new, (void *)msg);
+}
+
+void main_channel_client_push_notify(MainChannelClient *mcc, const char *msg)
+{
+    PipeItem *item = main_notify_item_new(&mcc->base, (void *)msg, 1);
+    red_channel_client_pipe_add_push(&mcc->base, item);
 }
 
 static uint64_t get_time_stamp(void)
@@ -611,9 +605,9 @@ static void main_channel_marshall_notify(RedChannelClient *rcc,
     notify.severity = SPICE_NOTIFY_SEVERITY_WARN;
     notify.visibilty = SPICE_NOTIFY_VISIBILITY_HIGH;
     notify.what = SPICE_WARN_GENERAL;
-    notify.message_len = item->mess_len;
+    notify.message_len = strlen(item->msg);
     spice_marshall_msg_notify(m, &notify);
-    spice_marshaller_add(m, item->mess, item->mess_len + 1);
+    spice_marshaller_add(m, (uint8_t *)item->msg, notify.message_len + 1);
 }
 
 static void main_channel_fill_migrate_dst_info(MainChannel *main_channel,
@@ -816,6 +810,11 @@ static void main_channel_release_pipe_item(RedChannelClient *rcc,
                 data->free_data(data->data, data->opaque);
                 break;
         }
+        case PIPE_ITEM_TYPE_MAIN_NOTIFY: {
+                NotifyPipeItem *data = (NotifyPipeItem *)base;
+                free(data->msg);
+                break;
+        }
         default:
             break;
     }
@@ -964,6 +963,7 @@ static int main_channel_handle_parsed(RedChannelClient *rcc, uint32_t size, uint
                 if (roundtrip <= mcc->latency) {
                     // probably high load on client or server result with incorrect values
                     mcc->latency = 0;
+                    mcc->net_test_stage = NET_TEST_STAGE_INVALID;
                     spice_printerr("net test: invalid values, latency %" PRIu64
                                " roundtrip %" PRIu64 ". assuming high"
                                "bandwidth", mcc->latency, roundtrip);
@@ -971,18 +971,19 @@ static int main_channel_handle_parsed(RedChannelClient *rcc, uint32_t size, uint
                 }
                 mcc->bitrate_per_sec = (uint64_t)(NET_TEST_BYTES * 8) * 1000000
                                         / (roundtrip - mcc->latency);
+                mcc->net_test_stage = NET_TEST_STAGE_COMPLETE;
                 spice_printerr("net test: latency %f ms, bitrate %"PRIu64" bps (%f Mbps)%s",
                            (double)mcc->latency / 1000,
                            mcc->bitrate_per_sec,
                            (double)mcc->bitrate_per_sec / 1024 / 1024,
                            main_channel_client_is_low_bandwidth(mcc) ? " LOW BANDWIDTH" : "");
-                mcc->net_test_stage = NET_TEST_STAGE_INVALID;
                 break;
             default:
                 spice_printerr("invalid net test stage, ping id %d test id %d stage %d",
                            ping->id,
                            mcc->net_test_id,
                            mcc->net_test_stage);
+                mcc->net_test_stage = NET_TEST_STAGE_INVALID;
             }
             break;
         }
@@ -1088,7 +1089,7 @@ static MainChannelClient *main_channel_client_create(MainChannel *main_chan, Red
 {
     MainChannelClient *mcc = (MainChannelClient*)
                              red_channel_client_create(sizeof(MainChannelClient), &main_chan->base,
-                                                       client, stream, num_common_caps,
+                                                       client, stream, FALSE, num_common_caps,
                                                        common_caps, num_caps, caps);
     spice_assert(mcc != NULL);
     mcc->connection_id = connection_id;
@@ -1141,6 +1142,11 @@ void main_channel_close(MainChannel *main_chan)
     }
 }
 
+int main_channel_client_is_network_info_initialized(MainChannelClient *mcc)
+{
+    return mcc->net_test_stage == NET_TEST_STAGE_COMPLETE;
+}
+
 int main_channel_client_is_low_bandwidth(MainChannelClient *mcc)
 {
     // TODO: configurable?
@@ -1150,6 +1156,11 @@ int main_channel_client_is_low_bandwidth(MainChannelClient *mcc)
 uint64_t main_channel_client_get_bitrate_per_sec(MainChannelClient *mcc)
 {
     return mcc->bitrate_per_sec;
+}
+
+uint64_t main_channel_client_get_roundtrip_ms(MainChannelClient *mcc)
+{
+    return mcc->latency / 1000;
 }
 
 static void main_channel_client_migrate(RedChannelClient *rcc)
