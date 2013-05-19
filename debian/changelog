@@ -9,6 +9,8 @@ spice (0.12.3-0nocelt1) unstable; urgency=low
       applied upstream
     - fix-tests-warnings.patch, refresh
     - make-celt-to-be-optional.patch, refresh
+  * libspice-server-dev should depends on libglib2.0-dev, or 
+    qxl driver compile will fail. 
 
  -- Liang Guo <guoliang@debian.org>  Sun, 19 May 2013 11:10:10 +0800
 
