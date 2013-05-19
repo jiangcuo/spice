@@ -7,6 +7,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  SPICE_SERVER_0.11.2@SPICE_SERVER_0.11.2 0.12.2
  SPICE_SERVER_0.11.4@SPICE_SERVER_0.11.4 0.12.2
  SPICE_SERVER_0.12.2@SPICE_SERVER_0.12.2 0.12.2
+ SPICE_SERVER_0.12.3@SPICE_SERVER_0.12.3 0.12.3
  SPICE_SERVER_0.6.0@SPICE_SERVER_0.6.0 0.8.2
  SPICE_SERVER_0.6.1@SPICE_SERVER_0.6.1 0.8.2
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
@@ -25,6 +26,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_qxl_destroy_surface_wait@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_destroy_surfaces@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_destroy_surfaces_async@SPICE_SERVER_0.8.2 0.8.2
+ spice_qxl_driver_unload@SPICE_SERVER_0.12.3 0.12.3
  spice_qxl_flush_surfaces_async@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_loadvm_commands@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_monitors_config_async@SPICE_SERVER_0.10.4 0.12.2
