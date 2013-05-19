@@ -97,7 +97,7 @@ static void red_dispatcher_set_display_peer(RedChannel *channel, RedClient *clie
                                             int num_common_caps, uint32_t *common_caps, int num_caps,
                                             uint32_t *caps)
 {
-    RedWorkerMessageDisplayConnect payload;
+    RedWorkerMessageDisplayConnect payload = {0,};
     RedDispatcher *dispatcher;
 
     spice_debug("%s", "");
@@ -159,7 +159,7 @@ static void red_dispatcher_set_cursor_peer(RedChannel *channel, RedClient *clien
                                            uint32_t *common_caps, int num_caps,
                                            uint32_t *caps)
 {
-    RedWorkerMessageCursorConnect payload;
+    RedWorkerMessageCursorConnect payload = {0,};
     RedDispatcher *dispatcher = (RedDispatcher *)channel->data;
     spice_printerr("");
     payload.client = client;
@@ -292,7 +292,7 @@ static void red_dispatcher_update_area(RedDispatcher *dispatcher, uint32_t surfa
                                    QXLRect *qxl_area, QXLRect *qxl_dirty_rects,
                                    uint32_t num_dirty_rects, uint32_t clear_dirty_region)
 {
-    RedWorkerMessageUpdate payload;
+    RedWorkerMessageUpdate payload = {0,};
 
     payload.surface_id = surface_id;
     payload.qxl_area = qxl_area;
@@ -522,7 +522,7 @@ static void
 red_dispatcher_create_primary_surface_sync(RedDispatcher *dispatcher, uint32_t surface_id,
                                            QXLDevSurfaceCreate *surface)
 {
-    RedWorkerMessageCreatePrimarySurface payload;
+    RedWorkerMessageCreatePrimarySurface payload = {0,};
 
     dispatcher->surface_create = *surface;
     payload.surface_id = surface_id;
@@ -703,6 +703,15 @@ static void red_dispatcher_monitors_config_async(RedDispatcher *dispatcher,
     payload.group_id = group_id;
 
     dispatcher_send_message(&dispatcher->dispatcher, message, &payload);
+}
+
+static void red_dispatcher_driver_unload(RedDispatcher *dispatcher)
+{
+    RedWorkerMessageDriverUnload payload;
+
+    dispatcher_send_message(&dispatcher->dispatcher,
+                            RED_WORKER_MESSAGE_DRIVER_UNLOAD,
+                            &payload);
 }
 
 static void red_dispatcher_stop(RedDispatcher *dispatcher)
@@ -994,6 +1003,12 @@ void spice_qxl_monitors_config_async(QXLInstance *instance, QXLPHYSICAL monitors
     red_dispatcher_monitors_config_async(instance->st->dispatcher, monitors_config, group_id, cookie);
 }
 
+SPICE_GNUC_VISIBLE
+void spice_qxl_driver_unload(QXLInstance *instance)
+{
+    red_dispatcher_driver_unload(instance->st->dispatcher);
+}
+
 void red_dispatcher_async_complete(struct RedDispatcher *dispatcher,
                                    AsyncCommand *async_command)
 {
@@ -1143,6 +1158,7 @@ RedDispatcher *red_dispatcher_init(QXLInstance *qxl)
         red_channel_register_client_cbs(display_channel, &client_cbs);
         red_channel_set_data(display_channel, red_dispatcher);
         red_channel_set_cap(display_channel, SPICE_DISPLAY_CAP_MONITORS_CONFIG);
+        red_channel_set_cap(display_channel, SPICE_DISPLAY_CAP_STREAM_REPORT);
         reds_register_channel(display_channel);
     }
 

@@ -53,6 +53,7 @@ void spice_marshall_msg_display_surface_destroy(SpiceMarshaller *m, SpiceMsgSurf
 void spice_marshall_msg_display_stream_data_sized(SpiceMarshaller *m, SpiceMsgDisplayStreamDataSized *msg);
 void spice_marshall_msg_display_monitors_config(SpiceMarshaller *m, SpiceMsgDisplayMonitorsConfig *msg);
 void spice_marshall_msg_display_draw_composite(SpiceMarshaller *m, SpiceMsgDisplayDrawComposite *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out);
+void spice_marshall_msg_display_stream_activate_report(SpiceMarshaller *m, SpiceMsgDisplayStreamActivateReport *msg);
 void spice_marshall_msg_inputs_init(SpiceMarshaller *m, SpiceMsgInputsInit *msg);
 void spice_marshall_msg_inputs_key_modifiers(SpiceMarshaller *m, SpiceMsgInputsKeyModifiers *msg);
 void spice_marshall_msg_cursor_init(SpiceMarshaller *m, SpiceMsgCursorInit *msg);
@@ -65,6 +66,7 @@ void spice_marshall_msg_playback_mode(SpiceMarshaller *m, SpiceMsgPlaybackMode *
 void spice_marshall_msg_playback_start(SpiceMarshaller *m, SpiceMsgPlaybackStart *msg);
 void spice_marshall_SpiceMsgAudioVolume(SpiceMarshaller *m, SpiceMsgAudioVolume *msg);
 void spice_marshall_SpiceMsgAudioMute(SpiceMarshaller *m, SpiceMsgAudioMute *msg);
+void spice_marshall_msg_playback_latency(SpiceMarshaller *m, SpiceMsgPlaybackLatency *msg);
 void spice_marshall_msg_record_start(SpiceMarshaller *m, SpiceMsgRecordStart *msg);
 void spice_marshall_msg_tunnel_init(SpiceMarshaller *m, SpiceMsgTunnelInit *msg);
 void spice_marshall_msg_tunnel_service_ip_map(SpiceMarshaller *m, SpiceMsgTunnelServiceIpMap *msg);

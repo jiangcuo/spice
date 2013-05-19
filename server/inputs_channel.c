@@ -37,6 +37,7 @@
 #include "red_common.h"
 #include "reds.h"
 #include "red_channel.h"
+#include "main_channel.h"
 #include "inputs_channel.h"
 #include "migration_protocol.h"
 
@@ -521,11 +522,17 @@ static void inputs_connect(RedChannel *channel, RedClient *client,
     spice_assert(g_inputs_channel);
     spice_assert(channel == &g_inputs_channel->base);
 
+    if (!stream->ssl && !red_client_during_migrate_at_target(client)) {
+        main_channel_client_push_notify(red_client_get_main(client),
+                                        "keyboard channel is insecure");
+    }
+
     spice_printerr("inputs channel client create");
     icc = (InputsChannelClient*)red_channel_client_create(sizeof(InputsChannelClient),
                                                           channel,
                                                           client,
                                                           stream,
+                                                          FALSE,
                                                           num_common_caps, common_caps,
                                                           num_caps, caps);
     if (!icc) {

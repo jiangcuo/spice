@@ -40,6 +40,7 @@ libspice_server_la_LIBADD =						\
 	$(SLIRP_LIBS)							\
 	$(SSL_LIBS)							\
 	$(Z_LIBS)							\
+	$(SPICE_NONPKGCONFIG_LIBS)					\
 	$(NULL)
 
 libspice_server_la_SOURCES =			\
@@ -92,6 +93,8 @@ libspice_server_la_SOURCES =			\
 	spice.h					\
 	stat.h					\
 	spicevmc.c				\
+	spice_timer_queue.c			\
+	spice_timer_queue.h			\
 	zlib_encoder.c				\
 	zlib_encoder.h				\
 	$(NULL)

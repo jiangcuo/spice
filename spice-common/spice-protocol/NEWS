@@ -1,3 +1,18 @@
+Major changes in 0.12.5
+=======================
+* Add agent file xfer success status
+* Add a client-disconnected agent message
+
+Major changes in 0.12.4
+=======================
+* Add agent file copy support.
+* Add agent sparse monitors capability.
+* Add controller proxy message.
+
+Major changes in 0.12.3
+=======================
+* Add a generic "port" channel
+
 Major changes in 0.12.2
 =======================
 * Add A8 surface capability in display channel.

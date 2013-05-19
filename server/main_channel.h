@@ -60,14 +60,22 @@ void main_channel_client_start_net_test(MainChannelClient *mcc);
 void main_channel_push_init(MainChannelClient *mcc, int display_channels_hint,
     int current_mouse_mode, int is_client_mouse_allowed, int multi_media_time,
     int ram_hint);
-void main_channel_push_notify(MainChannel *main_chan, uint8_t *mess, const int mess_len);
+void main_channel_push_notify(MainChannel *main_chan, const char *msg);
+void main_channel_client_push_notify(MainChannelClient *mcc, const char *msg);
 void main_channel_push_multi_media_time(MainChannel *main_chan, int time);
 int main_channel_getsockname(MainChannel *main_chan, struct sockaddr *sa, socklen_t *salen);
 int main_channel_getpeername(MainChannel *main_chan, struct sockaddr *sa, socklen_t *salen);
 uint32_t main_channel_client_get_link_id(MainChannelClient *mcc);
 
+/*
+ * return TRUE if network test had been completed successfully.
+ * If FALSE, bitrate_per_sec is set to MAX_UINT64 and the roundtrip is set to 0
+ */
+int main_channel_client_is_network_info_initialized(MainChannelClient *mcc);
 int main_channel_client_is_low_bandwidth(MainChannelClient *mcc);
 uint64_t main_channel_client_get_bitrate_per_sec(MainChannelClient *mcc);
+uint64_t main_channel_client_get_roundtrip_ms(MainChannelClient *mcc);
+
 int main_channel_is_connected(MainChannel *main_chan);
 RedChannelClient* main_channel_client_get_base(MainChannelClient* mcc);
 

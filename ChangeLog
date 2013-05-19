@@ -1,3 +1,516 @@
+2013-05-17  Alon Levy  <alevy@redhat.com>
+
+	0.12.3 release
+
+	server/red_parse_qxl: two coding convention pointer cast fix
+
+	server/dispatchers: initialize stack to 0 for valgrind
+
+	server/red_dispatcher: close pa hole in RedWorkerMessageDisplayConnect for valgrind
+
+	server/tests: test_display_width_stride
+
+	server/red_worker: simplify monitors_config update
+
+	server/tests/test_display_base: add missing set_client_capabilities, fix client_monitors_config signature
+
+	server/red_worker: turn critical (assert) non error into warning
+	The situation causing this assert is unknown but it doesn't cause
+	correctness issues with later rendering, and it is causing an abort.
+
+	server/red_worker: s/driver_has_monitors_config/driver_cap_monitors_config/ (plus small comment)
+
+2013-05-09  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker: don't get bit_rate from main_channel_client, if it wasn't initialized
+	When setting an initial video stream bit rate, if the bit rate
+	wasn't calculated by main_channel_client, and we don't have
+	estimation from previos streams, use some default values.
+	The patch also removes updating dcc->streams_max_bit_rate when
+	the bit_rate held by the main_channel is larger than it. It is not necessary
+	since we compare those 2 values each time we set the initial bit rate
+	for a stream.
+
+2013-05-08  Yonit Halperin  <yhalperi@redhat.com>
+
+	reds: fix memory leak when core->base.minor_version < 3
+
+	reds: move handle_channel_event logic from main_dispatcher to reds
+	main_dispactcher role is to pass events to the main thread.
+	The logic that handles the event better not be inside main_dispatcher.
+
+	red_worker: fail handle_migrate_data instead of aborting when there is an error during restoration of surfaces
+
+	red_channel: notify and shutdown a channel client when its handle_migrate_data fails
+
+	red_channel: add spice_channel_client_error
+	spice_channel_client_error prints warning and shutdowns the
+	channel_client that hit the error.
+	This macro is useful for errors that are specific for one session
+	and that are unrecoverable only with respect to this session.
+	Prefer disconnecting a client over aborting when possible.
+
+	red_worker: fix incorrect is_low_bandwidth after migrating a low bandwidth connection
+	rhbz#956345
+
+	After a spice session has been migrated, we don't retest the network
+	(user experience considerations). Instead, we obtain the is_low_bandwidth flag
+	from the src-server, via the migration data.
+	Before this patch, if we migrated from server s1 to s2 and then to s3,
+	and if the connection to s1 was a low bandwidth one, we erroneously
+	passed is_low_bandwidth=FALSE from s2 to s3.
+
+	Cc: Marc-André Lureau <marcandre.lureau@redhat.com>
+
+	red_worker: cleanup: add is_low_bandwidth flag to CommonChannelClient
+	Replace the mixed calls to display_channel_client_is_low_bandwidth
+	and to main_channel_client_is_low_bandwidth, with one flag in
+	CommonChannelClient that is set upon channel creation.
+
+	main_channel: add routine for checking if a network test had been conducted and completed
+
+2013-05-05  Alon Levy  <alevy@redhat.com>
+
+	red_worker: remove wrong TODO
+	red_create_stream is called even without any client but there is no
+	encoding since the mjpeg encoder is now associated with StreamAgent
+	which is only created when we have a client.
+
+2013-05-01  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_channel: on migration target, start sending ping messages only after the client's migration has completed
+	The connection to the target server is established before migration
+	starts. However, the client reads and replies to messages from the server only after
+	migration completes. Thus, we better not send ping msgs from the target
+	before migration completes (because the observed roundtrip duration will
+	be bigger than the real one).
+
+	red_channel: stop sending ping messages after migration has completed
+	We mustn't send any msg to the client, besides MSG_MIGRATE_DATA, after
+	we send MSG_MIGRATE.
+
+	reds: fix not sending the mm-time after migration when there is no audio playback
+	This bug results in the client dropping all the video frames after
+	migration in case that (1) the hosts involved in migration have different
+	mm-time; and that (2) there is no audio playback.
+	This is relvant only for the client that was connected during the
+	migration.
+
+	rhbz#958276
+
+2013-04-30  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_channel: fix not handling self pipe items in red_channel_client_release_item
+	When a client disconnects, red_channel_client_pipe_clear is called.
+	Releasing pipe items of type == MIGRATE||EMPTY_MSG||PING
+	wasn't handled, and was passed to channel_cbs.release_item.
+	There, an error occured since the pipe items were not recognized.
+
+2013-04-24  Hans de Goede  <hdegoede@redhat.com>
+
+	server: Add public spice_qxl_driver_unload method
+	With a SPICE_DISPLAY_CAP_MONITORS_CONFIG capable client, the client needs to
+	know what part of the primary to use for each monitor. If the guest driver
+	does not support this, the server sends messages to the client for a
+	single monitor spanning the entire primary.
+
+	As soon as the guest calls spice_qxl_monitors_config_async once, we set
+	the red_worker driver_has_monitors_config flag and stop doing this.
+
+	This is a problem when the driver gets unloaded, for example after a reboot
+	or when switching to a text vc with usermode mode-setting under Linux.
+
+	To reproduce this start a multi-mon capable Linux guest which uses
+	usermode mode-setting and then once X has started switch to a text vc. Note
+	how the client window does not only not resize, if you try to resize it
+	manually you always keep blackborders since the aspect is wrong.
+
+	This patch is the spice-server side of fixing this, it adds a new
+	spice_qxl_driver_unload method which clears the driver_has_monitors_config
+	flag.
+
+	The other patch needed to fix this is in qemu, and will calls this new method
+	from qxl_enter_vga_mode.
+
+2013-04-22  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker: assign mm_time to vga frames
+
+	red_worker: increase the interval limit for stream frames
+
+	collect and print video stream statistics
+
+	server/red_worker: add an option to supply the bandwidth via env var
+	SPICE_BIT_RATE can be set for supplying red_worker the available
+	bandwidth (in Mbps).
+
+	server/red_worker.c: use the bit rate of old streams as a start point for new streams
+	mjpeg_encoder modify the initial bit we supply it, according to the
+	client feedback. If it reaches a bit rate which is higher than the
+	initial one, we use the higher bit rate as the new bit rate estimation.
+
+	red_worker: video streams - adjust client playback latency
+
+	reds: support mm_time latency adjustments
+	When there is no audio playback, we set the mm_time in the client to be older
+	than the one in the server by at least the requested latency (the delta is
+	actually bigger, due to the network latency).
+	When there is an audio playback, we adjust the mm_time in the client by
+	adjusting the playback buffer using SPICE_MSG_PLAYBACK_LATENCY.
+
+	snd_worker: support sending SPICE_MSG_PLAYBACK_LATENCY
+	also update spice-common submodule
+
+	dispatcher.h: fix - s/#define MAIN_DISPATCHER_H/#define DISPATCHER_H
+
+	red_worker: ignoring video frame drops that are not due to pipe congestion
+	A frame can be dropped if a new frame was added during the same
+	call to red_process_command (we didn't attempt to send the older
+	frame). Such drops are ignored.
+
+	red_worker: notify mjpeg_encoder on server frame drops
+
+	red_worker: support SPICE_MSGC_DISPLAY_STREAM_REPORT
+	update mjpeg_encoder with reports from the client about
+	the playback quality.
+	The patch also updates the spice-common submodule.
+
+	red_worker: start using mjpeg_encoder rate control capabilities
+	This patch only employs setting the stream parameters based on
+	the initial given bit-rate, the latency, and the encoding size.
+	Later patches will also employ mjpeg_encoder response to client reports,
+	and its control over frame drops.
+
+	The patch also removes old stream bit rate calculations that weren't
+	used.
+
+	server/red_worker: enable latency monitoring in the display channel
+
+	red_worker: stream - update periodically the input frame rate
+	Periodically calculate the rate of frames arriving from the guest to the
+	server.
+
+	red_channel: monitor connection latency using MSG_PING
+
+	server/red_worker: assign timer callbacks to worker_core, using spice_timer_queue
+	display channel - supplying timeouts interface to red_channel, in order to allow
+	periodic latency monitoring (see next patch).
+
+	server: spice_timer_queue
+	Each thread can create a spice_timer_queue, for managing its
+	own timers.
+
+	mjpeg_encoder: add stream warmup time, in which we avoid server and client drops
+	The stream starts after lossless frames were sent to the client,
+	and without rate control (except for pipe congestion). Thus, on the beginning
+	of the stream, we might observe frame drops on the client and server side which
+	are not necessarily related to mis-estimation of the bit rate, and we would
+	like to wait till the stream stabilizes.
+
+	mjpeg_encoder: keep the average observed fps similar to the defined fps
+	The actual frames distribution does not necessarily fit the
+	condition "at least one frame every (1000/rate_contorl->fps)
+	milliseconds".
+	For keeping the average frame rate close to the defined fps, we
+	periodically measure the current average fps, and modify
+	rate_control->adjusted_fps accordingly. Then, we use
+	(1000/rate_control->adjusted_fps) as the interval between the
+	frames.
+
+	mjpeg_encoder: move the control over frame drops to mjpeg_encoder
+
+	mjpeg_encoder: update the client with estimations for the required playback latency
+	The required client playback latency is assessed based on the current
+	estimation of the bit rate, the network latency, and the encoding size
+	of the frames. When the playback delay that is reported by the client
+	seems too small, or when the stream parameters change, we send the
+	client an updated playback latency estimation.
+
+	mjpeg_encoder: modify stream bit rate based on server side pipe congestion
+	Downgrading stream bit rate when the input frame rate in the server
+	exceeds the output frame rate, and frames are being dropped from the
+	output pipe.
+
+	mjpeg_encoder: adjust the stream bit rate based on periodic client feedback
+	mjpeg_encoder can receive periodic reports about the playback status on
+	the client side. Then, mjpeg_encoder analyses the report and can
+	increase or decrease the stream bit rate, depending on the report.
+	When the bit rate is changed, the quality and frame rate of the stream
+	are re-evaluated.
+
+	mjpeg_encoder: re-configure stream parameters when the frame's encoding size changes
+	If the encoding size seems to get smaller/bigger, re-evaluate the
+	stream quality and frame rate.
+
+	mjpeg_encoder: configure mjpeg quality and frame rate according to a given bit rate
+	Previously, the mjpeg quality was always 70. The frame rate was
+	tuned according to the frames' congestion in the pipe.
+	This patch sets the quality and frame rate according to
+	a given bit rate and the size of the first encoded frames.
+
+	The following patches will introduce an adaptive video streaming, in which
+	the bit rate, the quality, and the frame rate, change in response to
+	different parameters.
+
+	Patches that make red_worker adopt this feature will also follow.
+
+	server/red_worker: streams: moving mjpeg_encoder from Stream to StreamAgent
+	The mjpeg_encoder should be client specific, and not shared between
+	different clients**, for the following reasons:
+	(1) Since we use abbreviated jpeg datastream for mjpeg, employing the same
+	    mjpeg_encoder for different clients might cause errors when the
+	    clients decode the jpeg data.
+	(2) The next patch introduces bit rate control to the mjpeg_encoder.
+	    This feature depends on the bandwidth available, which is client
+	    specific.
+
+	** at least till we change multi-clients not to re-encode the same
+	   streams.
+
+	red_worker: stream agent - fix miscounting of frames
+	Frames counting was skipped when the previous frame was already
+	sent completely to the client.
+
+2013-04-19  Hans de Goede  <hdegoede@redhat.com>
+
+	snd_worker: Make sure we never send an empty volume message
+	My commit 71315b2e "snd_worker: Don't send empty audio-volume messages",
+	fixes only one case of sending an empty volume message, if the client connects
+	to a vm early during its boot sequence, while the snd hardware is being reset
+	by the guest driver, qemu will call spice_server_playback_set_volume() with
+	0 channels from the reset handler.
+
+	This patch also applies both fixes to the record channel.
+
+2013-04-10  Hans de Goede  <hdegoede@redhat.com>
+
+	spice-common: Update
+
+2013-04-08  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker.c: fix not destroying streams before sending MSG_MIGRATE
+	When qemu migration completes, we need to stop the streams, and to send
+	the corresponding upgrade_items to the client.
+	Otherwise, (1) the client might display lossy regions that we don't track
+	(streams are not part of the migration data).
+	(2) streams_timeout may occur after MSG_MIGRATE has been sent, leading
+	to messages being sent to the client after MSG_MIGRATE and before
+	MSG_MIGRATE_DATA (e.g., STREAM_CLIP, STREAM_DESTROY, DRAW_COPY).
+	No message besides MSG_MIGRATE_DATA should be sent after
+	MSG_MIGRATE.
+
+	When a msg other than MIGRATE_DATA reached spice-gtk after MSG_MIGRATE,
+	spice-gtk sent it to dest server as the migration data, and the dest
+	server crashed with a "bad message size" assert.
+
+	red_worker.c: s/red_display_destroy_streams/red_display_destroy_streams_agents
+	In order not to confuse it with red_destroy_streams in the following
+	patch.
+
+2013-04-01  Hans de Goede  <hdegoede@redhat.com>
+
+	snd_worker: Don't send empty audio-volume messages
+	If no volume has been set it, we end up sending a volume message with
+	audio-volume for 0 channels (iow an empty message). This is not useful
+	and triggers the following warning in spice-gtk:
+
+	(remote-viewer:8726): GSpice-WARNING **: set_sink_input_volume() failed:
+	Invalid argument
+
+2013-03-29  Hans de Goede  <hdegoede@redhat.com>
+
+	char_device: Don't set active when stopped and don't access dev after unref
+	2 closely related changes in one:
+	1) When leaving the read or write loop because the chardev has been stopped
+	active should not be updated. It has been set to FALSE by
+	spice_char_device_stop and should stay FALSE
+	2) The updating of dev->active should be done *before* unref-ing dev
+
+	char_device: Don't set the write-retry timer when not running
+	The write-retry timer should not be set when we're leaving
+	spice_char_device_write_to_device because the char-dev has been stopped.
+
+	char_device: Properly update buffer status when leaving the write loop on stop
+	Before this patch the write-loop in spice_char_device_write_to_device would
+	break on running becoming 0, after having written some data, without updating
+	the buffer status, causing the same data to be written *again* when started.
+
+2013-03-15  Hans de Goede  <hdegoede@redhat.com>
+
+	inputs-channel: Don't send insecure keyb notify to in migrate client
+	This fixes spice-gtk printing message like these on migration:
+	(remote-viewer:18402): GSpice-CRITICAL **: spice_channel_iterate_read: assertion `c->state != SPICE_CHANNEL_STATE_MIGRATING' failed
+
+	inputs-channel: Handle printing of insecure keyboard notify
+	This is clearly something which should be handled in the inputs_channel code,
+	rather then having a special case for it in the generic channel handling
+	code in reds.c. Moving it here also fixes the TODO we had on only sending
+	this message to new clients.
+
+	main-channel: Add a main_channel_client_push_notify function
+	Sometimes we want to send a notify to a single client, rather then to
+	all of them.
+
+	main-channel: Make main_channel_push_notify deal with dynamic memory
+	Currently main_channel_push_notify only gets passed a static string, but
+	chances are in the future it may get passed dynamically allocated strings,
+	prepare it for this.
+
+	While at it also make clear that its argument is a string, and simplify
+	things a bit by making use of this knowledge (pushing the strlen call down).
+
+2013-03-07  Hans de Goede  <hdegoede@redhat.com>
+
+	server/reds: Send the agent a CLIENT_DISCONNECTED msg on client disconnect
+	Client -> agent messages can spawn multiple VDIChunks. When this happens
+	the agent re-assembles the chunks into a complete VDAgentMessage before
+	processing it. The server only guarentees coherency at the chunk level,
+	so it is not possible for a partial chunk to get delivered to the agent.
+
+	But it is possible for some chunks of a VDAgentMessage to be delivered to
+	the agent followed by a client to disconnect without the rest of the
+	VDAgentMessage being delivered!
+
+	This will leave the agent in a wrong state, and the first messages send to it
+	by the next client to connect will get seen as the rest of the VDAgentMessage
+	from the previous client.
+
+	This patch sends the agent a new VD_AGENT_CLIENT_DISCONNECTED message from the
+	VDP_SERVER_PORT, on which the agent can then reset its VDP_CLIENT_PORT state.
+
+	Note that no capability check is done for this, since the capabilities are
+	something negotiated between client and agent. The server will simply always
+	send this message on client disconnect, relying on older agents discarding the
+	message since it has an unknown type (which both the windows and linux agents
+	already do).
+
+	char_device: Add spice_char_device_write_buffer_get_server_no_token()
+	To allow the server to send agent messages without needing to wait for a
+	self-token. IE for sending VD_AGENT_CLIENT_DISCONNECTED messages.
+
+	Update spice-common
+
+2013-03-04  Hans de Goede  <hdegoede@redhat.com>
+
+	Silence __spice_char_device_write_buffer_get: internal buf is not available
+	These messages are printed when the server tries to push a mouse event to
+	the agent before the previous one has been flushed. This is a normal condition
+	(which gets tracked by the reds->pending_mouse_event boolean), and as such
+	it should *not* trigger the printing of error messages.
+
+	I've seen these messages occasionally before, but with agent file-xfer they
+	are trivial to trigger, simply send a large file to the agent and while it
+	is transferring move the mouse over the client window. Note that due to the
+	client tokens not allowing the client to completely saturate the agent
+	channel mouse events do still get send to the agent, just with a slightly
+	larger interval. So everything is working as designed and this spice_printerr
+	is just leading to people chasing ghosts.
+
+2013-01-15  Hans de Goede  <hdegoede@redhat.com>
+
+	worker_update_monitors_config: Drop bogus real_count accounting
+	1) This does not buy us much, as red_marshall_monitors_config() also
+	   removes 0x0 sized monitors and does a much better job at it
+	   (also removing intermediate ones, not only tailing ones)
+	2) The code is wrong, as it allocs space for real_count heads, where
+	   real_count always <= monitors_config->count and then stores
+	   monitors_config->count in worker->monitors_config->count, causing
+	   red_marshall_monitors_config to potentially walk
+	   worker->monitors_config->heads past its boundaries.
+
+	server: Fix SpiceWorker-CRITICAL **: red_worker.c:10968:red_push_monitors_config: condition `monitors_config != NULL' failed
+	During my dynamic monitor support testing today, I hit the following assert
+	in red_worker.c:
+	"red_push_monitors_config: condition `monitors_config != NULL' failed"
+
+	This is caused by the following scenario:
+	1) Guest causes handle_dev_monitors_config_async() to be called
+	2) handle_dev_monitors_config_async() calls worker_update_monitors_config()
+	3) handle_dev_monitors_config_async() pushes worker->monitors_config, this
+	   takes a ref on the current monitors_config
+	4) Guest causes handle_dev_monitors_config_async() to be called *again*
+	5) handle_dev_monitors_config_async() calls worker_update_monitors_config()
+	6) worker_update_monitors_config() does a decref on worker->monitors_config,
+	   releasing the workers reference, this monitor_config from step 2 is
+	   not yet free-ed though as the pipe-item still holds a ref
+	7) worker_update_monitors_config() creates a new monitors_config with an
+	   initial ref-count of 1 and stores that in worker->monitors_config
+	8) The pipe-item of the *first* monitors_config is send, upon completion
+	   a decref is done on the monitors_config, and monitors_config_decref not
+	   only frees the monitor_config, but *also* sets worker->monitors_config
+	   to NULL, even though worker->monitors_config no longer refers to the
+	   monitor_config being freed, it refers to the 2nd monitor_config!
+	9) The client which was connected when this all happened disconnects
+	10) A new client connects, leading to the assert:
+	    at red_worker.c:9519
+	    num_common_caps=1, common_caps=0x5555569b6f60, migrate=0,
+	    stream=<optimized out>, client=<optimized out>, worker=<optimized out>)
+	    at red_worker.c:10423
+	    at red_worker.c:11301
+
+	Note that red_worker.c:9519 is:
+	        red_push_monitors_config(dcc);
+	gdb does not point to the actual line of the assert because the function gets
+	inlined.
+
+	The fix is easy and obvious, don't set worker->monitors_config to NULL in
+	monitors_config_decref. I'm a bit baffled as to why that code is there in
+	the first place, the whole point of ref-counting is to not have one single
+	unique place to store the reference...
+
+	This fix should not have any adverse side-effects as the 4 callers of
+	monitors_config_decref fall into 2 categories:
+	1) Code which immediately after the decref replaces worker->monitors_config
+	   with a new monitors_config:
+	   worker_update_monitors_config()
+	   set_monitors_config_to_primary()
+	2) pipe-item freeing code, which should not touch the worker state at all
+	   to being with
+
+2013-01-14  Michael Tokarev  <mjt@tls.msk.ru>
+
+	link libspice server with libm libpthread
+	server/Makefile apparently forgot to link libspice-server
+	with -lm -lpthread, but it uses symbols from these libraries
+	directly.  These libs are detected by configure and stored in
+	$(SPICE_NONPKGCONFIG_LIBS) make variable, but this variable
+	is never referenced at link time.  Add it to server/Makefile.am,
+	to libspice_server_la_LIBADD variable.
+
+	Signed-off-By: Michael Tokarev <mjt@tls.msk.ru>
+
+2013-01-08  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker.c: clearing the stream vis_region, after it has been detached
+	The stream vis_region should be cleared after the stream region was sent
+	to the client losslessly. Otherwise, we might send redundant stream upgrades
+	if we process more drawables that are dependent on the stream region.
+
+	red_worker.c: insert a drawable to its position in the current tree before calling red_detach_streams_behind
+	resolves: rhbz#891326
+
+	Starting from commit 81fe00b08ad4f, red_detach_streams_behind can
+	trigger modifications in the current tree (by update_area calls). Thus,
+	after calling red_detach_streams_behind it is not safe to access tree
+	entries that were calculated before the call.
+	This patch inserts the drawable to the tree before the call to
+	red_detach_streams_behind. This change also requires making sure
+	that rendering operations that can be triggered by
+	red_detach_streams_behind will not include this drawable (which is now part of the tree).
+
+2013-01-01  Uri Lublin  <uril@redhat.com>
+
+	server: guest_set_client_capabilities: protect against NULL worker->display_channel
+	Reported-by: Michal Luscon <mluscon@redhat.com>
+
+	Found by a Coverity scan:
+	  in handle_dev_start -
+	    Checking "worker->display_channel" implies that "worker->display_channel"
+		         might be NULL.
+	    Passing "worker" to function "guest_set_client_capabilities"
+	  in guest_set_client_capabilities -
+	    Directly dereferencing parameter "worker->display_channel"
+
 2012-12-20  Hans de Goede  <hdegoede@redhat.com>
 
 	Release 0.12.2
@@ -1567,11 +2080,9 @@
 	server: export spice_server_is_server_mouse predicate
 	To be used by qemu query-spice / info spice commands.
 
-2012-03-26  Marc-André Lureau  <marcandre.lureau@redhat.com>
+2012-03-25  Marc-André Lureau  <marcandre.lureau@redhat.com>
 
 	Remove files moved to spice-common
-
-2012-03-25  Marc-André Lureau  <marcandre.lureau@redhat.com>
 
 	Copy common/win/my_getopt-1.5/my_getopt client/windows
 
@@ -2501,7 +3012,7 @@
 	Also fixup the header of server/red_parse_qxl.c, which still contained
 	some GPL (program rather then library) text in its header.
 
-2011-12-14  Marc-André Lureau  <marcandre.lureau@redhat.com>
+2011-12-13  Marc-André Lureau  <marcandre.lureau@redhat.com>
 
 	spelling: s/cupture/capture
 
@@ -2938,11 +3449,11 @@
 	test_playback.c:93:5: erreur: function declaration isn’t a prototype
 	[-Werror=strict-prototypes]
 
-2011-09-01  Marc-André Lureau  <marcandre.lureau@redhat.com>
+2011-08-31  Marc-André Lureau  <marcandre.lureau@redhat.com>
 
 	fix bug #692833
 
-2011-09-01  Christophe Fergeau  <cfergeau@redhat.com>
+2011-08-31  Christophe Fergeau  <cfergeau@redhat.com>
 
 	add C++ guards to backtrace.h
 	Without these, spice_backtrace() can't be used from the C++ client
@@ -5353,7 +5864,7 @@
 
 	server/red_channel: no need for extra loop
 
-2011-01-13  Alon Levy  <alevy@redhat.com>
+2011-01-12  Alon Levy  <alevy@redhat.com>
 
 	server/red_channel: go marshaller for outgoing (copied from red_worker)
 
@@ -7819,7 +8330,7 @@
 
 	server: fix race condition in lz global dictionary, in its image segments list
 
-2010-04-09  Izik Eidus  <ieidus@redhat.com>
+2010-04-08  Izik Eidus  <ieidus@redhat.com>
 
 	spice: win32 client: fix gdi locking
 	While the fix could have been more effective,
@@ -7875,7 +8386,7 @@
 
 	client: fix unsafe access to an event member
 
-2010-04-06  Izik Eidus  <ieidus@redhat.com>
+2010-04-05  Izik Eidus  <ieidus@redhat.com>
 
 	spice server: try to be less brutal when changing res or when flushing the tree
 	The idea is that we can try to defer some stuff to be later
@@ -7892,8 +8403,6 @@
 
 	Make things simpler
 
-2010-04-05  Izik Eidus  <ieidus@redhat.com>
-
 	spice: common: gdi_canvas fix gdi objects leak
 	BitmapMask was used by the draw_text function as well
 	therefore we need to mark from_surface = 0 if we want
@@ -7906,19 +8415,21 @@
 	Just skip the items of destroyed surface that are found in the pipe
 	before we skip them, we check if they are needed by other users...
 
+2010-04-04  Izik Eidus  <ieidus@redhat.com>
+
 	spice-server: remove glz objects related to surface when destroying a surface
 	make the surface released faster in the release ring
 	as well as clean unneeded reference into the glz
 
 	spice: reds: fix uninitlized pointer
 
-2010-04-03  Yonit Halperin  <yhalperi@redhat.com>
+2010-04-02  Yonit Halperin  <yhalperi@redhat.com>
 
 	client: x11: fix a crash caused by a call to a destroyed window.
 	Happens when a focused window is destroyed without a focus out event,
 	and a focus-in event occurs on another window.
 
-2010-04-03  Izik Eidus  <ieidus@redhat.com>
+2010-04-02  Izik Eidus  <ieidus@redhat.com>
 
 	libspice: add off screens support
 
@@ -8291,7 +8802,7 @@
 	the check for a window message procs. We need to properly filter
 	events with XFilterEvent to avoid this happening.
 
-2010-01-28  Izik Eidus  <ieidus@redhat.com>
+2010-01-27  Izik Eidus  <ieidus@redhat.com>
 
 	libspice: add surface 0 support
 	This include alot of infestracture for off screens.

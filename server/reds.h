@@ -111,10 +111,14 @@ typedef struct RedsMigSpice {
     int sport;
 } RedsMigSpice;
 
+/* any thread */
 ssize_t reds_stream_read(RedsStream *s, void *buf, size_t nbyte);
 ssize_t reds_stream_write(RedsStream *s, const void *buf, size_t nbyte);
 ssize_t reds_stream_writev(RedsStream *s, const struct iovec *iov, int iovcnt);
 void reds_stream_free(RedsStream *s);
+
+/* main thread only */
+void reds_handle_channel_event(int event, SpiceChannelEventInfo *info);
 
 void reds_disable_mm_timer(void);
 void reds_enable_mm_timer(void);
@@ -163,5 +167,7 @@ void reds_on_client_semi_seamless_migrate_complete(RedClient *client);
 void reds_on_client_seamless_migrate_complete(RedClient *client);
 void reds_on_main_channel_migrate(MainChannelClient *mcc);
 void reds_on_char_device_state_destroy(SpiceCharDeviceState *dev);
+
+void reds_set_client_mm_time_latency(RedClient *client, uint32_t latency);
 
 #endif
