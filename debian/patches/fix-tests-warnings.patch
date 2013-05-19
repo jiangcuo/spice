@@ -12,11 +12,9 @@ Signed-off-by: Serge Hallyn <serge.hallyn@ubuntu.com>
  server/tests/test_display_base.c | 8 +++++---
  2 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/server/tests/basic_event_loop.c b/server/tests/basic_event_loop.c
-index c6f6698..57303a2 100644
 --- a/server/tests/basic_event_loop.c
 +++ b/server/tests/basic_event_loop.c
-@@ -115,7 +115,7 @@ static void watch_remove(SpiceWatch *watch)
+@@ -115,7 +115,7 @@
  
  static void channel_event(int event, SpiceChannelEventInfo *info)
  {
@@ -25,7 +23,7 @@ index c6f6698..57303a2 100644
              info->connection_id, info->type, info->id, event);
  }
  
-@@ -215,7 +215,7 @@ void basic_event_loop_mainloop(void)
+@@ -215,7 +215,7 @@
          if ((next_timer = get_next_timer()) != NULL) {
              calc_next_timeout(next_timer, &next_timer_timeout);
              timeout = &next_timer_timeout;
@@ -34,11 +32,9 @@ index c6f6698..57303a2 100644
                      timeout->tv_sec, timeout->tv_usec);
          } else {
              timeout = NULL;
-diff --git a/server/tests/test_display_base.c b/server/tests/test_display_base.c
-index 588e960..bc01398 100644
 --- a/server/tests/test_display_base.c
 +++ b/server/tests/test_display_base.c
-@@ -42,7 +42,7 @@ static void test_spice_destroy_update(SimpleSpiceUpdate *update)
+@@ -42,7 +42,7 @@
          return;
      }
      if (update->drawable.clip.type != SPICE_CLIP_TYPE_NONE) {
@@ -47,7 +43,7 @@ index 588e960..bc01398 100644
      }
      free(update->bitmap);
      free(update);
-@@ -89,10 +89,11 @@ static void regression_test(void)
+@@ -89,10 +89,11 @@
      pid = fork();
      if (pid == 0) {
          char buf[PATH_MAX];
@@ -60,22 +56,3 @@ index 588e960..bc01398 100644
      } else if (pid > 0) {
          return;
      }
-@@ -701,13 +702,14 @@ static int flush_resources(QXLInstance *qin)
-     return TRUE;
- }
- 
--static void client_monitors_config(QXLInstance *qin, VDAgentMonitorsConfig *monitors_config)
-+static int client_monitors_config(QXLInstance *qin, VDAgentMonitorsConfig *monitors_config)
- {
-     if (!monitors_config) {
-         printf("%s: NULL monitors_config\n", __func__);
-     } else {
-         printf("%s: %d\n", __func__, monitors_config->num_of_monitors);
-     }
-+    return 1;
- }
- 
- QXLInterface display_sif = {
--- 
-1.8.1.2
-

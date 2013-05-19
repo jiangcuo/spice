@@ -1,6 +1,14 @@
 spice (0.12.3-0nocelt1) unstable; urgency=low
 
   * New upstream release
+  * debian/patches:
+    - fix-build-warning-PIXEL.patch, remove, applied upstream
+    - link-libspice-server-with-libm-libpthread.patch, remove,
+      applied upstream
+    - spice-common-remove-version-construction.patch, remove,
+      applied upstream
+    - fix-tests-warnings.patch, refresh
+    - make-celt-to-be-optional.patch, refresh
 
  -- Liang Guo <guoliang@debian.org>  Sun, 19 May 2013 11:10:10 +0800
 
