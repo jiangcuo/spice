@@ -125,6 +125,7 @@ void *red_tunnel = NULL;
 #endif
 int agent_mouse = TRUE;
 int agent_copypaste = TRUE;
+int agent_file_xfer = TRUE;
 static bool exit_on_disconnect = FALSE;
 
 static RedsState *reds = NULL;
@@ -483,7 +484,8 @@ static void reds_reset_vdp(void)
         state->current_read_buf = NULL;
     }
     /* Reset read filter to start with clean state when the agent reconnects */
-    agent_msg_filter_init(&state->read_filter, agent_copypaste, TRUE);
+    agent_msg_filter_init(&state->read_filter, agent_copypaste,
+                          agent_file_xfer, TRUE);
     /* Throw away pending chunks from the current (if any) and future
      * messages written by the client.
      * TODO: client should clear its agent messages queue when the agent
@@ -500,7 +502,7 @@ static void reds_reset_vdp(void)
      *  Instead, it would have been more appropriate to reset them upon AGEN_CONNECT.
      *  The client tokens are tracked as part of the SpiceCharDeviceClientState. Thus,
      *  in order to be backward compatible with the client, we need to track the tokens
-     *  even if the agent is detached. We don't destroy the the char_device state, and
+     *  even if the agent is detached. We don't destroy the char_device state, and
      *  instead we just reset it.
      *  In addition, there used to be a misshandling of AGENT_TOKENS message in spice-gtk: it
      *  overrides the amount of tokens, instead of adding the given amount.
@@ -596,7 +598,7 @@ void reds_client_disconnect(RedClient *client)
 
         /* Reset write filter to start with clean state on client reconnect */
         agent_msg_filter_init(&reds->agent_state.write_filter, agent_copypaste,
-                              TRUE);
+                              agent_file_xfer, TRUE);
 
         /* Throw away pending chunks from the current (if any) and future
          *  messages read from the agent */
@@ -2994,8 +2996,6 @@ static int reds_init_socket(const char *addr, int portnr, int family)
     static const int on=1, off=0;
     struct addrinfo ai,*res,*e;
     char port[33];
-    char uaddr[INET6_ADDRSTRLEN+1];
-    char uport[33];
     int slisten,rc;
 
     memset(&ai,0, sizeof(ai));
@@ -3012,9 +3012,6 @@ static int reds_init_socket(const char *addr, int portnr, int family)
     }
 
     for (e = res; e != NULL; e = e->ai_next) {
-        getnameinfo((struct sockaddr*)e->ai_addr,e->ai_addrlen,
-                    uaddr,INET6_ADDRSTRLEN, uport,32,
-                    NI_NUMERICHOST | NI_NUMERICSERV);
         slisten = socket(e->ai_family, e->ai_socktype, e->ai_protocol);
         if (slisten < 0) {
             continue;
@@ -3029,6 +3026,16 @@ static int reds_init_socket(const char *addr, int portnr, int family)
         }
 #endif
         if (bind(slisten, e->ai_addr, e->ai_addrlen) == 0) {
+            char uaddr[INET6_ADDRSTRLEN+1];
+            char uport[33];
+            rc = getnameinfo((struct sockaddr*)e->ai_addr,e->ai_addrlen,
+                             uaddr,INET6_ADDRSTRLEN, uport,32,
+                             NI_NUMERICHOST | NI_NUMERICSERV);
+            if (rc == 0) {
+                spice_info("bound to %s:%s", uaddr, uport);
+            } else {
+                spice_info("cannot resolve address spice-server is bound to");
+            }
             goto listen;
         }
         close(slisten);
@@ -3875,8 +3882,10 @@ static void init_vd_agent_resources(void)
     int i;
 
     ring_init(&state->read_bufs);
-    agent_msg_filter_init(&state->write_filter, agent_copypaste, TRUE);
-    agent_msg_filter_init(&state->read_filter, agent_copypaste, TRUE);
+    agent_msg_filter_init(&state->write_filter, agent_copypaste,
+                          agent_file_xfer, TRUE);
+    agent_msg_filter_init(&state->read_filter, agent_copypaste,
+                          agent_file_xfer, TRUE);
 
     state->read_state = VDI_PORT_READ_STATE_READ_HEADER;
     state->recive_pos = (uint8_t *)&state->vdi_chunk_header;
@@ -4326,6 +4335,15 @@ SPICE_GNUC_VISIBLE int spice_server_set_agent_copypaste(SpiceServer *s, int enab
     agent_copypaste = enable;
     reds->agent_state.write_filter.copy_paste_enabled = agent_copypaste;
     reds->agent_state.read_filter.copy_paste_enabled = agent_copypaste;
+    return 0;
+}
+
+SPICE_GNUC_VISIBLE int spice_server_set_agent_file_xfer(SpiceServer *s, int enable)
+{
+    spice_assert(reds == s);
+    agent_file_xfer = enable;
+    reds->agent_state.write_filter.file_xfer_enabled = agent_file_xfer;
+    reds->agent_state.read_filter.file_xfer_enabled = agent_file_xfer;
     return 0;
 }
 

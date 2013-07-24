@@ -1,3 +1,220 @@
+2013-07-17  Uri Lublin  <uril@redhat.com>
+
+	Release 0.12.4
+
+	Update spice-common submodule (get spice-protocol 0.12.6)
+
+	syntax-check: trailing whitespaces -- ignore binary files
+
+2013-07-16  Uri Lublin  <uril@redhat.com>
+
+	syntax-check: remove trailing whitespaces
+	Only whitespace changes in this commit.
+
+	syntax-check: make sure config.h is the first included .h file
+
+	syntax-check: use test A && test B instead of test A -a B
+
+	syntax-check: fix no-newline or empty line at EOF
+
+	syntax-check: s/the the/the/ in a comment
+
+	syntax-check: update AUTHORS
+
+	syntax-check: fix cast_of_argument_to_free
+	In this case, make syntax-check is wrong, and we actually do
+	need the cast.
+	A cast is needed when types are   uint64_t <--> pointer
+
+	Using a local "ptr" variable makes both gcc and syntax-check happy.
+
+	syntax-check: fix avoid_if_before_free
+
+	server/tests: fix timer for test_empty_success
+
+	server/tests: test_display_width_stride: add destroy command
+	Otherwise, the test exits after the first iteration over all tests,
+	on the second attempt to create an already created surface.
+
+	server/tests: remove option from usage if AUTOMATED_TESTS is not configured
+
+	server/tests: invalid-option: print the bad argument
+	optind points to the next argument to parse.
+
+	server/tests: fix produce_command for create surface
+	Earlier in this function, test->target_surface is set to 1, which
+	is the only allowed non-primary surface currently.
+
+	If surface parameters are given (and specifically data is checked)
+	they are being used, otherwise a default surface is used.
+
+	Earlier in this function, "command" is set to a non-NULL value.
+	Thus, the else part was unreachable code, which is fixed now.
+
+	server/tests: test_display_base: set rect according to appropriate surface
+	When surface_id == 0, primary is used.
+	Otherwise (currently 1), secondary is used.
+
+	Also, remove unused test_width and test_height.
+	Since commit caea7699434c20dceef8fc79d21b8eeb663fbf53,
+	test->width and test->height are used.
+
+	red_channel: replace RING_FOREACH with RING_FOREACH_SAFE in some places
+	This was originally intended to fix the problem fixed by
+	commit 53488f0275d6c8a121af49f7ac817d09ce68090d.
+
+	What is left are FOREACH loops that are at less risk and maybe safe (no
+	read/write or disconnect/destroy are called from within them).
+
+	red_worker: use a generic SAFE_FOREACH macro
+	Introduce SAFE_FOREACH macro
+
+	Make other safe iterators use SAFE_FOREACH
+
+	red_worker: delete unused CCC_FOREACH
+
+	red_worker: make DRAWABLE_FOREACH_DPI safe
+
+	red_worker: use only DRAWABLE_FOREACH_GLZ_SAFE
+
+	red_worker: make WORKER_FOREACH_DCC safe
+	Specifically, the loop in red_pipes_add_draw can cause spice to abort.
+
+	In red_worker.c (WORKER_FOREACH_DCC):
+	  red_pipes_add_drawable
+	    red_pipe_add_drawable
+	      red_handle_drawable_surfaces_client_synced
+	        red_push_surface_image
+	          red_channel_client_push
+	            red_channel_client_send
+	              red_peer_handle_outgoing
+	                reds_stream_writev (if fails -- EPIPE)
+	                handler->cb->on_error = red_channel_client_disconnect()
+	                  red_channel_remove_client()
+	                  ring_remove() -- of rcc from channel.clients ring.
+
+	red_worker: reuse DCC_FOREACH in WORKER_DCC_FOREACH
+	The only thing that is needed is to get the channel out of the worker.
+
+	red_worker: use only RCC_FOREACH_SAFE
+	RCC_FOREACH may be dangerous
+
+	The following patches replace FOREACH loops with a SAFE version.
+	Using unsafe loops may cause spice-server to abort (assert fails).
+	Specifically a read/write fail in those loops, may cause the client
+	to disconnect, removing the node currently iterated, which cause spice
+	to abort in ring_next():
+	 -- assertion `pos->next != NULL && pos->prev != NULL' failed
+
+2013-07-05  David Gibson  <david@gibson.dropbear.id.au>
+
+	Use RING_FOREACH_SAFE in red_channel.c functions which are missing it
+	Currently, both red_channel_pipes_add_type() and
+	red_channel_pipes_add_empty_msg() use plaing RING_FOREACH() which is not
+	safe versus removals from the ring within the loop body.
+
+	Although it's rare, such a removal can occur in both cases.  In the case
+	of red_channel_pipes_add_type() we have:
+	    red_channel_pipes_add_type()
+	    -> red_channel_client_pipe_add_type()
+	        -> red_channel_client_push()
+
+	And in the case of red_channel_client_pipes_add_empty_msg() we have:
+	    red_channel_client_pipes_add_empty_msg()
+	    -> red_channel_client_pipe_add_empty_msg()
+	        -> red_channel_client_push()
+
+	But red_channel_client_push() can cause a removal from the clients ring if
+	a network error occurs:
+	    red_channel_client_push()
+	    -> red_channel_client_send()
+	        -> red_peer_handle_outgoing()
+	            -> handler->cb->on_error callback
+	            =  red_channel_client_default_peer_on_error()
+	                -> red_channel_client_disconnect()
+	                    -> red_channel_remove_client()
+	                        -> ring_remove()
+
+	When this error path does occur, the assertion in RING_FOREACH()'s
+	ring_next() trips, and the process containing the spice server is aborted.
+	i.e. your whole VM dies, as a result of an unfortunately timed network
+	error on the spice channel.
+
+	Please apply.
+
+2013-06-25  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker: fix for stuck display_channel over WAN (jpeg_enabled=true)
+	The image descriptor flags shouldn't be copied as is from the flags that
+	were set by the driver. Specifically, the CACHE_ME flag shouldn't be copied,
+	since it is possible that (a) the image won't be cached (b) the image
+	is already cached, but in its lossy version, and we may want to set the bit for
+	CACHE_REPLACE_ME, in order to cache it in its lossless version.
+	In case (b), the client first looks for the CACHE_ME flag, and only if
+	it is not set it looks for CACHE_REPLACE_ME (see canvas_base.c). Since both flags where set,
+	the client ignored REPLACE_ME, and didn't turned off the lossy flag of the
+	cach item. Then, when a request from this lossles item reached the
+	client (FROM_CACHE_LOSSLESS), the client display channel waited
+	endlessly for the lossless version of the image.
+
+2013-06-24  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker: improve stream stats readability and ease of parsing
+	also added start/end-bit-rate and avg-quality to the final stream stats.
+
+	mjpeg_encoder: add mjpeg_encoder_get_stats
+
+	spice: silencing most of the ping/pong logging
+	Those messages are too frequent and don't contribute much
+
+2013-06-06  Hans de Goede  <hdegoede@redhat.com>
+
+	server: Add support for filtering out agent file-xfer msgs (rhbz#961848)
+
+2013-05-24  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_channel: replace an assert upon threads mismatch with a warning
+	The assert:
+	spice_assert(pthread_equal(pthread_self(), client->thread_id))
+	and the assert:
+	spice_assert(pthread_equal(pthread_self(), rcc->channel->thread_id))
+	were coded in order to protect data that is accessed from the main
+	context (red_client and most of the channels), from
+	access by threads of other channels (namely, the display and cursor
+	channels), and vice versa.
+	However, some of the calls to the sound channel interface,
+	and also the char_device interface, can be done from the vcpu thread.
+	It doesn't endanger these channels internal data, since qemu use global
+	mutex for the vcpu and io threads.
+	Thus, pthread_self() can be !=  channel->thread_id, if one of them is
+	the vcpu thread and the other is the io-thread, and we shouldn't assert.
+
+	Future plans: A more complete and complicated solution would be to manage our own thread for
+	spice-channels, and push input from qemu to this thread, instead of
+	counting on the global mutex of qemu
+
+	rhbz#823472
+
+2013-05-23  Yonit Halperin  <yhalperi@redhat.com>
+
+	main_channel: fix double release of migration target data
+	If client_migrate_info was called once with cert-host-subject and
+	then again without cert-host-subject, on a third call to
+	client_migrate info, the cert-host-subject from the first call would
+	have been freed for the second time.
+
+2013-05-19  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Log actual address spice-server binds to
+	It's not always obvious what address spice-server will bind to,
+	in particular when the 'addr' parameter is omitted on QEMU
+	commandline. The decision of what address to bind to is made
+	in reds_init_socket with a call to getaddrinfo. Surprisingly,
+	that function had a call to getnameinfo() already, but it does
+	not seem to be using the result of that call in any way.
+	This commit moves this call after the socket is successfully bound
+	and add a log message to indicate which address it's bound to.
+
 2013-05-17  Alon Levy  <alevy@redhat.com>
 
 	0.12.3 release
@@ -20,7 +237,7 @@
 
 	server/red_worker: s/driver_has_monitors_config/driver_cap_monitors_config/ (plus small comment)
 
-2013-05-09  Yonit Halperin  <yhalperi@redhat.com>
+2013-05-10  Yonit Halperin  <yhalperi@redhat.com>
 
 	red_worker: don't get bit_rate from main_channel_client, if it wasn't initialized
 	When setting an initial video stream bit rate, if the bit rate
@@ -860,7 +1077,7 @@
 	current code will segfault when BN_new fails as it immediatly tries
 	to use the NULL pointer.
 
-2012-09-14  Alon Levy  <alevy@redhat.com>
+2012-09-15  Alon Levy  <alevy@redhat.com>
 
 	Release 0.12.0
 
@@ -1056,7 +1273,7 @@
 
 	server/red_tunnel_worker: remove unneeded expect_migrate_mark
 
-2012-08-27  Alon Levy  <alevy@redhat.com>
+2012-08-28  Alon Levy  <alevy@redhat.com>
 
 	server/red_tunnel_worker.c: fix build
 	Only passes compile, not tested.
@@ -2080,9 +2297,11 @@
 	server: export spice_server_is_server_mouse predicate
 	To be used by qemu query-spice / info spice commands.
 
-2012-03-25  Marc-André Lureau  <marcandre.lureau@redhat.com>
+2012-03-26  Marc-André Lureau  <marcandre.lureau@redhat.com>
 
 	Remove files moved to spice-common
+
+2012-03-25  Marc-André Lureau  <marcandre.lureau@redhat.com>
 
 	Copy common/win/my_getopt-1.5/my_getopt client/windows
 
@@ -3012,7 +3231,7 @@
 	Also fixup the header of server/red_parse_qxl.c, which still contained
 	some GPL (program rather then library) text in its header.
 
-2011-12-13  Marc-André Lureau  <marcandre.lureau@redhat.com>
+2011-12-14  Marc-André Lureau  <marcandre.lureau@redhat.com>
 
 	spelling: s/cupture/capture
 
@@ -3449,11 +3668,11 @@
 	test_playback.c:93:5: erreur: function declaration isn’t a prototype
 	[-Werror=strict-prototypes]
 
-2011-08-31  Marc-André Lureau  <marcandre.lureau@redhat.com>
+2011-09-01  Marc-André Lureau  <marcandre.lureau@redhat.com>
 
 	fix bug #692833
 
-2011-08-31  Christophe Fergeau  <cfergeau@redhat.com>
+2011-09-01  Christophe Fergeau  <cfergeau@redhat.com>
 
 	add C++ guards to backtrace.h
 	Without these, spice_backtrace() can't be used from the C++ client
@@ -5864,7 +6083,7 @@
 
 	server/red_channel: no need for extra loop
 
-2011-01-12  Alon Levy  <alevy@redhat.com>
+2011-01-13  Alon Levy  <alevy@redhat.com>
 
 	server/red_channel: go marshaller for outgoing (copied from red_worker)
 
@@ -7149,8 +7368,6 @@
 
 	red_get_cursor: avoid extra copy
 
-2010-08-26  Gerd Hoffmann  <kraxel@redhat.com>
-
 	fix red_cursur_flush segfault
 
 	zap dead typedefs
@@ -7158,6 +7375,8 @@
 	zap dead qxl chunk code
 
 	qxl parser: add cursor parsing
+
+2010-08-26  Gerd Hoffmann  <kraxel@redhat.com>
 
 	qxl parser: complete QXL_SURFACE_CMD_CREATE parsing
 
@@ -7413,13 +7632,13 @@
 
 	server: add missing ifdef USE_OGL (red_worker.c)
 
-2010-07-07  Gerd Hoffmann  <kraxel@redhat.com>
+2010-07-08  Gerd Hoffmann  <kraxel@redhat.com>
 
 	Properly parse QXLImage to the new-world SpiceImage
 	SpiceImage now replaces RedImage and has all image types in it.
 	All image data are now chunked (and as such not copied when demarshalling).
 
-2010-07-07  Alexander Larsson  <alexl@redhat.com>
+2010-07-08  Alexander Larsson  <alexl@redhat.com>
 
 	codegen: support @chunk on non-pointer arrays
 	This is similar to @as_ptr, but generates a single chunk of data.
@@ -8330,7 +8549,7 @@
 
 	server: fix race condition in lz global dictionary, in its image segments list
 
-2010-04-08  Izik Eidus  <ieidus@redhat.com>
+2010-04-09  Izik Eidus  <ieidus@redhat.com>
 
 	spice: win32 client: fix gdi locking
 	While the fix could have been more effective,
@@ -8386,7 +8605,7 @@
 
 	client: fix unsafe access to an event member
 
-2010-04-05  Izik Eidus  <ieidus@redhat.com>
+2010-04-06  Izik Eidus  <ieidus@redhat.com>
 
 	spice server: try to be less brutal when changing res or when flushing the tree
 	The idea is that we can try to defer some stuff to be later
@@ -8403,6 +8622,8 @@
 
 	Make things simpler
 
+2010-04-05  Izik Eidus  <ieidus@redhat.com>
+
 	spice: common: gdi_canvas fix gdi objects leak
 	BitmapMask was used by the draw_text function as well
 	therefore we need to mark from_surface = 0 if we want
@@ -8415,21 +8636,19 @@
 	Just skip the items of destroyed surface that are found in the pipe
 	before we skip them, we check if they are needed by other users...
 
-2010-04-04  Izik Eidus  <ieidus@redhat.com>
-
 	spice-server: remove glz objects related to surface when destroying a surface
 	make the surface released faster in the release ring
 	as well as clean unneeded reference into the glz
 
 	spice: reds: fix uninitlized pointer
 
-2010-04-02  Yonit Halperin  <yhalperi@redhat.com>
+2010-04-03  Yonit Halperin  <yhalperi@redhat.com>
 
 	client: x11: fix a crash caused by a call to a destroyed window.
 	Happens when a focused window is destroyed without a focus out event,
 	and a focus-in event occurs on another window.
 
-2010-04-02  Izik Eidus  <ieidus@redhat.com>
+2010-04-03  Izik Eidus  <ieidus@redhat.com>
 
 	libspice: add off screens support
 
@@ -8802,7 +9021,7 @@
 	the check for a window message procs. We need to properly filter
 	events with XFilterEvent to avoid this happening.
 
-2010-01-27  Izik Eidus  <ieidus@redhat.com>
+2010-01-28  Izik Eidus  <ieidus@redhat.com>
 
 	libspice: add surface 0 support
 	This include alot of infestracture for off screens.
@@ -8896,13 +9115,15 @@
 
 	use spaces instead of tabs in bitmap_to_c and icon_to_c output
 
-2009-12-23  Yaniv Kamay  <ykamay@redhat.com>
+2009-12-24  Yaniv Kamay  <ykamay@redhat.com>
 
 	win client: change avcodec version to 51
 
-2009-12-23  Izik Eidus  <ieidus@redhat.com>
+2009-12-24  Izik Eidus  <ieidus@redhat.com>
 
 	spice: fix server crush in case connecting without qxl device
+
+2009-12-23  Izik Eidus  <ieidus@redhat.com>
 
 	spice client: fix wrong gdi-canvas handling of blend_alpha
 
@@ -8967,7 +9188,7 @@
 
 	spice: show splash screen on disconnect only on debug
 
-2009-11-15  Yaniv Kamay  <ykamay@redhat.com>
+2009-11-16  Yaniv Kamay  <ykamay@redhat.com>
 
 	client: change jitter buffer size to 300ms
 
@@ -9026,9 +9247,9 @@
 
 	fix win client copyright string
 
-2009-10-26  Yaniv Kamay  <ykamay@redhat.com>
-
 	fix bad initialization of XDisplay in case crt have more then one output
+
+2009-10-26  Yaniv Kamay  <ykamay@redhat.com>
 
 	fix build on Debian
 

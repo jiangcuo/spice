@@ -518,7 +518,6 @@ static void red_channel_client_send_ping(RedChannelClient *rcc)
         }  else {
             rcc->latency_monitor.tcp_nodelay = delay_val;
             if (!delay_val) {
-                spice_debug("switching to TCP_NODELAY");
                 delay_val = 1;
                 if (setsockopt(rcc->stream->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val,
                                sizeof(delay_val)) == -1) {
@@ -535,7 +534,6 @@ static void red_channel_client_send_ping(RedChannelClient *rcc)
     clock_gettime(CLOCK_MONOTONIC, &ts);
     ping.timestamp = ts.tv_sec * 1000000000LL + ts.tv_nsec;
     spice_marshall_msg_ping(rcc->send_data.marshaller, &ping);
-    spice_debug("time %lu", ping.timestamp);
     red_channel_client_begin_send_message(rcc);
 }
 
@@ -709,7 +707,6 @@ static int red_channel_client_pre_create_validate(RedChannel *channel, RedClient
 
 static void red_channel_client_push_ping(RedChannelClient *rcc)
 {
-    spice_debug(NULL);
     spice_assert(rcc->latency_monitor.state == PING_STATE_NONE);
     rcc->latency_monitor.state = PING_STATE_WARMUP;
     rcc->latency_monitor.warmup_was_sent = FALSE;
@@ -730,7 +727,7 @@ static void red_channel_client_ping_timer(void *opaque)
         spice_printerr("ioctl(TIOCOUTQ) failed, %s", strerror(errno));
     }
     if (so_unsent_size > 0) {
-        spice_debug("tcp snd buffer is still occupied. rescheduling ping");
+        /* tcp snd buffer is still occupied. rescheduling ping */
         red_channel_client_start_ping_timer(rcc, PING_TEST_IDLE_NET_TIMEOUT_MS);
     } else {
         red_channel_client_push_ping(rcc);
@@ -938,6 +935,8 @@ RedChannel *red_channel_create(int size,
 
     channel->out_bytes_counter = 0;
 
+    spice_debug("channel type %d id %d thread_id 0x%lx",
+                channel->type, channel->id, channel->thread_id);
     return channel;
 }
 
@@ -982,6 +981,8 @@ RedChannel *red_channel_create_dummy(int size, uint32_t type, uint32_t id)
     red_channel_set_common_cap(channel, SPICE_COMMON_CAP_MINI_HEADER);
 
     channel->thread_id = pthread_self();
+    spice_debug("channel type %d id %d thread_id 0x%lx",
+                channel->type, channel->id, channel->thread_id);
 
     channel->out_bytes_counter = 0;
 
@@ -1348,10 +1349,8 @@ static void red_channel_client_handle_pong(RedChannelClient *rcc, SpiceMsgPing *
     clock_gettime(CLOCK_MONOTONIC, &ts);
     now =  ts.tv_sec * 1000000000LL + ts.tv_nsec;
 
-    spice_debug("now %lu", now);
     if (rcc->latency_monitor.state == PING_STATE_WARMUP) {
         rcc->latency_monitor.state = PING_STATE_LATENCY;
-        spice_debug("warmup roundtrip  %.2f (ms)", (now - ping->timestamp)/1000.0/1000.0);
         return;
     } else if (rcc->latency_monitor.state != PING_STATE_LATENCY) {
         spice_warning("unexpected");
@@ -1362,7 +1361,6 @@ static void red_channel_client_handle_pong(RedChannelClient *rcc, SpiceMsgPing *
     if (!rcc->latency_monitor.tcp_nodelay) {
         int delay_val = 0;
 
-        spice_debug("switching to back TCP_NODELAY=0");
         if (setsockopt(rcc->stream->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val,
                        sizeof(delay_val)) == -1) {
             if (errno != ENOTSUP) {
@@ -1380,10 +1378,7 @@ static void red_channel_client_handle_pong(RedChannelClient *rcc, SpiceMsgPing *
     if (rcc->latency_monitor.roundtrip < 0 ||
         now - ping->timestamp < rcc->latency_monitor.roundtrip) {
         rcc->latency_monitor.roundtrip = now - ping->timestamp;
-        spice_debug("roundtrip ms %.2f (ms)", rcc->latency_monitor.roundtrip/1000.0/1000.0);
-    } else {
-        spice_debug("not updating roundtrip. The latest latency measured was bigger (%.2f)",
-                    (now - ping->timestamp)/1000.0/1000.0);
+        spice_debug("update roundtrip %.2f(ms)", rcc->latency_monitor.roundtrip/1000.0/1000.0);
     }
 
     rcc->latency_monitor.last_pong_time = now;
@@ -1577,9 +1572,9 @@ void red_channel_client_pipe_add_type(RedChannelClient *rcc, int pipe_item_type)
 
 void red_channel_pipes_add_type(RedChannel *channel, int pipe_item_type)
 {
-    RingItem *link;
+    RingItem *link, *next;
 
-    RING_FOREACH(link, &channel->clients) {
+    RING_FOREACH_SAFE(link, next, &channel->clients) {
         red_channel_client_pipe_add_type(
             SPICE_CONTAINEROF(link, RedChannelClient, channel_link),
             pipe_item_type);
@@ -1598,9 +1593,9 @@ void red_channel_client_pipe_add_empty_msg(RedChannelClient *rcc, int msg_type)
 
 void red_channel_pipes_add_empty_msg(RedChannel *channel, int msg_type)
 {
-    RingItem *link;
+    RingItem *link, *next;
 
-    RING_FOREACH(link, &channel->clients) {
+    RING_FOREACH_SAFE(link, next, &channel->clients) {
         red_channel_client_pipe_add_empty_msg(
             SPICE_CONTAINEROF(link, RedChannelClient, channel_link),
             msg_type);
@@ -1657,7 +1652,14 @@ void red_channel_client_ack_set_client_window(RedChannelClient *rcc, int client_
 
 static void red_channel_remove_client(RedChannelClient *rcc)
 {
-    spice_assert(pthread_equal(pthread_self(), rcc->channel->thread_id));
+    if (!pthread_equal(pthread_self(), rcc->channel->thread_id)) {
+        spice_warning("channel type %d id %d - "
+                      "channel->thread_id (0x%lx) != pthread_self (0x%lx)."
+                      "If one of the threads is != io-thread && != vcpu-thread, "
+                      "this might be a BUG",
+                      rcc->channel->type, rcc->channel->id,
+                      rcc->channel->thread_id, pthread_self());
+    }
     ring_remove(&rcc->channel_link);
     spice_assert(rcc->channel->clients_num > 0);
     rcc->channel->clients_num--;
@@ -1937,7 +1939,12 @@ void red_client_migrate(RedClient *client)
     RedChannelClient *rcc;
 
     spice_printerr("migrate client with #channels %d", client->channels_num);
-    spice_assert(pthread_equal(pthread_self(), client->thread_id));
+    if (!pthread_equal(pthread_self(), client->thread_id)) {
+        spice_warning("client->thread_id (0x%lx) != pthread_self (0x%lx)."
+                      "If one of the threads is != io-thread && != vcpu-thread,"
+                      " this might be a BUG",
+                      client->thread_id, pthread_self());
+    }
     RING_FOREACH_SAFE(link, next, &client->channels) {
         rcc = SPICE_CONTAINEROF(link, RedChannelClient, client_link);
         if (red_channel_client_is_connected(rcc)) {
@@ -1952,7 +1959,13 @@ void red_client_destroy(RedClient *client)
     RedChannelClient *rcc;
 
     spice_printerr("destroy client with #channels %d", client->channels_num);
-    spice_assert(pthread_equal(pthread_self(), client->thread_id));
+    if (!pthread_equal(pthread_self(), client->thread_id)) {
+        spice_warning("client->thread_id (0x%lx) != pthread_self (0x%lx)."
+                      "If one of the threads is != io-thread && != vcpu-thread,"
+                      " this might be a BUG",
+                      client->thread_id,
+                      pthread_self());
+    }
     RING_FOREACH_SAFE(link, next, &client->channels) {
         // some channels may be in other threads, so disconnection
         // is not synchronous.
@@ -2012,7 +2025,7 @@ void red_client_set_main(RedClient *client, MainChannelClient *mcc) {
 
 void red_client_semi_seamless_migrate_complete(RedClient *client)
 {
-    RingItem *link;
+    RingItem *link, *next;
 
     pthread_mutex_lock(&client->lock);
     if (!client->during_target_migrate || client->seamless_migrate) {
@@ -2021,7 +2034,7 @@ void red_client_semi_seamless_migrate_complete(RedClient *client)
         return;
     }
     client->during_target_migrate = FALSE;
-    RING_FOREACH(link, &client->channels) {
+    RING_FOREACH_SAFE(link, next, &client->channels) {
         RedChannelClient *rcc = SPICE_CONTAINEROF(link, RedChannelClient, client_link);
 
         if (rcc->latency_monitor.timer) {
@@ -2060,12 +2073,12 @@ static void red_channel_pipes_create_batch(RedChannel *channel,
                                 new_pipe_item_t creator, void *data,
                                 rcc_item_t callback)
 {
-    RingItem *link;
+    RingItem *link, *next;
     RedChannelClient *rcc;
     PipeItem *item;
     int num = 0;
 
-    RING_FOREACH(link, &channel->clients) {
+    RING_FOREACH_SAFE(link, next, &channel->clients) {
         rcc = SPICE_CONTAINEROF(link, RedChannelClient, channel_link);
         item = (*creator)(rcc, data, num++);
         if (callback) {
