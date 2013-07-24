@@ -20,6 +20,7 @@
 */
 
 
+#include <config.h>
 #include "char_device.h"
 #include "red_channel.h"
 #include "reds.h"
@@ -553,7 +554,7 @@ SpiceCharDeviceWriteBuffer *spice_char_device_write_buffer_get(SpiceCharDeviceSt
                                                                RedClient *client,
                                                                int size)
 {
-   return  __spice_char_device_write_buffer_get(dev, client, size, 
+   return  __spice_char_device_write_buffer_get(dev, client, size,
              client ? WRITE_BUFFER_ORIGIN_CLIENT : WRITE_BUFFER_ORIGIN_SERVER,
              0);
 }
@@ -561,7 +562,7 @@ SpiceCharDeviceWriteBuffer *spice_char_device_write_buffer_get(SpiceCharDeviceSt
 SpiceCharDeviceWriteBuffer *spice_char_device_write_buffer_get_server_no_token(
     SpiceCharDeviceState *dev, int size)
 {
-   return  __spice_char_device_write_buffer_get(dev, NULL, size, 
+   return  __spice_char_device_write_buffer_get(dev, NULL, size,
              WRITE_BUFFER_ORIGIN_SERVER_NO_TOKEN, 0);
 }
 
@@ -977,4 +978,3 @@ int spice_char_device_state_restore(SpiceCharDeviceState *dev,
     spice_char_device_read_from_device(dev);
     return TRUE;
 }
-

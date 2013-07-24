@@ -42,14 +42,12 @@ static void test_spice_destroy_update(SimpleSpiceUpdate *update)
         return;
     }
     if (update->drawable.clip.type != SPICE_CLIP_TYPE_NONE) {
-        free((uint8_t*)update->drawable.clip.data);
+        uint8_t *ptr = (uint8_t*)update->drawable.clip.data;
+        free(ptr);
     }
     free(update->bitmap);
     free(update);
 }
-
-static uint32_t test_width;
-static uint32_t test_height;
 
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 320
@@ -65,6 +63,7 @@ static int control = 3; //used to know when we can take a screenshot
 static int rects = 16; //number of rects that will be draw
 static int has_automated_tests = 0; //automated test flag
 
+__attribute__((noreturn))
 static void sigchld_handler(int signal_num) // wait for the child process and exit
 {
     int status;
@@ -507,9 +506,9 @@ static void produce_command(Test *test)
         case SIMPLE_UPDATE: {
             QXLRect rect = {
                 .left = 0,
-                .right = (test->target_surface == 0 ? test_width : SURF_WIDTH),
+                .right = (test->target_surface == 0 ? test->primary_width : test->width),
                 .top = 0,
-                .bottom = (test->target_surface == 0 ? test_height : SURF_HEIGHT)
+                .bottom = (test->target_surface == 0 ? test->primary_height : test->height)
             };
             if (rect.right > 0 && rect.bottom > 0) {
                 qxl_worker->update_area(qxl_worker, test->target_surface, &rect, NULL, 0, 1);
@@ -556,8 +555,10 @@ static void produce_command(Test *test)
 
         case SIMPLE_CREATE_SURFACE: {
             SimpleSurfaceCmd *update;
-            test->target_surface = MAX_SURFACE_NUM - 1;
-            if (command) {
+            if (command->create_surface.data) {
+                ASSERT(command->create_surface.surface_id > 0);
+                ASSERT(command->create_surface.surface_id < MAX_SURFACE_NUM);
+                ASSERT(command->create_surface.surface_id == 1);
                 update = create_surface(command->create_surface.surface_id,
                                         command->create_surface.format,
                                         command->create_surface.width,
@@ -879,6 +880,19 @@ void init_automated()
     sigaction(SIGCHLD, &sa, NULL);
 }
 
+__attribute__((noreturn))
+void usage(const char *argv0, const int exitcode)
+{
+#ifdef AUTOMATED_TESTS
+    const char *autoopt=" [--automated-tests]";
+#else
+    const char *autoopt="";
+#endif
+
+    printf("usage: %s%s\n", argv0, autoopt);
+    exit(exitcode);
+}
+
 void spice_test_config_parse_args(int argc, char **argv)
 {
     struct option options[] = {
@@ -893,20 +907,19 @@ void spice_test_config_parse_args(int argc, char **argv)
     while ((val = getopt_long(argc, argv, "", options, &option_index)) != -1) {
         switch (val) {
         case '?':
-            printf("unrecognized option %s", argv[optind]);
-            goto invalid_option;
+            printf("unrecognized option '%s'\n", argv[optind - 1]);
+            usage(argv[0], EXIT_FAILURE);
         case 0:
             break;
         }
     }
 
+    if (argc > optind) {
+        printf("unknown argument '%s'\n", argv[optind]);
+        usage(argv[0], EXIT_FAILURE);
+    }
     if (has_automated_tests) {
         init_automated();
     }
     return;
-
-invalid_option:
-    printf("Invalid option!\n"
-           "usage: %s [--automated-tests]\n", argv[0]);
-    exit(0);
 }
