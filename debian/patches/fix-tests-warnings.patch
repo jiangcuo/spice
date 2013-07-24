@@ -34,16 +34,7 @@ Signed-off-by: Serge Hallyn <serge.hallyn@ubuntu.com>
              timeout = NULL;
 --- a/server/tests/test_display_base.c
 +++ b/server/tests/test_display_base.c
-@@ -42,7 +42,7 @@
-         return;
-     }
-     if (update->drawable.clip.type != SPICE_CLIP_TYPE_NONE) {
--        free((uint8_t*)update->drawable.clip.data);
-+        free(update->drawable.clip.data);
-     }
-     free(update->bitmap);
-     free(update);
-@@ -89,10 +89,11 @@
+@@ -88,10 +88,11 @@
      pid = fork();
      if (pid == 0) {
          char buf[PATH_MAX];
