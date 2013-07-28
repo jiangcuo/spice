@@ -1,7 +1,6 @@
 spice (0.12.4-0nocelt1) unstable; urgency=low
 
   * New upstream release (Closes: #717030)
-  * Switch from libjpeg8-dev to libturbojpeg-dev
   * Remove .version after build (Closes: #671627)
   * debian/control:
     - Bump Standards-Version to 3.9.4 (no changes)
