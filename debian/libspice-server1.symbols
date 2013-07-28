@@ -8,6 +8,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  SPICE_SERVER_0.11.4@SPICE_SERVER_0.11.4 0.12.2
  SPICE_SERVER_0.12.2@SPICE_SERVER_0.12.2 0.12.2
  SPICE_SERVER_0.12.3@SPICE_SERVER_0.12.3 0.12.3
+ SPICE_SERVER_0.12.4@SPICE_SERVER_0.12.4 0.12.4
  SPICE_SERVER_0.6.0@SPICE_SERVER_0.6.0 0.8.2
  SPICE_SERVER_0.6.1@SPICE_SERVER_0.6.1 0.8.2
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
@@ -75,6 +76,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_remove_interface@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_addr@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_agent_copypaste@SPICE_SERVER_0.8.1 0.8.2
+ spice_server_set_agent_file_xfer@SPICE_SERVER_0.12.4 0.12.4
  spice_server_set_agent_mouse@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_channel_security@SPICE_SERVER_0.6.0 0.8.2
  spice_server_set_compat_version@SPICE_SERVER_0.6.1 0.8.2
