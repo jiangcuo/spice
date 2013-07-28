@@ -21,7 +21,7 @@ Build-Depends: debhelper (>= 9), pkg-config,
  libxinerama-dev,
  python-pyparsing,
  libglib2.0-dev (>= 2.22~),
-Standards-Version: 3.9.3
+Standards-Version: 3.9.4
 Homepage: http://spice-space.org/
 Vcs-Git: git://git.debian.org/collab-maint/spice.git
 Vcs-Browser: http://git.debian.org/?p=collab-maint/spice.git;a=summary
