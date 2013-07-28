@@ -17,7 +17,7 @@ Build-Depends: debhelper (>= 9), pkg-config,
 # which has to be enabled explicitly and is not recommended
 # libglu1-mesa-dev, libgl1-mesa-dev,
  libsasl2-dev,
- libjpeg8-turbo-dev,
+ libturbojpeg-dev,
  libxinerama-dev,
  python-pyparsing,
  libglib2.0-dev (>= 2.22~),
