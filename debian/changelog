@@ -1,10 +1,11 @@
 spice (0.12.4-0nocelt1) unstable; urgency=low
 
-  * New upstream release
+  * New upstream release (Closes: #717030)
   * Switch from libjpeg8-dev to libjpeg8-turbo-dev
   * Remove .version after build (Closes: #671627)
   * debian/patches:
     - fix-tests-warnings.patch, refresh
+    - link-server-test-with-libm-libpthread.patch, add (Closes: #713681)
   
  -- Liang Guo <guoliang@debian.org>  Thu, 25 Jul 2013 00:10:00 +0800
   
