@@ -1,3 +1,4 @@
 fix-tests-warnings.patch
 make-celt-to-be-optional.patch
 link-server-test-with-libm-libpthread.patch
+enable_subdir-objects.patch
