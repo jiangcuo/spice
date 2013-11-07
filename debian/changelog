@@ -1,3 +1,9 @@
+spice (0.12.4-0nocelt2) unstable; urgency=high
+
+  * Fix CVE-2013-4282 (Closes: #728314)
+
+ -- Liang Guo <guoliang@debian.org>  Thu, 07 Nov 2013 22:44:29 +0800
+
 spice (0.12.4-0nocelt1.1) unstable; urgency=low
 
   * Non-maintainer upload.
