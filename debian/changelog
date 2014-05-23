@@ -10,6 +10,7 @@ spice (0.12.5-1) UNRELEASED; urgency=medium
     (no --enable-opus configure flag for now)
   * do not remove .version in clean anymore (it is part of the tarball)
   * do not use dh_autoreconf, since we aren't changing autoconf anymore
+  * update libspice-server1.symbols with new symbols
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Fri, 23 May 2014 18:37:54 +0400
 
