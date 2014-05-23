@@ -3224,13 +3224,14 @@ void Platform::init()
         int num_configs;
         int attrlist[] = {
             GLX_RENDER_TYPE, GLX_RGBA_BIT,
+            GLX_DOUBLEBUFFER, True,
             GLX_DRAWABLE_TYPE, GLX_PBUFFER_BIT | GLX_WINDOW_BIT,
             GLX_X_VISUAL_TYPE, GLX_TRUE_COLOR,
             GLX_RED_SIZE, 8,
             GLX_GREEN_SIZE, 8,
             GLX_BLUE_SIZE, 8,
             GLX_ALPHA_SIZE, 8,
-            GLX_STENCIL_SIZE, 4,
+            GLX_STENCIL_SIZE, 0,
             GLX_DEPTH_SIZE, 0,
             None
         };
@@ -3430,18 +3431,20 @@ void Platform::reset_cursor_pos()
 }
 
 WaveRecordAbstract* Platform::create_recorder(RecordClient& client,
-                                              uint32_t sampels_per_sec,
+                                              uint32_t samples_per_sec,
                                               uint32_t bits_per_sample,
-                                              uint32_t channels)
+                                              uint32_t channels,
+                                              uint32_t frame_size)
 {
-    return new WaveRecorder(client, sampels_per_sec, bits_per_sample, channels);
+    return new WaveRecorder(client, samples_per_sec, bits_per_sample, channels, frame_size);
 }
 
-WavePlaybackAbstract* Platform::create_player(uint32_t sampels_per_sec,
+WavePlaybackAbstract* Platform::create_player(uint32_t samples_per_sec,
                                               uint32_t bits_per_sample,
-                                              uint32_t channels)
+                                              uint32_t channels,
+                                              uint32_t frame_size)
 {
-    return new WavePlayer(sampels_per_sec, bits_per_sample, channels);
+    return new WavePlayer(samples_per_sec, bits_per_sample, channels, frame_size);
 }
 
 void XPlatform::on_focus_in()

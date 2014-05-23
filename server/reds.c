@@ -37,12 +37,8 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#include <openssl/bio.h>
-#include <openssl/pem.h>
-#include <openssl/bn.h>
-#include <openssl/rsa.h>
-#include <openssl/ssl.h>
 #include <openssl/err.h>
+
 #if HAVE_SASL
 #include <sasl/sasl.h>
 #endif
@@ -70,12 +66,10 @@
 #include "demarshallers.h"
 #include "char_device.h"
 #include "migration_protocol.h"
-#ifdef USE_TUNNEL
-#include "red_tunnel_worker.h"
-#endif
 #ifdef USE_SMARTCARD
 #include "smartcard.h"
 #endif
+#include "reds_stream.h"
 
 #include "reds-private.h"
 
@@ -120,9 +114,6 @@ uint32_t streaming_video = STREAM_VIDEO_FILTER;
 spice_image_compression_t image_compression = SPICE_IMAGE_COMPRESS_AUTO_GLZ;
 spice_wan_compression_t jpeg_state = SPICE_WAN_COMPRESSION_AUTO;
 spice_wan_compression_t zlib_glz_state = SPICE_WAN_COMPRESSION_AUTO;
-#ifdef USE_TUNNEL
-void *red_tunnel = NULL;
-#endif
 int agent_mouse = TRUE;
 int agent_copypaste = TRUE;
 int agent_file_xfer = TRUE;
@@ -130,18 +121,8 @@ static bool exit_on_disconnect = FALSE;
 
 static RedsState *reds = NULL;
 
-typedef struct AsyncRead {
-    RedsStream *stream;
-    void *opaque;
-    uint8_t *now;
-    uint8_t *end;
-    void (*done)(void *opaque);
-    void (*error)(void *opaque, int err);
-} AsyncRead;
-
 typedef struct RedLinkInfo {
     RedsStream *stream;
-    AsyncRead asyc_read;
     SpiceLinkHeader link_header;
     SpiceLinkMess *link_mess;
     int mess_pos;
@@ -190,11 +171,6 @@ static ChannelSecurityOptions *find_channel_security(int id)
     return now;
 }
 
-static void reds_stream_push_channel_event(RedsStream *s, int event)
-{
-    main_dispatcher_channel_event(event, s->info);
-}
-
 void reds_handle_channel_event(int event, SpiceChannelEventInfo *info)
 {
     if (core->base.minor_version >= 3 && core->channel_event != NULL)
@@ -202,81 +178,6 @@ void reds_handle_channel_event(int event, SpiceChannelEventInfo *info)
 
     if (event == SPICE_CHANNEL_EVENT_DISCONNECTED) {
         free(info);
-    }
-}
-
-static ssize_t stream_write_cb(RedsStream *s, const void *buf, size_t size)
-{
-    return write(s->socket, buf, size);
-}
-
-static ssize_t stream_writev_cb(RedsStream *s, const struct iovec *iov, int iovcnt)
-{
-    ssize_t ret = 0;
-    do {
-        int tosend;
-        ssize_t n, expected = 0;
-        int i;
-#ifdef IOV_MAX
-        tosend = MIN(iovcnt, IOV_MAX);
-#else
-        tosend = iovcnt;
-#endif
-        for (i = 0; i < tosend; i++) {
-            expected += iov[i].iov_len;
-        }
-        n = writev(s->socket, iov, tosend);
-        if (n <= expected) {
-            if (n > 0)
-                ret += n;
-            return ret == 0 ? n : ret;
-        }
-        ret += n;
-        iov += tosend;
-        iovcnt -= tosend;
-    } while(iovcnt > 0);
-
-    return ret;
-}
-
-static ssize_t stream_read_cb(RedsStream *s, void *buf, size_t size)
-{
-    return read(s->socket, buf, size);
-}
-
-static ssize_t stream_ssl_write_cb(RedsStream *s, const void *buf, size_t size)
-{
-    int return_code;
-    SPICE_GNUC_UNUSED int ssl_error;
-
-    return_code = SSL_write(s->ssl, buf, size);
-
-    if (return_code < 0) {
-        ssl_error = SSL_get_error(s->ssl, return_code);
-    }
-
-    return return_code;
-}
-
-static ssize_t stream_ssl_read_cb(RedsStream *s, void *buf, size_t size)
-{
-    int return_code;
-    SPICE_GNUC_UNUSED int ssl_error;
-
-    return_code = SSL_read(s->ssl, buf, size);
-
-    if (return_code < 0) {
-        ssl_error = SSL_get_error(s->ssl, return_code);
-    }
-
-    return return_code;
-}
-
-static void reds_stream_remove_watch(RedsStream* s)
-{
-    if (s->watch) {
-        core->watch_remove(s->watch);
-        s->watch = NULL;
     }
 }
 
@@ -476,9 +377,9 @@ static void reds_reset_vdp(void)
     SpiceCharDeviceInterface *sif;
 
     state->read_state = VDI_PORT_READ_STATE_READ_HEADER;
-    state->recive_pos = (uint8_t *)&state->vdi_chunk_header;
-    state->recive_len = sizeof(state->vdi_chunk_header);
-    state->message_recive_len = 0;
+    state->receive_pos = (uint8_t *)&state->vdi_chunk_header;
+    state->receive_len = sizeof(state->vdi_chunk_header);
+    state->message_receive_len = 0;
     if (state->current_read_buf) {
         vdi_port_read_buf_unref(state->current_read_buf);
         state->current_read_buf = NULL;
@@ -537,6 +438,7 @@ void reds_client_disconnect(RedClient *client)
     }
 
     if (!client || client->disconnecting) {
+        spice_debug("client %p already during disconnection", client);
         return;
     }
 
@@ -785,43 +687,43 @@ static SpiceCharDeviceMsgToClient *vdi_port_read_one_msg_from_device(SpiceCharDe
     while (vdagent) {
         switch (state->read_state) {
         case VDI_PORT_READ_STATE_READ_HEADER:
-            n = sif->read(vdagent, state->recive_pos, state->recive_len);
+            n = sif->read(vdagent, state->receive_pos, state->receive_len);
             if (!n) {
                 return NULL;
             }
-            if ((state->recive_len -= n)) {
-                state->recive_pos += n;
+            if ((state->receive_len -= n)) {
+                state->receive_pos += n;
                 return NULL;
             }
-            state->message_recive_len = state->vdi_chunk_header.size;
+            state->message_receive_len = state->vdi_chunk_header.size;
             state->read_state = VDI_PORT_READ_STATE_GET_BUFF;
         case VDI_PORT_READ_STATE_GET_BUFF: {
             if (!(state->current_read_buf = vdi_port_read_buf_get())) {
                 return NULL;
             }
-            state->recive_pos = state->current_read_buf->data;
-            state->recive_len = MIN(state->message_recive_len,
+            state->receive_pos = state->current_read_buf->data;
+            state->receive_len = MIN(state->message_receive_len,
                                     sizeof(state->current_read_buf->data));
-            state->current_read_buf->len = state->recive_len;
-            state->message_recive_len -= state->recive_len;
+            state->current_read_buf->len = state->receive_len;
+            state->message_receive_len -= state->receive_len;
             state->read_state = VDI_PORT_READ_STATE_READ_DATA;
         }
         case VDI_PORT_READ_STATE_READ_DATA:
-            n = sif->read(vdagent, state->recive_pos, state->recive_len);
+            n = sif->read(vdagent, state->receive_pos, state->receive_len);
             if (!n) {
                 return NULL;
             }
-            if ((state->recive_len -= n)) {
-                state->recive_pos += n;
+            if ((state->receive_len -= n)) {
+                state->receive_pos += n;
                 break;
             }
             dispatch_buf = state->current_read_buf;
             state->current_read_buf = NULL;
-            state->recive_pos = NULL;
-            if (state->message_recive_len == 0) {
+            state->receive_pos = NULL;
+            if (state->message_receive_len == 0) {
                 state->read_state = VDI_PORT_READ_STATE_READ_HEADER;
-                state->recive_pos = (uint8_t *)&state->vdi_chunk_header;
-                state->recive_len = sizeof(state->vdi_chunk_header);
+                state->receive_pos = (uint8_t *)&state->vdi_chunk_header;
+                state->receive_len = sizeof(state->vdi_chunk_header);
             } else {
                 state->read_state = VDI_PORT_READ_STATE_GET_BUFF;
             }
@@ -878,7 +780,8 @@ static void vdi_port_on_free_self_token(void *opaque)
 
 static void vdi_port_remove_client(RedClient *client, void *opaque)
 {
-    reds_client_disconnect(client);
+    red_channel_client_shutdown(main_channel_client_get_base(
+                                    red_client_get_main(client)));
 }
 
 /****************************************************************************/
@@ -1008,7 +911,7 @@ void reds_on_main_agent_start(MainChannelClient *mcc, uint32_t num_tokens)
 
         if (!client_added) {
             spice_warning("failed to add client to agent");
-            reds_client_disconnect(rcc->client);
+            red_channel_client_shutdown(rcc);
             return;
         }
     } else {
@@ -1125,7 +1028,7 @@ void reds_on_main_agent_data(MainChannelClient *mcc, void *message, size_t size)
         reds_on_main_agent_monitors_config(mcc, message, size);
         return;
     case AGENT_MSG_FILTER_PROTO_ERROR:
-        reds_disconnect();
+        red_channel_client_shutdown(main_channel_client_get_base(mcc));
         return;
     }
 
@@ -1182,8 +1085,8 @@ void reds_on_main_channel_migrate(MainChannelClient *mcc)
         return;
     }
     spice_assert(agent_state->current_read_buf->data &&
-                 agent_state->recive_pos > agent_state->current_read_buf->data);
-    read_data_len = agent_state->recive_pos - agent_state->current_read_buf->data;
+                 agent_state->receive_pos > agent_state->current_read_buf->data);
+    read_data_len = agent_state->receive_pos - agent_state->current_read_buf->data;
 
     if (agent_state->read_filter.msg_data_to_read ||
         read_data_len > sizeof(VDAgentMessage)) { /* msg header has been read */
@@ -1203,11 +1106,11 @@ void reds_on_main_channel_migrate(MainChannelClient *mcc)
             vdi_port_read_buf_unref(read_buf);
         }
 
-        spice_assert(agent_state->recive_len);
-        agent_state->message_recive_len += agent_state->recive_len;
+        spice_assert(agent_state->receive_len);
+        agent_state->message_receive_len += agent_state->receive_len;
         agent_state->read_state = VDI_PORT_READ_STATE_GET_BUFF;
         agent_state->current_read_buf = NULL;
-        agent_state->recive_pos = NULL;
+        agent_state->receive_pos = NULL;
     }
 }
 
@@ -1246,7 +1149,7 @@ void reds_marshall_migrate_data(SpiceMarshaller *m)
 
     /* agent to client partial msg */
     if (agent_state->read_state == VDI_PORT_READ_STATE_READ_HEADER) {
-        mig_data.agent2client.chunk_header_size = agent_state->recive_pos -
+        mig_data.agent2client.chunk_header_size = agent_state->receive_pos -
             (uint8_t *)&agent_state->vdi_chunk_header;
 
         mig_data.agent2client.msg_header_done = FALSE;
@@ -1254,12 +1157,12 @@ void reds_marshall_migrate_data(SpiceMarshaller *m)
         spice_assert(!agent_state->read_filter.msg_data_to_read);
     } else {
         mig_data.agent2client.chunk_header_size = sizeof(VDIChunkHeader);
-        mig_data.agent2client.chunk_header.size = agent_state->message_recive_len;
+        mig_data.agent2client.chunk_header.size = agent_state->message_receive_len;
         if (agent_state->read_state == VDI_PORT_READ_STATE_READ_DATA) {
             /* in the middle of reading the message header (see reds_on_main_channel_migrate) */
             mig_data.agent2client.msg_header_done = FALSE;
             mig_data.agent2client.msg_header_partial_len =
-                agent_state->recive_pos - agent_state->current_read_buf->data;
+                agent_state->receive_pos - agent_state->current_read_buf->data;
             spice_assert(mig_data.agent2client.msg_header_partial_len < sizeof(VDAgentMessage));
             spice_assert(!agent_state->read_filter.msg_data_to_read);
         } else {
@@ -1304,11 +1207,11 @@ static int reds_agent_state_restore(SpiceMigrateDataMain *mig_data)
     chunk_header_remaining = sizeof(VDIChunkHeader) - mig_data->agent2client.chunk_header_size;
     if (chunk_header_remaining) {
         agent_state->read_state = VDI_PORT_READ_STATE_READ_HEADER;
-        agent_state->recive_pos = (uint8_t *)&agent_state->vdi_chunk_header +
+        agent_state->receive_pos = (uint8_t *)&agent_state->vdi_chunk_header +
             mig_data->agent2client.chunk_header_size;
-        agent_state->recive_len = chunk_header_remaining;
+        agent_state->receive_len = chunk_header_remaining;
     } else {
-        agent_state->message_recive_len = agent_state->vdi_chunk_header.size;
+        agent_state->message_receive_len = agent_state->vdi_chunk_header.size;
     }
 
     if (!mig_data->agent2client.msg_header_done) {
@@ -1325,21 +1228,21 @@ static int reds_agent_state_restore(SpiceMigrateDataMain *mig_data)
             memcpy(agent_state->current_read_buf->data,
                    partial_msg_header,
                    mig_data->agent2client.msg_header_partial_len);
-            agent_state->recive_pos = agent_state->current_read_buf->data +
+            agent_state->receive_pos = agent_state->current_read_buf->data +
                                       mig_data->agent2client.msg_header_partial_len;
             cur_buf_size = sizeof(agent_state->current_read_buf->data) -
                            mig_data->agent2client.msg_header_partial_len;
-            agent_state->recive_len = MIN(agent_state->message_recive_len, cur_buf_size);
-            agent_state->current_read_buf->len = agent_state->recive_len +
+            agent_state->receive_len = MIN(agent_state->message_receive_len, cur_buf_size);
+            agent_state->current_read_buf->len = agent_state->receive_len +
                                                  mig_data->agent2client.msg_header_partial_len;
-            agent_state->message_recive_len -= agent_state->recive_len;
+            agent_state->message_receive_len -= agent_state->receive_len;
         } else {
             spice_assert(mig_data->agent2client.msg_header_partial_len == 0);
         }
     } else {
             agent_state->read_state = VDI_PORT_READ_STATE_GET_BUFF;
             agent_state->current_read_buf = NULL;
-            agent_state->recive_pos = NULL;
+            agent_state->receive_pos = NULL;
             agent_state->read_filter.msg_data_to_read = mig_data->agent2client.msg_remaining;
             agent_state->read_filter.result = mig_data->agent2client.msg_filter_result;
     }
@@ -1412,24 +1315,6 @@ int reds_handle_migrate_data(MainChannelClient *mcc, SpiceMigrateDataMain *mig_d
     return TRUE;
 }
 
-static int sync_write(RedsStream *stream, const void *in_buf, size_t n)
-{
-    const uint8_t *buf = (uint8_t *)in_buf;
-
-    while (n) {
-        int now = reds_stream_write(stream, buf, n);
-        if (now <= 0) {
-            if (now == -1 && (errno == EINTR || errno == EAGAIN)) {
-                continue;
-            }
-            return FALSE;
-        }
-        n -= now;
-        buf += now;
-    }
-    return TRUE;
-}
-
 static void reds_channel_init_auth_caps(RedLinkInfo *link, RedChannel *channel)
 {
     if (sasl_enabled && !link->skip_auth) {
@@ -1473,7 +1358,7 @@ static int reds_send_link_ack(RedLinkInfo *link)
     ack.caps_offset = sizeof(SpiceLinkReply);
 
     if (!(link->tiTicketing.rsa = RSA_new())) {
-        spice_warning("RSA nes failed");
+        spice_warning("RSA new failed");
         return FALSE;
     }
 
@@ -1482,21 +1367,28 @@ static int reds_send_link_ack(RedLinkInfo *link)
         return FALSE;
     }
 
-    RSA_generate_key_ex(link->tiTicketing.rsa, SPICE_TICKET_KEY_PAIR_LENGTH, link->tiTicketing.bn,
-                        NULL);
+    if (RSA_generate_key_ex(link->tiTicketing.rsa,
+                            SPICE_TICKET_KEY_PAIR_LENGTH,
+                            link->tiTicketing.bn,
+                            NULL) != 1) {
+        spice_warning("Failed to generate %d bits RSA key: %s",
+                      SPICE_TICKET_KEY_PAIR_LENGTH,
+                      ERR_error_string(ERR_get_error(), NULL));
+        goto end;
+    }
     link->tiTicketing.rsa_size = RSA_size(link->tiTicketing.rsa);
 
     i2d_RSA_PUBKEY_bio(bio, link->tiTicketing.rsa);
     BIO_get_mem_ptr(bio, &bmBuf);
     memcpy(ack.pub_key, bmBuf->data, sizeof(ack.pub_key));
 
-    if (!sync_write(link->stream, &header, sizeof(header)))
+    if (!reds_stream_write_all(link->stream, &header, sizeof(header)))
         goto end;
-    if (!sync_write(link->stream, &ack, sizeof(ack)))
+    if (!reds_stream_write_all(link->stream, &ack, sizeof(ack)))
         goto end;
-    if (!sync_write(link->stream, channel_caps->common_caps, channel_caps->num_common_caps * sizeof(uint32_t)))
+    if (!reds_stream_write_all(link->stream, channel_caps->common_caps, channel_caps->num_common_caps * sizeof(uint32_t)))
         goto end;
-    if (!sync_write(link->stream, channel_caps->caps, channel_caps->num_caps * sizeof(uint32_t)))
+    if (!reds_stream_write_all(link->stream, channel_caps->caps, channel_caps->num_caps * sizeof(uint32_t)))
         goto end;
 
     ret = TRUE;
@@ -1506,7 +1398,7 @@ end:
     return ret;
 }
 
-static int reds_send_link_error(RedLinkInfo *link, uint32_t error)
+static bool reds_send_link_error(RedLinkInfo *link, uint32_t error)
 {
     SpiceLinkHeader header;
     SpiceLinkReply reply;
@@ -1517,7 +1409,7 @@ static int reds_send_link_error(RedLinkInfo *link, uint32_t error)
     header.minor_version = SPICE_VERSION_MINOR;
     memset(&reply, 0, sizeof(reply));
     reply.error = error;
-    return sync_write(link->stream, &header, sizeof(header)) && sync_write(link->stream, &reply,
+    return reds_stream_write_all(link->stream, &header, sizeof(header)) && reds_stream_write_all(link->stream, &reply,
                                                                          sizeof(reply));
 }
 
@@ -1526,20 +1418,20 @@ static void reds_info_new_channel(RedLinkInfo *link, int connection_id)
     spice_info("channel %d:%d, connected successfully, over %s link",
                link->link_mess->channel_type,
                link->link_mess->channel_id,
-               link->stream->ssl == NULL ? "Non Secure" : "Secure");
+               reds_stream_is_ssl(link->stream) ? "Secure" : "Non Secure");
     /* add info + send event */
-    if (link->stream->ssl) {
-        link->stream->info->flags |= SPICE_CHANNEL_EVENT_FLAG_TLS;
+    if (reds_stream_is_ssl(link->stream)) {
+        reds_stream_set_info_flag(link->stream, SPICE_CHANNEL_EVENT_FLAG_TLS);
     }
-    link->stream->info->connection_id = connection_id;
-    link->stream->info->type = link->link_mess->channel_type;
-    link->stream->info->id   = link->link_mess->channel_id;
+    reds_stream_set_channel(link->stream, connection_id,
+                            link->link_mess->channel_type,
+                            link->link_mess->channel_id);
     reds_stream_push_channel_event(link->stream, SPICE_CHANNEL_EVENT_INITIALIZED);
 }
 
 static void reds_send_link_result(RedLinkInfo *link, uint32_t error)
 {
-    sync_write(link->stream, &error, sizeof(error));
+    reds_stream_write_all(link->stream, &error, sizeof(error));
 }
 
 int reds_expects_link_id(uint32_t connection_id)
@@ -1716,11 +1608,10 @@ static void reds_handle_main_link(RedLinkInfo *link)
             main_channel_push_name(mcc, spice_name);
         if (spice_uuid_is_set)
             main_channel_push_uuid(mcc, spice_uuid);
-
-        main_channel_client_start_net_test(mcc);
     } else {
         reds_mig_target_client_add(client);
     }
+    main_channel_client_start_net_test(mcc, !mig_target);
 }
 
 #define RED_MOUSE_STATE_TO_LOCAL(state)     \
@@ -1931,256 +1822,69 @@ static void reds_handle_link(RedLinkInfo *link)
 static void reds_handle_ticket(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
-    char password[SPICE_MAX_PASSWORD_LENGTH];
+    char *password;
     time_t ltime;
+    int password_size;
 
     //todo: use monotonic time
     time(&ltime);
-    RSA_private_decrypt(link->tiTicketing.rsa_size,
-                        link->tiTicketing.encrypted_ticket.encrypted_data,
-                        (unsigned char *)password, link->tiTicketing.rsa, RSA_PKCS1_OAEP_PADDING);
+    if (RSA_size(link->tiTicketing.rsa) < SPICE_MAX_PASSWORD_LENGTH) {
+        spice_warning("RSA modulus size is smaller than SPICE_MAX_PASSWORD_LENGTH (%d < %d), "
+                      "SPICE ticket sent from client may be truncated",
+                      RSA_size(link->tiTicketing.rsa), SPICE_MAX_PASSWORD_LENGTH);
+    }
+
+    password = g_malloc0(RSA_size(link->tiTicketing.rsa) + 1);
+    password_size = RSA_private_decrypt(link->tiTicketing.rsa_size,
+                                        link->tiTicketing.encrypted_ticket.encrypted_data,
+                                        (unsigned char *)password,
+                                        link->tiTicketing.rsa,
+                                        RSA_PKCS1_OAEP_PADDING);
+    if (password_size == -1) {
+        spice_warning("failed to decrypt RSA encrypted password: %s",
+                      ERR_error_string(ERR_get_error(), NULL));
+        goto error;
+    }
+    password[password_size] = '\0';
 
     if (ticketing_enabled && !link->skip_auth) {
         int expired =  taTicket.expiration_time < ltime;
 
         if (strlen(taTicket.password) == 0) {
-            reds_send_link_result(link, SPICE_LINK_ERR_PERMISSION_DENIED);
             spice_warning("Ticketing is enabled, but no password is set. "
-                        "please set a ticket first");
-            reds_link_free(link);
-            return;
+                          "please set a ticket first");
+            goto error;
         }
 
-        if (expired || strncmp(password, taTicket.password, SPICE_MAX_PASSWORD_LENGTH) != 0) {
+        if (expired || strcmp(password, taTicket.password) != 0) {
             if (expired) {
                 spice_warning("Ticket has expired");
             } else {
                 spice_warning("Invalid password");
             }
-            reds_send_link_result(link, SPICE_LINK_ERR_PERMISSION_DENIED);
-            reds_link_free(link);
-            return;
+            goto error;
         }
     }
 
     reds_handle_link(link);
-}
+    goto end;
 
-static inline void async_read_clear_handlers(AsyncRead *obj)
-{
-    if (!obj->stream->watch) {
-        return;
-    }
+error:
+    reds_send_link_result(link, SPICE_LINK_ERR_PERMISSION_DENIED);
+    reds_link_free(link);
 
-    reds_stream_remove_watch(obj->stream);
-}
-
-#if HAVE_SASL
-static int sync_write_u8(RedsStream *s, uint8_t n)
-{
-    return sync_write(s, &n, sizeof(uint8_t));
-}
-
-static int sync_write_u32(RedsStream *s, uint32_t n)
-{
-    return sync_write(s, &n, sizeof(uint32_t));
-}
-
-static ssize_t reds_stream_sasl_write(RedsStream *s, const void *buf, size_t nbyte)
-{
-    ssize_t ret;
-
-    if (!s->sasl.encoded) {
-        int err;
-        err = sasl_encode(s->sasl.conn, (char *)buf, nbyte,
-                          (const char **)&s->sasl.encoded,
-                          &s->sasl.encodedLength);
-        if (err != SASL_OK) {
-            spice_warning("sasl_encode error: %d", err);
-            return -1;
-        }
-
-        if (s->sasl.encodedLength == 0) {
-            return 0;
-        }
-
-        if (!s->sasl.encoded) {
-            spice_warning("sasl_encode didn't return a buffer!");
-            return 0;
-        }
-
-        s->sasl.encodedOffset = 0;
-    }
-
-    ret = s->write(s, s->sasl.encoded + s->sasl.encodedOffset,
-                   s->sasl.encodedLength - s->sasl.encodedOffset);
-
-    if (ret <= 0) {
-        return ret;
-    }
-
-    s->sasl.encodedOffset += ret;
-    if (s->sasl.encodedOffset == s->sasl.encodedLength) {
-        s->sasl.encoded = NULL;
-        s->sasl.encodedOffset = s->sasl.encodedLength = 0;
-        return nbyte;
-    }
-
-    /* we didn't flush the encoded buffer */
-    errno = EAGAIN;
-    return -1;
-}
-
-static ssize_t reds_stream_sasl_read(RedsStream *s, uint8_t *buf, size_t nbyte)
-{
-    uint8_t encoded[4096];
-    const char *decoded;
-    unsigned int decodedlen;
-    int err;
-    int n;
-
-    n = spice_buffer_copy(&s->sasl.inbuffer, buf, nbyte);
-    if (n > 0) {
-        spice_buffer_remove(&s->sasl.inbuffer, n);
-        if (n == nbyte)
-            return n;
-        nbyte -= n;
-        buf += n;
-    }
-
-    n = s->read(s, encoded, sizeof(encoded));
-    if (n <= 0) {
-        return n;
-    }
-
-    err = sasl_decode(s->sasl.conn,
-                      (char *)encoded, n,
-                      &decoded, &decodedlen);
-    if (err != SASL_OK) {
-        spice_warning("sasl_decode error: %d", err);
-        return -1;
-    }
-
-    if (decodedlen == 0) {
-        errno = EAGAIN;
-        return -1;
-    }
-
-    n = MIN(nbyte, decodedlen);
-    memcpy(buf, decoded, n);
-    spice_buffer_append(&s->sasl.inbuffer, decoded + n, decodedlen - n);
-    return n;
-}
-#endif
-
-static void async_read_handler(int fd, int event, void *data)
-{
-    AsyncRead *obj = (AsyncRead *)data;
-
-    for (;;) {
-        int n = obj->end - obj->now;
-
-        spice_assert(n > 0);
-        n = reds_stream_read(obj->stream, obj->now, n);
-        if (n <= 0) {
-            if (n < 0) {
-                switch (errno) {
-                case EAGAIN:
-                    if (!obj->stream->watch) {
-                        obj->stream->watch = core->watch_add(obj->stream->socket,
-                                                           SPICE_WATCH_EVENT_READ,
-                                                           async_read_handler, obj);
-                    }
-                    return;
-                case EINTR:
-                    break;
-                default:
-                    async_read_clear_handlers(obj);
-                    obj->error(obj->opaque, errno);
-                    return;
-                }
-            } else {
-                async_read_clear_handlers(obj);
-                obj->error(obj->opaque, 0);
-                return;
-            }
-        } else {
-            obj->now += n;
-            if (obj->now == obj->end) {
-                async_read_clear_handlers(obj);
-                obj->done(obj->opaque);
-                return;
-            }
-        }
-    }
+end:
+    g_free(password);
 }
 
 static void reds_get_spice_ticket(RedLinkInfo *link)
 {
-    AsyncRead *obj = &link->asyc_read;
-
-    obj->now = (uint8_t *)&link->tiTicketing.encrypted_ticket.encrypted_data;
-    obj->end = obj->now + link->tiTicketing.rsa_size;
-    obj->done = reds_handle_ticket;
-    async_read_handler(0, 0, &link->asyc_read);
+    reds_stream_async_read(link->stream,
+                           (uint8_t *)&link->tiTicketing.encrypted_ticket.encrypted_data,
+                           link->tiTicketing.rsa_size, reds_handle_ticket, link);
 }
 
 #if HAVE_SASL
-static char *addr_to_string(const char *format,
-                            struct sockaddr_storage *sa,
-                            socklen_t salen) {
-    char *addr;
-    char host[NI_MAXHOST];
-    char serv[NI_MAXSERV];
-    int err;
-    size_t addrlen;
-
-    if ((err = getnameinfo((struct sockaddr *)sa, salen,
-                           host, sizeof(host),
-                           serv, sizeof(serv),
-                           NI_NUMERICHOST | NI_NUMERICSERV)) != 0) {
-        spice_warning("Cannot resolve address %d: %s",
-                      err, gai_strerror(err));
-        return NULL;
-    }
-
-    /* Enough for the existing format + the 2 vars we're
-     * substituting in. */
-    addrlen = strlen(format) + strlen(host) + strlen(serv);
-    addr = spice_malloc(addrlen + 1);
-    snprintf(addr, addrlen, format, host, serv);
-    addr[addrlen] = '\0';
-
-    return addr;
-}
-
-static int auth_sasl_check_ssf(RedsSASL *sasl, int *runSSF)
-{
-    const void *val;
-    int err, ssf;
-
-    *runSSF = 0;
-    if (!sasl->wantSSF) {
-        return 1;
-    }
-
-    err = sasl_getprop(sasl->conn, SASL_SSF, &val);
-    if (err != SASL_OK) {
-        return 0;
-    }
-
-    ssf = *(const int *)val;
-    spice_info("negotiated an SSF of %d", ssf);
-    if (ssf < 56) {
-        return 0; /* 56 is good for Kerberos */
-    }
-
-    *runSSF = 1;
-
-    /* We have a SSF that's good enough */
-    return 1;
-}
-
 /*
  * Step Msg
  *
@@ -2201,115 +1905,25 @@ static void reds_handle_auth_sasl_steplen(void *opaque);
 
 static void reds_handle_auth_sasl_step(void *opaque)
 {
-    const char *serverout;
-    unsigned int serveroutlen;
-    int err;
-    char *clientdata = NULL;
     RedLinkInfo *link = (RedLinkInfo *)opaque;
-    RedsSASL *sasl = &link->stream->sasl;
-    uint32_t datalen = sasl->len;
-    AsyncRead *obj = &link->asyc_read;
+    RedsSaslError status;
 
-    /* NB, distinction of NULL vs "" is *critical* in SASL */
-    if (datalen) {
-        clientdata = sasl->data;
-        clientdata[datalen - 1] = '\0'; /* Wire includes '\0', but make sure */
-        datalen--; /* Don't count NULL byte when passing to _start() */
-    }
-
-    spice_info("Step using SASL Data %p (%d bytes)",
-               clientdata, datalen);
-    err = sasl_server_step(sasl->conn,
-                           clientdata,
-                           datalen,
-                           &serverout,
-                           &serveroutlen);
-    if (err != SASL_OK &&
-        err != SASL_CONTINUE) {
-        spice_warning("sasl step failed %d (%s)",
-                      err, sasl_errdetail(sasl->conn));
-        goto authabort;
-    }
-
-    if (serveroutlen > SASL_DATA_MAX_LEN) {
-        spice_warning("sasl step reply data too long %d",
-                      serveroutlen);
-        goto authabort;
-    }
-
-    spice_info("SASL return data %d bytes, %p", serveroutlen, serverout);
-
-    if (serveroutlen) {
-        serveroutlen += 1;
-        sync_write(link->stream, &serveroutlen, sizeof(uint32_t));
-        sync_write(link->stream, serverout, serveroutlen);
-    } else {
-        sync_write(link->stream, &serveroutlen, sizeof(uint32_t));
-    }
-
-    /* Whether auth is complete */
-    sync_write_u8(link->stream, err == SASL_CONTINUE ? 0 : 1);
-
-    if (err == SASL_CONTINUE) {
-        spice_info("%s", "Authentication must continue (step)");
-        /* Wait for step length */
-        obj->now = (uint8_t *)&sasl->len;
-        obj->end = obj->now + sizeof(uint32_t);
-        obj->done = reds_handle_auth_sasl_steplen;
-        async_read_handler(0, 0, &link->asyc_read);
-    } else {
-        int ssf;
-
-        if (auth_sasl_check_ssf(sasl, &ssf) == 0) {
-            spice_warning("Authentication rejected for weak SSF");
-            goto authreject;
-        }
-
-        spice_info("Authentication successful");
-        sync_write_u32(link->stream, SPICE_LINK_ERR_OK); /* Accept auth */
-
-        /*
-         * Delay writing in SSF encoded until now
-         */
-        sasl->runSSF = ssf;
-        link->stream->writev = NULL; /* make sure writev isn't called directly anymore */
-
+    status = reds_sasl_handle_auth_step(link->stream, reds_handle_auth_sasl_steplen, link);
+    if (status == REDS_SASL_ERROR_OK) {
         reds_handle_link(link);
+    } else if (status != REDS_SASL_ERROR_CONTINUE) {
+        reds_link_free(link);
     }
-
-    return;
-
-authreject:
-    sync_write_u32(link->stream, 1); /* Reject auth */
-    sync_write_u32(link->stream, sizeof("Authentication failed"));
-    sync_write(link->stream, "Authentication failed", sizeof("Authentication failed"));
-
-authabort:
-    reds_link_free(link);
-    return;
 }
 
 static void reds_handle_auth_sasl_steplen(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
-    AsyncRead *obj = &link->asyc_read;
-    RedsSASL *sasl = &link->stream->sasl;
+    RedsSaslError status;
 
-    spice_info("Got steplen %d", sasl->len);
-    if (sasl->len > SASL_DATA_MAX_LEN) {
-        spice_warning("Too much SASL data %d", sasl->len);
+    status = reds_sasl_handle_auth_steplen(link->stream, reds_handle_auth_sasl_step, link);
+    if (status != REDS_SASL_ERROR_OK) {
         reds_link_free(link);
-        return;
-    }
-
-    if (sasl->len == 0) {
-        return reds_handle_auth_sasl_step(opaque);
-    } else {
-        sasl->data = spice_realloc(sasl->data, sasl->len);
-        obj->now = (uint8_t *)sasl->data;
-        obj->end = obj->now + sasl->len;
-        obj->done = reds_handle_auth_sasl_step;
-        async_read_handler(0, 0, &link->asyc_read);
     }
 }
 
@@ -2332,307 +1946,64 @@ static void reds_handle_auth_sasl_steplen(void *opaque)
 static void reds_handle_auth_sasl_start(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
-    AsyncRead *obj = &link->asyc_read;
-    const char *serverout;
-    unsigned int serveroutlen;
-    int err;
-    char *clientdata = NULL;
-    RedsSASL *sasl = &link->stream->sasl;
-    uint32_t datalen = sasl->len;
+    RedsSaslError status;
 
-    /* NB, distinction of NULL vs "" is *critical* in SASL */
-    if (datalen) {
-        clientdata = sasl->data;
-        clientdata[datalen - 1] = '\0'; /* Should be on wire, but make sure */
-        datalen--; /* Don't count NULL byte when passing to _start() */
-    }
-
-    spice_info("Start SASL auth with mechanism %s. Data %p (%d bytes)",
-               sasl->mechlist, clientdata, datalen);
-    err = sasl_server_start(sasl->conn,
-                            sasl->mechlist,
-                            clientdata,
-                            datalen,
-                            &serverout,
-                            &serveroutlen);
-    if (err != SASL_OK &&
-        err != SASL_CONTINUE) {
-        spice_warning("sasl start failed %d (%s)",
-                    err, sasl_errdetail(sasl->conn));
-        goto authabort;
-    }
-
-    if (serveroutlen > SASL_DATA_MAX_LEN) {
-        spice_warning("sasl start reply data too long %d",
-                    serveroutlen);
-        goto authabort;
-    }
-
-    spice_info("SASL return data %d bytes, %p", serveroutlen, serverout);
-
-    if (serveroutlen) {
-        serveroutlen += 1;
-        sync_write(link->stream, &serveroutlen, sizeof(uint32_t));
-        sync_write(link->stream, serverout, serveroutlen);
-    } else {
-        sync_write(link->stream, &serveroutlen, sizeof(uint32_t));
-    }
-
-    /* Whether auth is complete */
-    sync_write_u8(link->stream, err == SASL_CONTINUE ? 0 : 1);
-
-    if (err == SASL_CONTINUE) {
-        spice_info("%s", "Authentication must continue (start)");
-        /* Wait for step length */
-        obj->now = (uint8_t *)&sasl->len;
-        obj->end = obj->now + sizeof(uint32_t);
-        obj->done = reds_handle_auth_sasl_steplen;
-        async_read_handler(0, 0, &link->asyc_read);
-    } else {
-        int ssf;
-
-        if (auth_sasl_check_ssf(sasl, &ssf) == 0) {
-            spice_warning("Authentication rejected for weak SSF");
-            goto authreject;
-        }
-
-        spice_info("Authentication successful");
-        sync_write_u32(link->stream, SPICE_LINK_ERR_OK); /* Accept auth */
-
-        /*
-         * Delay writing in SSF encoded until now
-         */
-        sasl->runSSF = ssf;
-        link->stream->writev = NULL; /* make sure writev isn't called directly anymore */
-
+    status = reds_sasl_handle_auth_start(link->stream, reds_handle_auth_sasl_steplen, link);
+    if (status == REDS_SASL_ERROR_OK) {
         reds_handle_link(link);
+    } else if (status != REDS_SASL_ERROR_CONTINUE) {
+        reds_link_free(link);
     }
-
-    return;
-
-authreject:
-    sync_write_u32(link->stream, 1); /* Reject auth */
-    sync_write_u32(link->stream, sizeof("Authentication failed"));
-    sync_write(link->stream, "Authentication failed", sizeof("Authentication failed"));
-
-authabort:
-    reds_link_free(link);
-    return;
 }
 
 static void reds_handle_auth_startlen(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
-    AsyncRead *obj = &link->asyc_read;
-    RedsSASL *sasl = &link->stream->sasl;
+    RedsSaslError status;
 
-    spice_info("Got client start len %d", sasl->len);
-    if (sasl->len > SASL_DATA_MAX_LEN) {
-        spice_warning("Too much SASL data %d", sasl->len);
-        reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
-        reds_link_free(link);
-        return;
+    status = reds_sasl_handle_auth_startlen(link->stream, reds_handle_auth_sasl_start, link);
+    switch (status) {
+        case REDS_SASL_ERROR_OK:
+            break;
+        case REDS_SASL_ERROR_RETRY:
+            reds_handle_auth_sasl_start(opaque);
+            break;
+        case REDS_SASL_ERROR_GENERIC:
+        case REDS_SASL_ERROR_INVALID_DATA:
+            reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
+            reds_link_free(link);
+            break;
+        default:
+            g_warn_if_reached();
+            reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
+            reds_link_free(link);
+            break;
     }
-
-    if (sasl->len == 0) {
-        reds_handle_auth_sasl_start(opaque);
-        return;
-    }
-
-    sasl->data = spice_realloc(sasl->data, sasl->len);
-    obj->now = (uint8_t *)sasl->data;
-    obj->end = obj->now + sasl->len;
-    obj->done = reds_handle_auth_sasl_start;
-    async_read_handler(0, 0, &link->asyc_read);
 }
 
 static void reds_handle_auth_mechname(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
-    AsyncRead *obj = &link->asyc_read;
-    RedsSASL *sasl = &link->stream->sasl;
 
-    sasl->mechname[sasl->len] = '\0';
-    spice_info("Got client mechname '%s' check against '%s'",
-               sasl->mechname, sasl->mechlist);
-
-    if (strncmp(sasl->mechlist, sasl->mechname, sasl->len) == 0) {
-        if (sasl->mechlist[sasl->len] != '\0' &&
-            sasl->mechlist[sasl->len] != ',') {
-            spice_info("One %d", sasl->mechlist[sasl->len]);
-            reds_link_free(link);
-            return;
-        }
-    } else {
-        char *offset = strstr(sasl->mechlist, sasl->mechname);
-        spice_info("Two %p", offset);
-        if (!offset) {
+    if (!reds_sasl_handle_auth_mechname(link->stream, reds_handle_auth_startlen, link)) {
             reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
-            return;
-        }
-        spice_info("Two '%s'", offset);
-        if (offset[-1] != ',' ||
-            (offset[sasl->len] != '\0'&&
-             offset[sasl->len] != ',')) {
-            reds_send_link_error(link, SPICE_LINK_ERR_INVALID_DATA);
-            return;
-        }
     }
-
-    free(sasl->mechlist);
-    sasl->mechlist = spice_strdup(sasl->mechname);
-
-    spice_info("Validated mechname '%s'", sasl->mechname);
-
-    obj->now = (uint8_t *)&sasl->len;
-    obj->end = obj->now + sizeof(uint32_t);
-    obj->done = reds_handle_auth_startlen;
-    async_read_handler(0, 0, &link->asyc_read);
-
-    return;
 }
 
 static void reds_handle_auth_mechlen(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
-    AsyncRead *obj = &link->asyc_read;
-    RedsSASL *sasl = &link->stream->sasl;
 
-    if (sasl->len < 1 || sasl->len > 100) {
-        spice_warning("Got bad client mechname len %d", sasl->len);
+    if (!reds_sasl_handle_auth_mechlen(link->stream, reds_handle_auth_mechname, link)) {
         reds_link_free(link);
-        return;
     }
-
-    sasl->mechname = spice_malloc(sasl->len + 1);
-
-    spice_info("Wait for client mechname");
-    obj->now = (uint8_t *)sasl->mechname;
-    obj->end = obj->now + sasl->len;
-    obj->done = reds_handle_auth_mechname;
-    async_read_handler(0, 0, &link->asyc_read);
 }
 
 static void reds_start_auth_sasl(RedLinkInfo *link)
 {
-    const char *mechlist = NULL;
-    sasl_security_properties_t secprops;
-    int err;
-    char *localAddr, *remoteAddr;
-    int mechlistlen;
-    AsyncRead *obj = &link->asyc_read;
-    RedsSASL *sasl = &link->stream->sasl;
-
-    /* Get local & remote client addresses in form  IPADDR;PORT */
-    if (!(localAddr = addr_to_string("%s;%s", &link->stream->info->laddr_ext,
-                                              link->stream->info->llen_ext))) {
-        goto error;
+    if (!reds_sasl_start_auth(link->stream, reds_handle_auth_mechlen, link)) {
+        reds_link_free(link);
     }
-
-    if (!(remoteAddr = addr_to_string("%s;%s", &link->stream->info->paddr_ext,
-                                               link->stream->info->plen_ext))) {
-        free(localAddr);
-        goto error;
-    }
-
-    err = sasl_server_new("spice",
-                          NULL, /* FQDN - just delegates to gethostname */
-                          NULL, /* User realm */
-                          localAddr,
-                          remoteAddr,
-                          NULL, /* Callbacks, not needed */
-                          SASL_SUCCESS_DATA,
-                          &sasl->conn);
-    free(localAddr);
-    free(remoteAddr);
-    localAddr = remoteAddr = NULL;
-
-    if (err != SASL_OK) {
-        spice_warning("sasl context setup failed %d (%s)",
-                    err, sasl_errstring(err, NULL, NULL));
-        sasl->conn = NULL;
-        goto error;
-    }
-
-    /* Inform SASL that we've got an external SSF layer from TLS */
-    if (link->stream->ssl) {
-        sasl_ssf_t ssf;
-
-        ssf = SSL_get_cipher_bits(link->stream->ssl, NULL);
-        err = sasl_setprop(sasl->conn, SASL_SSF_EXTERNAL, &ssf);
-        if (err != SASL_OK) {
-            spice_warning("cannot set SASL external SSF %d (%s)",
-                        err, sasl_errstring(err, NULL, NULL));
-            goto error_dispose;
-        }
-    } else {
-        sasl->wantSSF = 1;
-    }
-
-    memset(&secprops, 0, sizeof secprops);
-    /* Inform SASL that we've got an external SSF layer from TLS */
-    if (link->stream->ssl) {
-        /* If we've got TLS (or UNIX domain sock), we don't care about SSF */
-        secprops.min_ssf = 0;
-        secprops.max_ssf = 0;
-        secprops.maxbufsize = 8192;
-        secprops.security_flags = 0;
-    } else {
-        /* Plain TCP, better get an SSF layer */
-        secprops.min_ssf = 56; /* Good enough to require kerberos */
-        secprops.max_ssf = 100000; /* Arbitrary big number */
-        secprops.maxbufsize = 8192;
-        /* Forbid any anonymous or trivially crackable auth */
-        secprops.security_flags =
-            SASL_SEC_NOANONYMOUS | SASL_SEC_NOPLAINTEXT;
-    }
-
-    err = sasl_setprop(sasl->conn, SASL_SEC_PROPS, &secprops);
-    if (err != SASL_OK) {
-        spice_warning("cannot set SASL security props %d (%s)",
-                      err, sasl_errstring(err, NULL, NULL));
-        goto error_dispose;
-    }
-
-    err = sasl_listmech(sasl->conn,
-                        NULL, /* Don't need to set user */
-                        "", /* Prefix */
-                        ",", /* Separator */
-                        "", /* Suffix */
-                        &mechlist,
-                        NULL,
-                        NULL);
-    if (err != SASL_OK || mechlist == NULL) {
-        spice_warning("cannot list SASL mechanisms %d (%s)",
-                      err, sasl_errdetail(sasl->conn));
-        goto error_dispose;
-    }
-
-    spice_info("Available mechanisms for client: '%s'", mechlist);
-
-    sasl->mechlist = spice_strdup(mechlist);
-
-    mechlistlen = strlen(mechlist);
-    if (!sync_write(link->stream, &mechlistlen, sizeof(uint32_t))
-        || !sync_write(link->stream, sasl->mechlist, mechlistlen)) {
-        spice_warning("SASL mechanisms write error");
-        goto error;
-    }
-
-    spice_info("Wait for client mechname length");
-    obj->now = (uint8_t *)&sasl->len;
-    obj->end = obj->now + sizeof(uint32_t);
-    obj->done = reds_handle_auth_mechlen;
-    async_read_handler(0, 0, &link->asyc_read);
-
-    return;
-
-error_dispose:
-    sasl_dispose(&sasl->conn);
-    sasl->conn = NULL;
-error:
-    reds_link_free(link);
-    return;
 }
 #endif
 
@@ -2665,15 +2036,14 @@ static int reds_security_check(RedLinkInfo *link)
 {
     ChannelSecurityOptions *security_option = find_channel_security(link->link_mess->channel_type);
     uint32_t security = security_option ? security_option->options : default_channel_security;
-    return (link->stream->ssl && (security & SPICE_CHANNEL_SECURITY_SSL)) ||
-        (!link->stream->ssl && (security & SPICE_CHANNEL_SECURITY_NONE));
+    return (reds_stream_is_ssl(link->stream) && (security & SPICE_CHANNEL_SECURITY_SSL)) ||
+        (!reds_stream_is_ssl(link->stream) && (security & SPICE_CHANNEL_SECURITY_NONE));
 }
 
 static void reds_handle_read_link_done(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
     SpiceLinkMess *link_mess = link->link_mess;
-    AsyncRead *obj = &link->asyc_read;
     uint32_t num_caps = link_mess->num_common_caps + link_mess->num_channel_caps;
     uint32_t *caps = (uint32_t *)((uint8_t *)link_mess + link_mess->caps_offset);
     int auth_selection;
@@ -2686,11 +2056,11 @@ static void reds_handle_read_link_done(void *opaque)
         return;
     }
 
-    auth_selection = test_capabilty(caps, link_mess->num_common_caps,
-                                    SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION);
+    auth_selection = test_capability(caps, link_mess->num_common_caps,
+                                     SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION);
 
     if (!reds_security_check(link)) {
-        if (link->stream->ssl) {
+        if (reds_stream_is_ssl(link->stream)) {
             spice_warning("spice channels %d should not be encrypted", link_mess->channel_type);
             reds_send_link_error(link, SPICE_LINK_ERR_NEED_UNSECURED);
         } else {
@@ -2715,10 +2085,11 @@ static void reds_handle_read_link_done(void *opaque)
         spice_warning("Peer doesn't support AUTH selection");
         reds_get_spice_ticket(link);
     } else {
-        obj->now = (uint8_t *)&link->auth_mechanism;
-        obj->end = obj->now + sizeof(SpiceLinkAuthMechanism);
-        obj->done = reds_handle_auth_mechanism;
-        async_read_handler(0, 0, &link->asyc_read);
+        reds_stream_async_read(link->stream,
+                               (uint8_t *)&link->auth_mechanism,
+                               sizeof(SpiceLinkAuthMechanism),
+                               reds_handle_auth_mechanism,
+                               link);
     }
 }
 
@@ -2740,7 +2111,6 @@ static void reds_handle_read_header_done(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
     SpiceLinkHeader *header = &link->link_header;
-    AsyncRead *obj = &link->asyc_read;
 
     if (header->magic != SPICE_MAGIC) {
         reds_send_link_error(link, SPICE_LINK_ERR_INVALID_MAGIC);
@@ -2769,51 +2139,47 @@ static void reds_handle_read_header_done(void *opaque)
 
     link->link_mess = spice_malloc(header->size);
 
-    obj->now = (uint8_t *)link->link_mess;
-    obj->end = obj->now + header->size;
-    obj->done = reds_handle_read_link_done;
-    async_read_handler(0, 0, &link->asyc_read);
+    reds_stream_async_read(link->stream,
+                           (uint8_t *)link->link_mess,
+                           header->size,
+                           reds_handle_read_link_done,
+                           link);
 }
 
 static void reds_handle_new_link(RedLinkInfo *link)
 {
-    AsyncRead *obj = &link->asyc_read;
-    obj->opaque = link;
-    obj->stream = link->stream;
-    obj->now = (uint8_t *)&link->link_header;
-    obj->end = (uint8_t *)((SpiceLinkHeader *)&link->link_header + 1);
-    obj->done = reds_handle_read_header_done;
-    obj->error = reds_handle_link_error;
-    async_read_handler(0, 0, &link->asyc_read);
+    reds_stream_set_async_error_handler(link->stream, reds_handle_link_error);
+    reds_stream_async_read(link->stream,
+                           (uint8_t *)&link->link_header,
+                           sizeof(SpiceLinkHeader),
+                           reds_handle_read_header_done,
+                           link);
 }
 
 static void reds_handle_ssl_accept(int fd, int event, void *data)
 {
     RedLinkInfo *link = (RedLinkInfo *)data;
-    int return_code;
+    int return_code = reds_stream_ssl_accept(link->stream);
 
-    if ((return_code = SSL_accept(link->stream->ssl)) != 1) {
-        int ssl_error = SSL_get_error(link->stream->ssl, return_code);
-        if (ssl_error != SSL_ERROR_WANT_READ && ssl_error != SSL_ERROR_WANT_WRITE) {
-            spice_warning("SSL_accept failed, error=%d", ssl_error);
+    switch (return_code) {
+        case REDS_STREAM_SSL_STATUS_ERROR:
             reds_link_free(link);
-        } else {
-            if (ssl_error == SSL_ERROR_WANT_READ) {
-                core->watch_update_mask(link->stream->watch, SPICE_WATCH_EVENT_READ);
-            } else {
-                core->watch_update_mask(link->stream->watch, SPICE_WATCH_EVENT_WRITE);
-            }
-        }
-        return;
+            return;
+        case REDS_STREAM_SSL_STATUS_WAIT_FOR_READ:
+            core->watch_update_mask(link->stream->watch, SPICE_WATCH_EVENT_READ);
+            return;
+        case REDS_STREAM_SSL_STATUS_WAIT_FOR_WRITE:
+            core->watch_update_mask(link->stream->watch, SPICE_WATCH_EVENT_WRITE);
+            return;
+        case REDS_STREAM_SSL_STATUS_OK:
+            reds_stream_remove_watch(link->stream);
+            reds_handle_new_link(link);
     }
-    reds_stream_remove_watch(link->stream);
-    reds_handle_new_link(link);
 }
 
 static RedLinkInfo *reds_init_client_connection(int socket)
 {
     RedLinkInfo *link;
-    RedsStream *stream;
     int delay_val = 1;
     int flags;
 
@@ -2834,28 +2200,11 @@ static RedLinkInfo *reds_init_client_connection(int socket)
     }
 
     link = spice_new0(RedLinkInfo, 1);
-    stream = spice_new0(RedsStream, 1);
-    stream->info = spice_new0(SpiceChannelEventInfo, 1);
-    link->stream = stream;
+    link->stream = reds_stream_new(socket);
 
-    stream->socket = socket;
     /* gather info + send event */
 
-    /* deprecated fields. Filling them for backward compatibility */
-    stream->info->llen = sizeof(stream->info->laddr);
-    stream->info->plen = sizeof(stream->info->paddr);
-    getsockname(stream->socket, (struct sockaddr*)(&stream->info->laddr), &stream->info->llen);
-    getpeername(stream->socket, (struct sockaddr*)(&stream->info->paddr), &stream->info->plen);
-
-    stream->info->flags |= SPICE_CHANNEL_EVENT_FLAG_ADDR_EXT;
-    stream->info->llen_ext = sizeof(stream->info->laddr_ext);
-    stream->info->plen_ext = sizeof(stream->info->paddr_ext);
-    getsockname(stream->socket, (struct sockaddr*)(&stream->info->laddr_ext),
-                &stream->info->llen_ext);
-    getpeername(stream->socket, (struct sockaddr*)(&stream->info->paddr_ext),
-                &stream->info->plen_ext);
-
-    reds_stream_push_channel_event(stream, SPICE_CHANNEL_EVENT_CONNECTED);
+    reds_stream_push_channel_event(link->stream, SPICE_CHANNEL_EVENT_CONNECTED);
 
     openssl_init(link);
 
@@ -2869,52 +2218,29 @@ error:
 static RedLinkInfo *reds_init_client_ssl_connection(int socket)
 {
     RedLinkInfo *link;
-    int return_code;
-    int ssl_error;
-    BIO *sbio;
+    int ssl_status;
 
     link = reds_init_client_connection(socket);
     if (link == NULL)
         goto error;
 
-    // Handle SSL handshaking
-    if (!(sbio = BIO_new_socket(link->stream->socket, BIO_NOCLOSE))) {
-        spice_warning("could not allocate ssl bio socket");
-        goto error;
-    }
-
-    link->stream->ssl = SSL_new(reds->ctx);
-    if (!link->stream->ssl) {
-        spice_warning("could not allocate ssl context");
-        BIO_free(sbio);
-        goto error;
-    }
-
-    SSL_set_bio(link->stream->ssl, sbio, sbio);
-
-    link->stream->write = stream_ssl_write_cb;
-    link->stream->read = stream_ssl_read_cb;
-    link->stream->writev = NULL;
-
-    return_code = SSL_accept(link->stream->ssl);
-    if (return_code == 1) {
-        reds_handle_new_link(link);
-        return link;
-    }
-
-    ssl_error = SSL_get_error(link->stream->ssl, return_code);
-    if (return_code == -1 && (ssl_error == SSL_ERROR_WANT_READ ||
-                              ssl_error == SSL_ERROR_WANT_WRITE)) {
-        int eventmask = ssl_error == SSL_ERROR_WANT_READ ?
-            SPICE_WATCH_EVENT_READ : SPICE_WATCH_EVENT_WRITE;
-        link->stream->watch = core->watch_add(link->stream->socket, eventmask,
+    ssl_status = reds_stream_enable_ssl(link->stream, reds->ctx);
+    switch (ssl_status) {
+        case REDS_STREAM_SSL_STATUS_OK:
+            reds_handle_new_link(link);
+            return link;
+        case REDS_STREAM_SSL_STATUS_ERROR:
+            goto error;
+        case REDS_STREAM_SSL_STATUS_WAIT_FOR_READ:
+            link->stream->watch = core->watch_add(link->stream->socket, SPICE_WATCH_EVENT_READ,
                                             reds_handle_ssl_accept, link);
-        return link;
+            break;
+        case REDS_STREAM_SSL_STATUS_WAIT_FOR_WRITE:
+            link->stream->watch = core->watch_add(link->stream->socket, SPICE_WATCH_EVENT_WRITE,
+                                                  reds_handle_ssl_accept, link);
+            break;
     }
-
-    ERR_print_errors_fp(stderr);
-    spice_warning("SSL_accept failed, error=%d", ssl_error);
-    SSL_free(link->stream->ssl);
+    return link;
 
 error:
     free(link->stream);
@@ -2957,7 +2283,6 @@ static void reds_accept(int fd, int event, void *data)
 SPICE_GNUC_VISIBLE int spice_server_add_client(SpiceServer *s, int socket, int skip_auth)
 {
     RedLinkInfo *link;
-    RedsStream *stream;
 
     spice_assert(reds == s);
     if (!(link = reds_init_client_connection(socket))) {
@@ -2966,11 +2291,6 @@ SPICE_GNUC_VISIBLE int spice_server_add_client(SpiceServer *s, int socket, int s
     }
 
     link->skip_auth = skip_auth;
-
-    stream = link->stream;
-    stream->read = stream_read_cb;
-    stream->write = stream_write_cb;
-    stream->writev = stream_writev_cb;
 
     reds_handle_new_link(link);
     return 0;
@@ -3206,6 +2526,8 @@ static int reds_init_ssl(void)
     SSL_METHOD *ssl_method;
 #endif
     int return_code;
+    /* When some other SSL/TLS version becomes obsolete, add it to this
+     * variable. */
     long ssl_options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
 
     /* Global system initialization*/
@@ -3213,7 +2535,8 @@ static int reds_init_ssl(void)
     SSL_load_error_strings();
 
     /* Create our context*/
-    ssl_method = TLSv1_method();
+    /* SSLv23_method() handles TLSv1.x in addition to SSLv2/v3 */
+    ssl_method = SSLv23_method();
     reds->ctx = SSL_CTX_new(ssl_method);
     if (!reds->ctx) {
         spice_warning("Could not allocate new SSL context");
@@ -3292,39 +2615,6 @@ static void reds_exit(void)
     free(reds->stat_shm_name);
 #endif
 }
-
-enum {
-    SPICE_OPTION_INVALID,
-    SPICE_OPTION_PORT,
-    SPICE_OPTION_SPORT,
-    SPICE_OPTION_HOST,
-    SPICE_OPTION_IMAGE_COMPRESSION,
-    SPICE_OPTION_PASSWORD,
-    SPICE_OPTION_DISABLE_TICKET,
-    SPICE_OPTION_RENDERER,
-    SPICE_OPTION_SSLKEY,
-    SPICE_OPTION_SSLCERTS,
-    SPICE_OPTION_SSLCAFILE,
-    SPICE_OPTION_SSLDHFILE,
-    SPICE_OPTION_SSLPASSWORD,
-    SPICE_OPTION_SSLCIPHERSUITE,
-    SPICE_SECURED_CHANNELS,
-    SPICE_UNSECURED_CHANNELS,
-    SPICE_OPTION_STREAMING_VIDEO,
-    SPICE_OPTION_AGENT_MOUSE,
-    SPICE_OPTION_PLAYBACK_COMPRESSION,
-};
-
-typedef struct OptionsMap {
-    const char *name;
-    int val;
-} OptionsMap;
-
-enum {
-    SPICE_TICKET_OPTION_INVALID,
-    SPICE_TICKET_OPTION_EXPIRATION,
-    SPICE_TICKET_OPTION_CONNECTED,
-};
 
 static inline void on_activating_ticketing(void)
 {
@@ -3686,7 +2976,11 @@ static int spice_server_char_device_add_interface(SpiceServer *s,
         dev_state = spicevmc_device_connect(char_device, SPICE_CHANNEL_USBREDIR);
     }
     else if (strcmp(char_device->subtype, SUBTYPE_PORT) == 0) {
-        dev_state = spicevmc_device_connect(char_device, SPICE_CHANNEL_PORT);
+        if (strcmp(char_device->portname, "org.spice-space.webdav.0") == 0) {
+            dev_state = spicevmc_device_connect(char_device, SPICE_CHANNEL_WEBDAV);
+        } else {
+            dev_state = spicevmc_device_connect(char_device, SPICE_CHANNEL_PORT);
+        }
     }
 
     if (dev_state) {
@@ -3770,7 +3064,7 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *s,
         qxl = SPICE_CONTAINEROF(sin, QXLInstance, base);
         qxl->st = spice_new0(QXLState, 1);
         qxl->st->qif = SPICE_CONTAINEROF(interface, QXLInterface, base);
-        qxl->st->dispatcher = red_dispatcher_init(qxl);
+        red_dispatcher_init(qxl);
 
     } else if (strcmp(interface->type, SPICE_INTERFACE_TABLET) == 0) {
         spice_info("SPICE_INTERFACE_TABLET");
@@ -3814,25 +3108,8 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *s,
         spice_server_char_device_add_interface(s, sin);
 
     } else if (strcmp(interface->type, SPICE_INTERFACE_NET_WIRE) == 0) {
-#ifdef USE_TUNNEL
-        SpiceNetWireInstance *net;
-        spice_info("SPICE_INTERFACE_NET_WIRE");
-        if (red_tunnel) {
-            spice_warning("net wire already attached");
-            return -1;
-        }
-        if (interface->major_version != SPICE_INTERFACE_NET_WIRE_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_NET_WIRE_MINOR) {
-            spice_warning("unsupported net wire interface");
-            return -1;
-        }
-        net = SPICE_CONTAINEROF(sin, SpiceNetWireInstance, base);
-        net->st = spice_new0(SpiceNetWireState, 1);
-        red_tunnel = red_tunnel_attach(core, net);
-#else
         spice_warning("unsupported net wire interface");
         return -1;
-#endif
     } else if (strcmp(interface->type, SPICE_INTERFACE_MIGRATION) == 0) {
         spice_info("SPICE_INTERFACE_MIGRATION");
         if (migration_interface) {
@@ -3888,8 +3165,8 @@ static void init_vd_agent_resources(void)
                           agent_file_xfer, TRUE);
 
     state->read_state = VDI_PORT_READ_STATE_READ_HEADER;
-    state->recive_pos = (uint8_t *)&state->vdi_chunk_header;
-    state->recive_len = sizeof(state->vdi_chunk_header);
+    state->receive_pos = (uint8_t *)&state->vdi_chunk_header;
+    state->receive_len = sizeof(state->vdi_chunk_header);
 
     for (i = 0; i < REDS_VDI_PORT_NUM_RECEIVE_BUFFS; i++) {
         VDIReadBuf *buf = spice_new0(VDIReadBuf, 1);
@@ -4237,13 +3514,11 @@ SPICE_GNUC_VISIBLE int spice_server_set_channel_security(SpiceServer *s, const c
         [ SPICE_CHANNEL_CURSOR   ] = "cursor",
         [ SPICE_CHANNEL_PLAYBACK ] = "playback",
         [ SPICE_CHANNEL_RECORD   ] = "record",
-#ifdef USE_TUNNEL
-        [ SPICE_CHANNEL_TUNNEL   ] = "tunnel",
-#endif
 #ifdef USE_SMARTCARD
         [ SPICE_CHANNEL_SMARTCARD] = "smartcard",
 #endif
         [ SPICE_CHANNEL_USBREDIR ] = "usbredir",
+        [ SPICE_CHANNEL_WEBDAV ] = "webdav",
     };
     int i;
 
@@ -4543,85 +3818,4 @@ SPICE_GNUC_VISIBLE void spice_server_set_seamless_migration(SpiceServer *s, int 
     /* seamless migration is not supported with multiple clients */
     reds->seamless_migration_enabled = enable && !reds->allow_multiple_clients;
     spice_debug("seamless migration enabled=%d", enable);
-}
-
-ssize_t reds_stream_read(RedsStream *s, void *buf, size_t nbyte)
-{
-    ssize_t ret;
-
-#if HAVE_SASL
-    if (s->sasl.conn && s->sasl.runSSF) {
-        ret = reds_stream_sasl_read(s, buf, nbyte);
-    } else
-#endif
-        ret = s->read(s, buf, nbyte);
-
-    return ret;
-}
-
-ssize_t reds_stream_write(RedsStream *s, const void *buf, size_t nbyte)
-{
-    ssize_t ret;
-
-#if HAVE_SASL
-    if (s->sasl.conn && s->sasl.runSSF) {
-        ret = reds_stream_sasl_write(s, buf, nbyte);
-    } else
-#endif
-        ret = s->write(s, buf, nbyte);
-
-    return ret;
-}
-
-ssize_t reds_stream_writev(RedsStream *s, const struct iovec *iov, int iovcnt)
-{
-    int i;
-    int n;
-    ssize_t ret = 0;
-
-    if (s->writev != NULL) {
-        return s->writev(s, iov, iovcnt);
-    }
-
-    for (i = 0; i < iovcnt; ++i) {
-        n = reds_stream_write(s, iov[i].iov_base, iov[i].iov_len);
-        if (n <= 0)
-            return ret == 0 ? n : ret;
-        ret += n;
-    }
-
-    return ret;
-}
-
-void reds_stream_free(RedsStream *s)
-{
-    if (!s) {
-        return;
-    }
-
-    reds_stream_push_channel_event(s, SPICE_CHANNEL_EVENT_DISCONNECTED);
-
-#if HAVE_SASL
-    if (s->sasl.conn) {
-        s->sasl.runSSF = s->sasl.wantSSF = 0;
-        s->sasl.len = 0;
-        s->sasl.encodedLength = s->sasl.encodedOffset = 0;
-        s->sasl.encoded = NULL;
-        free(s->sasl.mechlist);
-        free(s->sasl.mechname);
-        s->sasl.mechlist = NULL;
-        sasl_dispose(&s->sasl.conn);
-        s->sasl.conn = NULL;
-    }
-#endif
-
-    if (s->ssl) {
-        SSL_free(s->ssl);
-    }
-
-    reds_stream_remove_watch(s);
-    spice_info("close socket fd %d", s->socket);
-    close(s->socket);
-
-    free(s);
 }

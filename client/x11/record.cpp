@@ -46,20 +46,21 @@ void WaveRecorder::EventTrigger::on_event()
 }
 
 WaveRecorder::WaveRecorder(Platform::RecordClient& client,
-                           uint32_t sampels_per_sec,
+                           uint32_t samples_per_sec,
                            uint32_t bits_per_sample,
-                           uint32_t channels)
+                           uint32_t channels,
+                           uint32_t frame_size)
     : _client (client)
     , _pcm (NULL)
     , _hw_params (NULL)
     , _sw_params (NULL)
     , _sample_bytes (bits_per_sample * channels / 8)
-    , _frame (new uint8_t[_sample_bytes * WaveRecordAbstract::FRAME_SIZE])
+    , _frame (new uint8_t[_sample_bytes * frame_size])
     , _frame_pos (_frame)
-    , _frame_end (_frame + _sample_bytes * WaveRecordAbstract::FRAME_SIZE)
+    , _frame_end (_frame + _sample_bytes * frame_size)
     , _event_trigger (NULL)
 {
-    if (!init(sampels_per_sec, bits_per_sample, channels)) {
+    if (!init(samples_per_sec, bits_per_sample, channels, frame_size)) {
         cleanup();
         THROW("failed");
     }
@@ -91,14 +92,16 @@ void WaveRecorder::cleanup()
     }
 }
 
-bool WaveRecorder::init(uint32_t sampels_per_sec,
+bool WaveRecorder::init(uint32_t samples_per_sec,
                         uint32_t bits_per_sample,
-                        uint32_t channels)
+                        uint32_t channels,
+                        uint32_t frame_size)
 {
-    const int frame_size = WaveRecordAbstract::FRAME_SIZE;
     const char* pcm_device = "default";
     snd_pcm_format_t format;
     int err;
+
+    _frame_size = frame_size;
 
     switch (bits_per_sample) {
     case 8:
@@ -141,7 +144,7 @@ bool WaveRecorder::init(uint32_t sampels_per_sec,
         return false;
     }
 
-    if ((err = snd_pcm_hw_params_set_rate(_pcm, _hw_params, sampels_per_sec, 0)) < 0) {
+    if ((err = snd_pcm_hw_params_set_rate(_pcm, _hw_params, samples_per_sec, 0)) < 0) {
         LOG_ERROR("cannot set sample rate %s", snd_strerror(err));
         return false;
     }
@@ -157,7 +160,7 @@ bool WaveRecorder::init(uint32_t sampels_per_sec,
     }
 
     int direction = 0;
-    snd_pcm_uframes_t buffer_size = (sampels_per_sec * 160 / 1000) / frame_size * frame_size;
+    snd_pcm_uframes_t buffer_size = (samples_per_sec * 160 / 1000) / frame_size * frame_size;
 
     if ((err = snd_pcm_hw_params_set_buffer_size_near(_pcm, _hw_params, &buffer_size)) < 0) {
         LOG_ERROR("cannot set buffer size %s", snd_strerror(err));

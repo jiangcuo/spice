@@ -27,9 +27,10 @@
 class WaveRecorder: public WaveRecordAbstract {
 public:
     WaveRecorder(Platform::RecordClient& client,
-                 uint32_t sampels_per_sec,
+                 uint32_t samples_per_sec,
                  uint32_t bits_per_sample,
-                 uint32_t channels);
+                 uint32_t channels,
+                 uint32_t frame_size);
     virtual ~WaveRecorder();
 
     virtual void start();
@@ -37,9 +38,10 @@ public:
     virtual bool abort();
 
 private:
-    bool init(uint32_t sampels_per_sec,
+    bool init(uint32_t samples_per_sec,
               uint32_t bits_per_sample,
-              uint32_t channels);
+              uint32_t channels,
+              uint32_t frame_size);
     void cleanup();
     void on_event();
 
@@ -49,6 +51,7 @@ private:
     snd_pcm_hw_params_t* _hw_params;
     snd_pcm_sw_params_t* _sw_params;
     uint32_t _sample_bytes;
+    uint32_t _frame_size;
     uint8_t* _frame;
     uint8_t* _frame_pos;
     uint8_t* _frame_end;

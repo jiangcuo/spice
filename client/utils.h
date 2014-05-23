@@ -19,6 +19,7 @@
 #define _H_UTILS
 
 #include "common.h"
+#include "common/log.h"
 #include <spice/error_codes.h>
 #include <spice/macros.h>
 
@@ -38,15 +39,20 @@ private:
 #define THROW(format, ...)  {                                   \
     std::string exption_string;                                 \
     string_printf(exption_string, format, ## __VA_ARGS__ );     \
+    spice_warning(format, ## __VA_ARGS__ );                    \
     throw Exception(exption_string);                            \
 }
 
 #define THROW_ERR(err, format, ...)  {                          \
     std::string exption_string;                                 \
     string_printf(exption_string, format, ## __VA_ARGS__ );     \
+    spice_warning(format, ## __VA_ARGS__ );      \
     throw Exception(exption_string, err);                       \
 }
 
+#define SPICE_BREAKPOINT() do{                  \
+    __asm__ __volatile__ ("int $03");           \
+}while(0)
 
 template <class T>
 class AutoRef {

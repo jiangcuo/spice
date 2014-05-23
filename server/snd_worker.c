@@ -25,7 +25,6 @@
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include <celt051/celt.h>
 
 #include "common/marshaller.h"
 #include "common/generated_server_marshallers.h"
@@ -36,23 +35,17 @@
 #include "reds.h"
 #include "red_dispatcher.h"
 #include "snd_worker.h"
+#include "common/snd_codec.h"
 #include "demarshallers.h"
 
 #ifndef IOV_MAX
 #define IOV_MAX 1024
 #endif
 
-#define RECIVE_BUF_SIZE (16 * 1024 * 2)
+#define SND_RECEIVE_BUF_SIZE     (16 * 1024 * 2)
+#define RECORD_SAMPLES_SIZE (SND_RECEIVE_BUF_SIZE >> 2)
 
-#define FRAME_SIZE 256
-#define PLAYBACK_BUF_SIZE (FRAME_SIZE * 4)
-
-#define CELT_BIT_RATE (64 * 1024)
-#define CELT_COMPRESSED_FRAME_BYTES (FRAME_SIZE * CELT_BIT_RATE / SPICE_INTERFACE_PLAYBACK_FREQ / 8)
-
-#define RECORD_SAMPLES_SIZE (RECIVE_BUF_SIZE >> 2)
-
-enum PlaybackeCommand {
+enum PlaybackCommand {
     SND_PLAYBACK_MIGRATE,
     SND_PLAYBACK_MODE,
     SND_PLAYBACK_CTRL,
@@ -112,11 +105,11 @@ struct SndChannel {
     } send_data;
 
     struct {
-        uint8_t buf[RECIVE_BUF_SIZE];
+        uint8_t buf[SND_RECEIVE_BUF_SIZE];
         uint8_t *message_start;
         uint8_t *now;
         uint8_t *end;
-    } recive_data;
+    } receive_data;
 
     snd_channel_send_messages_proc send_messages;
     snd_channel_handle_message_proc handle_message;
@@ -129,7 +122,7 @@ typedef struct PlaybackChannel PlaybackChannel;
 typedef struct AudioFrame AudioFrame;
 struct AudioFrame {
     uint32_t time;
-    uint32_t samples[FRAME_SIZE];
+    uint32_t samples[SND_CODEC_MAX_FRAME_SIZE];
     PlaybackChannel *channel;
     AudioFrame *next;
 };
@@ -140,13 +133,10 @@ struct PlaybackChannel {
     AudioFrame *free_frames;
     AudioFrame *in_progress;
     AudioFrame *pending_frame;
-    CELTMode *celt_mode;
-    CELTEncoder *celt_encoder;
     uint32_t mode;
-    struct {
-        uint8_t celt_buf[CELT_COMPRESSED_FRAME_BYTES];
-    } send_data;
     uint32_t latency;
+    SndCodec codec;
+    uint8_t  encode_buf[SND_CODEC_MAX_COMPRESSED_BYTES];
 };
 
 struct SndWorker {
@@ -166,12 +156,14 @@ struct SpicePlaybackState {
     struct SndWorker worker;
     SpicePlaybackInstance *sin;
     SpiceVolumeState volume;
+    uint32_t frequency;
 };
 
 struct SpiceRecordState {
     struct SndWorker worker;
     SpiceRecordInstance *sin;
     SpiceVolumeState volume;
+    uint32_t frequency;
 };
 
 typedef struct RecordChannel {
@@ -182,13 +174,12 @@ typedef struct RecordChannel {
     uint32_t mode;
     uint32_t mode_time;
     uint32_t start_time;
-    CELTDecoder *celt_decoder;
-    CELTMode *celt_mode;
-    uint32_t celt_buf[FRAME_SIZE];
+    SndCodec codec;
+    uint8_t  decode_buf[SND_CODEC_MAX_FRAME_BYTES];
 } RecordChannel;
 
 static SndWorker *workers;
-static uint32_t playback_compression = SPICE_AUDIO_DATA_MODE_CELT_0_5_1;
+static uint32_t playback_compression = TRUE;
 
 static void snd_receive(void* data);
 
@@ -201,8 +192,8 @@ static SndChannel *snd_channel_get(SndChannel *channel)
 static SndChannel *snd_channel_put(SndChannel *channel)
 {
     if (!--channel->refs) {
+        spice_printerr("SndChannel=%p freed", channel);
         free(channel);
-        spice_printerr("sound channel freed");
         return NULL;
     }
     return channel;
@@ -212,21 +203,21 @@ static void snd_disconnect_channel(SndChannel *channel)
 {
     SndWorker *worker;
 
-    if (!channel) {
+    if (!channel || !channel->stream) {
         spice_debug("not connected");
         return;
     }
-    spice_debug("%p", channel);
+    spice_debug("SndChannel=%p rcc=%p type=%d",
+                 channel, channel->channel_client, channel->channel_client->channel->type);
     worker = channel->worker;
-    if (channel->stream) {
-        channel->cleanup(channel);
-        red_channel_client_disconnect(worker->connection->channel_client);
-        core->watch_remove(channel->stream->watch);
-        channel->stream->watch = NULL;
-        reds_stream_free(channel->stream);
-        channel->stream = NULL;
-        spice_marshaller_destroy(channel->send_data.marshaller);
-    }
+    channel->cleanup(channel);
+    red_channel_client_disconnect(worker->connection->channel_client);
+    worker->connection->channel_client = NULL;
+    core->watch_remove(channel->stream->watch);
+    channel->stream->watch = NULL;
+    reds_stream_free(channel->stream);
+    channel->stream = NULL;
+    spice_marshaller_destroy(channel->send_data.marshaller);
     snd_channel_put(channel);
     worker->connection = NULL;
 }
@@ -321,23 +312,19 @@ static int snd_record_handle_write(RecordChannel *record_channel, size_t size, v
     }
 
     packet = (SpiceMsgcRecordPacket *)message;
-    size = packet->data_size;
 
-    if (record_channel->mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
-        int celt_err = celt051_decode(record_channel->celt_decoder, packet->data, size,
-                                      (celt_int16_t *)record_channel->celt_buf);
-        if (celt_err != CELT_OK) {
-            spice_printerr("celt decode failed (%d)", celt_err);
-            return FALSE;
-        }
-        data = record_channel->celt_buf;
-        size = FRAME_SIZE;
-    } else if (record_channel->mode == SPICE_AUDIO_DATA_MODE_RAW) {
+    if (record_channel->mode == SPICE_AUDIO_DATA_MODE_RAW) {
         data = (uint32_t *)packet->data;
-        size = size >> 2;
+        size = packet->data_size >> 2;
         size = MIN(size, RECORD_SAMPLES_SIZE);
-    } else {
-        return FALSE;
+     } else {
+        int decode_size;
+        decode_size = sizeof(record_channel->decode_buf);
+        if (snd_codec_decode(record_channel->codec, packet->data, packet->data_size,
+                    record_channel->decode_buf, &decode_size) != SND_CODEC_OK)
+            return FALSE;
+        data = (uint32_t *) record_channel->decode_buf;
+        size = decode_size >> 2;
     }
 
     write_pos = record_channel->write_pos % RECORD_SAMPLES_SIZE;
@@ -385,14 +372,27 @@ static int snd_record_handle_message(SndChannel *channel, size_t size, uint32_t 
         return snd_record_handle_write((RecordChannel *)channel, size, message);
     case SPICE_MSGC_RECORD_MODE: {
         SpiceMsgcRecordMode *mode = (SpiceMsgcRecordMode *)message;
-        record_channel->mode = mode->mode;
+        SpiceRecordState *st = SPICE_CONTAINEROF(channel->worker, SpiceRecordState, worker);
         record_channel->mode_time = mode->time;
-        if (record_channel->mode != SPICE_AUDIO_DATA_MODE_CELT_0_5_1 &&
-                                                  record_channel->mode != SPICE_AUDIO_DATA_MODE_RAW) {
-            spice_printerr("unsupported mode");
+        if (mode->mode != SPICE_AUDIO_DATA_MODE_RAW) {
+            if (snd_codec_is_capable(mode->mode, st->frequency)) {
+                if (snd_codec_create(&record_channel->codec, mode->mode, st->frequency, SND_CODEC_DECODE) == SND_CODEC_OK) {
+                    record_channel->mode = mode->mode;
+                } else {
+                    spice_printerr("create decoder failed");
+                    return FALSE;
+                }
+            }
+            else {
+                spice_printerr("unsupported mode %d", record_channel->mode);
+                return FALSE;
+            }
         }
+        else
+            record_channel->mode = mode->mode;
         break;
     }
+
     case SPICE_MSGC_RECORD_START_MARK: {
         SpiceMsgcRecordStartMark *mark = (SpiceMsgcRecordStartMark *)message;
         record_channel->start_time = mark->time;
@@ -420,9 +420,9 @@ static void snd_receive(void* data)
 
     for (;;) {
         ssize_t n;
-        n = channel->recive_data.end - channel->recive_data.now;
+        n = channel->receive_data.end - channel->receive_data.now;
         spice_assert(n);
-        n = reds_stream_read(channel->stream, channel->recive_data.now, n);
+        n = reds_stream_read(channel->stream, channel->receive_data.now, n);
         if (n <= 0) {
             if (n == 0) {
                 snd_disconnect_channel(channel);
@@ -443,16 +443,16 @@ static void snd_receive(void* data)
                 return;
             }
         } else {
-            channel->recive_data.now += n;
+            channel->receive_data.now += n;
             for (;;) {
-                uint8_t *msg_start = channel->recive_data.message_start;
+                uint8_t *msg_start = channel->receive_data.message_start;
                 uint8_t *data = msg_start + header->header_size;
                 size_t parsed_size;
                 uint8_t *parsed;
                 message_destructor_t parsed_free;
 
                 header->data = msg_start;
-                n = channel->recive_data.now - msg_start;
+                n = channel->receive_data.now - msg_start;
 
                 if (n < header->header_size ||
                     n < header->header_size + header->get_msg_size(header)) {
@@ -473,16 +473,16 @@ static void snd_receive(void* data)
                     return;
                 }
                 parsed_free(parsed);
-                channel->recive_data.message_start = msg_start + header->header_size +
+                channel->receive_data.message_start = msg_start + header->header_size +
                                                      header->get_msg_size(header);
             }
-            if (channel->recive_data.now == channel->recive_data.message_start) {
-                channel->recive_data.now = channel->recive_data.buf;
-                channel->recive_data.message_start = channel->recive_data.buf;
-            } else if (channel->recive_data.now == channel->recive_data.end) {
-                memcpy(channel->recive_data.buf, channel->recive_data.message_start, n);
-                channel->recive_data.now = channel->recive_data.buf + n;
-                channel->recive_data.message_start = channel->recive_data.buf;
+            if (channel->receive_data.now == channel->receive_data.message_start) {
+                channel->receive_data.now = channel->receive_data.buf;
+                channel->receive_data.message_start = channel->receive_data.buf;
+            } else if (channel->receive_data.now == channel->receive_data.end) {
+                memcpy(channel->receive_data.buf, channel->receive_data.message_start, n);
+                channel->receive_data.now = channel->receive_data.buf + n;
+                channel->receive_data.message_start = channel->receive_data.buf;
             }
         }
     }
@@ -630,6 +630,7 @@ static int snd_playback_send_latency(PlaybackChannel *playback_channel)
 static int snd_playback_send_start(PlaybackChannel *playback_channel)
 {
     SndChannel *channel = (SndChannel *)playback_channel;
+    SpicePlaybackState *st = SPICE_CONTAINEROF(channel->worker, SpicePlaybackState, worker);
     SpiceMsgPlaybackStart start;
 
     if (!snd_reset_send_data(channel, SPICE_MSG_PLAYBACK_START)) {
@@ -637,7 +638,7 @@ static int snd_playback_send_start(PlaybackChannel *playback_channel)
     }
 
     start.channels = SPICE_INTERFACE_PLAYBACK_CHAN;
-    start.frequency = SPICE_INTERFACE_PLAYBACK_FREQ;
+    start.frequency = st->frequency;
     spice_assert(SPICE_INTERFACE_PLAYBACK_FMT == SPICE_INTERFACE_AUDIO_FMT_S16);
     start.format = SPICE_AUDIO_FMT_S16;
     start.time = reds_get_mm_time();
@@ -671,6 +672,7 @@ static int snd_playback_send_ctl(PlaybackChannel *playback_channel)
 static int snd_record_send_start(RecordChannel *record_channel)
 {
     SndChannel *channel = (SndChannel *)record_channel;
+    SpiceRecordState *st = SPICE_CONTAINEROF(channel->worker, SpiceRecordState, worker);
     SpiceMsgRecordStart start;
 
     if (!snd_reset_send_data(channel, SPICE_MSG_RECORD_START)) {
@@ -678,7 +680,7 @@ static int snd_record_send_start(RecordChannel *record_channel)
     }
 
     start.channels = SPICE_INTERFACE_RECORD_CHAN;
-    start.frequency = SPICE_INTERFACE_RECORD_FREQ;
+    start.frequency = st->frequency;
     spice_assert(SPICE_INTERFACE_RECORD_FMT == SPICE_INTERFACE_AUDIO_FMT_S16);
     start.format = SPICE_AUDIO_FMT_S16;
     spice_marshall_msg_record_start(channel->send_data.marshaller, &start);
@@ -758,19 +760,21 @@ static int snd_playback_send_write(PlaybackChannel *playback_channel)
 
     spice_marshall_msg_playback_data(channel->send_data.marshaller, &msg);
 
-    if (playback_channel->mode == SPICE_AUDIO_DATA_MODE_CELT_0_5_1) {
-        int n = celt051_encode(playback_channel->celt_encoder, (celt_int16_t *)frame->samples, NULL,
-                               playback_channel->send_data.celt_buf, CELT_COMPRESSED_FRAME_BYTES);
-        if (n < 0) {
-            spice_printerr("celt encode failed");
+    if (playback_channel->mode == SPICE_AUDIO_DATA_MODE_RAW) {
+        spice_marshaller_add_ref(channel->send_data.marshaller,
+                                 (uint8_t *)frame->samples,
+                                 snd_codec_frame_size(playback_channel->codec) * sizeof(frame->samples[0]));
+    }
+    else {
+        int n = sizeof(playback_channel->encode_buf);
+        if (snd_codec_encode(playback_channel->codec, (uint8_t *) frame->samples,
+                                    snd_codec_frame_size(playback_channel->codec) * sizeof(frame->samples[0]),
+                                    playback_channel->encode_buf, &n) != SND_CODEC_OK) {
+            spice_printerr("encode failed");
             snd_disconnect_channel(channel);
             return FALSE;
         }
-        spice_marshaller_add_ref(channel->send_data.marshaller,
-                                 playback_channel->send_data.celt_buf, n);
-    } else {
-        spice_marshaller_add_ref(channel->send_data.marshaller,
-                                 (uint8_t *)frame->samples, sizeof(frame->samples));
+        spice_marshaller_add_ref(channel->send_data.marshaller, playback_channel->encode_buf, n);
     }
 
     return snd_begin_send_message(channel);
@@ -897,6 +901,7 @@ static SndChannel *__new_channel(SndWorker *worker, int size, uint32_t channel_i
     int tos;
     MainChannelClient *mcc = red_client_get_main(client);
 
+    spice_assert(stream);
     if ((flags = fcntl(stream->socket, F_GETFL)) == -1) {
         spice_printerr("accept failed, %s", strerror(errno));
         goto error1;
@@ -937,9 +942,9 @@ static SndChannel *__new_channel(SndWorker *worker, int size, uint32_t channel_i
     channel->parser = spice_get_client_channel_parser(channel_id, NULL);
     channel->stream = stream;
     channel->worker = worker;
-    channel->recive_data.message_start = channel->recive_data.buf;
-    channel->recive_data.now = channel->recive_data.buf;
-    channel->recive_data.end = channel->recive_data.buf + sizeof(channel->recive_data.buf);
+    channel->receive_data.message_start = channel->receive_data.buf;
+    channel->receive_data.now = channel->receive_data.buf;
+    channel->receive_data.end = channel->receive_data.buf + sizeof(channel->receive_data.buf);
     channel->send_data.marshaller = spice_marshaller_new();
 
     stream->watch = core->watch_add(stream->socket, SPICE_WATCH_EVENT_READ,
@@ -976,11 +981,11 @@ static void snd_disconnect_channel_client(RedChannelClient *rcc)
 {
     SndWorker *worker;
 
-    spice_debug(NULL);
     spice_assert(rcc->channel);
     spice_assert(rcc->channel->data);
     worker = (SndWorker *)rcc->channel->data;
 
+    spice_debug("channel-type=%d", rcc->channel->type);
     if (worker->connection) {
         spice_assert(worker->connection->channel_client == rcc);
         snd_disconnect_channel(worker->connection);
@@ -1089,7 +1094,7 @@ SPICE_GNUC_VISIBLE void spice_server_playback_get_buffer(SpicePlaybackInstance *
 
     *frame = playback_channel->free_frames->samples;
     playback_channel->free_frames = playback_channel->free_frames->next;
-    *num_samples = FRAME_SIZE;
+    *num_samples = snd_codec_frame_size(playback_channel->codec);
 }
 
 SPICE_GNUC_VISIBLE void spice_server_playback_put_samples(SpicePlaybackInstance *sin, uint32_t *samples)
@@ -1097,14 +1102,13 @@ SPICE_GNUC_VISIBLE void spice_server_playback_put_samples(SpicePlaybackInstance 
     PlaybackChannel *playback_channel;
     AudioFrame *frame;
 
-    if (!sin->st->worker.connection) {
-        return;
-    }
-
     frame = SPICE_CONTAINEROF(samples, AudioFrame, samples);
     playback_channel = frame->channel;
-    if (!snd_channel_put(&playback_channel->base) || !playback_channel->base.worker->connection) {
+    spice_assert(playback_channel);
+    if (!snd_channel_put(&playback_channel->base) ||
+        sin->st->worker.connection != &playback_channel->base) {
         /* lost last reference, channel has been destroyed previously */
+        spice_info("audio samples belong to a disconnected channel");
         return;
     }
     spice_assert(playback_channel->base.active);
@@ -1140,6 +1144,21 @@ void snd_set_playback_latency(RedClient *client, uint32_t latency)
         }
     }
 }
+
+static int snd_desired_audio_mode(int frequency, int client_can_celt, int client_can_opus)
+{
+    if (! playback_compression)
+        return SPICE_AUDIO_DATA_MODE_RAW;
+
+    if (client_can_opus && snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_OPUS, frequency))
+        return SPICE_AUDIO_DATA_MODE_OPUS;
+
+    if (client_can_celt && snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_CELT_0_5_1, frequency))
+        return SPICE_AUDIO_DATA_MODE_CELT_0_5_1;
+
+    return SPICE_AUDIO_DATA_MODE_RAW;
+}
+
 static void on_new_playback_channel(SndWorker *worker)
 {
     PlaybackChannel *playback_channel =
@@ -1168,8 +1187,7 @@ static void snd_playback_cleanup(SndChannel *channel)
         reds_enable_mm_timer();
     }
 
-    celt051_encoder_destroy(playback_channel->celt_encoder);
-    celt051_mode_destroy(playback_channel->celt_mode);
+    snd_codec_destroy(&playback_channel->codec);
 }
 
 static void snd_set_playback_peer(RedChannel *channel, RedClient *client, RedsStream *stream,
@@ -1179,24 +1197,8 @@ static void snd_set_playback_peer(RedChannel *channel, RedClient *client, RedsSt
     SndWorker *worker = channel->data;
     PlaybackChannel *playback_channel;
     SpicePlaybackState *st = SPICE_CONTAINEROF(worker, SpicePlaybackState, worker);
-    CELTEncoder *celt_encoder;
-    CELTMode *celt_mode;
-    int celt_error;
-    RedChannelClient *rcc;
 
     snd_disconnect_channel(worker->connection);
-
-    if (!(celt_mode = celt051_mode_create(SPICE_INTERFACE_PLAYBACK_FREQ,
-                                          SPICE_INTERFACE_PLAYBACK_CHAN,
-                                          FRAME_SIZE, &celt_error))) {
-        spice_printerr("create celt mode failed %d", celt_error);
-        return;
-    }
-
-    if (!(celt_encoder = celt051_encoder_create(celt_mode))) {
-        spice_printerr("create celt encoder failed");
-        goto error_1;
-    }
 
     if (!(playback_channel = (PlaybackChannel *)__new_channel(worker,
                                                               sizeof(*playback_channel),
@@ -1210,32 +1212,32 @@ static void snd_set_playback_peer(RedChannel *channel, RedClient *client, RedsSt
                                                               snd_playback_cleanup,
                                                               common_caps, num_common_caps,
                                                               caps, num_caps))) {
-        goto error_2;
+        return;
     }
     worker->connection = &playback_channel->base;
-    rcc = playback_channel->base.channel_client;
     snd_playback_free_frame(playback_channel, &playback_channel->frames[0]);
     snd_playback_free_frame(playback_channel, &playback_channel->frames[1]);
     snd_playback_free_frame(playback_channel, &playback_channel->frames[2]);
 
-    playback_channel->celt_mode = celt_mode;
-    playback_channel->celt_encoder = celt_encoder;
-    playback_channel->mode = red_channel_client_test_remote_cap(rcc,
-                                                                SPICE_PLAYBACK_CAP_CELT_0_5_1) ?
-        playback_compression : SPICE_AUDIO_DATA_MODE_RAW;
+    int client_can_celt = red_channel_client_test_remote_cap(playback_channel->base.channel_client,
+                                          SPICE_PLAYBACK_CAP_CELT_0_5_1);
+    int client_can_opus = red_channel_client_test_remote_cap(playback_channel->base.channel_client,
+                                          SPICE_PLAYBACK_CAP_OPUS);
+    int desired_mode = snd_desired_audio_mode(st->frequency, client_can_celt, client_can_opus);
+    playback_channel->mode = SPICE_AUDIO_DATA_MODE_RAW;
+    if (desired_mode != SPICE_AUDIO_DATA_MODE_RAW) {
+        if (snd_codec_create(&playback_channel->codec, desired_mode, st->frequency, SND_CODEC_ENCODE) == SND_CODEC_OK) {
+            playback_channel->mode = desired_mode;
+        } else {
+            spice_printerr("create encoder failed");
+        }
+    }
 
     on_new_playback_channel(worker);
     if (worker->active) {
         spice_server_playback_start(st->sin);
     }
     snd_playback_send(worker->connection);
-    return;
-
-error_2:
-    celt051_encoder_destroy(celt_encoder);
-
-error_1:
-    celt051_mode_destroy(celt_mode);
 }
 
 static void snd_record_migrate_channel_client(RedChannelClient *rcc)
@@ -1362,6 +1364,54 @@ SPICE_GNUC_VISIBLE uint32_t spice_server_record_get_samples(SpiceRecordInstance 
     return len;
 }
 
+SPICE_GNUC_VISIBLE uint32_t spice_server_get_best_playback_rate(SpicePlaybackInstance *sin)
+{
+    int client_can_opus = TRUE;
+    if (sin && sin->st->worker.connection) {
+        SndChannel *channel = sin->st->worker.connection;
+        PlaybackChannel *playback_channel = SPICE_CONTAINEROF(channel, PlaybackChannel, base);
+        client_can_opus = red_channel_client_test_remote_cap(playback_channel->base.channel_client,
+                                          SPICE_PLAYBACK_CAP_OPUS);
+    }
+
+    if (client_can_opus && snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_OPUS, SND_CODEC_ANY_FREQUENCY))
+        return SND_CODEC_OPUS_PLAYBACK_FREQ;
+
+    return SND_CODEC_CELT_PLAYBACK_FREQ;
+}
+
+SPICE_GNUC_VISIBLE void spice_server_set_playback_rate(SpicePlaybackInstance *sin, uint32_t frequency)
+{
+    RedChannel *channel = sin->st->worker.base_channel;
+    sin->st->frequency = frequency;
+    if (channel && snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_OPUS, frequency))
+        red_channel_set_cap(channel, SPICE_PLAYBACK_CAP_OPUS);
+}
+
+SPICE_GNUC_VISIBLE uint32_t spice_server_get_best_record_rate(SpiceRecordInstance *sin)
+{
+    int client_can_opus = TRUE;
+    if (sin && sin->st->worker.connection) {
+        SndChannel *channel = sin->st->worker.connection;
+        RecordChannel *record_channel = SPICE_CONTAINEROF(channel, RecordChannel, base);
+        client_can_opus = red_channel_client_test_remote_cap(record_channel->base.channel_client,
+                                          SPICE_RECORD_CAP_OPUS);
+    }
+
+    if (client_can_opus && snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_OPUS, SND_CODEC_ANY_FREQUENCY))
+        return SND_CODEC_OPUS_PLAYBACK_FREQ;
+
+    return SND_CODEC_CELT_PLAYBACK_FREQ;
+}
+
+SPICE_GNUC_VISIBLE void spice_server_set_record_rate(SpiceRecordInstance *sin, uint32_t frequency)
+{
+    RedChannel *channel = sin->st->worker.base_channel;
+    sin->st->frequency = frequency;
+    if (channel && snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_OPUS, frequency))
+        red_channel_set_cap(channel, SPICE_RECORD_CAP_OPUS);
+}
+
 static void on_new_record_channel(SndWorker *worker)
 {
     RecordChannel *record_channel = (RecordChannel *)worker->connection;
@@ -1380,9 +1430,7 @@ static void on_new_record_channel(SndWorker *worker)
 static void snd_record_cleanup(SndChannel *channel)
 {
     RecordChannel *record_channel = SPICE_CONTAINEROF(channel, RecordChannel, base);
-
-    celt051_decoder_destroy(record_channel->celt_decoder);
-    celt051_mode_destroy(record_channel->celt_mode);
+    snd_codec_destroy(&record_channel->codec);
 }
 
 static void snd_set_record_peer(RedChannel *channel, RedClient *client, RedsStream *stream,
@@ -1392,23 +1440,8 @@ static void snd_set_record_peer(RedChannel *channel, RedClient *client, RedsStre
     SndWorker *worker = channel->data;
     RecordChannel *record_channel;
     SpiceRecordState *st = SPICE_CONTAINEROF(worker, SpiceRecordState, worker);
-    CELTDecoder *celt_decoder;
-    CELTMode *celt_mode;
-    int celt_error;
 
     snd_disconnect_channel(worker->connection);
-
-    if (!(celt_mode = celt051_mode_create(SPICE_INTERFACE_RECORD_FREQ,
-                                          SPICE_INTERFACE_RECORD_CHAN,
-                                          FRAME_SIZE, &celt_error))) {
-        spice_printerr("create celt mode failed %d", celt_error);
-        return;
-    }
-
-    if (!(celt_decoder = celt051_decoder_create(celt_mode))) {
-        spice_printerr("create celt decoder failed");
-        goto error_1;
-    }
 
     if (!(record_channel = (RecordChannel *)__new_channel(worker,
                                                           sizeof(*record_channel),
@@ -1422,26 +1455,18 @@ static void snd_set_record_peer(RedChannel *channel, RedClient *client, RedsStre
                                                           snd_record_cleanup,
                                                           common_caps, num_common_caps,
                                                           caps, num_caps))) {
-        goto error_2;
+        return;
     }
 
-    worker->connection = &record_channel->base;
+    record_channel->mode = SPICE_AUDIO_DATA_MODE_RAW;
 
-    record_channel->celt_mode = celt_mode;
-    record_channel->celt_decoder = celt_decoder;
+    worker->connection = &record_channel->base;
 
     on_new_record_channel(worker);
     if (worker->active) {
         spice_server_record_start(st->sin);
     }
     snd_record_send(worker->connection);
-    return;
-
-error_2:
-    celt051_decoder_destroy(celt_decoder);
-
-error_1:
-    celt051_mode_destroy(celt_mode);
 }
 
 static void snd_playback_migrate_channel_client(RedChannelClient *rcc)
@@ -1488,6 +1513,7 @@ void snd_attach_playback(SpicePlaybackInstance *sin)
     sin->st = spice_new0(SpicePlaybackState, 1);
     sin->st->sin = sin;
     playback_worker = &sin->st->worker;
+    sin->st->frequency = SND_CODEC_CELT_PLAYBACK_FREQ; /* Default to the legacy rate */
 
     // TODO: Make RedChannel base of worker? instead of assigning it to channel->data
     channel = red_channel_create_dummy(sizeof(RedChannel), SPICE_CHANNEL_PLAYBACK, 0);
@@ -1498,7 +1524,10 @@ void snd_attach_playback(SpicePlaybackInstance *sin)
     client_cbs.migrate = snd_playback_migrate_channel_client;
     red_channel_register_client_cbs(channel, &client_cbs);
     red_channel_set_data(channel, playback_worker);
-    red_channel_set_cap(channel, SPICE_PLAYBACK_CAP_CELT_0_5_1);
+
+    if (snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_CELT_0_5_1, SND_CODEC_ANY_FREQUENCY))
+        red_channel_set_cap(channel, SPICE_PLAYBACK_CAP_CELT_0_5_1);
+
     red_channel_set_cap(channel, SPICE_PLAYBACK_CAP_VOLUME);
 
     playback_worker->base_channel = channel;
@@ -1515,6 +1544,7 @@ void snd_attach_record(SpiceRecordInstance *sin)
     sin->st = spice_new0(SpiceRecordState, 1);
     sin->st->sin = sin;
     record_worker = &sin->st->worker;
+    sin->st->frequency = SND_CODEC_CELT_PLAYBACK_FREQ; /* Default to the legacy rate */
 
     // TODO: Make RedChannel base of worker? instead of assigning it to channel->data
     channel = red_channel_create_dummy(sizeof(RedChannel), SPICE_CHANNEL_RECORD, 0);
@@ -1525,7 +1555,8 @@ void snd_attach_record(SpiceRecordInstance *sin)
     client_cbs.migrate = snd_record_migrate_channel_client;
     red_channel_register_client_cbs(channel, &client_cbs);
     red_channel_set_data(channel, record_worker);
-    red_channel_set_cap(channel, SPICE_RECORD_CAP_CELT_0_5_1);
+    if (snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_CELT_0_5_1, SND_CODEC_ANY_FREQUENCY))
+        red_channel_set_cap(channel, SPICE_RECORD_CAP_CELT_0_5_1);
     red_channel_set_cap(channel, SPICE_RECORD_CAP_VOLUME);
 
     record_worker->base_channel = channel;
@@ -1572,18 +1603,19 @@ void snd_set_playback_compression(int on)
 {
     SndWorker *now = workers;
 
-    playback_compression = on ? SPICE_AUDIO_DATA_MODE_CELT_0_5_1 : SPICE_AUDIO_DATA_MODE_RAW;
+    playback_compression = !!on;
+
     for (; now; now = now->next) {
         if (now->base_channel->type == SPICE_CHANNEL_PLAYBACK && now->connection) {
-            SndChannel* sndchannel = now->connection;
             PlaybackChannel* playback = (PlaybackChannel*)now->connection;
-            if (!red_channel_client_test_remote_cap(sndchannel->channel_client,
-                                                    SPICE_PLAYBACK_CAP_CELT_0_5_1)) {
-                spice_assert(playback->mode == SPICE_AUDIO_DATA_MODE_RAW);
-                continue;
-            }
-            if (playback->mode != playback_compression) {
-                playback->mode = playback_compression;
+            SpicePlaybackState *st = SPICE_CONTAINEROF(now, SpicePlaybackState, worker);
+            int client_can_celt = red_channel_client_test_remote_cap(playback->base.channel_client,
+                                    SPICE_PLAYBACK_CAP_CELT_0_5_1);
+            int client_can_opus = red_channel_client_test_remote_cap(playback->base.channel_client,
+                                    SPICE_PLAYBACK_CAP_OPUS);
+            int desired_mode = snd_desired_audio_mode(st->frequency, client_can_opus, client_can_celt);
+            if (playback->mode != desired_mode) {
+                playback->mode = desired_mode;
                 snd_set_command(now->connection, SND_PLAYBACK_MODE_MASK);
             }
         }
@@ -1592,5 +1624,5 @@ void snd_set_playback_compression(int on)
 
 int snd_get_playback_compression(void)
 {
-    return (playback_compression == SPICE_AUDIO_DATA_MODE_RAW) ? FALSE : TRUE;
+    return playback_compression;
 }

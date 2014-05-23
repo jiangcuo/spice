@@ -1,22 +1,24 @@
 NULL =
 
-INCLUDES =					\
+AM_CPPFLAGS =					\
 	-I$(top_srcdir)				\
 	-I$(top_srcdir)/common			\
 	-I$(top_srcdir)/server			\
 	-I$(top_srcdir)/server/tests		\
 	$(COMMON_CFLAGS)			\
+	$(GLIB2_CFLAGS)				\
 	$(SMARTCARD_CFLAGS)			\
 	$(SPICE_NONPKGCONFIG_CFLAGS)		\
 	$(NULL)
 
 if SUPPORT_AUTOMATED_TESTS
-INCLUDES += -DAUTOMATED_TESTS
+AM_CPPFLAGS += -DAUTOMATED_TESTS
 endif
 
 LDADD =								\
 	$(top_builddir)/spice-common/common/libspice-common.la	\
 	$(top_builddir)/server/libspice-server.la		\
+	$(GLIB2_LIBS)						\
 	$(NULL)
 
 COMMON_BASE =					\

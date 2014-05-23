@@ -1,7 +1,7 @@
 NULL =
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = spice-common server
+SUBDIRS = spice-common server docs
 
 if SUPPORT_CLIENT
 SUBDIRS += client
@@ -15,10 +15,12 @@ DISTCHECK_CONFIGURE_FLAGS =			\
 	--enable-opengl				\
 	--enable-smartcard			\
 	--with-sasl				\
+	--enable-manual				\
 	$(NULL)
 
 EXTRA_DIST =					\
 	build-aux/git-version-gen		\
+	.version				\
 	$(NULL)
 
 # Generate the ChangeLog file (with all entries since the switch to git)

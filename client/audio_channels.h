@@ -18,7 +18,7 @@
 #ifndef _H_AUDIO_CHANNELS
 #define _H_AUDIO_CHANNELS
 
-#include <celt051/celt.h>
+#include "common/snd_codec.h"
 
 #include "red_channel.h"
 #include "debug.h"
@@ -45,7 +45,7 @@ private:
     void handle_start(RedPeer::InMessage* message);
     void handle_stop(RedPeer::InMessage* message);
     void handle_raw_data(RedPeer::InMessage* message);
-    void handle_celt_data(RedPeer::InMessage* message);
+    void handle_compressed_data(RedPeer::InMessage* message);
     void null_handler(RedPeer::InMessage* message);
     void disable();
 
@@ -57,8 +57,7 @@ private:
     WavePlaybackAbstract* _wave_player;
     uint32_t _mode;
     uint32_t _frame_bytes;
-    CELTMode *_celt_mode;
-    CELTDecoder *_celt_decoder;
+    SndCodec  _codec;
     bool _playing;
     uint32_t _frame_count;
 };
@@ -73,7 +72,6 @@ public:
     static ChannelFactory& Factory();
 
 protected:
-    virtual void on_connect();
     virtual void on_disconnect();
 
 private:
@@ -86,6 +84,8 @@ private:
     virtual void remove_event_source(EventSources::Trigger& event_source);
     virtual void push_frame(uint8_t *frame);
 
+    void set_desired_mode(int frequency);
+    void send_record_mode();
     void send_start_mark();
     void release_message(RecordSamplesMessage *message);
     RecordSamplesMessage * get_message();
@@ -96,11 +96,10 @@ private:
     Mutex _messages_lock;
     std::list<RecordSamplesMessage *> _messages;
     int _mode;
-    CELTMode *_celt_mode;
-    CELTEncoder *_celt_encoder;
+    SndCodec _codec;
     uint32_t _frame_bytes;
 
-    static int data_mode;
+    uint8_t compressed_buf[SND_CODEC_MAX_COMPRESSED_BYTES];
 
     friend class RecordSamplesMessage;
 };

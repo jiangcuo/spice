@@ -1073,28 +1073,6 @@ void RedWindow_p::wait_for_unmap()
     }
 }
 
-#ifdef USE_OPENGL
-void RedWindow_p::set_glx(int width, int height)
-{
-    if (_glcont_copy) {
-        XLockDisplay(x_display);
-        XSync(x_display, False);
-        XUnlockDisplay(x_display);
-        glXMakeCurrent(x_display, _win, _glcont_copy);
-        //glDrawBuffer(GL_FRONT);
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        gluOrtho2D(0, width, 0, height);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-        glViewport(0, 0, width, height);
-        glColor3f(1, 1, 1);
-        glEnable(GL_TEXTURE_2D);
-        GLC_ERROR_TEST_FINISH;
-    }
-}
-#endif // USE_OPENGL
-
 void RedWindow_p::set_minmax(PixelsSource_p& pix_source)
 {
     //todo: auto res
@@ -1134,9 +1112,6 @@ Cursor RedWindow_p::create_invisible_cursor(Window window)
 RedWindow_p::RedWindow_p()
     : _win (None)
     , _show_pos_valid (false)
-#ifdef USE_OPENGL
-    , _glcont_copy (NULL)
-#endif // USE_OPENGL
     , _icon (NULL)
     , _focused (false)
     , _ignore_foucs (false)
@@ -1174,12 +1149,6 @@ void RedWindow_p::destroy(RedWindow& red_window, PixelsSource_p& pix_source)
     XFreeCursor(x_display, _invisible_cursor);
     _invisible_cursor = None;
     XDeleteContext(x_display, window, user_data_context);
-#ifdef USE_OPENGL
-    if (_glcont_copy) {
-        glXDestroyContext(x_display, _glcont_copy);
-        _glcont_copy = NULL;
-    }
-#endif // USE_OPENGL
     XDestroyWindow(x_display, window);
     XFreeColormap(x_display, _colormap);
     XFreeGC(x_display, pix_source.x_drawable.gc);
@@ -1796,9 +1765,13 @@ void RedWindow::do_start_key_interception()
     // that reason we temporary disable focus event handling. Same happens
     // LeaveNotify and EnterNotify.
 
+    if (getenv("SPICE_NOGRAB"))
+        return;
+
     ASSERT(_focused);
     XLockDisplay(x_display);
     XGrabKeyboard(x_display, _win, True, GrabModeAsync, GrabModeAsync, CurrentTime);
+
     XUnlockDisplay(x_display);
     sync(true);
     _listener.on_start_key_interception();
@@ -1876,6 +1849,9 @@ void RedWindow::release_mouse()
 
 void RedWindow::capture_mouse()
 {
+    if (getenv("SPICE_NOGRAB"))
+        return;
+
     int grab_retries = MOUSE_GRAB_RETRIES;
     XLockDisplay(x_display);
     XSync(x_display, False);
@@ -2120,6 +2096,18 @@ RedPbuffer RedWindow::create_pbuff(int width, int height)
 void RedWindow::untouch_context()
 {
     glXMakeCurrent(x_display, 0, 0);
+}
+
+void RedWindow::swap_gl()
+{
+    PixelsSource_p *pix_source = (PixelsSource_p*)get_opaque();
+    RedGlContext context = pix_source->x_drawable.context;
+
+    if (!context)
+        return;
+
+    glXMakeCurrent(x_display, get_window(), context);
+    glXSwapBuffers(x_display, get_window());
 }
 
 void RedWindow::set_type_gl()
