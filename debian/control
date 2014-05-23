@@ -25,7 +25,7 @@ Build-Depends: debhelper (>= 9), pkg-config,
 Standards-Version: 3.9.4
 Homepage: http://spice-space.org/
 Vcs-Git: git://anonscm.debian.org/collab-maint/spice.git
-Vcs-Browser: http://anonscm.debian.org/git/collab-maint/spice.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/spice.git
 
 Package: spice-client
 Architecture: i386 amd64
