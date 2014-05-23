@@ -4,3 +4,11 @@
 override_dh_auto_configure:
 	dh_auto_configure --  --disable-celt051 --disable-silent-rules \
 		--disable-smartcard --enable-client
+
+override_dh_strip:
+	dh_strip -plibspice-server1 --dbg-package=libspice-server1-dbg
+	dh_strip -Nlibspice-server1
+
+override_dh_installdocs:
+	dh_installdocs -plibspice-server1-dbg --link-doc=libspice-server1
+	dh_installdocs -Nlibspice-server1-dbg

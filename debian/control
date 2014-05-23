@@ -58,6 +58,23 @@ Description: Implements the server side of the SPICE protocol
  This package contains the run-time libraries for any application that 
  wishes to be a SPICE server.
 
+Package: libspice-server1-dbg
+Section: debug
+Architecture: i386 amd64
+Priority: extra
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}
+Description: Debugging symbols for libspice-server1
+ The Simple Protocol for Independent Computing Environments (SPICE) is
+ a remote display system built for virtual environments which allows
+ you to view a computing 'desktop' environment not only on the machine
+ where it is running, but from anywhere on the Internet and from a wide
+ variety of machine architectures.
+ .
+ This package contains the debugging symbols for the libspice-server1
+ library.
+
 Package: libspice-server-dev
 Section: libdevel
 Architecture: i386 amd64
