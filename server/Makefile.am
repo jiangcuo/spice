@@ -2,8 +2,8 @@ NULL =
 SUBDIRS = . tests
 
 AM_CPPFLAGS =					\
+	-DSPICE_SERVER_INTERNAL			\
 	-DRED_STATISTICS			\
-	$(CELT051_CFLAGS)			\
 	$(COMMON_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
@@ -20,6 +20,8 @@ lib_LTLIBRARIES = libspice-server.la
 libspice_server_la_LDFLAGS =			\
 	-version-info $(SPICE_LT_VERSION)	\
 	-no-undefined				\
+	$(RELRO_LDFLAGS)			\
+	$(NO_INDIRECT_LDFLAGS)			\
 	$(NULL)
 
 if HAVE_LD_VERSION_SCRIPT
@@ -30,7 +32,6 @@ endif
 libspice_server_la_LIBADD =						\
 	$(top_builddir)/spice-common/common/libspice-common.la		\
 	$(top_builddir)/spice-common/common/libspice-common-server.la	\
-	$(CELT051_LIBS)							\
 	$(GL_LIBS)							\
 	$(GLIB2_LIBS)							\
 	$(JPEG_LIBS)							\
@@ -80,11 +81,14 @@ libspice_server_la_SOURCES =			\
 	red_memslots.h				\
 	red_parse_qxl.c				\
 	red_parse_qxl.h				\
+	red_time.h				\
 	red_worker.c				\
 	red_worker.h				\
 	reds.c					\
 	reds.h					\
 	reds-private.h				\
+	reds_stream.c				\
+	reds_stream.h				\
 	reds_sw_canvas.c			\
 	reds_sw_canvas.h			\
 	snd_worker.c				\
@@ -97,14 +101,12 @@ libspice_server_la_SOURCES =			\
 	spice_timer_queue.h			\
 	zlib_encoder.c				\
 	zlib_encoder.h				\
+	spice_bitmap_utils.h		\
+	spice_bitmap_utils.c		\
+	spice_server_utils.h		\
+	spice_image_cache.h			\
+	spice_image_cache.c			\
 	$(NULL)
-
-if SUPPORT_TUNNEL
-libspice_server_la_SOURCES +=	\
-	red_tunnel_worker.c	\
-	red_tunnel_worker.h	\
-	$(NULL)
-endif
 
 if SUPPORT_GL
 libspice_server_la_SOURCES +=	\

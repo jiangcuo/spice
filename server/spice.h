@@ -22,8 +22,14 @@
 #include <sys/socket.h>
 #include <spice/qxl_dev.h>
 #include <spice/vd_agent.h>
+#include <spice/macros.h>
 
-#define SPICE_SERVER_VERSION 0x000c04 /* release 0.12.4 */
+#define SPICE_SERVER_VERSION 0x000c05 /* release 0.12.5 */
+
+#ifdef SPICE_SERVER_INTERNAL
+#undef SPICE_GNUC_DEPRECATED
+#define SPICE_GNUC_DEPRECATED
+#endif
 
 /* interface base type */
 
@@ -69,9 +75,10 @@ typedef struct SpiceChannelEventInfo {
     int id;
     int flags;
     /* deprecated, can't hold ipv6 addresses, kept for backward compatibility */
-    struct sockaddr laddr;
-    struct sockaddr paddr;
-    socklen_t llen, plen;
+    struct sockaddr laddr SPICE_GNUC_DEPRECATED;
+    struct sockaddr paddr SPICE_GNUC_DEPRECATED;
+    socklen_t llen SPICE_GNUC_DEPRECATED;
+    socklen_t plen SPICE_GNUC_DEPRECATED;
     /* should be used if (flags & SPICE_CHANNEL_EVENT_FLAG_ADDR_EXT) */
     struct sockaddr_storage laddr_ext;
     struct sockaddr_storage paddr_ext;
@@ -113,32 +120,32 @@ struct QXLWorker {
     uint32_t minor_version;
     uint32_t major_version;
     /* These calls are deprecated. Please use the spice_qxl_* calls instead */
-    void (*wakeup)(QXLWorker *worker);
-    void (*oom)(QXLWorker *worker);
-    void (*start)(QXLWorker *worker);
-    void (*stop)(QXLWorker *worker);
+    void (*wakeup)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
+    void (*oom)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
+    void (*start)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
+    void (*stop)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
     void (*update_area)(QXLWorker *qxl_worker, uint32_t surface_id,
                        struct QXLRect *area, struct QXLRect *dirty_rects,
-                       uint32_t num_dirty_rects, uint32_t clear_dirty_region);
-    void (*add_memslot)(QXLWorker *worker, QXLDevMemSlot *slot);
-    void (*del_memslot)(QXLWorker *worker, uint32_t slot_group_id, uint32_t slot_id);
-    void (*reset_memslots)(QXLWorker *worker);
-    void (*destroy_surfaces)(QXLWorker *worker);
-    void (*destroy_primary_surface)(QXLWorker *worker, uint32_t surface_id);
+                       uint32_t num_dirty_rects, uint32_t clear_dirty_region) SPICE_GNUC_DEPRECATED;
+    void (*add_memslot)(QXLWorker *worker, QXLDevMemSlot *slot) SPICE_GNUC_DEPRECATED;
+    void (*del_memslot)(QXLWorker *worker, uint32_t slot_group_id, uint32_t slot_id) SPICE_GNUC_DEPRECATED;
+    void (*reset_memslots)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
+    void (*destroy_surfaces)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
+    void (*destroy_primary_surface)(QXLWorker *worker, uint32_t surface_id) SPICE_GNUC_DEPRECATED;
     void (*create_primary_surface)(QXLWorker *worker, uint32_t surface_id,
-                                   QXLDevSurfaceCreate *surface);
-    void (*reset_image_cache)(QXLWorker *worker);
-    void (*reset_cursor)(QXLWorker *worker);
-    void (*destroy_surface_wait)(QXLWorker *worker, uint32_t surface_id);
-    void (*loadvm_commands)(QXLWorker *worker, struct QXLCommandExt *ext, uint32_t count);
+                                   QXLDevSurfaceCreate *surface) SPICE_GNUC_DEPRECATED;
+    void (*reset_image_cache)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
+    void (*reset_cursor)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
+    void (*destroy_surface_wait)(QXLWorker *worker, uint32_t surface_id) SPICE_GNUC_DEPRECATED;
+    void (*loadvm_commands)(QXLWorker *worker, struct QXLCommandExt *ext, uint32_t count) SPICE_GNUC_DEPRECATED;
 };
 
 void spice_qxl_wakeup(QXLInstance *instance);
 void spice_qxl_oom(QXLInstance *instance);
-void spice_qxl_start(QXLInstance *instance); /* deprecated since 0.11.2
-                                                spice_server_vm_start replaces it */
-void spice_qxl_stop(QXLInstance *instance);  /* deprecated since 0.11.2
-                                                spice_server_vm_stop replaces it */
+/* deprecated since 0.11.2, spice_server_vm_start replaces it */
+void spice_qxl_start(QXLInstance *instance) SPICE_GNUC_DEPRECATED;
+/* deprecated since 0.11.2 spice_server_vm_stop replaces it */
+void spice_qxl_stop(QXLInstance *instance) SPICE_GNUC_DEPRECATED;
 void spice_qxl_update_area(QXLInstance *instance, uint32_t surface_id,
                    struct QXLRect *area, struct QXLRect *dirty_rects,
                    uint32_t num_dirty_rects, uint32_t clear_dirty_region);
@@ -326,7 +333,7 @@ struct SpiceTabletInstance {
 
 #define SPICE_INTERFACE_PLAYBACK "playback"
 #define SPICE_INTERFACE_PLAYBACK_MAJOR 1
-#define SPICE_INTERFACE_PLAYBACK_MINOR 2
+#define SPICE_INTERFACE_PLAYBACK_MINOR 3
 typedef struct SpicePlaybackInterface SpicePlaybackInterface;
 typedef struct SpicePlaybackInstance SpicePlaybackInstance;
 typedef struct SpicePlaybackState SpicePlaybackState;
@@ -335,7 +342,7 @@ enum {
     SPICE_INTERFACE_AUDIO_FMT_S16 = 1,
 };
 
-#define SPICE_INTERFACE_PLAYBACK_FREQ  44100
+#define SPICE_INTERFACE_PLAYBACK_FREQ  48000
 #define SPICE_INTERFACE_PLAYBACK_CHAN  2
 #define SPICE_INTERFACE_PLAYBACK_FMT   SPICE_INTERFACE_AUDIO_FMT_S16
 
@@ -360,12 +367,12 @@ void spice_server_playback_set_mute(SpicePlaybackInstance *sin, uint8_t mute);
 
 #define SPICE_INTERFACE_RECORD "record"
 #define SPICE_INTERFACE_RECORD_MAJOR 2
-#define SPICE_INTERFACE_RECORD_MINOR 2
+#define SPICE_INTERFACE_RECORD_MINOR 3
 typedef struct SpiceRecordInterface SpiceRecordInterface;
 typedef struct SpiceRecordInstance SpiceRecordInstance;
 typedef struct SpiceRecordState SpiceRecordState;
 
-#define SPICE_INTERFACE_RECORD_FREQ  44100
+#define SPICE_INTERFACE_RECORD_FREQ  48000
 #define SPICE_INTERFACE_RECORD_CHAN  2
 #define SPICE_INTERFACE_RECORD_FMT   SPICE_INTERFACE_AUDIO_FMT_S16
 
@@ -385,6 +392,11 @@ uint32_t spice_server_record_get_samples(SpiceRecordInstance *sin,
 void spice_server_record_set_volume(SpiceRecordInstance *sin,
                                     uint8_t nchannels, uint16_t *volume);
 void spice_server_record_set_mute(SpiceRecordInstance *sin, uint8_t mute);
+
+uint32_t spice_server_get_best_playback_rate(SpicePlaybackInstance *sin);
+void     spice_server_set_playback_rate(SpicePlaybackInstance *sin, uint32_t frequency);
+uint32_t spice_server_get_best_record_rate(SpiceRecordInstance *sin);
+void     spice_server_set_record_rate(SpiceRecordInstance *sin, uint32_t frequency);
 
 /* char device interfaces */
 

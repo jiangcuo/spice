@@ -30,12 +30,12 @@
 #define REDS_NUM_INTERNAL_AGENT_MESSAGES 1
 
 // approximate max receive message size for main channel
-#define RECEIVE_BUF_SIZE \
+#define MAIN_CHANNEL_RECEIVE_BUF_SIZE \
     (4096 + (REDS_AGENT_WINDOW_SIZE + REDS_NUM_INTERNAL_AGENT_MESSAGES) * SPICE_AGENT_MAX_DATA_SIZE)
 
 typedef struct MainChannel {
     RedChannel base;
-    uint8_t recv_buf[RECEIVE_BUF_SIZE];
+    uint8_t recv_buf[MAIN_CHANNEL_RECEIVE_BUF_SIZE];
     RedsMigSpice mig_target; // TODO: add refs and release (afrer all clients completed migration in one way or the other?)
     int num_clients_mig_wait;
 } MainChannel;
@@ -54,7 +54,7 @@ void main_channel_push_agent_disconnected(MainChannel *main_chan);
 void main_channel_client_push_agent_tokens(MainChannelClient *mcc, uint32_t num_tokens);
 void main_channel_client_push_agent_data(MainChannelClient *mcc, uint8_t* data, size_t len,
                                          spice_marshaller_item_free_func free_data, void *opaque);
-void main_channel_client_start_net_test(MainChannelClient *mcc);
+void main_channel_client_start_net_test(MainChannelClient *mcc, int test_rate);
 // TODO: huge. Consider making a reds_* interface for these functions
 // and calling from main.
 void main_channel_push_init(MainChannelClient *mcc, int display_channels_hint,

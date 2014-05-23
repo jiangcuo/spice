@@ -1,3 +1,847 @@
+2014-05-19  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Update libtool version information for 0.12.5 release
+
+	Update 'release' instructions in configure.ac
+	The instructions are obsolete, replace them with the explanation about
+	how to handle current/revision/age from libtool manual:
+	https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+
+	Update NEWS
+
+2014-05-16  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	server: use a warning when disconnecting unresponsive client
+	The debug level is not visible by default, since it is an unsolicited
+	server behaviour, make it a warning.
+
+2014-05-15  Christophe Fergeau  <cfergeau@redhat.com>
+
+	docs: Fix make distcheck
+
+2014-05-15  소병철  <byungchul.so@samsung.com>
+
+	Use PRI macros in printf to keep compatibility between 32/64bit system
+	gcc's some integer type definitions are different between 32/64bit system.
+	This causes platform dependency problem with printf function. However,
+	we can avoid this problem by using PRI macros that supports platform
+	independent printf.
+
+2014-04-16  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Fix submodule reference
+
+	Add missing buffer (re)allocation to reds_sasl_handle_auth_steplen()
+	We need to make sure we have a buffer big enough to accomodate the data
+	sent by the coming SASL step.
+
+	Call correct SASL helper in reds_handle_auth_sasl_step
+	sasl_handle_auth_start() was called instead of reds_sasl_handle_auth_step()
+
+	Add G_GNUC_UNUSED annotations to async_read_handler args
+	2 of the arguments are not used, the G_GNUC_UNUSED annotation will make
+	this explicit.
+
+	Make struct AsyncRead/async_read_handler private
+	All users are now contained in reds_stream.c
+
+	Remove RedLinkInfo::async_read
+	9feed69 moved the async reader code to RedsStream so that it can be used
+	for the SASL authentication code. In particular, it introduced a
+	RedsStream::async_read member which is used by the SASL authentication code
+	for its async operations.
+
+	However, what was not done is to remove the now redundant
+	RedLinkInfo::async_read field. This causes failures when using SASL
+	authentication as the async read error callback is getting set
+	on the RedLinkInfo::async_read structure, but then the SASL code is trying
+	to use the RedeStream::async_read structure for its async IOs, which do not
+	have the needed error callback set.
+
+	This commit makes use of the newly introduced reds_stream_async_read()
+	helper in order to make use of RedsStream::async_read.
+
+	Call AsyncRead variables 'async' instead of 'obj'
+	This is a more explicit name.
+
+	Add reds_stream_set_async_error_handler() helper
+	This replaces async_read_set_error_handler() which was unused. This sets a
+	callback to be called when an async operation fails.
+
+	We could pass the error_handler to each reds_stream_async_read() call, but as
+	we will be using the same one for all async calls, it's more convenient to set it
+	once and for all.
+	AsyncRead is going to be private to reds_stream.c in one of the next
+	commits, and the error handler will need to be set from reds.c,
+	hence the move to a public RedsStream method.
+
+	Introduce reds_stream_async_read() helper
+	This will allow to make RedsStream::async_read private
+
+	build-sys: Fix VPATH builds
+	Fixing this is a matter of picking the spice-common fix to generate the
+	(de)marshaller source files in the right place, and to adjust the compiler
+	flags to look for includes in the build directory as well.
+
+	Fix --without-sasl build
+	There are 2 SASL-related function prototypes which are unused in the
+	--without-sasl case. They cause a warning, and a build failure
+	when using -Werror. Wrapping them in #if HAVE_SASL avoids this issue.
+
+	doc: Generate chunked manual
+	This commit makes use of a2x in order to generate a chunked manual in
+	addition to the "all in one page" one.
+
+2014-03-25  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	manual: improve text about ~/Public
+
+2014-03-20  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Check RSA_generate_key_ex return value
+	This can fail in fips mode for example. If we ignore the failure, we'll get
+	a crash:
+
+	 #0  0x00007f38d63728a0 in BN_num_bits () from /lib64/libcrypto.so.10
+	 #1  0x00007f38d639661d in RSA_size () from /lib64/libcrypto.so.10
+	 #2  0x00007f38d7991762 in reds_handle_read_link_done () from /lib64/libspice-server.so.1
+	 #3  0x00007f38d7990c06 in spice_server_add_client () from /lib64/libspice-server.so.1
+	 #4  0x00007f38d7990c6a in reds_accept () from /lib64/libspice-server.so.1
+	 #5  0x00007f38dc0d2946 in qemu_iohandler_poll (pollfds=0x7f38dedce200, ret=755449965, ret@entry=1) at iohandler.c:143
+	 #6  0x00007f38dc0d6ea8 in main_loop_wait (nonblocking=<optimized out>) at main-loop.c:465
+	 #7  0x00007f38dbffd7c0 in main_loop () at vl.c:1988
+	 #8  main (argc=<optimized out>, argv=<optimized out>, envp=<optimized out>) at vl.c:4357
+
+	This commit will cause the client connection to fail but qemu won't
+	segfault.
+
+2014-03-20  David Gibson  <dgibson@redhat.com>
+
+	Don't truncate large 'now' values in _spice_timer_set
+	static void _spice_timer_set(SpiceTimer *timer, uint32_t ms, uint32_t now)
+
+	The _spice_timer_set() function takes a 32-bit integer for the "now" value.
+	The now value passed in however, can exceed 2^32 (it's in ms and derived
+	from CLOCK_MONOTONIC, which will wrap around a 32-bit integer in around 46
+	days).
+
+	If the now value passed in exceeds 2^32, this will mean timers are inserted
+	into the active list with expiry values before the current time, they will
+	immediately trigger, and (if they don't make themselves inactive) be
+	reinserted still before the current time.
+
+	This leads to an infinite loop in spice_timer_queue_cb().
+
+	https://bugzilla.redhat.com/show_bug.cgi?id=1072700
+
+2014-03-19  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	Update spice-common
+
+	manual: fix xml highlighting
+
+	manual: add folder sharing section
+
+	Translate docbook -> asciidoc
+	It's much much easier to read and edit, and the end results looks better
+	as well, see http://elmarco.fedorapeople.org/manual.html
+
+	Associate org.spice-space.webdav.0 port to webdav channel
+	For example, with qemu, a webdav channel can be created this way:
+
+	 -chardev spiceport,name=org.spice-space.webdav.0,...
+
+	And redirected to a virtio port:
+
+	 -device virtserialport,...,name=org.spice-space.webdav.0
+
+	build-sys: simplify manual html generation
+
+	SpiceUserManual.xml: small clean-ups
+	Remove some non-conventional/non-freesoftware editor-specific lines.
+
+	Remove trailing whitespaces
+
+	Get rid of DTD, which is too strict for docbook, see also:
+	http://docbook.org/tdg5/en/html/ch02.html
+
+	This get rids of the following warning/error:
+
+	I/O error : Attempt to load network entity
+	http://docbook.org/xml/5.0/dtd/docbook.dtd
+	/home/elmarco/src/spice/spice-master/docs/manual/SpiceUserManual.xml:4:
+	warning: failed to load external entity
+	"http://docbook.org/xml/5.0/dtd/docbook.dtd"
+	          "http://docbook.org/xml/5.0/dtd/docbook.dtd">
+	                                                       ^
+
+2014-03-13  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Fix test_capability() typo
+	It was spelt 'capabilty'
+
+	Fix typo in log message
+
+	mjpeg: Don't warn on unsupported image formats
+	When trying to start mjpeg compression mode, mjpeg_encoder_start_frame()
+	tests the image format as its only able to compress 24/32bpp images. On
+	images with lower bit depths, we return MJPEG_ENCODER_FRAME_UNSUPPORTED to
+	indicate this is not a format we can compress. However, this return goes
+	with a spice_warning("unsupported format"). As the rest of the code can
+	cope with this unsupported format by not doing mjpeg compression, it's
+	nicer to downgrade this spice_warning() to spice_debug().
+
+	This fixes https://bugzilla.redhat.com/show_bug.cgi?id=1070028
+
+2014-01-20  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Add reference manual
+	This manual documents how to enable/use various SPICE features when
+	creating a VM by running QEMU directly, or when using libvirt, or when
+	using virt-manager.
+	This is based on work by Lubos Kocman
+
+	Make RedsStream::info private
+
+	Introduce reds_stream_set_channel()
+
+	Introduce reds_stream_set_info_flag()
+
+	Make RedsStream::async_read private
+
+	Make RedsStream::sasl private
+
+	Make RedsStream read/write functions private
+
+	Make RedsStream::ssl private
+
+	Introduce reds_stream_is_ssl()
+
+	Add RedsStream::priv
+	The private data is allocated at the same time as RedsStream and
+	goes immediatly after the main RedsStream data.
+	This private member will allow to hide internal RedsStream
+	implementation details from the rest of spice-server.
+
+	Move SASL authentication to reds_stream.h
+	SASL authentication mostly use members from RedsStream to do its work, so
+	it makes sense to have its code in reds_stream.c. This should allow to make
+	RedsStream::sasl private in the future.
+
+	Move async code to RedsStream
+	The AsyncRead structure in reds.h wraps an async read + callback to
+	be done on a stream. Moving it to reds_stream.h is needed in order
+	to move SASL authentication there.
+
+	Move stream read/write callbacks to reds_stream.c
+	Now that stream creation and SSL enabling are done by helpers
+	in reds_stream.c, we can move the initialization of the vfunc
+	read/write pointers there too.
+
+	Introduce reds_stream_new() helper
+	Initializing a new stream means initializing quite a few fields.
+	This commit factors this initialization in a dedicated reds_stream_new
+	helper. This also helps moving more code from reds.c to reds_stream.c
+
+	reds: Move SSL-related code to RedsStream
+	Code to initiate a SSL stream belongs there
+
+	Move sync_write* to reds_stream.h
+	They are renamed to reds_stream_write*
+
+	Add reds_stream.[ch]
+	Gather common RedsStream code there rather than having it
+	in reds.c
+
+	Move SPICE_GNUC_VISIBLE to red_common.h
+
+2014-01-02  Christophe Fergeau  <cfergeau@redhat.com>
+
+	tests: Avoid malloc failures
+	test-display-streaming is calling malloc() without checking its return
+	value. Coverity warns about this. This commit switches to g_malloc() to
+	sidestep this warning (g_malloc() never returns NULL but aborts instead).
+
+	tests: Remove unused variables
+	coverity spotted some variables that were declared but not used in
+	server/tests
+
+2014-01-02  Jeremy White  <jwhite@codeweavers.com>
+
+	Fix typo; sampel --> sample
+
+	Add support for the Opus codec
+
+	Revise the spice client and server to use the new snd_codec functions in spice-common.
+	This makes celt optional, and paves the way to readily add additional codecs.
+
+2013-12-12  David Jaša  <djasa@redhat.com>
+
+	Use TLS version 1.0 or better
+	When creating a TLS socket, both spice-server and spice-gtk currently
+	call SSL_CTX_new(TLSv1_method()). The TLSv1_method() function set the
+	protocol version to TLS 1.0 exclusively. The correct way to support
+	multiple protocol versions is to call SSLv23_method() in spite of its
+	scary name. This method will enable all SSL/TLS protocol versions. The
+	protocol suite may be further narrowed down by setting respective
+	SSL_OP_NO_<version_code> options of SSL context.  This possibility is
+	used in this patch in order to block use of SSLv3 that is enabled by
+	default in openssl for client sockets as of now but spice has never used
+	it.
+
+2013-12-11  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Remove empty red_time.c
+
+	Add red_time.h to Makefile.am
+	This file was added in bc50ff076 a few months ago, but is not listed
+	in Makefile.am, and thus not part of tarballs. However, it's being included
+	from other C files, so not having it causes compilation breakage.
+
+	Update git-version-gen to latest version
+	Pick the latest git-version-gen version from
+	http://git.savannah.gnu.org/cgit/gnulib.git/plain/build-aux/git-version-gen
+
+	Add .version to EXTRA_DIST
+	Newer versions of git-version-gen document that it should be done, and
+	builddir != srcdir builds are broken if it's not present in the tarball as
+	we'd attempt to generate this file in the read-only source directory (if
+	the source dir is read-only)
+
+	Fix snappy detection with newer spice-gtk
+	It was renamed to spicy-screenshot
+
+2013-11-04  Christian Ruppert  <idl0r@qasl.de>
+
+	Require alsa only with --enable-client
+	Hey guys,
+
+	the alsa libraries/header seem to be required only when configured with
+	--enable-client so I wrote a patch to make configure respect it.
+
+	--
+	Regards,
+	Christian Ruppert
+
+	From 53683cc75ba092799f856f710cb45b2aacfb6123 Mon Sep 17 00:00:00 2001
+	From: Christian Ruppert <idl0r@gentoo.org>
+	Date: Sun, 3 Nov 2013 18:36:26 +0100
+	Subject: [PATCH] Require alsa only with --enable-client
+
+2013-10-30  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Fix buffer overflow when decrypting client SPICE ticket
+	reds_handle_ticket uses a fixed size 'password' buffer for the decrypted
+	password whose size is SPICE_MAX_PASSWORD_LENGTH. However,
+	RSA_private_decrypt which we call for the decryption expects the
+	destination buffer to be at least RSA_size(link->tiTicketing.rsa)
+	bytes long. On my spice-server build, SPICE_MAX_PASSWORD_LENGTH
+	is 60 while RSA_size() is 128, so we end up overflowing 'password'
+	when using long passwords (this was reproduced using the string:
+	'fullscreen=1proxy=#enter proxy here; e.g spice_proxy = http://[proxy]:[port]'
+	as a password).
+
+	When the overflow occurs, QEMU dies with:
+	*** stack smashing detected ***: qemu-system-x86_64 terminated
+
+	This commit ensures we use a corectly sized 'password' buffer,
+	and that it's correctly nul-terminated so that we can use strcmp
+	instead of strncmp. To keep using strncmp, we'd need to figure out
+	which one of 'password' and 'taTicket.password' is the smaller buffer,
+	and use that size.
+
+	This fixes rhbz#999839
+
+2013-10-28  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Remove tunneling support
+	It's depending on an unmaintained package (slirp), and I don't
+	think anyone uses that code. It's not tested upstream nor in fedora,
+	so let's remove it.
+
+	Silence gcc false positive with -Wuninitialized
+	Some versions of gcc warn about:
+	red_channel.c: In function 'red_channel_client_wait_outgoing_item':
+	red_channel.c:2331: error: 'end_time' may be used uninitialized in this function [-Wuninitialized]
+	red_channel.c: In function 'red_channel_client_wait_pipe_item_sent':
+	red_channel.c:2363: error: 'end_time' may be used uninitialized in this function [-Wuninitialized]
+	red_channel.c: In function 'red_channel_wait_all_sent':
+	red_channel.c:2401: error: 'end_time' may be used uninitialized in this function [-Wuninitialized]
+
+	This is a false positive as end_time is unitialized when timeout is -1, and
+	we will only try to use end_time if timeout is not -1.
+
+	This commit initializes end_time to UINT64_MAX to avoid that warning. As
+	the test involving end_time will never be reached, we ensure it's always
+	TRUE so that it would be a noop even if it was reached.
+
+2013-10-18  Axel Lin  <axel.lin@ingics.com>
+
+	red_tunnel_worker: Fix build error due to missing monitor_latency argument
+	Fix missing monitor_latency argument in red_channel_client_create call.
+
+2013-10-10  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Use latest warnings.m4 from gnulib
+	This fixes at least some issues when building with clang
+
+	Use hardened linker flags if available
+	This commit reuse several macros from libvirt to test for
+	support for "-Wl,-z -Wl,relro", "-Wl,-z -Wl,now" and
+	"-Wl,--no-copy-dt-needed-entries", and use them if available.
+
+	Don't ignore all of m4/ in .gitignore
+	m4/ contains several files tracked in git, so we should not ignore
+	the whole directory.
+
+2013-10-09  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Fix PlaybackeCommand typo
+
+2013-10-09  Jeremy White  <jwhite@codeweavers.com>
+
+	Fix an overlooked x11 client case.
+
+2013-10-08  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	reds: remove dead code
+
+2013-10-08  Christophe Fergeau  <cfergeau@redhat.com>
+
+	reds: Fix 'asyc' typo
+
+	Fix 'recive' typo throughout the code base
+	'receive' was mispelt 'recive' in multiple places.
+
+	Namespace RECEIVE_BUF_SIZE
+
+2013-10-07  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	server: handle red_get_surface_cmd() error explicitely
+	Don't ignore red_get_surface_cmd() error, and explicitely interrupt and
+	free cmd before processing.
+
+	server: plug some leaks on error
+	Plug what looks like memory leaks, that could be potentially be
+	triggered by a misbehaving guest.
+
+	server: inputs s/relase/release
+
+	server: release all pressed keys on client disconnect
+	Releasing modifiers keys unconditionally on disconnect leads to
+	unexpected guest wakeups. To improve the situation, the server can
+	release only the pressed keys, which will prevent the wakeup in most
+	cases.
+
+	Furthermore, it's not sufficient to release only the modifiers keys.
+	Any key should be released on client disconnect to avoid sticky key
+	press across connections.
+
+	https://bugzilla.redhat.com/show_bug.cgi?id=871240
+
+	server: mark deprecated symbols
+
+	server/tests: avoid using deprecated symbols
+
+	server: set dispatcher before calling attache_worker
+	This allows to call spice_qxl_add_memslot during attache_worker(), like
+	done in the tests.
+
+	Update spice-common
+
+2013-10-01  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	server: remove memslot unused functions
+
+2013-09-30  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	cleanup: remove GITVERSION
+	This file is unneeded since d986fb46
+
+	server: remove unused fill_rects_clip
+	Unused since 62d0c076eb2eb0f9954c3870f31b4dd685e5f95c.
+
+	spicec: disable stencil test with primary fbo
+	The primary buffer doesn't use stencil test. However, this should be
+	explicitely disabled, since the canvas might change stencil state, and
+	this will affect primary stencil buffer, making some of further update
+	operations clipped in unwanted ways.
+
+	spicec: use pre/post copy
+	Ensure the GL state is appropriate for calling GCanvas::copy_pixels.
+
+	spicec: add sw canvas diff check
+	Setting CHECKDIFF=1 environment variable will compare the rendering of
+	the selected canvas with a software canvas. This is useful for debugging
+	some rendering issues, however it is far from being perfect, since it's
+	not able to tell whether one or the other is actually faulty. It's a
+	strong indication though of which operations are incorrect.
+
+	Ideally, all operations should be checked, however, a few of them are
+	disabled by default because they fail all the time, and it looks like
+	pixman is not very accurate for blending/compositing (at least visually,
+	it seems gl has better rendering)
+
+	spicec: do not abort if cache error
+
+	spicec: add SPICE_NOGRAB
+	Similar to spice-gtk, disable mouse and keyboard grab (useful when
+	running under a debugger)
+
+	spicec: remove dead GL code
+
+	spicec: use doublebuffer for opengl
+	This visually reduces glitches without noticeable speed difference.
+
+	It's also the traditionnal way of doing opengl.
+
+	spicec: fix non-doublebuffer drawing
+	First, context must set it, then Draw/ReadBuffer must be set to FRONT,
+	and then explicit Flush is needed.
+
+	This patch is mostly for future reference, it is mostly discarded in
+	following patch using double-buffer.
+
+	spicec: use standard opengl 3.0 framebuffer
+
+	spicec: refresh the display after display resize
+
+	spicec: warn when throwing exception
+	This helps to identify the code location of exception
+
+	update spice-common
+
+2013-09-26  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker: disconnect the channel instead of shutdown in case of a blocking method failure
+	rhbz#1004443
+
+	The methods that trigger waitings on the client pipe require that
+	the waiting will succeed in order to continue, or otherwise, that
+	all the living pipe items will be released (e.g., when
+	we must destroy a surface, we need that all its related pipe items will
+	be released). Shutdown of the socket will eventually trigger
+	red_channel_client_disconnect (*), which will empty the pipe. However,
+	if the blocking method failed, we need to empty the pipe synchronously.
+	It is not safe(**) to call red_channel_client_disconnect from ChannelCbs
+	, but all the blocking calls in red_worker are done from callbacks that
+	are triggered from the device.
+	To summarize, calling red_channel_client_disconnect instead of calling
+	red_channel_client_shutdown will immediately release all the pipe items that are
+	held by the channel client (by calling red_channel_client_pipe_clear).
+	If red_clear_surface_drawables_from_pipe timeouts,
+	red_channel_client_disconnect will make sure that the surface we wish to
+	release is not referenced by any pipe-item.
+
+	(*) After a shutdown of a socket, we expect that later, when
+	red_peer_handle_incoming is called, it will encounter a socket
+	error and will call the channel's on_error callback which calls
+	red_channel_client_disconnect.
+
+	(**) I believe it was not safe before commit 2d2121a17038bc0 (before adding ref
+	count to ChannelClient). However, I think it might still be unsafe, because
+	red_channel_client_disconnect sets rcc->stream to NULL, and rcc->stream
+	may be referred later inside a red_channel_client method unsafely. So instead
+	of checking if (stream != NULL) after calling callbacks, we try to avoid
+	calling red_channel_client_disconnect from callbacks.
+
+	red_channel: cleanup of red_channel_client blocking methods
+	(1) receive timeout as a parameter.
+	(2) add a return value and pass the handling
+	    of failures to the calling routine.
+
+	red_worker: cleanup red_clear_surface_drawables_from_pipes
+	(1) merge 'force' and 'wait_for_outgoing_item' to one parameter.
+	    'wait_for_outgoing_item' is a derivative of 'force'.
+	(2) move the call to red_wait_outgoing_item to red_clear_surface_drawables_from_pipe
+
+2013-09-17  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	build-sys: fix some automake warning
+	client/Makefile.am:199: warning: 'INCLUDES' is the old name for 'AM_CPPFLAGS' (or '*_CPPFLAGS')
+	server/tests/Makefile.am:3: warning: 'INCLUDES' is the old name for 'AM_CPPFLAGS' (or '*_CPPFLAGS')
+
+2013-09-10  Dunrong Huang  <riegamaths@gmail.com>
+
+	Fix _FORTIFY_SOURCE redefine error
+	If the _FORTIFY_SOURCE has been already defined, we shouldn't redefine
+	it, or it will raise a build error as below:
+
+	In file included from agent-msg-filter.c:21:0:
+	../config.h:17:0: error: "_FORTIFY_SOURCE" redefined [-Werror]
+	agent-msg-filter.c:1:0: note: this is the location of the previous definition
+
+	Suggested-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2013-09-02  Christophe Fergeau  <cfergeau@redhat.com>
+
+	red_parse_qxl: Change spice_error() to spice_warning()
+	After eb09c25c, red_parse_qxl.c still has some spice_error() which
+	will kill the server even though the code is trying to return an error
+	when the spice_error() is hit.
+	This commit replaces these occurrences with a spice_warning() which
+	will not kill spice-server.
+
+2013-09-02  Uri Lublin  <uril@redhat.com>
+
+	server: bitmap_consistent: replace spice_error with spice_warning
+	bitmap_consistent should return true or false.
+	Currently it aborts instead of returning false, due to spice_error.
+	Replacing spice_error with spice_warning, provides information and returns
+	false, as expected.
+
+	This fixes Fedora bz#997932
+
+2013-08-29  Alon Levy  <alevy@redhat.com>
+
+	client: add some missing USE_GUI define guards
+
+2013-08-22  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker: fix call to dump_bitmap (too many args)
+
+	spice_bitmap_utils: fix dump_bitmap
+
+2013-08-14  Yonit Halperin  <yhalperi@redhat.com>
+
+	main_channel: monitoring client connection status
+	rhbz#994175
+
+	Start monitoring if the client connection is alive after completing
+	the bit-rate test.
+
+	red_channel: add option to monitor whether a channel client is alive
+	rhbz#994175
+
+	When a client connection is closed surprisingly (i.e., without a FIN
+	segment), we cannot identify it by a socket error (which is the only
+	way by which we identified disconnections so far).
+	This patch allows a channel client to periodically check the state of
+	the connection and identify surprise disconnections.
+
+	red_channel: add on_input callback for tracing incoming bytes
+	The callback will be used in the next patch.
+
+	spice_timer_queue: don't call timers repeatedly
+	For channels that don't run as part of the main loop, we use
+	spice_timer_queue, while for the other channels we use
+	qemu timers support. The callbacks for setting timers are supplied to
+	red_channel via SpiceCoreInterface, and their behavior should be
+	consistent. qemu timers are called only once per each call to
+	timer_start. This patch assigns the same behaviour to spice_timer_queue.
+
+2013-08-14  Alon Levy  <alevy@redhat.com>
+
+	server: split spice_image_cache from red_worker
+
+	server/red_worker: s/image_cache_eaging/image_cache_aging/
+
+	server: move surface_format_to_image_type to spice_bitmap_utils
+
+	server: s/red_wait_all_sent/red_channel_wait_all_sent/
+
+	server: move three functions to red_channel
+	Three blocking functions, one was split to leave the display channel
+	specific referencing of the DrawablePipeItem being sent inside
+	red_worker, but the rest (most) of the timeout logic was moved to
+	red_channel, including the associated constants.
+
+	Moved functions:
+	red_channel_client_wait_pipe_item_sent
+	red_wait_outgoing_item
+	red_wait_all_sent
+
+	Introduces red_time.h & red_time.c for a small helper function dealing
+	with time.h
+
+	server: move bit set/clear utilities out of red_worker.h
+
+	server: move dump_bitmap to separate file
+
+	server/red_worker.c:red_process_drawable: rename item to drawable
+
+	server/red_worker.c:red_process_drawable: rename drawable to red_drawable
+
+	red_worker: mark DRAW_ALL as broken
+	setting DRAW_ALL define doesn't produce correct rendering. Using
+	update_area instead of red_draw_qxl_drawable will work but it shouldn't
+	be required. This is not work I intend to do right now, so marking it
+	for anyone looking at this in the future.
+
+2013-08-06  Yonit Halperin  <yhalperi@redhat.com>
+
+	red_worker: decrease the timeout when flushing commands and waiting for the client.
+	150 seconds is way too long period for holding the guest driver and
+	waiting for a response for the client. This timeout was 15 seconds, but
+	when off-screen surfaces ware introduced it was arbitrarily multiplied by
+	10.
+	Other existing related bugs emphasize why it is important to decrease
+	the timeout:
+	(1) 994211 - the qxl driver waits for an async-io reponse for 60 seconds
+	    and after that, it switches to sync-io mode. Not only that the
+	    driver might use invalid data (since it didn't wait for the query to
+	    complete), falling back to sync-io mode introduces other errors.
+	(2) 994175 - spice server sometimes doesn't recognize that the client
+	             has disconnected.
+	(3) There might be cache inconsistency between the client and the server,
+	and then the display channel waits indefinitely for a cache item (e.g., bug
+	977998)
+
+	This patch changes the timeout to 30 seconds. I tested it under wifi +emulating 2.5Mbps network,
+	together with playing video on the guest and changing resolutions in a loop. The timeout didn't expired
+	during my tests.
+
+	This bug is related to rhbz#964136 (but from rhbz#964136 info it is still not
+	clear why the client wasn't responsive).
+
+2013-07-29  Yonit Halperin  <yhalperi@redhat.com>
+
+	log: improve debug information related to client disconnection
+
+	snd_worker/snd_disconnect_channel: don't call snd_channel_put if the channel has already been disconnected
+	The snd channels has one reference as long as their socket is active.
+	The playback channel has an additional reference for each frame that is
+	currently filled by the sound device.
+	Once the channel is disconnected (the socket has been freed and the
+	first reference is released) snd_disconnect_channel shouldn't release
+	a reference again.
+
+	snd_worker: fix memory leak of PlaybackChannel
+	When the sequence of calls bellow occurs, the PlaybackChannel
+	is not released (snd_channel_put is not called for the
+	samples that refer to the channel).
+
+	    spice_server_playback_get_buffer
+	    snd_channel_disconnect
+	    spice_server_playback_put_samples
+
+	reds: s/red_client_disconnect/red_channel_client_shutdown inside callbacks
+	When we want to disconnect the main channel from a callback, it is
+	safer to use red_channel_client_shutdown, instead of directly
+	destroying the client. It is also more consistent with how other
+	channels treat errors.
+	red_channel_client_shutdown will trigger socket error in the main channel.
+	Then, main_channel_client_on_disconnect will be called,
+	and eventually, main_dispatcher_client_disconnect.
+
+	I didn't replace calls to reds_disconnect/reds_client_disconnect in
+	places where those calls were safe && that might need immediate client
+	disconnection.
+
+	decouple disconnection of the main channel from client destruction
+	Fixes rhbz#918169
+
+	Some channels make direct calls to reds/main_channel routines. If
+	these routines try to read/write to the socket, and they get socket
+	error, main_channel_client_on_disconnect is called, and triggers
+	red_client_destroy. In order to prevent accessing expired references
+	to RedClient, RedChannelClient, or other objects (inside the original call, after
+	red_client_destroy has been called) I made the call to
+	red_client_destroy asynchronous with respect to main_channel_client_on_disconnect.
+	I added MAIN_DISPATCHER_CLIENT_DISCONNECT to main_dispatcher.
+	main_channel_client_on_disconnect pushes this msg to the dispatcher,
+	instead of calling directly to reds_client_disconnect.
+
+	The patch uses RedClient ref-count in order to handle a case where
+	reds_client_disconnect is called directly (e.g., when a new client connects while
+	another one is connected), while there is already CLIENT_DISCONNECT msg
+	pending in the main_dispatcher.
+
+	Examples:
+	(1) snd_worker.c
+
+	    snd_disconnect_channel()
+	        channel->cleanup() //snd_playback_cleanup
+	            reds_enable_mm_timer()
+	                .
+	                .
+	                main_channel_push_multi_media_time()...socket_error
+	                    .
+	                    .
+	                    red_client_destory()
+	                        .
+	                        .
+	                        snd_disconnect_channel()
+	                            channel->cleanup()
+	                                celt051_encoder_destroy()
+	            celt051_encoder_destory() // double release
+
+	Note that this bug could have been solved by changing the order of
+	calls: e.g., channel->stream = NULL before calling cleanup, and
+	some other changes + reference counting. However, I found other
+	places in the code with similar problems, and I looked for a general
+	solution, at least till we redesign red_channel to handle reference
+	counting more consistently.
+
+	(2) inputs_channel.c
+
+	    inputs_connect()
+	        main_channel_client_push_notify()...socket_error
+	                .
+	                .
+	            red_client_destory()
+	                .
+	                .
+	        red_channel_client_create() // refers to client which is already destroyed
+
+	(3) reds.c
+
+	    reds_handle_main_link()
+	       main_channel_push_init() ...socket error
+	                .
+	                .
+	            red_client_destory()
+	                .
+	                .
+	       main_channel_client_start_net_test(mcc) // refers to mcc which is already destroyed
+
+	    This can explain the assert in rhbz#964136, comment #1 (but not the hang that occurred before).
+
+	main_dispatcher: add ref count protection to RedClient instances
+
+	red_channel: add ref count to RedClient
+
+	red_channel: prevent adding and pushing pipe items after a channel_client has diconnected
+	Fixes: leaks of pipe items & "red_client_destroy: assertion `rcc->send_data.size == 0'"
+
+	red_channel_disconnect clears the pipe. It is called only once. After,
+	it was called, not items should be added to the pipe.
+
+	An example of when this assert can occur:
+	on_new_cursor_channel (red_worker.c), pushes 2 pipe items.
+	When it pushes the first pipe item, if the client has disconnected,
+	it can hit a socket error, and then, red_channel_client_disconnect is called.
+	The second call to adding a pipe item, will add the item to
+	the pipe. red_channel_client_pipe_add_type also calls
+	red_channel_client_push, which will update the send_data.size.
+	Then, the push will also hit a socket error, but red_channel_client_disconnect
+	won't clear the pending pipe item again, since it was already called.
+	When red_client_destory is called, we hit assertion `rcc->send_data.size
+	== 0'.
+	Note that if a pipe item is added to the pipe after
+	red_channel_client_disconnect was called, but without pushing it,
+	we should hit "spice_assert(rcc->pipe_size == 0)".
+
+2013-07-28  Alon Levy  <alevy@redhat.com>
+
+	server/red_channel: fix unused variable
+	unused variable 'so_unsent_size' [-Werror=unused-variable]
+
+2013-07-24  Alon Levy  <alevy@redhat.com>
+
+	server/red_worker.c: remove unused pipe_item_remove
+
+2013-07-22  Nahum Shalman  <nshalman@elys.com>
+
+	TIOCOUTQ -> SIOCOUTQ and portability ifdefs
+	The ioctl on sockets is actually named SIOCOUTQ though its value
+	is identical to TIOCOUTQ which is for terminals.
+	SIOCOUTQ is linux specific so we add a header check and ifdef based
+	on the presence of the header
+	This prevents bogus ioctls on non-Linux platforms
+
+	configure.ac comment typo nit
+
 2013-07-17  Uri Lublin  <uril@redhat.com>
 
 	Release 0.12.4
@@ -237,7 +1081,7 @@
 
 	server/red_worker: s/driver_has_monitors_config/driver_cap_monitors_config/ (plus small comment)
 
-2013-05-10  Yonit Halperin  <yhalperi@redhat.com>
+2013-05-09  Yonit Halperin  <yhalperi@redhat.com>
 
 	red_worker: don't get bit_rate from main_channel_client, if it wasn't initialized
 	When setting an initial video stream bit rate, if the bit rate
@@ -1077,7 +1921,7 @@
 	current code will segfault when BN_new fails as it immediatly tries
 	to use the NULL pointer.
 
-2012-09-15  Alon Levy  <alevy@redhat.com>
+2012-09-14  Alon Levy  <alevy@redhat.com>
 
 	Release 0.12.0
 
@@ -1273,7 +2117,7 @@
 
 	server/red_tunnel_worker: remove unneeded expect_migrate_mark
 
-2012-08-28  Alon Levy  <alevy@redhat.com>
+2012-08-27  Alon Levy  <alevy@redhat.com>
 
 	server/red_tunnel_worker.c: fix build
 	Only passes compile, not tested.
@@ -7368,6 +8212,8 @@
 
 	red_get_cursor: avoid extra copy
 
+2010-08-26  Gerd Hoffmann  <kraxel@redhat.com>
+
 	fix red_cursur_flush segfault
 
 	zap dead typedefs
@@ -7375,8 +8221,6 @@
 	zap dead qxl chunk code
 
 	qxl parser: add cursor parsing
-
-2010-08-26  Gerd Hoffmann  <kraxel@redhat.com>
 
 	qxl parser: complete QXL_SURFACE_CMD_CREATE parsing
 
@@ -7632,13 +8476,13 @@
 
 	server: add missing ifdef USE_OGL (red_worker.c)
 
-2010-07-08  Gerd Hoffmann  <kraxel@redhat.com>
+2010-07-07  Gerd Hoffmann  <kraxel@redhat.com>
 
 	Properly parse QXLImage to the new-world SpiceImage
 	SpiceImage now replaces RedImage and has all image types in it.
 	All image data are now chunked (and as such not copied when demarshalling).
 
-2010-07-08  Alexander Larsson  <alexl@redhat.com>
+2010-07-07  Alexander Larsson  <alexl@redhat.com>
 
 	codegen: support @chunk on non-pointer arrays
 	This is similar to @as_ptr, but generates a single chunk of data.
@@ -9115,15 +9959,13 @@
 
 	use spaces instead of tabs in bitmap_to_c and icon_to_c output
 
-2009-12-24  Yaniv Kamay  <ykamay@redhat.com>
+2009-12-23  Yaniv Kamay  <ykamay@redhat.com>
 
 	win client: change avcodec version to 51
 
-2009-12-24  Izik Eidus  <ieidus@redhat.com>
+2009-12-23  Izik Eidus  <ieidus@redhat.com>
 
 	spice: fix server crush in case connecting without qxl device
-
-2009-12-23  Izik Eidus  <ieidus@redhat.com>
 
 	spice client: fix wrong gdi-canvas handling of blend_alpha
 
@@ -9188,7 +10030,7 @@
 
 	spice: show splash screen on disconnect only on debug
 
-2009-11-16  Yaniv Kamay  <ykamay@redhat.com>
+2009-11-15  Yaniv Kamay  <ykamay@redhat.com>
 
 	client: change jitter buffer size to 300ms
 
@@ -9247,9 +10089,9 @@
 
 	fix win client copyright string
 
-	fix bad initialization of XDisplay in case crt have more then one output
-
 2009-10-26  Yaniv Kamay  <ykamay@redhat.com>
+
+	fix bad initialization of XDisplay in case crt have more then one output
 
 	fix build on Debian
 
