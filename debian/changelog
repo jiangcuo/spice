@@ -6,6 +6,9 @@ spice (0.12.6-1) UNRELEASED; urgency=medium
     since this version (instead of internal version)
   * remove libxinerama from build-deps and deps of libspice-server-dev
     (#658173 fixed upstream)
+  * remove libcacard-dev from libspice-server1-dev deps (it is not
+    actually used by the server) and remove version from libcacard
+    build-dep (any version ever seen in debian will do)
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 08 Oct 2015 21:47:14 +0300
 
