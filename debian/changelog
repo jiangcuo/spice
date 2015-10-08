@@ -8,7 +8,7 @@ spice (0.12.6-2) UNRELEASED; urgency=medium
 
 spice (0.12.6-1) unstable; urgency=medium
 
-  * Acknowlege previous NMUs. Thank you Salvatore and Laurent!
+  * Acknowledge previous NMUs. Thank you Salvatore and Laurent!
   * new upstream release (0.12.6), removed all patches (applied upstream)
   * add libspice-protocol-dev to build-deps, it is actually used
     since this version (instead of internal version)
