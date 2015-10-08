@@ -5,9 +5,7 @@ Maintainer: Liang Guo <guoliang@debian.org>
 Uploaders: Michael Tokarev <mjt@tls.msk.ru>
 Build-Depends: debhelper (>= 9), pkg-config,
  python,
-# libspice-protocol is actually not needed for build,
-# 0.12 always uses included definitions
-# libspice-protocol-dev (>= 0.10.1~),
+ libspice-protocol-dev (>= 0.12.10~),
  libopus-dev (>= 0.9.14),
  libpixman-1-dev (>= 0.17.7~),
  libxrandr-dev (>= 1.2~),
@@ -79,7 +77,7 @@ Description: Debugging symbols for libspice-server1
 Package: libspice-server-dev
 Section: libdevel
 Architecture: i386 amd64
-Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libglib2.0-dev (>= 2.22~), libpixman-1-dev (>= 0.17.7~), libssl-dev, libxinerama-dev, libspice-protocol-dev (>= 0.12.0~), libcacard-dev (>= 0.1.2)
+Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libglib2.0-dev (>= 2.22~), libpixman-1-dev (>= 0.17.7~), libssl-dev, libxinerama-dev, libspice-protocol-dev (>= 0.12.10~), libcacard-dev (>= 0.1.2)
 Suggests: pkg-config
 Description: Header files and development documentation for spice-server
  The Simple Protocol for Independent Computing Environments (SPICE) is
