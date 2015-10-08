@@ -8,13 +8,8 @@ Build-Depends: debhelper (>= 9), pkg-config,
  libspice-protocol-dev (>= 0.12.10~),
  libopus-dev (>= 0.9.14),
  libpixman-1-dev (>= 0.17.7~),
- libxrandr-dev (>= 1.2~),
  libasound2-dev,
  libssl-dev,
- libxfixes-dev,
-# these might be required for opengl support
-# which has to be enabled explicitly and is not recommended
-# libglu1-mesa-dev, libgl1-mesa-dev,
  libsasl2-dev,
  libjpeg-dev,
  python-pyparsing,
@@ -24,18 +19,6 @@ Standards-Version: 3.9.4
 Homepage: http://spice-space.org/
 Vcs-Git: git://anonscm.debian.org/collab-maint/spice.git
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/spice.git
-
-Package: spice-client
-Architecture: i386 amd64
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Implements the client side of the SPICE protocol
- The Simple Protocol for Independent Computing Environments (SPICE) is
- a remote display system built for virtual environments which allows
- you to view a computing 'desktop' environment not only on the machine
- where it is running, but from anywhere on the Internet and from a wide
- variety of machine architectures.
- .
- This package contains the SPICE client application.
 
 Package: libspice-server1
 Section: libs
