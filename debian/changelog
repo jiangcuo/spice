@@ -1,4 +1,4 @@
-spice (0.12.6-1) UNRELEASED; urgency=medium
+spice (0.12.6-1) unstable; urgency=medium
 
   * Acknowlege previous NMUs. Thank you Salvatore and Laurent!
   * new upstream release (0.12.6), removed all patches (applied upstream)
@@ -28,7 +28,7 @@ spice (0.12.6-1) UNRELEASED; urgency=medium
   * remove spice-protocol refs from d/copyright
   * remove double LGPL-2.1+ license text from d/copyright
 
- -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 08 Oct 2015 21:47:14 +0300
+ -- Michael Tokarev <mjt@tls.msk.ru>  Fri, 09 Oct 2015 00:00:34 +0300
 
 spice (0.12.5-1.3) unstable; urgency=high
 
