@@ -26,6 +26,7 @@ spice (0.12.6-1) UNRELEASED; urgency=medium
     libspice-server-dev package, since spice headers does not include
     these anymore, and the libs will be satisfied from the shared library
   * remove spice-protocol refs from d/copyright
+  * remove double LGPL-2.1+ license text from d/copyright
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 08 Oct 2015 21:47:14 +0300
 
