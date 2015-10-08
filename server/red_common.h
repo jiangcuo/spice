@@ -18,9 +18,8 @@
 #ifndef _H_RED_COMMON
 #define _H_RED_COMMON
 
-#include <sys/uio.h>
-#include <openssl/ssl.h>
 #include <spice/macros.h>
+#include <string.h>
 
 #include "common/mem.h"
 #include "common/spice_common.h"
@@ -30,13 +29,6 @@
 #include "spice.h"
 
 #define SPICE_GNUC_VISIBLE __attribute__ ((visibility ("default")))
-
-enum {
-    STREAM_VIDEO_INVALID,
-    STREAM_VIDEO_OFF,
-    STREAM_VIDEO_ALL,
-    STREAM_VIDEO_FILTER
-};
 
 static const LzImageType MAP_BITMAP_FMT_TO_LZ_IMAGE_TYPE[] = {
     LZ_IMAGE_TYPE_INVALID,

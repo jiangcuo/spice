@@ -421,7 +421,7 @@ static void snd_receive(void* data)
     for (;;) {
         ssize_t n;
         n = channel->receive_data.end - channel->receive_data.now;
-        spice_assert(n);
+        spice_warn_if(n <= 0);
         n = reds_stream_read(channel->stream, channel->receive_data.now, n);
         if (n <= 0) {
             if (n == 0) {
@@ -1041,7 +1041,7 @@ SPICE_GNUC_VISIBLE void spice_server_playback_start(SpicePlaybackInstance *sin)
     if (!channel)
         return;
     spice_assert(!playback_channel->base.active);
-    reds_disable_mm_timer();
+    reds_disable_mm_time();
     playback_channel->base.active = TRUE;
     if (!playback_channel->base.client_active) {
         snd_set_command(&playback_channel->base, SND_PLAYBACK_CTRL_MASK);
@@ -1060,7 +1060,7 @@ SPICE_GNUC_VISIBLE void spice_server_playback_stop(SpicePlaybackInstance *sin)
     if (!channel)
         return;
     spice_assert(playback_channel->base.active);
-    reds_enable_mm_timer();
+    reds_enable_mm_time();
     playback_channel->base.active = FALSE;
     if (playback_channel->base.client_active) {
         snd_set_command(&playback_channel->base, SND_PLAYBACK_CTRL_MASK);
@@ -1117,7 +1117,6 @@ SPICE_GNUC_VISIBLE void spice_server_playback_put_samples(SpicePlaybackInstance 
         snd_playback_free_frame(playback_channel, playback_channel->pending_frame);
     }
     frame->time = reds_get_mm_time();
-    red_dispatcher_set_mm_time(frame->time);
     playback_channel->pending_frame = frame;
     snd_set_command(&playback_channel->base, SND_PLAYBACK_PCM_MASK);
     snd_playback_send(&playback_channel->base);
@@ -1175,7 +1174,7 @@ static void on_new_playback_channel(SndWorker *worker)
         snd_set_command((SndChannel *)playback_channel, SND_PLAYBACK_VOLUME_MASK);
     }
     if (playback_channel->base.active) {
-        reds_disable_mm_timer();
+        reds_disable_mm_time();
     }
 }
 
@@ -1184,7 +1183,7 @@ static void snd_playback_cleanup(SndChannel *channel)
     PlaybackChannel *playback_channel = SPICE_CONTAINEROF(channel, PlaybackChannel, base);
 
     if (playback_channel->base.active) {
-        reds_enable_mm_timer();
+        reds_enable_mm_time();
     }
 
     snd_codec_destroy(&playback_channel->codec);
@@ -1233,7 +1232,10 @@ static void snd_set_playback_peer(RedChannel *channel, RedClient *client, RedsSt
         }
     }
 
-    on_new_playback_channel(worker);
+    if (!red_client_during_migrate_at_target(client)) {
+        on_new_playback_channel(worker);
+    }
+
     if (worker->active) {
         spice_server_playback_start(st->sin);
     }
@@ -1620,9 +1622,4 @@ void snd_set_playback_compression(int on)
             }
         }
     }
-}
-
-int snd_get_playback_compression(void)
-{
-    return playback_compression;
 }

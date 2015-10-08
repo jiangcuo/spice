@@ -167,7 +167,7 @@ typedef struct RedWorkerMessageLoadvmCommands {
 } RedWorkerMessageLoadvmCommands;
 
 typedef struct RedWorkerMessageSetCompression {
-    spice_image_compression_t image_compression;
+    SpiceImageCompression image_compression;
 } RedWorkerMessageSetCompression;
 
 typedef struct RedWorkerMessageSetStreamingVideo {
@@ -200,6 +200,7 @@ typedef struct RedWorkerMessageMonitorsConfigAsync {
     RedWorkerMessageAsync base;
     QXLPHYSICAL monitors_config;
     int group_id;
+    unsigned int max_monitors;
 } RedWorkerMessageMonitorsConfigAsync;
 
 typedef struct RedWorkerMessageDriverUnload {

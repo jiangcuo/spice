@@ -22,6 +22,7 @@
 #include <config.h>
 #endif
 
+#include <glib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <netinet/in.h>
@@ -120,47 +121,47 @@ static void red_channel_client_unref(RedChannelClient *rcc);
 
 static uint32_t full_header_get_msg_size(SpiceDataHeaderOpaque *header)
 {
-    return ((SpiceDataHeader *)header->data)->size;
+    return GUINT32_FROM_LE(((SpiceDataHeader *)header->data)->size);
 }
 
 static uint32_t mini_header_get_msg_size(SpiceDataHeaderOpaque *header)
 {
-    return ((SpiceMiniDataHeader *)header->data)->size;
+    return GUINT32_FROM_LE(((SpiceMiniDataHeader *)header->data)->size);
 }
 
 static uint16_t full_header_get_msg_type(SpiceDataHeaderOpaque *header)
 {
-    return ((SpiceDataHeader *)header->data)->type;
+    return GUINT16_FROM_LE(((SpiceDataHeader *)header->data)->type);
 }
 
 static uint16_t mini_header_get_msg_type(SpiceDataHeaderOpaque *header)
 {
-    return ((SpiceMiniDataHeader *)header->data)->type;
+    return GUINT16_FROM_LE(((SpiceMiniDataHeader *)header->data)->type);
 }
 
 static void full_header_set_msg_type(SpiceDataHeaderOpaque *header, uint16_t type)
 {
-    ((SpiceDataHeader *)header->data)->type = type;
+    ((SpiceDataHeader *)header->data)->type = GUINT16_TO_LE(type);
 }
 
 static void mini_header_set_msg_type(SpiceDataHeaderOpaque *header, uint16_t type)
 {
-    ((SpiceMiniDataHeader *)header->data)->type = type;
+    ((SpiceMiniDataHeader *)header->data)->type = GUINT16_TO_LE(type);
 }
 
 static void full_header_set_msg_size(SpiceDataHeaderOpaque *header, uint32_t size)
 {
-    ((SpiceDataHeader *)header->data)->size = size;
+    ((SpiceDataHeader *)header->data)->size = GUINT32_TO_LE(size);
 }
 
 static void mini_header_set_msg_size(SpiceDataHeaderOpaque *header, uint32_t size)
 {
-    ((SpiceMiniDataHeader *)header->data)->size = size;
+    ((SpiceMiniDataHeader *)header->data)->size = GUINT32_TO_LE(size);
 }
 
 static void full_header_set_msg_serial(SpiceDataHeaderOpaque *header, uint64_t serial)
 {
-    ((SpiceDataHeader *)header->data)->serial = serial;
+    ((SpiceDataHeader *)header->data)->serial = GUINT64_TO_LE(serial);
 }
 
 static void mini_header_set_msg_serial(SpiceDataHeaderOpaque *header, uint64_t serial)
@@ -170,7 +171,7 @@ static void mini_header_set_msg_serial(SpiceDataHeaderOpaque *header, uint64_t s
 
 static void full_header_set_msg_sub_list(SpiceDataHeaderOpaque *header, uint32_t sub_list)
 {
-    ((SpiceDataHeader *)header->data)->sub_list = sub_list;
+    ((SpiceDataHeader *)header->data)->sub_list = GUINT32_TO_LE(sub_list);
 }
 
 static void mini_header_set_msg_sub_list(SpiceDataHeaderOpaque *header, uint32_t sub_list)
@@ -538,7 +539,7 @@ static void red_channel_client_send_ping(RedChannelClient *rcc)
         /*
          * When testing latency, TCP_NODELAY must be switched on, otherwise,
          * sending the ping message is delayed by Nagle algorithm, and the
-         * roundtrip measurment is less accurate (bigger).
+         * roundtrip measurement is less accurate (bigger).
          */
         rcc->latency_monitor.tcp_nodelay = 1;
         if (getsockopt(rcc->stream->socket, IPPROTO_TCP, TCP_NODELAY, &delay_val,
@@ -599,8 +600,6 @@ static void red_channel_client_send_item(RedChannelClient *rcc, PipeItem *item)
 
 static void red_channel_client_release_item(RedChannelClient *rcc, PipeItem *item, int item_pushed)
 {
-    int handled = TRUE;
-
     switch (item->type) {
         case PIPE_ITEM_TYPE_SET_ACK:
         case PIPE_ITEM_TYPE_EMPTY_MSG:
@@ -609,10 +608,7 @@ static void red_channel_client_release_item(RedChannelClient *rcc, PipeItem *ite
             free(item);
             break;
         default:
-            handled = FALSE;
-    }
-    if (!handled) {
-        rcc->channel->channel_cbs.release_item(rcc, item, item_pushed);
+            rcc->channel->channel_cbs.release_item(rcc, item, item_pushed);
     }
 }
 
@@ -928,7 +924,7 @@ RedChannelClient *red_channel_client_create(int size, RedChannel *channel, RedCl
     red_channel_ref(channel);
     pthread_mutex_unlock(&client->lock);
 
-    if (monitor_latency) {
+    if (monitor_latency && reds_stream_get_family(stream) != AF_UNIX) {
         rcc->latency_monitor.timer = channel->core->timer_add(
             red_channel_client_ping_timer, rcc);
         if (!client->during_target_migrate) {
@@ -1021,7 +1017,7 @@ void red_channel_client_default_migrate(RedChannelClient *rcc)
 }
 
 RedChannel *red_channel_create(int size,
-                               SpiceCoreInterface *core,
+                               const SpiceCoreInterface *core,
                                uint32_t type, uint32_t id,
                                int handle_acks,
                                channel_handle_message_proc handle_message,
@@ -1136,7 +1132,7 @@ static int do_nothing_handle_message(RedChannelClient *rcc,
 }
 
 RedChannel *red_channel_create_parser(int size,
-                               SpiceCoreInterface *core,
+                               const SpiceCoreInterface *core,
                                uint32_t type, uint32_t id,
                                int handle_acks,
                                spice_parse_channel_func_t parser,
@@ -1172,7 +1168,7 @@ void red_channel_register_client_cbs(RedChannel *channel, ClientCbs *client_cbs)
     }
 }
 
-int test_capability(uint32_t *caps, int num_caps, uint32_t cap)
+int test_capability(const uint32_t *caps, int num_caps, uint32_t cap)
 {
     uint32_t index = cap / 32;
     if (num_caps < index + 1) {
@@ -2295,7 +2291,7 @@ uint32_t red_channel_max_pipe_size(RedChannel *channel)
 
     RING_FOREACH(link, &channel->clients) {
         rcc = SPICE_CONTAINEROF(link, RedChannelClient, channel_link);
-        pipe_size = pipe_size > rcc->pipe_size ? pipe_size : rcc->pipe_size;
+        pipe_size = MAX(pipe_size, rcc->pipe_size);
     }
     return pipe_size;
 }
@@ -2308,7 +2304,7 @@ uint32_t red_channel_min_pipe_size(RedChannel *channel)
 
     RING_FOREACH(link, &channel->clients) {
         rcc = SPICE_CONTAINEROF(link, RedChannelClient, channel_link);
-        pipe_size = pipe_size < rcc->pipe_size ? pipe_size : rcc->pipe_size;
+        pipe_size = MIN(pipe_size, rcc->pipe_size);
     }
     return pipe_size == ~0 ? 0 : pipe_size;
 }

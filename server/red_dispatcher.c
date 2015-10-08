@@ -66,20 +66,11 @@ struct RedDispatcher {
     Ring async_commands;
     pthread_mutex_t  async_lock;
     QXLDevSurfaceCreate surface_create;
+    unsigned int max_monitors;
 };
 
-typedef struct RedWorkeState {
-    uint8_t *io_base;
-    unsigned long phys_delta;
-
-    uint32_t x_res;
-    uint32_t y_res;
-    uint32_t bits;
-    uint32_t stride;
-} RedWorkeState;
-
 extern uint32_t streaming_video;
-extern spice_image_compression_t image_compression;
+extern SpiceImageCompression image_compression;
 extern spice_wan_compression_t jpeg_state;
 extern spice_wan_compression_t zlib_glz_state;
 
@@ -228,7 +219,7 @@ static RendererInfo renderers_info[] = {
     {RED_RENDERER_INVALID, NULL},
 };
 
-static uint32_t renderers[RED_MAX_RENDERERS];
+static uint32_t renderers[RED_RENDERER_LAST];
 static uint32_t num_renderers = 0;
 
 static RendererInfo *find_renderer(const char *name)
@@ -247,7 +238,7 @@ int red_dispatcher_add_renderer(const char *name)
 {
     RendererInfo *inf;
 
-    if (num_renderers == RED_MAX_RENDERERS || !(inf = find_renderer(name))) {
+    if (num_renderers == RED_RENDERER_LAST || !(inf = find_renderer(name))) {
         return FALSE;
     }
     renderers[num_renderers++] = inf->id;
@@ -332,8 +323,8 @@ void red_dispatcher_client_monitors_config(VDAgentMonitorsConfig *monitors_confi
         if (!now->qxl->st->qif->client_monitors_config ||
             !now->qxl->st->qif->client_monitors_config(now->qxl,
                                                        monitors_config)) {
-            spice_warning("spice bug: QXLInterface::client_monitors_config"
-                          " failed/missing unexpectedly\n");
+            /* this is a normal condition, some qemu devices might not implement it */
+            spice_debug("QXLInterface::client_monitors_config failed");
         }
         now = now->next;
     }
@@ -703,6 +694,7 @@ static void red_dispatcher_monitors_config_async(RedDispatcher *dispatcher,
     payload.base.cmd = async_command_alloc(dispatcher, message, cookie);
     payload.monitors_config = monitors_config;
     payload.group_id = group_id;
+    payload.max_monitors = dispatcher->max_monitors;
 
     dispatcher_send_message(&dispatcher->dispatcher, message, &payload);
 }
@@ -751,20 +743,11 @@ static void qxl_worker_loadvm_commands(QXLWorker *qxl_worker,
     red_dispatcher_loadvm_commands((RedDispatcher*)qxl_worker, ext, count);
 }
 
-void red_dispatcher_set_mm_time(uint32_t mm_time)
-{
-    RedDispatcher *now = dispatchers;
-    while (now) {
-        now->qxl->st->qif->set_mm_time(now->qxl, mm_time);
-        now = now->next;
-    }
-}
-
 static inline int calc_compression_level(void)
 {
-    spice_assert(streaming_video != STREAM_VIDEO_INVALID);
-    if ((streaming_video != STREAM_VIDEO_OFF) ||
-        (image_compression != SPICE_IMAGE_COMPRESS_QUIC)) {
+    spice_assert(streaming_video != SPICE_STREAM_VIDEO_INVALID);
+    if ((streaming_video != SPICE_STREAM_VIDEO_OFF) ||
+        (image_compression != SPICE_IMAGE_COMPRESSION_QUIC)) {
         return 0;
     } else {
         return 1;
@@ -1006,6 +989,12 @@ void spice_qxl_monitors_config_async(QXLInstance *instance, QXLPHYSICAL monitors
 }
 
 SPICE_GNUC_VISIBLE
+void spice_qxl_set_max_monitors(QXLInstance *instance, unsigned int max_monitors)
+{
+    instance->st->dispatcher->max_monitors = MAX(1u, max_monitors);
+}
+
+SPICE_GNUC_VISIBLE
 void spice_qxl_driver_unload(QXLInstance *instance)
 {
     red_dispatcher_driver_unload(instance->st->dispatcher);
@@ -1129,6 +1118,8 @@ void red_dispatcher_init(QXLInstance *qxl)
     red_dispatcher->base.destroy_surface_wait = qxl_worker_destroy_surface_wait;
     red_dispatcher->base.loadvm_commands = qxl_worker_loadvm_commands;
 
+    red_dispatcher->max_monitors = UINT_MAX;
+
     qxl->st->qif->get_init_info(qxl, &init_info);
 
     init_data.memslot_id_bits = init_info.memslot_id_bits;
@@ -1162,6 +1153,7 @@ void red_dispatcher_init(QXLInstance *qxl)
         red_channel_register_client_cbs(display_channel, &client_cbs);
         red_channel_set_data(display_channel, red_dispatcher);
         red_channel_set_cap(display_channel, SPICE_DISPLAY_CAP_MONITORS_CONFIG);
+        red_channel_set_cap(display_channel, SPICE_DISPLAY_CAP_PREF_COMPRESSION);
         red_channel_set_cap(display_channel, SPICE_DISPLAY_CAP_STREAM_REPORT);
         reds_register_channel(display_channel);
     }

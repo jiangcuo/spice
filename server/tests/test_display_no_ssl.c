@@ -17,7 +17,7 @@ void show_channels(SpiceServer *server);
 
 int ping_ms = 100;
 
-void pinger(void *opaque)
+void pinger(SPICE_GNUC_UNUSED void *opaque)
 {
     // show_channels is not thread safe - fails if disconnections / connections occur
     //show_channels(server);
@@ -41,7 +41,7 @@ int main(void)
 
     core = basic_event_loop_init();
     test = test_new(core);
-    //spice_server_set_image_compression(server, SPICE_IMAGE_COMPRESS_OFF);
+    //spice_server_set_image_compression(server, SPICE_IMAGE_COMPRESSION_OFF);
     test_add_display_interface(test);
     test_add_agent_interface(test->server);
     test_set_simple_command_list(test, simple_commands, COUNT(simple_commands));

@@ -1,3 +1,1511 @@
+2015-10-06  Frediano Ziglio  <fziglio@redhat.com>
+
+	build-sys: bump libtool version information
+	As one interface was added bump the version and put a comment to avoid
+	too much updates.
+
+2015-10-06  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Mention the 2 recently fixed CVEs in NEWS
+
+2015-10-06  Frediano Ziglio  <fziglio@redhat.com>
+
+	Prevent leak if size from red_get_data_chunks don't match in red_get_image
+
+	Prevent data_size to be set independently from data
+	There was not check for data_size field so one could set data to
+	a small set of data and data_size much bigger than size of data
+	leading to buffer overflow.
+
+	Avoid race condition copying segments in red_get_path
+	The guest can attempt to increase the number of segments while
+	spice-server is reading them.
+	Make sure we don't copy more then the allocated segments.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Make sure we can read QXLPathSeg structures
+	start pointer points to a QXLPathSeg structure.
+	Before reading from the structure, make sure the structure is contained
+	in the memory range checked.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Fix some possible overflows in red_get_string for 32 bit
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Prevent DoS from guest trying to allocate too much data on host for chunks
+	Limit number of chunks to a given amount to avoid guest trying to
+	allocate too much memory. Using circular or nested chunks lists
+	guest could try to allocate huge amounts of memory.
+	Considering the list can be infinite and guest can change data this
+	also prevents strange security attacks from guest.
+
+	Prevent memory leak if red_get_data_chunks_ptr fails
+	Free linked list if client tries to do nasty things
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Fix race condition in red_get_data_chunks_ptr
+	Do not read multiple times data from guest as this can be changed by
+	other guest vcpus. This causes races and security problems if these
+	data are used for buffer allocation or checks.
+
+	Actually, the 'data' member can't change during read as it is just a
+	pointer to a fixed array contained in qxl. However, this change will
+	make it clear that there can be no race condition.
+
+	Fix integer overflow computing glyph_size in red_get_string
+	If bpp is int the formula can lead to weird overflows. width and height
+	are uint16_t so the formula is:
+
+	  size_t = u16 * (u16 * int + const_int) / const_int;
+
+	so it became
+
+	  size_t = (int) u16 * ((int) u16 * int + const_int) / const_int;
+
+	However the (int) u16 * (int) u16 can then became negative to overflow.
+	Under 64 bit architectures size_t is 64 and int usually 32 so converting
+	this negative 32 bit number to a unsigned 64 bit lead to a very big
+	number as the signed is extended and then converted to unsigned.
+	Using unsigned arithmetic prevent extending the sign.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Fix race condition in red_get_string
+	Do not read multiple time an array size that can be changed.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Fix race in red_get_image
+	Do not read multiple times data from guest as this could be changed
+	by other vcpu threads.
+	This causes races and security problems if these data are used for
+	buffer allocation or checks.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Fix race condition on red_get_clip_rects
+	Do not read multiple time an array size that can be changed.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Prevent 32 bit integer overflow in bitmap_consistent
+	The overflow may lead to buffer overflow as the row size computed from
+	width (bitmap->x) can be bigger than the size in bytes (bitmap->stride).
+	This can make spice-server accept the invalid sizes.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Fix buffer reading overflow
+	Not security risk as just for read.
+	However, this could be used to attempt integer overflows in the
+	following lines.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Check properly surface to be created
+	Check format is valid.
+	Check stride is at least the size of required bytes for a row.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Fix some integer overflow causing large memory allocations
+	Prevent integer overflow when computing image sizes.
+	Image index computations are done using 32 bit so this can cause easily
+	security issues. MAX_DATA_CHUNK is larger than the virtual
+	card limit, so this is not going to cause change in behaviours.
+	Comparing size calculation results with MAX_DATA_CHUNK will allow us to
+	catch overflows.
+	Prevent guest from allocating large amount of memory.
+
+	Define a constant to limit data from guest.
+	This limit will prevent guest trying to do nasty things and DoS to host.
+
+	worker: avoid double free or double create of surfaces
+	A driver can overwrite surface state creating a surface with the same
+	id of a previous one.
+	Also can try to destroy surfaces that are not created.
+	Both requests cause invalid internal states that could lead to crashes
+	or memory corruptions.
+
+	worker: validate correctly surfaces
+	Do not just give warning and continue to use an invalid index into
+	an array.
+
+	Resolves: CVE-2015-5260
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2015-10-05  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	worker: make it clear it returns from process when no cmd
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2015-10-02  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	server: remove useless includes
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2015-10-01  Christophe Fergeau  <cfergeau@redhat.com>
+
+	manual: Fix Arnon last name
+	It's "Gilboa", not "Giloba"
+
+	manual: Add section about debugging
+	This details the basics for now, but can be detailed in the future.
+
+	Update NEWS
+
+2015-09-29  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	worker: count in drawable_new()
+
+2015-09-29  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	PALLET -> PALETTE
+	Use the correct spelling for the enumeration
+
+2015-09-29  Christophe Fergeau  <cfergeau@redhat.com>
+
+	tests: Fix -Werror=format-zero-length build failure
+	replay.c: In function 'replay_channel_event':
+	replay.c:226:16: error: zero-length gnu_printf format string
+	[-Werror=format-zero-length]
+	     g_printerr("");
+
+2015-09-24  Christophe Fergeau  <cfergeau@redhat.com>
+
+	display: Advertise preferred compression cap
+	The patches adding a way for the client to set its preferred compression
+	method added a new capability so that the server can indicate support
+	for this feature. However, spice-server was not setting this capability
+	on its display channel, which means clients are not going to try to send
+	'preferred-compression' messages even though the user request it.
+
+2015-09-15  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	manual: add smartcard channel section
+	Add some basic instructions to setup smartcard channel
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	manual: add missing space
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	manual: update webdav virt-manager section
+	virt-manager can add webdav channel for a while now.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2015-09-08  Frediano Ziglio  <fziglio@redhat.com>
+
+	Avoid race conditions reading monitor configs from guest
+	For security reasons do not assume guest do not change structures it
+	pass to Qemu.
+	Guest could change count field while Qemu is copying QXLMonitorsConfig
+	structure leading to heap corruption.
+	This patch avoid it reading count only once.
+
+	This patch solves CVE-2015-3247.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	replay: fix formatting string
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2015-09-07  Frediano Ziglio  <fziglio@redhat.com>
+
+	build-sys: Update warning message
+	arch_warn was set to 1 only if architecture is not x86, x64 or arm.
+	Update the message as we actually mainly test x64.
+	Define the warning message and do the architecture checks in the
+	same place so that they are easier to keep in sync.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2015-09-04  Frediano Ziglio  <fziglio@redhat.com>
+
+	improve performances comparing image pixels
+	This patch contains a bit of small optimizations.
+	It avoid boolean	 operations which could involve branches replacing
+	with binary operations (equal/all_ident -> some_differences).
+	The other optimization avoids the use of ABS. First the way the macro
+	was used (with a large expression) was not easy to optimize by the
+	compiler.
+	Then instead of using ABS a much simpler range check is used so instead
+	of (ABS(n) >= k) a ((n) <= -k || (n) >= k) is used. This looks small
+	but modern compilers can translate this not in range check in a couple
+	of machine instructions (and a single compare).
+
+	Using operf on same samples (using spice-server-replay) and trying 2 runs
+	I got
+
+	run             1       2
+	-------------------------
+	before    104441   106267
+	after      92387    91083
+
+	So the performance increase is about 13%.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2015-09-03  Frediano Ziglio  <fziglio@redhat.com>
+
+	avoid to call red_get_streams_timout twice computing timeout
+	Due to how the MIN macro is defined the function was called twice
+	unless the compiler could demonstrate that was returning the same
+	value (which actually is impossible as function as clock_gettime
+	are not deterministic).
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	spice_timer_queue: fix access after free
+	Do not access to timer after we call the associated function.
+	Some of these callbacks can call spice_timer_remove making the pointer
+	pointing to freed data.
+	This happen for instance when the client is disconnecting.
+	This does not cause memory corruption on current allocator
+	implementations as all freeing/accessing happen on a single thread quite
+	closely and allocators use different pools for different thread.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2015-09-01  Frediano Ziglio  <fziglio@redhat.com>
+
+	replay: compatibility with former version
+	GMutex usage in replay.c was not working so replace with plain pthread.
+
+	replay: do not define same type twice
+	Avoid to use typedef twice for the same type as some compiler
+	complaints about it.
+	SpiceTimer and SpiceWatch are defined in server/spice-core.h
+	as an abstract type which should be defined by some code (as
+	server/tests/basic_event_loop.c does).
+
+2015-09-01  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Update spice-common submodule
+	Christophe Fergeau (1):
+	      build-sys: Remove code generation files from EXTRA_DIST
+
+	Frediano Ziglio (1):
+	      common: Fix typo in comment
+
+	build-sys: Add missing header files to _SOURCES
+	2 newly-added header files were not added to _SOURCES, breaking make
+	distcheck.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2015-09-01  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	Remove useless pack attribute
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	server: remove srand(time(NULL))
+	This is clearly not a library responsability.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2015-09-01  Alon Levy  <alon@pobox.com>
+
+	server/red_worker: remove redundant spice_warn_if in validate_surface
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2015-09-01  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	server: remove hardcoded RED_MAX_RENDERERS
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2015-08-28  Frediano Ziglio  <fziglio@redhat.com>
+
+	Simplify set_surface_release_info
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	replay: fix typo in message
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2015-08-26  Frediano Ziglio  <fziglio@redhat.com>
+
+	Avoid core calling spice_server_destroy
+	spice_server_destroy calls reds_exit which is called also at exit time
+	(is registered with atexit) so avoid to keep dangling pointers.
+	Currently this does not happen as spice_server_destroy is not called
+	by Qemu.
+
+	prevent integer overflow on 32 bit
+	On 32 bit machine timespec->tv_sec (time_t) is 32 bit.
+	Also 1000 * 1000 * 1000 is 32 bit.
+	The multiplication of 2 32 bit integers gives a 32 bit integer, however
+	this can overflow.
+	Converting the first factor to 64 bit before the multiplication solves
+	the issue.
+
+	remove unused SAME_PIXEL macro
+
+2015-08-26  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build-sys: Remove test_spice_version.h
+	This script was used at make distcheck time to verify consistency of the
+	version number defined in configure.ac and in spice-server headers.
+	Since commit ab12cf414c, these 2 version numbers can no longer be out of
+	sync, so we can drop this script.
+
+	server: Readd spice-experimental.h
+	Commit 3c6b4e41 removed spice-experimental.h as this header was not
+	used, nor supposed to be used. However, QEMU had been including it
+	(without using any of its symbols) until commit v2.3.0-rc0~135^2~1
+
+	As this is fairly recent (Nov 2014), building older QEMUs with new
+	spice-server releases, or even bisecting QEMU will be broken as they
+	will be looking for a no-longer available header.
+
+	This commit readds a spice-experimental.h file, however it only contains
+	a #warning indicating this file is deprecated. This means older QEMU
+	will build now, but only if they were configured with --disable-werror.
+
+	build-sys: Require a new enough spice-protocol in .pc file
+	spice-server headers expose SpiceImageCompression which is only available
+	from recent spice-protocol releases.
+	This dependency must be expressed in Requires and not Requires.private
+
+2015-08-25  Frediano Ziglio  <fziglio@redhat.com>
+
+	remove wrong statement terminator from preprocessor macro
+	Actually not causing problems as when used is always followed by another
+	terminator but better to fix the definition.
+
+	Acked-by: Pavel Grunt <pgrunt@redhat.com>
+
+	Use MAX macro to compute the maximum value
+
+	replay: use plain pthread for mutex/condition
+	Mutex/conditional require Glib 2.32 which is not available in RHEL6.
+	Use plain pthread to make this module compatible with RHEL6.
+
+	Acked-by: Fabiano Fidencio <ffidenci@redhat.com>
+
+	replay: fix check for QXL_SURF_FLAG_KEEP_DATA flag
+	A logical and (&&) was used instead of a bit one (&).
+	Was working just as is the only flag defined.
+
+	Acked-by: Fabiano Fidencio <ffidenci@redhat.com>
+
+2015-08-24  Frediano Ziglio  <fziglio@redhat.com>
+
+	worker: remove unused members from Drawable
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2015-08-22  Alon Levy  <alon@pobox.com>
+
+	server/tests/spice-server-replay: introduce
+	usage: spice-server-replay -p <port> -c <client command line> <cmdfile>
+
+	will run the commands from cmdfile ignoring timestamps, right after a
+	connection is established from the client, and will SIGINT the client
+	on end of cmdfile, and exit itself after waiting for the client.
+
+	spicy-stats from spice-gtk is useful for testing, it prints the summary
+	of the traffic on each channel.
+
+	You can also run with no client by doing:
+	spice-server-replay <cmdfile>
+
+	For example, the 300 MB file (compressed to 4 MB with xz -9) available
+	at [1] produces the following output:
+
+	spicy-stats total bytes read:
+	total bytes read:
+	inputs: 214
+	display: 1968983
+	cursor: 390
+	main: 256373
+
+	You could run it directly like so:
+	curl http://annarchy.freedesktop.org/~alon/win7_boot_shutdown.cmd.xz | \
+	  xzcat | server/tests/spice-server-replay -p 12345 -c `which spicy-stats` -
+
+	Known Problems:
+	* Implementation is wrong. Should do a single device->host conversion
+	 (i.e. get_virt), and then marshall/demarshall that (i.e. RedDrawable).
+	* segfault on file read done resulting in the above spicy-stats not
+	 being reproducable (well, up to 1% yes).
+
+	[1] http://annarchy.freedesktop.org/~alon/win7_boot_shutdown.cmd.xz
+
+	Now based on glib including using an asyncqueue for reading the playback
+	file, and proper freeing of the allocated commands, with --slow,
+	--compression and a progress timer, and doesn't use more then nsurfaces.
+
+2015-08-21  Alon Levy  <alon@pobox.com>
+
+	server/red_worker: record to SPICE_WORKER_RECORD_FILENAME
+	if the environment variable in the title is set and can be
+	opened for writing a log of all display commands (no cursor
+	commands yet) and any QXLWorker calls (particularily primary
+	create and destroy) will be logged to that file, and possible
+	to replay using the replay utility introduced later.
+
+	For an example file (4 MB download, 300 MB after unpack with xz,
+	these 300 MB are themselves reduced from 1.2GB using zlib compression
+	for any chunk):
+
+	(old file without a header)
+	http://annarchy.freedesktop.org/~alon/win7_boot_shutdown.cmd.xz
+
+	server/red_{record, replay}.[ch]: introduce
+	Currently hand crafted with some sed scripts and alot of vim macros from
+	red_parse_qxl after considering the logger in qemu/hw/qxl-logger.c and seeing
+	it was incomplete. The only problem with logging from the server and
+	not from qemu is that it requires coordinated shutdown to avoid half a message.
+
+	Should be automatically generated from a declarative syntax, i.e. qxl.proto.
+
+	Note: zlib compression is introduced in a disabled state, see ZLIB
+	define
+
+	Now with a simple versioned header and generated ids by the server
+	instead of based on the recorded file, and doesn't use more then 1024
+	surfaces (configurable).
+
+2015-08-20  Alon Levy  <alon@pobox.com>
+
+	server/dispatcher: add extra_dispatcher, hack for red_record
+
+2015-08-20  Marc-André Lureau  <marcandre.lureau@redhat.com>
+
+	tests: use glib main loop
+
+2015-08-20  Alon Levy  <alon@pobox.com>
+
+	Remove use of INLINE
+	It's #define'd to 'inline', and only used in the GLZ encoder.
+
+2015-08-20  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build-sys: Remove spice-protocol submodule
+	It's seeing regular releases and is API stable, so we don't need to
+	bundle it with spice-server
+
+2015-08-20  Victor Toso  <victortoso@redhat.com>
+
+	mjpeg and jpeg encoder: fix alignment warnings
+	As the input line could be uint8_t*, uint16_t* or uint32_t*, changing
+	the default from uint8_t* to void* seems the correct choice to deal with
+	upcasting warnings.
+
+	Regarding chunks->data allocation, I quote Frediano explantion:
+	"Lines came from spice_bitmap_get_line. This function assume that bitmap
+	data is split among chunks each containing some lines
+	(always full lines). If chunk->data is allocated using malloc or similar
+	SHOULD (not 100% sure) be 4 bytes aligned so in our cases
+	(8, 16, 24 or 32 bit images) should be aligned enough.
+
+	All the casts unfortunately came from the fact we compute based on
+	pixel bytes to make it generic so we use uint8_t*."
+
+	and
+
+	"Looking at code looks like these chunks came from the virtual machine.
+	So the question is... why should the virtual machine give use some
+	not-pixel align data?
+	I would put a large comment to state that we assume VM send aligned
+	data, would be stupid for the VM to not align it!"
+
+	clang output:
+	jpeg_encoder.c:109:26: error: cast from 'uint8_t *'
+	(aka 'unsigned char *') to 'uint16_t *' (aka 'unsigned short *')
+	increases required alignment from 1 to 2 [-Werror,-Wcast-align]
+	  uint16_t *src_line = (uint16_t *)line;
+	                       ^~~~~~~~~~~~~~~~
+
+	jpeg_encoder.c:144:26: error: cast from 'uint8_t *'
+	(aka 'unsigned char *') to 'uint32_t *' (aka 'unsigned int *')
+	increases required alignment from 1 to 4 [-Werror,-Wcast-align]
+	  uint32_t *src_line = (uint32_t *)line;
+	                       ^~~~~~~~~~~~~~~~
+
+	mjpeg_encoder.c:260:23: error: cast from 'uint8_t *'
+	(aka 'unsigned char *') to 'uint16_t *' (aka 'unsigned short *')
+	increases required alignment from 1 to 2 [-Werror,-Wcast-align]
+	  uint16_t pixel = *(uint16_t *)src;
+	                    ^~~~~~~~~~~~~~~
+
+	glz: WindowImageSegment lines lines_end as void*
+	Instead of using uint8_t* which can cause several warnings on casting as
+	the example below:
+
+	./glz_encode_tmpl.c:321:29: error: cast from 'uint8_t *'
+	(aka 'unsigned char *') to 'rgb16_pixel_t *' (aka 'unsigned short *')
+	increases required alignment from 1 to 2 [-Werror,-Wcast-align]
+	 ref_limit = (PIXEL *)(seg->lines_end);
+	              ^~~~~~~~~~~~~~~~~~~~~~~~~
+
+	migration_protocol: use SPICE_MAGIC_CONST
+	spice-protocol has a new define to create the magic constants, let's use
+	that.
+
+2015-08-12  Victor Toso  <victortoso@redhat.com>
+
+	red_parse_qxl: Do not compute abs unsigned int
+	SpiceBitmap's stride is uint32_t.
+
+	from clang:
+	red_parse_qxl.c:452:41: error: taking the absolute value of unsigned
+	type 'uint32_t' (aka 'unsigned int') has no effect
+
+	bitmap_size = red->u.bitmap.y * abs(red->u.bitmap.stride);
+	                                ^
+
+2015-08-12  Alon Levy  <alon@pobox.com>
+
+	server/inputs_channel: Cope with NULL keyboard in release_keys()
+	This fixes a test_display_no_ssl segfault on client disconnect when
+	the keyboard was never initialized.
+
+2015-08-11  Victor Toso  <victortoso@redhat.com>
+
+	red_parse_qxl: remove unused variable
+
+2015-08-11  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Remove unused struct RedsOutItem
+
+	RedChannel: remove unused BufDescriptor struct
+
+2015-08-11  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Remove unused snd_get_playback_compression() method
+
+	Fix typo in comment in char_device.h
+
+2015-08-11  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Fix typo in comments
+
+	Move RedsMigSpice to main-channel.h
+	This is the place that needs the complete type definition. If it is
+	defined in reds.h, it can create circular references.
+
+	Cleanup: move static function declarations out of header
+	It doesn't make much sense to have static function declarations in a
+	header, even a private header. So move them down into the source file.
+
+2015-08-11  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	worker: remove unused preload_group_id
+
+	channel: minor simplification
+
+	server: remove unused CursorData
+
+	server: use more const CoreInterface
+
+	worker: move red_init_*() functions
+	There is a red_init() methods, we can group all the red_init_*() calls
+	in it rather than calling red_init() followed by all these calls in our
+	main function.
+
+2015-08-04  Uri Lublin  <uril@redhat.com>
+
+	spice-common: codegen: ptypes.py: keep attribute names in sets
+	This fixes the build on RHEL-6
+
+2015-07-29  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Adjust to new SpiceImageCompress name
+	This has been renamed to SpiceImageCompression in order to avoid clashes
+	with older spice-server in the SPICE_IMAGE_COMPRESS_ namespace. This
+	commit is a straight rename of SpiceImageCompress to
+	SpiceImageCompression and SPICE_IMAGE_COMPRESS_ to
+	SPICE_IMAGE_COMPRESSION_
+
+2015-07-28  Jeremy White  <jwhite@codeweavers.com>
+
+	Add libraries such as -lm and -lpthread to the tests build line.
+	This prevents a compile error on Debian Jessie, from git, such as this:
+	/usr/bin/ld: test_playback.o: undefined reference to symbol 'sin@@GLIBC_2.2.5'
+	//lib/x86_64-linux-gnu/libm.so.6: error adding symbols: DSO missing from command line
+
+	This is fairly subtle, and Debian specific.  It only happens when you use
+	autoreconf to generate a new libtool script.  Debian patches that script
+	to require an explicit setting to link with all dependent libraries.
+
+	It should be harmless on other distros, and it does save us Debian guys some
+	hassle.
+
+2015-07-20  Frediano Ziglio  <fziglio@redhat.com>
+
+	reds: Assure we don't have stale statistic files before trying to create a new one
+	If a previous Qemu executable is not able to delete the statistic file
+	on the next creation with same name (statitics file are based on pid
+	numbers so if pid get reused for another Qemu process you get the same
+	name) it fails as you can't open a file with 0444 permissions (these
+	are the permission used to create these files).
+	This patch assure there are no stale file trying to remove it before the
+	creation of the new one. As file is based on pid and name used for spice
+	you are not deleting another file.
+
+	Fixes: rhbz#1177326
+
+2015-07-20  Francois Gouget  <fgouget@codeweavers.com>
+
+	server: spice_debug() messages don't need a trailing '\n'.
+
+	server: Weakly try to get a better latency value for the bandwidth test.
+	NET_TEST_WARMUP_BYTES is 0 so the warmup ping is the same as the one we
+	use to measure the latency. Even if it was not, the actual latency would
+	be the MIN() of both anyway so we might as well use both roundtrip times
+	to ward off latency jitter a bit.
+
+	server: Don't reset the latency before showing it in the invalid net test error message.
+
+2015-07-13  Pavel Grunt  <pgrunt@redhat.com>
+
+	Use desired image compression for the first image
+	red_marshall_image() allows to use other than QUIC compression only
+	when auto_lz or auto_glz image compression is set. Other images don't
+	have the problem because they are compressed using red_compress_image()
+
+2015-06-30  Javier Celaya  <javier.celaya@flexvm.es>
+
+	Handle preferred image compression messages
+
+	Use image compress constants from spice-protocol
+
+2015-06-29  Francois Gouget  <fgouget@codeweavers.com>
+
+	server: Remove the rate_control_is_active field from MJpegEncoder.
+	It is redundant with the corresponding callbacks.
+
+	server: Fix an incorrect time calculation.
+
+	HAVE_CLOCK_GETTIME is not used so remove it.
+
+2015-06-29  Sandy Stutsman  <sstutsma@redhat.com>
+
+	Lock the pixmap image cache for the entire fill_bits call
+	Locking the individual calls that access the pixmap cache in fill_bits is
+	not adequately thread safe.  Often a windows guest with multiple monitors
+	will be sending the same image via different threads.  Both threads can
+	be in fill_bits at the same time making changes to the cache for the same
+	image.  This can result in images being deleted before all the client
+	channels are finished with them or with the same image being send multiple
+	times.  Here's what can happen with out the lock in fill_bits
+
+	On the server in red_worker.c:fill_bits
+	 Thread 1 calls pixmap_cache_hit for Image A and finds it isn't in cache
+	 Thread 2 calls pixmap_cache_hit for Image A and finds it isn't in cache
+
+	 Thread 1 adds Image 1 to pixmap_cache (1x)
+	 Thread 2 adds Image 1 to pixmap_cache (2x)
+
+	On the client
+	 Channel 1 adds Image A to image_cache (1x)
+	 Channel 2 replaces Image A in image_cache (1x)
+
+	On server
+	 Thread 1 sends Image A rendering commands
+	 Thread N removes Image A from pixmap_cache (image remains - 1x)
+	 Thread 2 sends Image A rendering commands
+
+	On client
+	 Channe1 renders from Image A
+	 Channel N removes Image a from image_cache (image is completely removed)
+	 Channel2 render command hangs waiting for Image A
+
+2015-06-26  Frediano Ziglio  <fziglio@redhat.com>
+
+	server: allows to set maximum monitors
+	spice-server will attempt to limit number of monitors.
+	Guest machine can send monitor list it accepts. Limiting the number sent
+	by guest will limit the number of monitors client will try to enable.
+	The guest usually see client monitors enabled and start using it so
+	not seeing client monitor won't try to enable more monitor.
+	In this case the additional monitor guest can support will always be
+	seen as heads with no attached monitors.
+	This allows limiting monitors number without changing guest drivers.
+
+2015-06-26  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build-sys: Fix build with automake < 1.13
+	AC_CONFIG_MACRO_DIRS is not available with older automake versions,
+	which causes autogen.sh failures on RHEL6. m4_include() can be used
+	instead.
+
+2015-06-22  Francois Gouget  <fgouget@codeweavers.com>
+
+	mjpeg: Convert rate control checks to asserts in encoder
+	The checks would lead the reader to think these functions can be called
+	when bit rate control is off when in fact they are only called when it
+	is active.
+
+	server: Refresh the input fps every 5 second, without a timer.
+
+2015-06-22  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build-sys: Use spice-common m4 macro for lz4
+	This will allow to share this detection code with spice-gtk.
+
+	build-sys: Use spice-common m4 macro for opengl
+	This factorizes a bit of configure.ac m4 code.
+
+	build-sys: Use spice-common m4 macro for smartcard
+	Besides the code factorization, this will allow smartcard support to be
+	automatically enabled if libcacard is present and --disable-smartcard is
+	not used.
+
+2015-06-17  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	reds: increase listening socket backlog
+	With a TCP socket, the backlog doesn't seem to matter much,
+	perhaps because of latency or underlying protocol behaviour. However,
+	on UNIX socket, it is fairly easy to reach the backlog limit and the
+	client will get an EAGAIN error (but not ECONNREFUSED as stated in
+	listen(7)) that is not easy to deal with: attempting to reconnect in a
+	loop might busy-loop forever as there are no guarantee the server will
+	accept new connections, so it will be inherently racy.
+
+	Typically, Spice server can easily have up to 15 concurrent incoming
+	connections that are established during initialization of the session.
+	To improve the situation, raise the backlog limit to the default maximum
+	system value, which is 128 on Linux.
+
+2015-06-16  Cédric Bosdonnat  <cbosdonnat@suse.com>
+
+	Add password length check
+	Don't allow setting a too long password.
+
+2015-06-16  Frediano Ziglio  <fziglio@redhat.com>
+
+	Use spice_malloc instead of malloc
+	Do not just check and give warning before crashing the program
+	accessing a NULL pointer but use spice_malloc which exits with a
+	proper message.
+
+2015-06-15  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Remove duplicate streaming enumeration
+	There is already a enumeration in a public header that defines the
+	different streaming options, so there's no need to duplicate that
+	enumeration internally. Just use the public enum values.
+
+	Use AS_HELP_STRING for configure options
+
+2015-06-11  Frediano Ziglio  <fziglio@redhat.com>
+
+	Fix typo in comment
+
+	Use MIN macro to compute a minimum
+
+2015-06-11  Javier Celaya  <javier.celaya@flexvm.es>
+
+	LZ4: warn if trying to set lz4 but not supported
+
+2015-06-09  Francois Gouget  <fgouget@codeweavers.com>
+
+	server: Remove an unused structure.
+
+2015-06-04  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	sound: do not modify client state on migration
+	During migration, a volume jump is observed by the client. This is due
+	to qemu setting up destination server with default sound state, and the
+	server sending it after the client is connected. The volume is later
+	restored after migration is finished so there is no need to send this
+	default state values on connection.
+
+	Tested with both AC97 & HDA devices.
+
+	Fixes:
+	https://bugzilla.redhat.com/show_bug.cgi?id=1012868
+
+2015-04-23  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build-sys: Pass --enable-python-checks when running autogen.sh
+	This will tell spice-common configure.ac to test for the availability of
+	python-six when building from git.
+
+	Update spice-common submodule
+	This fixes a few issues with older python-six versions:
+
+	Christophe Fergeau (2):
+	      configure.ac: Check for needed python modules for git builds
+	      codegen: Use six.PY3 rather than six.PY2
+
+2015-04-10  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build-sys: Replace cpu detection error with warning
+	configure.ac currently errors out when trying to build on
+	non-x86/non-ARM CPUs. Since the previous commits improved
+	big endian support a lot, this commit replaces the error
+	with a warning at configure time to make testing on big
+	endian platforms easier.
+
+	build-sys: Remove unused 'X86_64' conditional
+	X86_64 was defined as an AM_CONDITIONAL, but then nothing was using it.
+	This commit gets rid of it.
+
+	ppc: Fix glz magic endianess
+	This is a modified version of a patch initially by Erlon R. Cruz
+	<erlon.cruz@br.flextronics.com>
+
+	ppc: Fixing endianness for channel messages
+	This is a modified version of a patch initially from
+	Erlon R. Cruz <erlon.cruz@br.flextronics.com>
+
+	ppc: Update spice-common for endianness-related fixes
+	Alexander Wauck (1):
+	      Make spice_codegen.py work on both Python 2 and 3
+
+	Christophe Fergeau (17):
+	      Remove unused header file
+	      build-sys: Remove unused X check
+	      build-sys: Remove unused win32 check
+	      build-sys: Remove unused WITH_SMARTCARD conditional
+	      build-sys: Small cleanup of AM_CPPFLAGS
+	      build-sys: Add fallback for AS_VAR_APPEND
+	      build-sys: Move posix checks to a separate m4 macro
+	      build-sys: Move smartcard check to m4 macro
+	      build-sys: Move celt check to m4 macro
+	      build-sys: Move opus check to m4 macro
+	      build-sys: Move opengl check to m4 macro
+	      build-sys: Move pixman check to m4 macro
+	      Remove unused 'invers' arg from canvas_get_*
+	      Remove redundant #if defined(SW_CANVAS_CACHE) ||
+	defined(SW_CANVAS_IMAGE_CACHE)
+	      Remove another redundant (SW_CANVAS_CACHE) ||
+	(SW_CANVAS_IMAGE_CACHE) #ifdef
+	      Get rid of SW_CANVAS_IMAGE_CACHE
+	      ssl_verify: Move wincrypt.h related #ifdef closer to the include
+
+	Erlon Cruz (2):
+	      ppc: Fix lz magic endianness
+	      ppc: build-sys: Add big-endian support
+
+	Fabiano Fidêncio (1):
+	      Fix typo in pixman_image_get_stride() function
+
+	Javier Celaya (6):
+	      LZ4: Fix output buffer size
+	      LZ4: Adjust reading the top_down flag
+	      LZ4: Decode the image format from the stream
+	      LZ4: Fix the row alignment when it is not on a 32bit boundary
+	      LZ4: Add support for 24bit pixman surfaces
+	      LZ4: Do not include arpa/inet.h in Windows builds
+
+	Victor Toso (1):
+	      common: fix build with mingw
+
+	ppc: Fix endianness handling in initial SPICE connection
+	This commit fixes enough endianness issues that it's possible to
+	connect to a spice-server/qemu running on a big-endian box with a client
+	running on a little-endian machine.
+
+	I haven't tested more than getting to the bios/bootloader and typing a
+	bit on the keyboard as I did not manage to boot a distro afterwards :(
+
+	This is based on patches send by Erlon R. Cruz
+	<erlon.cruz@br.flextronics.com>
+
+2015-03-15  Uri Lublin  <uril@redhat.com>
+
+	m4: WARN FLAGS: Drop -Wenum-compare
+	My RHEL-6 gcc (4.4.7) complains a lot about it:
+	   cc1: warning: command line option "-Wenum-compare" is
+	   valid for C++/ObjC++ but not for C
+
+	For older gcc version (e.g. 4.4.7), man gcc says
+	-Wenum-compare is "C++ and Objective-C++ only".
+
+	For newer gcc (e.g. 4.9.2), man gcc says
+	"In C this warning is enabled by -Wall."
+
+2015-02-25  Fabiano Fidêncio  <fidencio@redhat.com>
+
+	Do not compress bitmaps on UNIX socket
+	On UNIX socket do not perform unnecessary image compression
+
+2015-02-24  Fabiano Fidêncio  <fidencio@redhat.com>
+
+	tests: Fix build on Hurd
+	As PATH_MAX is not defined on Hurd, let's check for it and define
+	whenever it is necessary.
+
+	https://bugs.freedesktop.org/show_bug.cgi?id=74313
+
+2015-02-08  Uri Lublin  <uril@redhat.com>
+
+	char-device: spice_char_device_write_to_device: protect against recursion
+	This fixes Spice's smart card support and is related to
+	commit 697f3214fd16adcd524456003619f7f44ddd031b.
+
+	Reported-by: Swapna Krishnan <skrishna@redhat.com>
+
+	Recursion is now possible starting with spice_char_device_write_to_device
+	going through spice_char_device_wakeup (after going through qemu),
+	calling again to spice_char_device_write_to_device.
+
+	The protecting code is the same as the one protecting the read path.
+
+	This function call loop makes the program to abort with the following messages:
+
+	  usb-ccid: chardev: unexpected message of type 3000000
+	  qemu: qemu_mutex_lock: Resource deadlock avoided
+
+	Backtrace:
+
+	(gdb) bt
+	* #0  0x00007ffff3fc78c7 in raise () from /lib64/libc.so.6
+	* #1  0x00007ffff3fc952a in abort () from /lib64/libc.so.6
+	* #2  0x0000555555969a95 in error_exit (err=35,
+	*     msg=0x5555559f8c90 <__func__.5119> "qemu_mutex_lock")
+	*     at util/qemu-thread-posix.c:48
+	* #3  0x0000555555969b82 in qemu_mutex_lock (mutex=0x5555562c4d60)
+	*     at util/qemu-thread-posix.c:79
+	* #4  0x0000555555714771 in qemu_chr_fe_write (s=0x5555562c4d60,
+	*     buf=0x7fffffffd2a0 "", len=12) at qemu-char.c:219
+	* #5  0x000055555586be49 in ccid_card_vscard_send_msg (s=0x5555565c5f80,
+	*     type=VSC_Error, reader_id=0, payload=0x7fffffffd2e0 "", length=4)
+	*     at hw/usb/ccid-card-passthru.c:75
+	* #6  0x000055555586bf00 in ccid_card_vscard_send_error (s=0x5555565c5f80,
+	*     reader_id=0, code=VSC_GENERAL_ERROR) at
+	*     hw/usb/ccid-card-passthru.c:91
+	* #7  0x000055555586c559 in ccid_card_vscard_handle_message (
+	*     card=0x5555565c5f80, scr_msg_header=0x5555565c6008)
+	*     at hw/usb/ccid-card-passthru.c:254
+	* #8  0x000055555586c72f in ccid_card_vscard_read (opaque=0x5555565c5f80,
+	*     buf=0x5555565034b0 "", size=12) at hw/usb/ccid-card-passthru.c:289
+	* #9  0x00005555557149db in qemu_chr_be_write (s=0x5555562c4d60,
+	*     buf=0x5555565034b0 "", len=12) at qemu-char.c:305
+	* #10 0x000055555571cde5 in vmc_write (sin=0x5555562c4e78,
+	*     buf=0x5555565034b0 "", len=12) at spice-qemu-char.c:41
+	* #11 0x00007ffff4fa86aa in spice_char_device_write_to_device (
+	*     dev=0x55555657f210) at char_device.c:462
+	* #12 0x00007ffff4fa9b48 in spice_char_device_wakeup (dev=0x55555657f210)
+	*     at char_device.c:862
+	* #13 0x00007ffff4ff7658 in spice_server_char_device_wakeup
+	*     (sin=0x5555562c4e78) at reds.c:2955
+	* #14 0x000055555571d1d2 in spice_chr_write (chr=0x5555562c4d60,
+	*     buf=0x7fffffffd560 "", len=12) at spice-qemu-char.c:189
+	* #15 0x0000555555714789 in qemu_chr_fe_write (s=0x5555562c4d60,
+	*     buf=0x7fffffffd560 "", len=12) at qemu-char.c:220
+	* #16 0x000055555586be49 in ccid_card_vscard_send_msg (s=0x5555565c5f80,
+	*     type=VSC_Error, reader_id=0, payload=0x7fffffffd5a0 "", length=4)
+	*     at hw/usb/ccid-card-passthru.c:75
+	* #17 0x000055555586bf00 in ccid_card_vscard_send_error
+	* (s=0x5555565c5f80,
+	*     reader_id=0, code=VSC_SUCCESS) at hw/usb/ccid-card-passthru.c:91
+	* #18 0x000055555586c4fc in ccid_card_vscard_handle_message (
+	*     card=0x5555565c5f80, scr_msg_header=0x5555565c6008)
+	*     at hw/usb/ccid-card-passthru.c:242
+	* #19 0x000055555586c72f in ccid_card_vscard_read (opaque=0x5555565c5f80,
+	*     buf=0x5555565034b0 "", size=12) at hw/usb/ccid-card-passthru.c:289
+	* #20 0x00005555557149db in qemu_chr_be_write (s=0x5555562c4d60,
+	*     buf=0x5555565034b0 "", len=12) at qemu-char.c:305
+	* #21 0x000055555571cde5 in vmc_write (sin=0x5555562c4e78,
+	*     buf=0x5555565034b0 "", len=12) at spice-qemu-char.c:41
+	* #22 0x00007ffff4fa86aa in spice_char_device_write_to_device (
+	*     dev=0x55555657f210) at char_device.c:462
+	* #23 0x00007ffff4fa8d37 in spice_char_device_write_buffer_add (
+	*     dev=0x55555657f210, write_buf=0x555556501f70) at char_device.c:597
+	* #24 0x00007ffff501142d in smartcard_channel_write_to_reader (
+	*     write_buf=0x555556501f70) at smartcard.c:669
+	* #25 0x00007ffff501034c in smartcard_char_device_notify_reader_add (
+	*     st=0x55555657ef00) at smartcard.c:335
+	* #26 0x00007ffff50112b3 in smartcard_add_reader (scc=0x555556493ee0,
+	*     name=0x5555565023cc "E-Gate 0 0") at smartcard.c:642
+	* #27 0x00007ffff50118d2 in smartcard_channel_handle_message (
+	*     rcc=0x555556493ee0, type=101, size=22, msg=0x5555565023c0 "\003")
+	*     at smartcard.c:757
+	* #28 0x00007ffff4fbc168 in red_peer_handle_incoming
+	*     (stream=0x555556588250, handler=0x555556497ff0) at red_channel.c:308
+	* #29 0x00007ffff4fbc231 in red_channel_client_receive
+	*     (rcc=0x555556493ee0) at red_channel.c:326
+	* #30 0x00007ffff4fc0019 in red_channel_client_event (fd=59, event=1,
+	*     data=0x555556493ee0) at red_channel.c:1574
+	* #31 0x00005555558b6076 in watch_read (opaque=0x5555565002f0)
+	*     at ui/spice-core.c:101
+	* #32 0x00005555558e8d48 in qemu_iohandler_poll (pollfds=0x5555562b7630,
+	*     ret=2) at iohandler.c:143
+	* #33 0x00005555558e89a4 in main_loop_wait (nonblocking=0) at
+	* main-loop.c:495
+	* #34 0x00005555557219b0 in main_loop () at vl.c:1794
+	* #35 0x0000555555729257 in main (argc=40, argv=0x7fffffffddc8,
+	*     envp=0x7fffffffdf10) at vl.c:4350
+
+2015-02-03  Javier Celaya  <javier.celaya@flexvm.es>
+
+	LZ4: Send the original format with the compressed data
+
+	LZ4: Do not reverse bottom-up images
+	Reversing the bottom-up images in the server is not needed since Pixman,
+	in the client, is able to deal with them. As a result, the previous code
+	was more complex and wrong. This commit fixes and cleans it.
+
+	LZ4: Fix encoder output size
+
+	LZ4: Limit LZ4 to RGB formats
+	Currently, the LZ4 encoding only (partially) supports RGB images, so
+	we must check the image format before using it. In the future, indexed
+	formats may be implemented too, but their use is usually very small
+	compared to RGB.
+
+2015-01-15  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	Remove spice-experimental
+	Remove unneded symbols that nobody should be using anyway.
+	ABI is modified with this patch, but the library version is not bumped.
+
+	Do not perform network tests on UNIX socket
+	By default, stream latency is 0 and bandwidth is infinite. On UNIX
+	socket do not perform unnecessary testing and keep those values.
+
+	reds-stream: add reds_stream_get_family() function
+
+	reds: add Unix socket support
+	Learn to listen on a Unix address. In this case, the connection is plain
+	only (non-tls).
+
+2014-12-15  Christophe Fergeau  <cfergeau@redhat.com>
+
+	inputs: Remove unneeded variable
+	inputs_channel_handle_parsed() is casting its void * argument to
+	a uint8_t * buf before recasting this 'buf' variable to different
+	other types. This intermediate 'buf' variable is not needed, especially
+	as we can then benefit from implicit casts from void * to the type we
+	need.
+
+	inputs: Split overlong line
+	Cosmetic change.
+
+	inputs: Fix key_up/key_down mismatch
+	When handling a KEY_UP message, the various variables were called
+	'key_down', and they were called 'key_up' when handling KEY_DOWN
+	messages. This commit makes the naming consistent.
+
+2014-12-03  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Remove unused SPICE_CANVAS_INTERNAL
+
+	client: Remove client code
+	The client has been superseded by virt-viewer (
+	http://virt-manager.org/download/sources/virt-viewer/ ) and is no longer
+	being maintained.
+
+2014-12-02  Javier Celaya  <javier.celaya@flexvm.es>
+
+	Add LZ4 compression support.
+	- Add lz4 encoder to compress an image of type LZ4 (see spice_common).
+	- Add code in red_worker to use LZ4 when it is enabled, and the client
+	  supports it through its display capability, or fallback to LZ.
+	- Add enable_lz4 switch in the configure script. Show LZ4 support at the
+	  end.
+
+2014-12-01  Christophe Fergeau  <cfergeau@redhat.com>
+
+	configure.ac: Never add xinerama to SPICE_REQUIRES
+	SPICE_REQUIRES is only used to generate the Requires.private line of
+	spice-server.pc. The server code is not using xinerama, so we don't need
+	to list xinerama in Requires.private.
+
+	configure.ac: Only check for xinerama for client builds
+	Xinerama support is only used for the X11 client, but is currently
+	being checked even for server only builds. This commit ensures Xinerama
+	is not checked for/added to spice-server.pc when not building the
+	client.
+
+2014-11-29  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	build-sys: fix out-of-tree build of tests
+	Fixes the following build error:
+	In file included from
+	/home/elmarco/src/spice-new/src/spice/server/tests/test_display_base.h:4:0,
+	                 from
+	                 /home/elmarco/src/spice-new/src/spice/server/tests/test_display_no_ssl.c:11:
+	                 /home/elmarco/src/spice-new/src/spice/server/spice.h:23:27:
+	                 fatal error: spice-version.h: No such file or directory
+	                  #include "spice-version.h"
+	                                             ^
+
+2014-11-27  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	Add explicit spice-core.h include
+	Several functions use core interfaces, add and explicit include.
+
+	Move spice_server_get_num_clients() declaration
+	This function is not related to migration.
+
+	Rename mm_timer/mm_time
+	As suggested by Christophe on the mailing list.
+
+	Remove guest side video time-stamping
+	The multimedia time is defined by the server side monotonic time [1],
+	but the drawing time-stamp is done in guest side, so it requires
+	synchronization between host and guest. This is expensive, when no audio
+	is playing, there is a ~30x/sec wakeup to update the qxl device mmtime,
+	and it requires marking dirty the rom region.
+
+	Instead, the video timestamping can be done more efficiently on server
+	side, without visible drawbacks.
+
+	[1] a better timestamp could be the audio time, since audio players are
+	    usually sync with audio time)
+
+	Related to:
+	https://bugzilla.redhat.com/show_bug.cgi?id=912763
+
+	build-sys: generate spice-version.h
+	Editing the hexadecimal value of spice-version and keeping it in sync
+	with actual release is a bit tedious. Let's generate it
+	automatically (although handling of bumps will need temporarily static
+	versions, when 0.12 -> 1.0 for example)
+
+	Split spice.h
+	Make it easier to read the Spice server API.
+
+	spice.h: remove redundant declarations
+	Those are already declared in <spice/qxl_dev.h>.
+
+2014-11-25  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	Validate RedDrawable before allocating drawable
+	Avoid unnecessary allocation (and possibly leaking) if the RedDrawable
+	is not valid.
+
+	Related to: rhbz#1135372
+
+	chardev: remove write polling
+	In an effort to reduce the wakeups per second, get rid of the
+	"write_to_dev" timer when the implementation supports
+	SPICE_CHAR_DEVICE_NOTIFY_WRITABLE.
+
+	When this flag is set, the frontend instance is responsible for calling
+	spice_char_device_wakeup() when the device is ready to perform IO.
+
+	Related to:
+	https://bugzilla.redhat.com/show_bug.cgi?id=912763
+
+2014-11-24  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Don't set SpiceLinkReply::pub_key if client advertises SASL cap
+	If the client advertises the SASL cap, it means it guarantees it will be
+	able to use SASL if the server supports, and that it does not need a valid
+	SpiceLinkReply::pub_key field when using SASL.
+
+	When the client cap is set, we thus don't need to create a RSA public key
+	if SASL is enabled server side.
+
+	The reason for needing client guarantees about not looking at the pub_key
+	field is that its presence and size is hardcoded in the protocol, but in
+	some hardened setups (using fips mode), generating a RSA 1024 bit key as
+	expected is forbidden and fails. With this new capability, the server
+	knows the client will be able to handle SASL if needed, and can skip
+	the generation of the key altogether. This means that on the setups
+	described above, SASL authentication has to be used.
+
+	Introduce red_link_info_test_capability()
+	This just hides a bit of pointer arithmetic away from reds_send_link_ack.
+	This helper will be used in the next commits.
+
+	Add const to test_capability first argument
+	We don't modify the capabilities content, so it can be marked as const.
+
+2014-11-21  Alexander Tsoy  <alexander@tsoy.me>
+
+	configure.ac: use portable shell
+	This fixes the following errors when configure run in dash:
+
+	 ./configure: 17366: ./configure: SPICE_NONPKGCONFIG_LIBS+= -pthread -lm -lrt: not found
+	 ./configure: 17974: ./configure: SPICE_REQUIRES+= glib-2.0 >= 2.22: not found
+	 ./configure: 18069: ./configure: SPICE_REQUIRES+= pixman-1 >= 0.17.7: not found
+	 ./configure: 18165: ./configure: SPICE_REQUIRES+= celt051 >= 0.5.1.1: not found
+	 ./configure: 18369: ./configure: SPICE_REQUIRES+= openssl: not found
+	 ./configure: 18477: ./configure: SPICE_NONPKGCONFIG_LIBS+= : not found
+	 ./configure: 18948: ./configure: SPICE_REQUIRES+= xinerama: not found
+	 ./configure: 20377: test: no: unexpected operator
+	 ./configure: 20409: test: no: unexpected operator
+	 ./configure: 23423: test: xno: unexpected operator
+	 ./configure: 23443: test: no: unexpected operator
+
+2014-11-17  Christophe Fergeau  <cfergeau@redhat.com>
+
+	manual: Add missing closure of XML tag
+	The <model type='qxl'> examples in the reference documentation are
+	missing a closing tag.
+
+2014-10-17  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	server: fix crash when restarting VM with old client
+	The server will reset the vdagent char device when the client does not
+	implement SPICE_MAIN_CAP_AGENT_CONNECTED_TOKENS. This will nullify
+	dev->sin and the following crash will be reached on restart:
+
+	 #0  0x00007fb05aa264a1 in spice_char_device_write_to_device (dev=dev@entry=0x7fb066ae5d30) at char_device.c:443
+	 #1  0x00007fb05aa27137 in spice_char_device_write_to_device (dev=0x7fb066ae5d30) at char_device.c:436
+	 #2  spice_char_device_start (dev=0x7fb066ae5d30) at char_device.c:798
+	 #3  0x00007fb05aa6a981 in spice_server_vm_start (s=<optimized out>) at reds.c:3795
+	 #4  0x00007fb0644b7f89 in qdev_reset_one (dev=<optimized out>, opaque=<optimized out>) at hw/core/qdev.c:241
+	 #5  0x00007fb0644b7918 in qbus_walk_children (bus=0x7fb06661e870, pre_devfn=0x0, pre_busfn=0x0,
+	     post_devfn=0x7fb0644b7f80 <qdev_reset_one>, post_busfn=0x7fb0644b6350 <qbus_reset_one>, opaque=0x0)
+	     at hw/core/qdev.c:422
+	 #6  0x00007fb0644b7848 in qdev_walk_children (dev=0x7fb0665f47a0, pre_devfn=0x0, pre_busfn=0x0,
+	     post_devfn=0x7fb0644b7f80 <qdev_reset_one>, post_busfn=0x7fb0644b6350 <qbus_reset_one>, opaque=0x0)
+	     at hw/core/qdev.c:456
+	 #7  0x00007fb0644b7918 in qbus_walk_children (bus=0x7fb06647cde0, pre_devfn=0x0, pre_busfn=0x0,
+	     post_devfn=0x7fb0644b7f80 <qdev_reset_one>, post_busfn=0x7fb0644b6350 <qbus_reset_one>, opaque=0x0)
+	     at hw/core/qdev.c:422
+	 #8  0x00007fb0644399fd in qemu_devices_reset () at vl.c:1830
+
+	After restart, qemu will reset the device instance (sin) when virtio
+	port is opened:
+
+	 #0  spice_char_device_state_reset_dev_instance (state=0x7fe4873876d0, sin=sin@entry=0x7fe486fb0c68)
+	     at char_device.c:667
+	 #1  0x00007fe47b277516 in attach_to_red_agent (sin=0x7fe486fb0c68) at reds.c:2838
+	 #2  spice_server_char_device_add_interface (sin=0x7fe486fb0c68, s=0x7fe486fb2e60) at reds.c:2962
+	 #3  spice_server_add_interface (s=0x7fe486fb2e60, sin=0x7fe486fb0c68) at reds.c:3104
+	 #4  0x00007fe484c69e57 in vmc_register_interface (scd=0x7fe486fb0c60) at spice-qemu-char.c:123
+	 #5  0x00007fe484ce96b4 in set_guest_connected (port=<optimized out>, guest_connected=1)
+	     at hw/char/virtio-console.c:89
+	 #6  0x00007fe484ba70ed in handle_control_message (len=8, buf=0x7fe486fbdf70, vser=0x7fe48739ae98)
+	     at /usr/src/debug/qemu-2.1.0/hw/char/virtio-serial-bus.c:382
+
+	Let's ignore the call to spice_char_device_{write,read}_to_device() when
+	dev->sin is NULL, similary to other conditions, such as dev->running.
+
+	Fixes: https://bugzilla.redhat.com/show_bug.cgi?id=1145919
+
+2014-10-14  Uri Lublin  <uril@redhat.com>
+
+	migration: Don't assert() if MIGRATE_DATA comes before attaching the agent
+	During seamless migration, after switching host, if a client was connected
+	during the migration, it will have data to send back to the new
+	qemu/spice-server instance. This is handled through MIGRATE_DATA messages.
+	SPICE char devices use such MIGRATE_DATA messages to restore their state.
+
+	However, the MIGRATE_DATA message can arrive any time after the new qemu
+	instance has started, this can happen before or after the SPICE char
+	devices have been created. In order to handle this, if the migrate data
+	arrives early, it's stored in reds->agent_state.mig_data, and
+	attach_to_red_agent() will restore the agent state as appropriate.
+
+	Unfortunately this does not work as expected, for main
+	channel (agent messages).
+	If attach_to_red_agent() is called before the MIGRATE_DATA
+	message reaches the server, all goes well,
+	but if MIGRATE_DATA reaches the server before
+	attach_to_red_agent() gets called, then some assert() gets
+	triggered in spice_char_device_state_restore():
+
+	((null):32507): Spice-ERROR **: char_device.c:937:spice_char_device_state_restore: assertion `dev->num_clients == 1 && dev->wait_for_migrate_data' failed
+	Thread 3 (Thread 0x7f406b543700 (LWP 32543)):
+	Thread 2 (Thread 0x7f40697ff700 (LWP 32586)):
+	Thread 1 (Thread 0x7f4079b45a40 (LWP 32507)):
+
+	When restoring state, a client must already be added to the
+	spice-char-device.
+	What happens is that a client is not being added to the char-device
+	when when MIGRATE_DATA arrives first, which leaves both
+	dev->num_clients and dev->wait_for_migrate_data value at 0.
+
+	This commit changes the logic in spice_server_char_device_add_interface(),
+	such that if there is migrate data pending in reds->agent_state.mig_data
+	but no client was added to the spice-char-device yet,
+	then first the client is added to the device by calling
+	spice_char_device_client_add(), and only then the state is restored.
+
+	=== How to Reproduce
+	To reproduce, add delays to the migration connection between
+	qmeu-kvm on the source host (SRC) and on the destination (DST).
+
+	Specifically I added a man in the middle DLY host between
+	migration ports from SRC to DST.
+
+	+-----+    +-----+     +-----+
+	| SRC |--> | DLY | --> | DST |
+	+-----+    +-----+     +-----+
+
+	DLY listens on port P1 (e.g. 4444) and DST listens on port
+	PINCOMING (e.g. 4444, from qemu-kvm '-incoming' command line option)
+
+	Precondition: make sure port P1 on DLY is accessible in iptables.
+	Option 1: use ssh tcp port forwarding
+	On DLY host run ssh:
+	  ssh DLY:P1:DST:PINCOMING DST
+	Then use the following migration command (on qemu-kvm monitor):
+	  client_migrate_info spice DST PSPICE
+	  migrate -d tcp:DLY:P1
+
+	Option 2: Use a simple proxy program that forwards
+	packets from SRC to DST while adding some delays.
+	The program runs on DLY, listens to port D1, upon
+	accept connects to DST:PINCOMING and forward all
+	packets from DLY:D1 to DST:PINCOMING.
+	Then use the same migrate command as in option 1:
+	  client_migrate_info spice DST PSPICE
+	  migrate -d tcp:DLY:P1
+
+	=== How to Reproduce Ends
+
+	This fixes https://bugzilla.redhat.com/show_bug.cgi?id=1035184
+
+	Based-on-a-patch-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2014-10-10  Cole Robinson  <crobinso@redhat.com>
+
+	m4: Update manywarnings from gnulib
+	Fixes these noisy errors on Fedora 21:
+
+	gcc: warning: switch '-Wmudflap' is no longer supported
+
+2014-09-18  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Validate surface bounding box before using it
+	It's possible for a buggy guest driver to pass invalid bounding box
+	dimensions in QXL commands, which would then cause spice-server to
+	segfault. This patch checks the size of the bounding box of the QXL
+	command right after it has been parsed.
+
+	This fixes rhbz#1135372
+
+	Fix 'abberiviations' typo in comment
+
+	Fix indentation in red_get_opaque_ptr
+	This removes one extra space
+
+	server/tests/Makefile.am: White-space cleanup
+	Make sure the \ at the end of lines are nicely aligned
+
+2014-09-12  Fabiano Fidêncio  <fidencio@redhat.com>
+
+	Fix -Wunused-function
+
+	Fix -Wmissing-field-initializers
+
+	Fix -Wnonnull
+
+	Fix -Wformat
+
+	Fix -Wswitch
+
+	Fix -Wsign
+
+	Fix -Wunused-value
+
+	Fix -Wunused-parameter
+
+	server: Don't dump the bitmap when the format is invalid
+	Caught by covscan:
+	spice/server/spice_bitmap_utils.c:54: var_decl: Declaring variable "n_pixel_bits" without initializer.
+	spice/server/spice_bitmap_utils.c:106: uninit_use: Using uninitialized value "n_pixel_bits".
+
+2014-09-08  Marc-André Lureau  <marcandre.lureau@redhat.com>
+
+	clean-up: remove unused function
+
+	build-sys: check for spicy-screenshot
+
+2014-09-08  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	reds: lookup corresponding channel id
+	In reds_send_link_ack(), lookup the channel with the same id as the link
+	message.
+
+	The bug was found during code review a while ago.
+
+	A reproducer bug was later reported:
+	https://bugzilla.redhat.com/show_bug.cgi?id=1058625
+
+	dispatcher: lower a monitor-config warning to a debug level
+	Some QXLInterface implementations might not have or succeed
+	with client_monitors_config(). Thus, lower warning to debug
+	level.
+
+	https://bugzilla.redhat.com/show_bug.cgi?id=1119220
+
+2014-08-20  Christophe Fergeau  <cfergeau@redhat.com>
+
+	spice.h: Don't use 48kHz for playback/recording rates
+	When adding Opus support, SPICE_INTERFACE_PLAYBACK_FREQ and
+	SPICE_INTERFACE_RECORD_FREQ in the public header 'spice.h' were changed
+	from 44100 to 48000.
+	However, this was not really useful as these constants are not used in
+	spice-server, but only by users of spice-server (ie QEMU).
+	It turns out changing these values is actually harmful. QEMU uses these
+	constants in 2 situations:
+	1. when it's a version of QEMU with this commit, but we are compiling
+	   against older spice-server headers (before Opus support was added)
+	2. when it's a version of QEMU without commit 795ca114d35 which added
+	   what is needed for Opus support
+
+	When we are in the second situation, having 48000 in the public header
+	will actually cause issues as spice-server will know QEMU does not
+	support Opus, so internally spice-server will be using a 44100 rate for
+	audio. However, QEMU will be using SPICE_INTERFACE_.*_FREQ and think it
+	should use a 48000 rate, which will cause distorsions as experienced in
+	bug https://bugzilla.redhat.com/show_bug.cgi?id=1129961
+
+	Reverting these constants back to 44100 will fix audio in the 'new
+	spice-server/old QEMU' scenario, and won't cause issues either when both
+	support Opus as in this case these constants are not used.
+
+2014-08-07  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	Fix crash when clearing surface memory
+	The beginning of the surface data needs to be computed correctly if the
+	stride is negative, otherwise, it should point already to the beginning
+	of the surface data. This bug seems to exists since 4a208b (0.5.2)
+
+	https://bugzilla.redhat.com/show_bug.cgi?id=1029646
+
+2014-07-25  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	server: don't assert on invalid client message
+	Some users have been reaching this error:
+	snd_receive: ASSERT n failed
+
+	A misbehaving client could easily hit that condition by sending too big
+	messages. Instead of assert(), replace with a warning. When a message
+	too big to fit is received, it will simply disconnect the channel.
+
+	https://bugzilla.redhat.com/show_bug.cgi?id=962187
+
+2014-05-30  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Fix assert in mjpeg_encoder_adjust_params_to_bit_rate()
+	If mjpeg_encoder_reset_quality() is called with the same quality as currently
+	set, it will not reset last_enc_size but not reset num_recent_enc_frames,
+	violating some assumptions in _adjust_params_to_bit_rate(). To avoid aborting
+	the server, simply return early from this function.
+
+	Resolves: rhbz#1086820
+
+2014-05-26  Wang Qiang  <wangqiang.hunan@gmail.com>
+
+	Fix make failed when uncommented COMPRESS_STAT in red_worker.c
+	https://bugs.freedesktop.org/show_bug.cgi?id=79246
+	As a developer, I maybe want to see the detail compress stat of spice, like this:
+	Method   	  count  	orig_size(MB)	enc_size(MB)	enc_time(s)
+	QUIC     	     846	       948.02	      147.22	        7.51
+	GLZ      	    2895	       594.90	       26.60	        1.33
+	ZLIB GLZ 	       0	         0.00	        0.00	        0.00
+	LZ       	       1	         3.15	        0.01	        0.00
+	JPEG     	       0	         0.00	        0.00	        0.00
+	JPEG-RGBA	       0	         0.00	        0.00	        0.00
+	----------------------------------------------------------------------------
+	Total    	    3742	      1546.07	      173.83	        8.84
+
+	But when I uncommented the COMPRESS_STAT and COMPRESS_DEBUG in red_worker.c and make.
+	I got some error(in Bugzilla). This error because of some simple syntax errors.
+	Commit this patch to fix this issue.
+
 2014-05-19  Christophe Fergeau  <cfergeau@redhat.com>
 
 	Update libtool version information for 0.12.5 release

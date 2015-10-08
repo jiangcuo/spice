@@ -6,10 +6,12 @@ AM_CPPFLAGS =					\
 	-DRED_STATISTICS			\
 	$(COMMON_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
+	$(LZ4_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
 	$(SASL_CFLAGS)				\
 	$(SLIRP_CFLAGS)				\
 	$(SMARTCARD_CFLAGS)			\
+	$(SPICE_PROTOCOL_CFLAGS)		\
 	$(SSL_CFLAGS)				\
 	$(VISIBILITY_HIDDEN_CFLAGS)		\
 	$(WARN_CFLAGS)				\
@@ -35,6 +37,7 @@ libspice_server_la_LIBADD =						\
 	$(GL_LIBS)							\
 	$(GLIB2_LIBS)							\
 	$(JPEG_LIBS)							\
+	$(LZ4_LIBS)							\
 	$(LIBRT)							\
 	$(PIXMAN_LIBS)							\
 	$(SASL_LIBS)							\
@@ -44,7 +47,22 @@ libspice_server_la_LIBADD =						\
 	$(SPICE_NONPKGCONFIG_LIBS)					\
 	$(NULL)
 
+libspice_serverincludedir = $(includedir)/spice-server
+libspice_serverinclude_HEADERS =		\
+	spice-audio.h				\
+	spice-char.h				\
+	spice-core.h				\
+	spice-experimental.h			\
+	spice-input.h				\
+	spice-migration.h			\
+	spice-qxl.h				\
+	spice-server.h				\
+	spice-version.h				\
+	spice.h					\
+	$(NULL)
+
 libspice_server_la_SOURCES =			\
+	$(libspice_serverinclude_HEADERS)	\
 	agent-msg-filter.c			\
 	agent-msg-filter.h			\
 	char_device.c				\
@@ -60,6 +78,8 @@ libspice_server_la_SOURCES =			\
 	inputs_channel.h			\
 	jpeg_encoder.c				\
 	jpeg_encoder.h				\
+	lz4_encoder.c				\
+	lz4_encoder.h				\
 	main_channel.c				\
 	main_channel.h				\
 	mjpeg_encoder.c				\
@@ -80,6 +100,10 @@ libspice_server_la_SOURCES =			\
 	red_memslots.c				\
 	red_memslots.h				\
 	red_parse_qxl.c				\
+	red_record_qxl.c			\
+	red_record_qxl.h			\
+	red_replay_qxl.c			\
+	red_replay_qxl.h			\
 	red_parse_qxl.h				\
 	red_time.h				\
 	red_worker.c				\
@@ -93,8 +117,6 @@ libspice_server_la_SOURCES =			\
 	reds_sw_canvas.h			\
 	snd_worker.c				\
 	snd_worker.h				\
-	spice-experimental.h			\
-	spice.h					\
 	stat.h					\
 	spicevmc.c				\
 	spice_timer_queue.c			\
@@ -122,12 +144,6 @@ libspice_server_la_SOURCES +=	\
 	$(NULL)
 endif
 
-libspice_serverincludedir = $(includedir)/spice-server
-libspice_serverinclude_HEADERS =		\
-	spice.h					\
-	spice-experimental.h			\
-	$(NULL)
-
 EXTRA_DIST =					\
 	glz_encode_match_tmpl.c			\
 	glz_encode_tmpl.c			\
@@ -135,6 +151,3 @@ EXTRA_DIST =					\
 	$(NULL)
 
 BUILT_SOURCES = $(spice_built_sources)
-
-dist-hook:
-	if test ./tests/test_spice_version.sh && ! test ./tests/test_spice_version.sh; then exit 1; fi

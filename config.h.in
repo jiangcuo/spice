@@ -27,9 +27,6 @@
    */
 #undef HAVE_ALLOCA_H
 
-/* Defined if we have clock_gettime() */
-#undef HAVE_CLOCK_GETTIME
-
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
@@ -72,14 +69,7 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
-/* Define if we have Xinerama */
-#undef HAVE_XINERAMA
-
-/* Define if we have XRANDR 12 */
-#undef HAVE_XRANDR12
-
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
 /* Name of package */
@@ -103,9 +93,6 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
-/* The POSIX RT yield function */
-#undef POSIX_YIELD_FUNC
-
 /* If using the C implementation of alloca, define if you know the
    direction of stack growth for your system; otherwise it will be
    automatically deduced at runtime.
@@ -117,8 +104,8 @@
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
-/* Define to build with CEGUI support */
-#undef USE_GUI
+/* Define to build with lz4 support */
+#undef USE_LZ4
 
 /* Define to build with OpenGL support */
 #undef USE_OPENGL
@@ -140,9 +127,6 @@
 #  undef WORDS_BIGENDIAN
 # endif
 #endif
-
-/* Force definition of format macros for C++ */
-#undef __STDC_FORMAT_MACROS
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 #undef size_t

@@ -313,7 +313,7 @@ You should also add a QXL video device
 
 [source,xml]
 <video>
-    <model type='qxl'>
+    <model type='qxl'/>
 </video>
 
 After stopping and restarting the virtual machine `$vmname`, it should
@@ -540,6 +540,60 @@ which are described when running remote-viewer with `--help-spice`.
 You may need additional services running in the client, such as the
 Spice USB Clerk service on Windows.
 
+CAC smartcard redirection
+=========================
+
+Spice has a dedicated channel for smartcard redirection, using
+libcacard, which currently supports limited CAC emulation.
+
+You may consider redirecting your USB card reader instead. This is
+easier to setup but will prevent from sharing the smartcard with both
+the client and the remote simultaneously.
+
+libcacard is actually emulating a simple CAC card, sharing the card
+and its certificates. It can successfully be used with the coolkey
+PKCS#11 module.
+
+Configuration
+-------------
+
+.Using virt-manager
+
+In the hardware details, click on "Add Hardware", then select
+"Smartcard". Add a "passthrough" device type.
+
+.Using libvirt
+
+Setup a "passthrough" smartcard of type "spicevmc" on a CCID
+controller:
+
+[source,xml]
+<controller type='ccid' index='0'/>
+<smartcard mode='passthrough' type='spicevmc'>
+  <address type='ccid' controller='0' slot='0'/>
+</smartcard>
+
+.Using QEMU
+
+With the qemu command line, you must add a USB CCID device, and a
+"ccid-card-passthru" associated with a "spicevmc" channel with the
+name "smartcard":
+
+[source,sh]
+-device usb-ccid -chardev spicevmc,name=smartcard -device ccid-card-passthru,chardev=ccid
+
+Client
+------
+
+In order for the client certificates to be shared with the remote, you
+need a NSS database configured to access the smartcard. Please look
+for instructions on coolkey or NSS setup and make sure you certficates
+can be listed with certutil.
+
+[NOTE]
+Most Spice clients disable smartcard support by default, and
+need `--spice-smartcard` or similar configuration.
+
 Multiple monitor support
 ========================
 
@@ -565,7 +619,7 @@ Configuration
 
 To add an additional QXL device for Windows guests, simply go to your
 virtual machine details. Check that you already have a "Video QXL"
-device, if notclick on "Add Hardware", and add a "Video" device with
+device, if not, click on "Add Hardware", and add a "Video" device with
 model "QXL". This can also work with Linux guests if your are willing
 to configure X.Org to use Xinerama (instead of XRandR).
 
@@ -583,10 +637,10 @@ QXL:
 
 [source,xml]
 <video>
-    <model type='qxl'>
+    <model type='qxl'/>
 </video>
 <video>
-    <model type='qxl'>
+    <model type='qxl'/>
 </video>
 
 
@@ -803,7 +857,9 @@ Configuration
 
 .Using virt-manager
 
-It's currently not possible to configure folder sharing with virt-manager.
+In the hardware details, click on "Add Hardware", then select
+"Channel". Add a "Spice port" device type with the
+"org.spice-space.webdav.0" name.
 
 .Using libvirt
 
@@ -1026,13 +1082,108 @@ You should now be able to access the qemu-system-x86_64 Spice binary.
 
 :numbered!:
 
+Debugging
+=========
+
+Server side
+-----------
+
+If the virtual machine was started using QEMU directly, SPICE server logs will be output to
+your console stdout.
+When using libvirt, logs are located in `/var/log/libvirt/qemu/` for the qemu
+system instance (`qemu:///system`), and in `~/.cache/libvirt/qemu/log` for the
+qemu session instance (`qemu:///session`).
+
+Client side
+-----------
+
+remote-viewer can be started with `SPICE_DEBUG=1` in the environment, or with
+`--spice-debug` in order to get it to output more logs on stdout. `SPICE_DEBUG`
+should work with any application using spice-gtk (virt-manager, gnome-boxes, ...).
+
+Guest side
+----------
+
+.QXL KMS driver
+
+On recent Linux kernels using the QXL kms driver, booting the kernel with the
+`drm.debug=0xf` parameter.  `journalctl -k`/`dmesg` will then contain debug
+logs for the QXL kms driver. This can also be changed at runtime by echo'ing
+this value to `/sys/module/drm/parameters/debug`.
+
+
+.qxl.guestdebug QEMU parameter
+
+It's also possible to get some host-side debugging logs from the guest QXL driver.
+The driver reads a guestdebug parameter from the rom, which can be set when starting
+the VM. Only the Windows QXL driver is using this feature, see `qxl.cmdlog` for
+something guest-agnostic.  This can be enabled with `-global
+qxl-vga.guestdebug=3`, or `-global qxl.guestdebug=3` for secondary devices.
+
+The corresponding libvirt XML is:
+
+[source,xml]
+-------------------------------------------------
+<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+  ....
+  <qemu:commandline>
+    <qemu:arg value='-global'/>
+    <qemu:arg value='qxl-vga.guestdebug=3'/>
+  </qemu:commandline>
+</domain>
+-------------------------------------------------
+
+(don't forget to add the
+xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0' attribute to the
+toplevel `<domain>` node)
+
+
+You can go up to 12 (or more, look for DEBUG_PRINT in the driver), you get really a lot of debug information. Interesting values are:
+
+  * 3 - will give you all the highlevel commands (DrvCopyBits, DrvBitBlt, etc.)
+  * 6 - will also show QXLGetBitMap
+  * 11 - will show caching of images (this is a driver cache, not to be confused with the server<->client shared cache).
+
+
+.qxl.cmdlog QEMU parameter
+
+This will dump all the commands passing through the ringbuffer on the device
+side. It is driver and hence guest agnostic. This can be enabled with
+`-global qxl-vga.cmdlog=1`, or `-global qxl.cmdlog=1` for secondary devices.
+See the section above for the libvirt XML to use.
+
+
+Agent
+~~~~~
+
+On Linux, `journalctl -t spice-vdagentd -t spice-vdagent` will display the agent log messages.
+spice-vdagent can also be restarted by hand with the `-d` argument in order to display more logs.
+
+Recording/replaying SPICE server traffic
+----------------------------------------
+
+Since spice-server 0.12.6, it's possible to record display traffic sent by the
+SPICE server in order to replay it afterwards for a client without needing to
+start a VM. This is achieved by setting the environment variable
+`SPICE_WORKER_RECORD_FILENAME` to the filename to write the traffic to before starting
+QEMU.
+
+Once the recording session is done, the `spice-server-replay` tool can be used
+to replay the previously recorded SPICE session, for example:
+
+[source,sh]
+-------------------------------------------------
+spice-server-replay -p 5900 -c "remote-viewer spice://localhost:5900" recorded-session.spice
+-------------------------------------------------
+
+
 [appendix]
 Manual authors
 ==============
 
 The following people have contributed to this manual:
 
-Arnon Giloba +
+Arnon Gilboa +
 Christophe Fergeau +
 Lubos Kocman +
 Marc-André Lureau +

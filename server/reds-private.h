@@ -6,7 +6,6 @@
 #include <spice/protocol.h>
 
 #define MIGRATE_TIMEOUT (1000 * 10) /* 10sec */
-#define MM_TIMER_GRANULARITY_MS (1000 / 30)
 #define MM_TIME_DELTA 400 /*ms*/
 
 typedef struct TicketAuthentication {
@@ -33,10 +32,6 @@ typedef struct VDIReadBuf {
     int len;
     uint8_t data[SPICE_AGENT_MAX_DATA_SIZE];
 } VDIReadBuf;
-
-static VDIReadBuf *vdi_port_read_buf_get(void);
-static VDIReadBuf *vdi_port_read_buf_ref(VDIReadBuf *buf);
-static void vdi_port_read_buf_unref(VDIReadBuf *buf);
 
 enum {
     VDI_PORT_READ_STATE_READ_HEADER,
@@ -159,7 +154,6 @@ typedef struct RedsState {
     int dispatcher_allows_client_mouse;
     MonitorMode monitor_mode;
     SpiceTimer *mig_timer;
-    SpiceTimer *mm_timer;
 
     int vm_running;
     Ring char_devs_states; /* list of SpiceCharDeviceStateItem */
@@ -177,7 +171,7 @@ typedef struct RedsState {
     int allow_multiple_clients;
 
     RedsClientMonitorsConfig client_monitors_config;
-    int mm_timer_enabled;
+    int mm_time_enabled;
     uint32_t mm_time_latency;
 } RedsState;
 

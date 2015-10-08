@@ -1070,7 +1070,7 @@ created by <code>qemu-img</code> as a demonstration.</p></div>
 <div class="paragraph"><p>The following command will allocate a 10GB file. See <code>qemu-img</code> man
 page for further information.</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1079,7 +1079,7 @@ http://www.gnu.org/software/src-highlite -->
 population. I assume that you have a locally stored ISO of your
 favourite operating system so you can use it for installation.</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1129,32 +1129,32 @@ default.</p></div>
 <div class="paragraph"><p>To add Spice support to an existing virtual machine managed by
 libvirt, you need to edit it:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt>host$ virsh edit <span style="color: #009900">$vmname</span></tt></pre></div></div>
 <div class="paragraph"><p>and then add a Spice graphics element:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt><span style="font-weight: bold"><span style="color: #0000FF">&lt;graphics</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'spice'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span></tt></pre></div></div>
 <div class="paragraph"><p>You should also add a QXL video device</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt><span style="font-weight: bold"><span style="color: #0000FF">&lt;video&gt;</span></span>
-    <span style="font-weight: bold"><span style="color: #0000FF">&lt;model</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'qxl'</span><span style="font-weight: bold"><span style="color: #0000FF">&gt;</span></span>
+    <span style="font-weight: bold"><span style="color: #0000FF">&lt;model</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'qxl'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
 <span style="font-weight: bold"><span style="color: #0000FF">&lt;/video&gt;</span></span></tt></pre></div></div>
 <div class="paragraph"><p>After stopping and restarting the virtual machine <code>$vmname</code>, it should
 be accessible through Spice. You can check the connection parameters
 with:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1162,7 +1162,7 @@ http://www.gnu.org/software/src-highlite -->
 <div class="paragraph"><div class="title">Using QEMU</div><p>To enable Spice support to your virtual machine, you only need to
 append the following to your QEMU command line:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1181,7 +1181,7 @@ started in the previous sections.</p></div>
 case) should not be blocked by firewall. Host <code>myhost</code> is referring to
 the machine which is running our qemu instance.</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1215,7 +1215,7 @@ field.</p></div>
 <div class="paragraph"><div class="title">Using libvirt</div><p>All you need to do is to append a <code>passwd</code> attribute to the Spice
 graphics node for your virtual machine:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1223,7 +1223,7 @@ http://www.gnu.org/software/src-highlite -->
 <div class="paragraph"><div class="title">Using QEMU</div><p>Adding a ticket with QEMU involves a slight modification of the
 <code>-spice</code> parameter used when running QEMU:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1283,7 +1283,7 @@ virtio-serial device in addition to the spicevmc channel.</p></div>
 </li>
 </ul></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1296,7 +1296,7 @@ http://www.gnu.org/software/src-highlite -->
 <div class="paragraph"><div class="title">Using QEMU</div><p>Adding the following parameters to your QEMU command line will enable
 the needed devices for agent support in the guest OS:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1331,7 +1331,7 @@ sure there is no pre-existing USB controller in your virtual machine
 XML before doing this), as well as one Spice USB redirection channel
 per device you want to redirect simultaneously.</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1353,7 +1353,7 @@ http://www.gnu.org/software/src-highlite -->
 command line, and we also need to add one Spice redirection channel
 per device we want to redirect simultaneously.</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1388,6 +1388,60 @@ Spice USB Clerk service on Windows.</td>
 </div>
 </div>
 <div class="sect1">
+<h2 id="_cac_smartcard_redirection">CAC smartcard redirection</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Spice has a dedicated channel for smartcard redirection, using
+libcacard, which currently supports limited CAC emulation.</p></div>
+<div class="paragraph"><p>You may consider redirecting your USB card reader instead. This is
+easier to setup but will prevent from sharing the smartcard with both
+the client and the remote simultaneously.</p></div>
+<div class="paragraph"><p>libcacard is actually emulating a simple CAC card, sharing the card
+and its certificates. It can successfully be used with the coolkey
+PKCS#11 module.</p></div>
+<div class="sect2">
+<h3 id="_configuration_4">Configuration</h3>
+<div class="paragraph"><div class="title">Using virt-manager</div><p>In the hardware details, click on "Add Hardware", then select
+"Smartcard". Add a "passthrough" device type.</p></div>
+<div class="paragraph"><div class="title">Using libvirt</div><p>Setup a "passthrough" smartcard of type "spicevmc" on a CCID
+controller:</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #0000FF">&lt;controller</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'ccid'</span> <span style="color: #009900">index</span><span style="color: #990000">=</span><span style="color: #FF0000">'0'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
+<span style="font-weight: bold"><span style="color: #0000FF">&lt;smartcard</span></span> <span style="color: #009900">mode</span><span style="color: #990000">=</span><span style="color: #FF0000">'passthrough'</span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'spicevmc'</span><span style="font-weight: bold"><span style="color: #0000FF">&gt;</span></span>
+  <span style="font-weight: bold"><span style="color: #0000FF">&lt;address</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'ccid'</span> <span style="color: #009900">controller</span><span style="color: #990000">=</span><span style="color: #FF0000">'0'</span> <span style="color: #009900">slot</span><span style="color: #990000">=</span><span style="color: #FF0000">'0'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
+<span style="font-weight: bold"><span style="color: #0000FF">&lt;/smartcard&gt;</span></span></tt></pre></div></div>
+<div class="paragraph"><div class="title">Using QEMU</div><p>With the qemu command line, you must add a USB CCID device, and a
+"ccid-card-passthru" associated with a "spicevmc" channel with the
+name "smartcard":</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>-device usb-ccid -chardev spicevmc<span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>smartcard -device ccid-card-passthru<span style="color: #990000">,</span><span style="color: #009900">chardev</span><span style="color: #990000">=</span>ccid</tt></pre></div></div>
+</div>
+<div class="sect2">
+<h3 id="_client_3">Client</h3>
+<div class="paragraph"><p>In order for the client certificates to be shared with the remote, you
+need a NSS database configured to access the smartcard. Please look
+for instructions on coolkey or NSS setup and make sure you certficates
+can be listed with certutil.</p></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<img src="./images/icons/note.png" alt="Note" />
+</td>
+<td class="content">Most Spice clients disable smartcard support by default, and
+need <code>--spice-smartcard</code> or similar configuration.</td>
+</tr></table>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
 <h2 id="_multiple_monitor_support">Multiple monitor support</h2>
 <div class="sectionbody">
 <div class="paragraph"><p>When using Spice, it&#8217;s possible to use multiple monitors. For that,
@@ -1403,10 +1457,10 @@ make any other change to get multiple heads in a Linux guest. The
 following paragraph will deal with adding multiple QXL devices to get
 multiple monitors in a Windows guest.</p></div>
 <div class="sect2">
-<h3 id="_configuration_4">Configuration</h3>
+<h3 id="_configuration_5">Configuration</h3>
 <div class="paragraph"><div class="title">Using virt-manager</div><p>To add an additional QXL device for Windows guests, simply go to your
 virtual machine details. Check that you already have a "Video QXL"
-device, if notclick on "Add Hardware", and add a "Video" device with
+device, if not, click on "Add Hardware", and add a "Video" device with
 model "QXL". This can also work with Linux guests if your are willing
 to configure X.Org to use Xinerama (instead of XRandR).</p></div>
 <div class="paragraph"><p>If you are using a new enough distribution (for example Fedora 19),
@@ -1418,28 +1472,28 @@ you&#8217;ll need to edit libvirt XML as described on this blog post.</p></div>
 libvirt, you simply need to append a new video node whose model is
 QXL:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt><span style="font-weight: bold"><span style="color: #0000FF">&lt;video&gt;</span></span>
-    <span style="font-weight: bold"><span style="color: #0000FF">&lt;model</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'qxl'</span><span style="font-weight: bold"><span style="color: #0000FF">&gt;</span></span>
+    <span style="font-weight: bold"><span style="color: #0000FF">&lt;model</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'qxl'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
 <span style="font-weight: bold"><span style="color: #0000FF">&lt;/video&gt;</span></span>
 <span style="font-weight: bold"><span style="color: #0000FF">&lt;video&gt;</span></span>
-    <span style="font-weight: bold"><span style="color: #0000FF">&lt;model</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'qxl'</span><span style="font-weight: bold"><span style="color: #0000FF">&gt;</span></span>
+    <span style="font-weight: bold"><span style="color: #0000FF">&lt;model</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'qxl'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
 <span style="font-weight: bold"><span style="color: #0000FF">&lt;/video&gt;</span></span></tt></pre></div></div>
 <div class="paragraph"><div class="title">Using QEMU</div><p>To get a second QXL device in your virtual machine, you need to append
 <code>-device qxl</code> to your QEMU command line in addition to the <code>-vga qxl</code>
 that is already there:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt>-vga qxl -device qxl</tt></pre></div></div>
 </div>
 <div class="sect2">
-<h3 id="_client_3">Client</h3>
+<h3 id="_client_4">Client</h3>
 <div class="paragraph"><p>You can enable additional displays either from the "Display/Displays"
 menu in remote-viewer, or from your guest OS display configuration
 tool.</p></div>
@@ -1460,7 +1514,7 @@ official CA, or by passing to the client the certificate of the
 authority which signed the host certificate. The latter allows the use
 of self-signed certificates.</p></div>
 <div class="sect2">
-<h3 id="_configuration_5">Configuration</h3>
+<h3 id="_configuration_6">Configuration</h3>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1508,7 +1562,7 @@ up to libvirt:</p></div>
 <div class="paragraph"><p>TODO proof-read the following section:</p></div>
 </div></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1519,7 +1573,7 @@ host$</tt></pre></div></div>
 without any encryption. You can edit the libvirt graphics node if you
 want to change that behaviour and only allow connections through TLS:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1529,14 +1583,14 @@ expects in the previous paragraph. The directory where these
 certificates can be found is specified as options to the <code>-spice</code>
 command line parameters:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt>-spice <span style="color: #009900">port</span><span style="color: #990000">=</span><span style="color: #993399">5900</span><span style="color: #990000">,</span>tls-port<span style="color: #990000">=</span><span style="color: #993399">5901</span><span style="color: #990000">,</span>disable-ticketing<span style="color: #990000">,</span>x509-dir<span style="color: #990000">=</span>/etc/pki/libvirt-spice</tt></pre></div></div>
 </div>
 <div class="sect2">
-<h3 id="_client_4">Client</h3>
+<h3 id="_client_5">Client</h3>
 <div class="paragraph"><p>We need to change 2 things when starting the client:</p></div>
 <div class="ulist"><ul>
 <li>
@@ -1552,7 +1606,7 @@ specify the CA certificate to use when verifying the host certificate
 </ul></div>
 <div class="paragraph"><p>With remote-viewer, this is done this way:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1565,7 +1619,7 @@ needed to use a TLS Spice connection. Make sure to substitute the
 hostname of your Spice host in the subject of the certificate signing
 request.</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1618,7 +1672,7 @@ handle your VM.</p></div>
 <div class="paragraph"><p>To troubleshoot SASL issues, running <code>strace -e open</code> on the QEMU
 process can be a useful first step.</p></div>
 <div class="sect2">
-<h3 id="_configuration_6">Configuration</h3>
+<h3 id="_configuration_7">Configuration</h3>
 <div class="paragraph"><div class="title">Using virt-manager</div><p>It&#8217;s currently not possible to enable SASL from virt-manager.</p></div>
 <div class="paragraph"><div class="title">Using libvirt</div><p>SASL support for SPICE has been added to libvirt mid-October 2013 so
 you need a libvirt version that was released after this date. To
@@ -1628,14 +1682,14 @@ for the session libvirtd instance.</p></div>
 <div class="paragraph"><div class="title">Using QEMU</div><p>Using SASL with QEMU involves a slight modification of the <code>-spice</code>
 parameter used when running QEMU:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt>-spice <span style="color: #009900">port</span><span style="color: #990000">=</span><span style="color: #993399">3001</span><span style="color: #990000">,</span>sasl</tt></pre></div></div>
 </div>
 <div class="sect2">
-<h3 id="_client_5">Client</h3>
+<h3 id="_client_6">Client</h3>
 <div class="paragraph"><p>When you start the client as usual, if SASL was enabled on the host,
 remote-viewer will pop up a window asking for a password before
 starting the Spice session. It won&#8217;t be established if an incorrect
@@ -1651,13 +1705,15 @@ the client will share the XDG Public Share directory (ie <em>~/Public</em> if
 you use a regular system).  You may specify a different folder with
 <code>--spice-share-dir</code> client option.</p></div>
 <div class="sect2">
-<h3 id="_configuration_7">Configuration</h3>
-<div class="paragraph"><div class="title">Using virt-manager</div><p>It&#8217;s currently not possible to configure folder sharing with virt-manager.</p></div>
+<h3 id="_configuration_8">Configuration</h3>
+<div class="paragraph"><div class="title">Using virt-manager</div><p>In the hardware details, click on "Add Hardware", then select
+"Channel". Add a "Spice port" device type with the
+"org.spice-space.webdav.0" name.</p></div>
 <div class="paragraph"><div class="title">Using libvirt</div><p>In order to set up folder sharing, qemu needs to expose a
 <code>org.spice-space.webdav.0</code> virtio port, associated with a
 corresponding Spice port:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1671,7 +1727,7 @@ http://www.gnu.org/software/src-highlite -->
 <code>org.spice-space.webdav.0</code> virtio port, associated with a
 corresponding Spice port:</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1830,7 +1886,7 @@ virtio-win drivers</a>.</p></div>
 <div class="paragraph"><p>Be aware that RHEL has no builds of qemu/spice-server for i386, only
 x86_64 builds are available.  RHEL &gt;=6 and Fedora &gt;=13</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1843,7 +1899,7 @@ dependency of package kvm.</p></div>
 it allows you to execute spice-client directly from the oVirt/RHEVM
 UserPortal.</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1894,7 +1950,7 @@ Spice mailing list if you need help building from source.</td>
 </tr></table>
 </div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1923,7 +1979,7 @@ variable. For example RHEL is using /usr/libexec as directory for
 qemu-kvm binaries. The following setup should be suitable for qemu and
 Spice built according to the instructions in this chapter.</p></div>
 <div class="listingblock">
-<div class="content"><!-- Generator: GNU source-highlight 3.1.6
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
@@ -1935,10 +1991,100 @@ http://www.gnu.org/software/src-highlite -->
 </div>
 </div>
 <div class="sect1">
+<h2 id="_debugging">Debugging</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_server_side">Server side</h3>
+<div class="paragraph"><p>If the virtual machine was started using QEMU directly, SPICE server logs will be output to
+your console stdout.
+When using libvirt, logs are located in <code>/var/log/libvirt/qemu/</code> for the qemu
+system instance (<code>qemu:///system</code>), and in <code>~/.cache/libvirt/qemu/log</code> for the
+qemu session instance (<code>qemu:///session</code>).</p></div>
+</div>
+<div class="sect2">
+<h3 id="_client_side">Client side</h3>
+<div class="paragraph"><p>remote-viewer can be started with <code>SPICE_DEBUG=1</code> in the environment, or with
+<code>--spice-debug</code> in order to get it to output more logs on stdout. <code>SPICE_DEBUG</code>
+should work with any application using spice-gtk (virt-manager, gnome-boxes, &#8230;).</p></div>
+</div>
+<div class="sect2">
+<h3 id="_guest_side">Guest side</h3>
+<div class="paragraph"><div class="title">QXL KMS driver</div><p>On recent Linux kernels using the QXL kms driver, booting the kernel with the
+<code>drm.debug=0xf</code> parameter.  <code>journalctl -k</code>/<code>dmesg</code> will then contain debug
+logs for the QXL kms driver. This can also be changed at runtime by echo&#8217;ing
+this value to <code>/sys/module/drm/parameters/debug</code>.</p></div>
+<div class="paragraph"><div class="title">qxl.guestdebug QEMU parameter</div><p>It&#8217;s also possible to get some host-side debugging logs from the guest QXL driver.
+The driver reads a guestdebug parameter from the rom, which can be set when starting
+the VM. Only the Windows QXL driver is using this feature, see <code>qxl.cmdlog</code> for
+something guest-agnostic.  This can be enabled with <code>-global
+qxl-vga.guestdebug=3</code>, or <code>-global qxl.guestdebug=3</code> for secondary devices.</p></div>
+<div class="paragraph"><p>The corresponding libvirt XML is:</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #0000FF">&lt;domain</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'kvm'</span> <span style="color: #009900">xmlns:qemu</span><span style="color: #990000">=</span><span style="color: #FF0000">'http://libvirt.org/schemas/domain/qemu/1.0'</span><span style="font-weight: bold"><span style="color: #0000FF">&gt;</span></span>
+  ....
+  <span style="font-weight: bold"><span style="color: #0000FF">&lt;qemu:commandline&gt;</span></span>
+    <span style="font-weight: bold"><span style="color: #0000FF">&lt;qemu:arg</span></span> <span style="color: #009900">value</span><span style="color: #990000">=</span><span style="color: #FF0000">'-global'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
+    <span style="font-weight: bold"><span style="color: #0000FF">&lt;qemu:arg</span></span> <span style="color: #009900">value</span><span style="color: #990000">=</span><span style="color: #FF0000">'qxl-vga.guestdebug=3'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
+  <span style="font-weight: bold"><span style="color: #0000FF">&lt;/qemu:commandline&gt;</span></span>
+<span style="font-weight: bold"><span style="color: #0000FF">&lt;/domain&gt;</span></span></tt></pre></div></div>
+<div class="paragraph"><p>(don&#8217;t forget to add the
+xmlns:qemu=<em>http://libvirt.org/schemas/domain/qemu/1.0</em> attribute to the
+toplevel <code>&lt;domain&gt;</code> node)</p></div>
+<div class="paragraph"><p>You can go up to 12 (or more, look for DEBUG_PRINT in the driver), you get really a lot of debug information. Interesting values are:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+3 - will give you all the highlevel commands (DrvCopyBits, DrvBitBlt, etc.)
+</p>
+</li>
+<li>
+<p>
+6 - will also show QXLGetBitMap
+</p>
+</li>
+<li>
+<p>
+11 - will show caching of images (this is a driver cache, not to be confused with the server&lt;&#8594;client shared cache).
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><div class="title">qxl.cmdlog QEMU parameter</div><p>This will dump all the commands passing through the ringbuffer on the device
+side. It is driver and hence guest agnostic. This can be enabled with
+<code>-global qxl-vga.cmdlog=1</code>, or <code>-global qxl.cmdlog=1</code> for secondary devices.
+See the section above for the libvirt XML to use.</p></div>
+<div class="sect3">
+<h4 id="_agent">Agent</h4>
+<div class="paragraph"><p>On Linux, <code>journalctl -t spice-vdagentd -t spice-vdagent</code> will display the agent log messages.
+spice-vdagent can also be restarted by hand with the <code>-d</code> argument in order to display more logs.</p></div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_recording_replaying_spice_server_traffic">Recording/replaying SPICE server traffic</h3>
+<div class="paragraph"><p>Since spice-server 0.12.6, it&#8217;s possible to record display traffic sent by the
+SPICE server in order to replay it afterwards for a client without needing to
+start a VM. This is achieved by setting the environment variable
+<code>SPICE_WORKER_RECORD_FILENAME</code> to the filename to write the traffic to before starting
+QEMU.</p></div>
+<div class="paragraph"><p>Once the recording session is done, the <code>spice-server-replay</code> tool can be used
+to replay the previously recorded SPICE session, for example:</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>spice-server-replay -p <span style="color: #993399">5900</span> -c <span style="color: #FF0000">"remote-viewer spice://localhost:5900"</span> recorded-session<span style="color: #990000">.</span>spice</tt></pre></div></div>
+</div>
+</div>
+</div>
+<div class="sect1">
 <h2 id="_manual_authors">Appendix A: Manual authors</h2>
 <div class="sectionbody">
 <div class="paragraph"><p>The following people have contributed to this manual:</p></div>
-<div class="paragraph"><p>Arnon Giloba<br />
+<div class="paragraph"><p>Arnon Gilboa<br />
 Christophe Fergeau<br />
 Lubos Kocman<br />
 Marc-André Lureau<br />
@@ -1980,7 +2126,7 @@ Client is referring to a system running the Spice client (the recommended one is
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2014-05-14 12:06:09 CEST
+Last updated 2015-10-01 17:56:43 CEST
 </div>
 </div>
 </body>
