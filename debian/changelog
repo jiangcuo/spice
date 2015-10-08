@@ -18,6 +18,8 @@ spice (0.12.6-1) UNRELEASED; urgency=medium
     but it looks like it was exported by mistake and has never been
     a public API, so we wont make new library package
   * enable parallel build (dch --parallel)
+  * add python-six to build-deps, needed for code generation
+    (marshallers/demarshallers)
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 08 Oct 2015 21:47:14 +0300
 
