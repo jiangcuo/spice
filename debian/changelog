@@ -9,6 +9,8 @@ spice (0.12.6-1) UNRELEASED; urgency=medium
   * remove libcacard-dev from libspice-server1-dev deps (it is not
     actually used by the server) and remove version from libcacard
     build-dep (any version ever seen in debian will do)
+    TODO: stop linking with libcacard0 too, as libspice-server does
+    not actually use any of its symbols
   * stop building spice-client, since upstream dropped it
     (Closes: #749331 #704229 #641772 #715179).
     Remove libxrandr-dev, libxfixes-dev, and mentions of mesa from build-deps.
