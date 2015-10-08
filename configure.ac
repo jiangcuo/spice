@@ -11,19 +11,27 @@ AC_PREREQ([2.57])
 # - If any interfaces have been removed or changed since the last public release,
 #   then set age to 0.
 #
-m4_define([SPICE_CURRENT], [10])
+m4_define([SPICE_CURRENT], [11])
 m4_define([SPICE_REVISION], [0])
-m4_define([SPICE_AGE], [9])
+m4_define([SPICE_AGE], [10])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
         [spice-devel@lists.freedesktop.org], spice)
 
+major=`echo $PACKAGE_VERSION | cut -d. -f1`
+minor=`echo $PACKAGE_VERSION | cut -d. -f2`
+micro=`echo $PACKAGE_VERSION | cut -d. -f3`
+git=`echo $PACKAGE_VERSION | cut -d. -f4`
+if test x"$git" != x ; then
+    micro=$(($micro+1))
+fi
+SPICE_SERVER_VERSION=`printf "0x%02x%02x%02x" $major $minor $micro`
+AC_SUBST(SPICE_SERVER_VERSION)
+
 AC_CONFIG_MACRO_DIR([m4])
+m4_include([spice-common/m4/spice-deps.m4])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR(.)
-
-# For automake >= 1.12
-m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
 AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip subdir-objects])
 AM_MAINTAINER_MODE
@@ -33,7 +41,6 @@ AC_PROG_CC_C99
 if test x"$ac_cv_prog_cc_c99" = xno; then
     AC_MSG_ERROR([C99 compiler is required.])
 fi
-AC_PROG_CXX
 AC_PROG_INSTALL
 AC_CANONICAL_HOST
 AC_PROG_LIBTOOL
@@ -47,188 +54,80 @@ AC_CHECK_HEADERS([execinfo.h])
 AC_CHECK_HEADERS([linux/sockios.h])
 AC_FUNC_ALLOCA
 
-AC_DEFINE([__STDC_FORMAT_MACROS],[],[Force definition of format macros for C++])
-
 SPICE_LT_VERSION=m4_format("%d:%d:%d", SPICE_CURRENT, SPICE_REVISION, SPICE_AGE)
 AC_SUBST(SPICE_LT_VERSION)
 
+# For autoconf < 2.63
+m4_ifndef([AS_VAR_APPEND],
+          AC_DEFUN([AS_VAR_APPEND], $1=$$1$2))
+
 # Check for the CPU we are using
-#
-AC_MSG_CHECKING(for x86, x86-64 or armv6+ platform)
 case $host_cpu in
-  i386|i486|i586|i686|i786|k6|k7|armv6|armv6l|armv6hl|armv7|armv7l|armv7hl)
-	variant=32
-        ;;
   x86_64)
-	variant=64
-	;;
+        arch_warn=""
+        ;;
   *)
-	AC_MSG_RESULT(no)
-	echo Only x86 and x86-64 are supported
-	exit 1
+        arch_warn="spice-server on non-x86_64 architectures hasn't been extensively tested"
 esac
-AC_MSG_RESULT($variant bit)
-AM_CONDITIONAL([X86_64], [test "$variant" = 64])
-
-AC_MSG_CHECKING([for native Win32])
-case "$host" in
-  *-*-mingw*)
-    os_win32=yes
-    ;;
-  *)
-    os_win32=no
-    ;;
-esac
-AC_MSG_RESULT([$os_win32])
-
-case $host in
-  *-*-linux*)
-    os_linux=yes
-    ;;
-esac
-
-dnl =========================================================================
-dnl Check OS target
-
-AC_MSG_CHECKING([for some Win32 platform])
-case "$host" in
-  *-*-mingw*|*-*-cygwin*)
-    platform_win32=yes
-    ;;
-  *)
-    platform_win32=no
-    ;;
-esac
-AC_MSG_RESULT([$platform_win32])
-if test "$platform_win32" = yes; then
-  red_target=windows
-else
-  red_target=x11
-fi
-
-AM_CONDITIONAL(OS_WIN32, test "$os_win32" = "yes")
-AM_CONDITIONAL(OS_UNIX, test "$os_win32" != "yes")
-AM_CONDITIONAL(OS_LINUX, test "$os_linux" = "yes")
 
 dnl =========================================================================
 dnl Check optional features
-AC_ARG_ENABLE(gui,
-[  --enable-gui         Enable start dialog with CEGUI],,
-[enable_gui="no"])
-AS_IF([test x"$enable_gui" != "xno"], [enable_gui="yes"])
-AM_CONDITIONAL(SUPPORT_GUI, test "x$enable_gui" != "xno")
+SPICE_CHECK_OPENGL([GL])
+AS_IF([test x"$enable_opengl" != "xno"], [
+      AS_VAR_APPEND([SPICE_NONPKGCONFIG_LIBS], [" $GL_LIBS"])
+])
 
-AC_ARG_ENABLE(opengl,
-[  --enable-opengl         Enable opengl requirement / support (not recommended)],,
-[enable_opengl="no"])
-AS_IF([test x"$enable_opengl" != "xno"], [enable_opengl="yes"])
-AM_CONDITIONAL(SUPPORT_GL, test "x$enable_opengl" = "xyes")
 
-AC_ARG_ENABLE(smartcard,
-[  --enable-smartcard         Enable network redirection],,
-[enable_smartcard="no"])
-AS_IF([test x"$enable_smartcard" != "xno"], [enable_smartcard="yes"])
-AM_CONDITIONAL(SUPPORT_SMARTCARD, test "x$enable_smartcard" != "xno")
-if test "x$enable_smartcard" = "xyes"; then
-   AC_DEFINE([USE_SMARTCARD], [1], [Define if supporting smartcard proxying])
-fi
+SPICE_CHECK_SMARTCARD([SMARTCARD])
+AM_CONDITIONAL(SUPPORT_SMARTCARD, test "x$have_smartcard" = "xyes")
 
-AC_ARG_ENABLE(client,
-[  --enable-client         Enable spice client],,
-[enable_client="no"])
-AS_IF([test x"$enable_client" != "xno"], [enable_client="yes"])
-AM_CONDITIONAL(SUPPORT_CLIENT, test "x$enable_client" = "xyes")
-
-AC_ARG_ENABLE(automated_tests,
-[  --enable-automated-tests     Enable automated tests using snappy (part of spice--gtk)],,
-[enable_automated_tests="no"])
+AC_ARG_ENABLE([automated_tests],
+              AS_HELP_STRING([--enable-automated-tests], [Enable automated tests using spicy-screenshot (part of spice--gtk)]),,
+              [enable_automated_tests="no"])
 AS_IF([test x"$enable_automated_tests" != "xno"], [enable_automated_tests="yes"])
 AM_CONDITIONAL(SUPPORT_AUTOMATED_TESTS, test "x$enable_automated_tests" != "xno")
 
+SPICE_CHECK_LZ4([LZ4])
 
 dnl =========================================================================
 dnl Check deps
 
 AC_CONFIG_SUBDIRS([spice-common])
-COMMON_CFLAGS='-I ${top_srcdir}/spice-common/ -I ${top_builddir}/spice-common/ -I ${top_srcdir}/spice-common/spice-protocol/'
+COMMON_CFLAGS='-I ${top_srcdir}/spice-common/ -I ${top_builddir}/spice-common/'
 AC_SUBST(COMMON_CFLAGS)
 
 AC_CHECK_LIBM
 AC_SUBST(LIBM)
 
-AC_CHECK_LIB(rt, clock_gettime,
-   AC_DEFINE([HAVE_CLOCK_GETTIME], 1, [Defined if we have clock_gettime()])
-   LIBRT=-lrt
-   )
+AC_CHECK_LIB(rt, clock_gettime, LIBRT="-lrt")
 AC_SUBST(LIBRT)
 
-if test "$red_target" = "windows"; then
-	SPICE_NONPKGCONFIG_LIBS+=" -lpthreadGC2 -lversion -lmsimg32 $LIBM"
-else
-	SPICE_NONPKGCONFIG_LIBS+=" -pthread $LIBM $LIBRT"
-fi
-
-dnl The client needs a yield function
-AC_MSG_CHECKING(for posix yield function)
-for yield_func in pthread_yield pthread_yield_np sched_yield \
-					thr_yield; do
-    spice_save_CPPFLAGS="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS $SPICE_NONPKGCONFIG_LIBS"
-    AC_TRY_LINK([#include <pthread.h>],
-		[$yield_func()],
-		[posix_yield_func="$yield_func"
-		break])
-    CPPFLAGS="$spice_save_CPPFLAGS"
-done
-if test x"$posix_yield_func" = xnone; then
-    AC_MSG_ERROR([No posix yield function found])
-else
-    AC_MSG_RESULT($posix_yield_func)
-    posix_yield_func="$posix_yield_func()"
-fi
-AC_DEFINE_UNQUOTED([POSIX_YIELD_FUNC],$posix_yield_func,[The POSIX RT yield function])
+AS_VAR_APPEND([SPICE_NONPKGCONFIG_LIBS], [" -pthread $LIBM $LIBRT"])
 
 SPICE_REQUIRES=""
 
-if test "x$enable_gui" = "xyes" && test "x$enable_client" = "xyes" ; then
-    PKG_CHECK_MODULES(CEGUI06, CEGUI-0.6 >= 0.6.0 CEGUI-0.6 < 0.7.0,
-    [
-        AC_SUBST(CEGUI06_CFLAGS)
-        AC_SUBST(CEGUI06_LIBS)
-        AC_DEFINE([USE_GUI], [1], [Define to build with CEGUI support])
-    ],
-    [
-        PKG_CHECK_MODULES(CEGUI, CEGUI >= 0.6.0 CEGUI < 0.7.0)
-        AC_SUBST(CEGUI_CFLAGS)
-        AC_SUBST(CEGUI_LIBS)
-        AC_DEFINE([USE_GUI], [1], [Define to build with CEGUI support])
-    ])
-fi
+AS_IF([test x"$have_smartcard" = "xyes"], [
+    AS_VAR_APPEND([SPICE_REQUIRES], [" libcacard >= 0.1.2"])
+])
 
-if test "x$enable_smartcard" = "xyes"; then
-    PKG_CHECK_MODULES(CAC_CARD, libcacard >= 0.1.2)
-    SMARTCARD_LIBS="$CAC_CARD_LIBS"
-    SMARTCARD_CFLAGS="$CAC_CARD_CFLAGS"
-    AC_SUBST(SMARTCARD_LIBS)
-    AC_SUBST(SMARTCARD_CFLAGS)
-    SPICE_REQUIRES+=" libcacard >= 0.1.2"
-fi
-
+SPICE_PROTOCOL_MIN_VER=0.12.10
+PKG_CHECK_MODULES([SPICE_PROTOCOL], [spice-protocol >= $SPICE_PROTOCOL_MIN_VER])
+AC_SUBST([SPICE_PROTOCOL_MIN_VER])
 
 PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= 2.22])
-SPICE_REQUIRES+=" glib-2.0 >= 2.22"
+AS_VAR_APPEND([SPICE_REQUIRES], [" glib-2.0 >= 2.22"])
 
 PKG_CHECK_MODULES(PIXMAN, pixman-1 >= 0.17.7)
 AC_SUBST(PIXMAN_CFLAGS)
 AC_SUBST(PIXMAN_LIBS)
-SPICE_REQUIRES+=" pixman-1 >= 0.17.7"
+AS_VAR_APPEND([SPICE_REQUIRES], [" pixman-1 >= 0.17.7"])
 
-AC_ARG_ENABLE(celt051,
-    [  --disable-celt051       Disable celt051 audio codec (enabled by default)],,
-        [enable_celt051="yes"])
+AC_ARG_ENABLE([celt051],
+              AS_HELP_STRING([--disable-celt051], [Disable celt051 audio codec (enabled by default)]),,
+              [enable_celt051="yes"])
 
 if test "x$enable_celt051" = "xyes"; then
-    PKG_CHECK_MODULES(CELT051, celt051 >= 0.5.1.1, SPICE_REQUIRES+=" celt051 >= 0.5.1.1")
+    PKG_CHECK_MODULES(CELT051, celt051 >= 0.5.1.1, AS_VAR_APPEND([SPICE_REQUIRES], [" celt051 >= 0.5.1.1"]))
 fi
 
 if test ! -e client/generated_marshallers.cpp; then
@@ -244,91 +143,7 @@ fi
 PKG_CHECK_MODULES(SSL, openssl)
 AC_SUBST(SSL_CFLAGS)
 AC_SUBST(SSL_LIBS)
-SPICE_REQUIRES+=" openssl"
-
-# These are commented out because the gl libraries on RHEL 5 do not have pkgconfig files
-#
-# PKG_CHECK_MODULES(GL, gl glu)
-# AC_SUBST(GL_CFLAGS)
-# AC_SUBST(GL_LIBS)
-# SPICE_REQUIRES+=" gl glu"
-
-if test "x$enable_opengl" = "xyes"; then
-   AC_CHECK_LIB(GL, glBlendFunc, GL_LIBS="$GL_LIBS -lGL", enable_opengl=no)
-   AC_CHECK_LIB(GLU, gluSphere, GL_LIBS="$GL_LIBS -lGLU", enable_opengl=no)
-   AC_DEFINE([USE_OPENGL], [1], [Define to build with OpenGL support])
-   AC_DEFINE([GL_GLEXT_PROTOTYPES], [], [Enable GLExt prototypes])
-
-   if test "x$enable_opengl" = "xno"; then
-      AC_MSG_ERROR([GL libraries not available])
-   fi
-fi
-
-AC_SUBST(GL_CFLAGS)
-AC_SUBST(GL_LIBS)
-SPICE_NONPKGCONFIG_LIBS+=" $GL_LIBS"
-
-if test "x$red_target" = "xx11" && test "x$enable_client" = "xyes" ; then
-	if test "$os_linux" = yes; then
-		PKG_CHECK_MODULES(ALSA, alsa)
-		AC_SUBST(ALSA_CFLAGS)
-		AC_SUBST(ALSA_LIBS)
-	fi
-
-	PKG_CHECK_MODULES(XRANDR, xrandr)
-	PKG_CHECK_MODULES(XFIXES, xfixes)
-	PKG_CHECK_MODULES(MISC_X, x11 xext xrender)
-	AC_SUBST(XRANDR_CFLAGS)
-	AC_SUBST(XRANDR_LIBS)
-	AC_SUBST(MISC_X_CFLAGS)
-	AC_SUBST(MISC_X_LIBS)
-
-	PKG_CHECK_MODULES(XRANDR12,
-	        xrandr >= 1.2,
-	        have_xrandr12=yes,
-	        have_xrandr12=no)
-else
-	have_xrandr12=no
-fi
-
-AM_CONDITIONAL([HAVE_XRANDR12], [test "x$have_xrandr12" = "xyes"])
-if test "x$have_xrandr12" = "xyes" ; then
-  AC_DEFINE([HAVE_XRANDR12], [], [Define if we have XRANDR 12])
-fi
-
-# Add parameter for libXinerama
-AC_ARG_ENABLE([xinerama],
-    [AS_HELP_STRING([--disable-xinerama],
-        [disable Xinerama library @<:@default=no@:>@])])
-
-if test "x$enable_xinerama" != "xno"; then
-    PKG_CHECK_MODULES(XINERAMA,
-        xinerama >= 1.0,
-        have_xinerama=yes,
-        have_xinerama=no)
-else
-    have_xinerama=no
-fi
-
-if test "x$enable_xinerama" = "xyes" && test "x$have_xinerama" = "xno"; then
-    AC_MSG_ERROR([Requested Xinerama library was not found])
-fi
-
-AM_CONDITIONAL([HAVE_XINERAMA], [test "x$have_xinerama" = "xyes"])
-if test "x$have_xinerama" = "xyes" ; then
-  AC_DEFINE([HAVE_XINERAMA], [], [Define if we have Xinerama])
-  AC_SUBST(XINERAMA_CFLAGS)
-  AC_SUBST(XINERAMA_LIBS)
-  SPICE_REQUIRES+=" xinerama"
-fi
-
-# Add parameter for (partial) static linkage of spice client.
-# this is used to achive single binary package for all (?) distros.
-AC_ARG_ENABLE(static-linkage,
-[  --enable-static-linkage will generate spice client binary with static linkage to external libraries ],,
-[enable_static_linkage="no"])
-AS_IF([test x"$enable_static_linkage" != "xno"],
-[SPICEC_STATIC_LINKAGE_BSTATIC=["-Wl,-Bstatic"]])
+AS_VAR_APPEND([SPICE_REQUIRES], [" openssl"])
 
 AC_CHECK_LIB(jpeg, jpeg_destroy_decompress,
     AC_MSG_CHECKING([for jpeglib.h])
@@ -399,11 +214,11 @@ AC_SUBST([SASL_CFLAGS])
 AC_SUBST([SASL_LIBS])
 
 if test "x$enable_automated_tests" = "xyes"; then
-    AC_MSG_CHECKING([for snappy/spicy-screenshot])
-    snappy --help >/dev/null 2>&1 || spicy-screenshot --help >/dev/null 2>&1
+    AC_MSG_CHECKING([for spicy-screenshot])
+    spicy-screenshot --help >/dev/null 2>&1
     if test $? -ne 0 ; then
         AC_MSG_RESULT([not found])
-        AC_MSG_ERROR([snappy/spicy-screenshot was not found, this module is part of spice-gtk and is required to compile this package])
+        AC_MSG_ERROR([spicy-screenshot was not found, this module is part of spice-gtk and is required to compile this package])
     fi
     AC_MSG_RESULT([found])
 fi
@@ -435,35 +250,7 @@ SPICE_COMPILE_WARNINGS
 LIBVIRT_LINKER_RELRO
 LIBVIRT_LINKER_NO_INDIRECT
 
-# use ximage.h for win32 build if it is found (no package for mingw32 atm)
-if test $os_win32 == "yes" ; then
-    AC_MSG_CHECKING([for cximage])
-    AC_TRY_CPP(
-[#include <ximage.h>
-int main()
-{
- return CXIMAGE_FORMAT_RAW;
-)}
-],[
- AC_MSG_RESULT([found])
- have_cximage="yes"
-]
-,[AC_MSG_RESULT([missing])
- CXIMAGE_CFLAGS='-DDISABLE_CXIMAGE'
- have_cximage="no"
- ]
-)
-fi
-AC_SUBST(CXIMAGE_CFLAGS)
-
-# check for windres for mingw32 builds
-if test $os_win32 == "yes" ; then
-    AC_CHECK_PROGS(WINDRES,i686-pc-mingw32-windres mingw-windres mingw32-windres,false)
-    AC_SUBST(WINDRES)
-fi
-
 AC_SUBST(WARN_CFLAGS)
-AC_SUBST(CFLAGS_CFLAGS)
 
 dnl =========================================================================
 dnl -fvisibility stuff
@@ -506,8 +293,8 @@ AC_OUTPUT([
 Makefile
 spice-server.pc
 server/Makefile
+server/spice-version.h
 server/tests/Makefile
-client/Makefile
 docs/Makefile
 docs/manual/Makefile
 ])
@@ -523,19 +310,11 @@ echo "
         c++ compiler:             ${CXX}
         python:                   ${PYTHON}
 
-        Build Spice client:       ${enable_client}
-" ; if test "x$enable_client" == "xyes"; then echo "\
-        Have XRANDR 1.2:          ${have_xrandr12}
-
-        Have Xinerama:            ${have_xinerama}
-
-        Red target:               ${red_target}
-
         OpenGL:                   ${enable_opengl}
 
-        GUI:                      ${enable_gui}
-" ; fi ; echo "\
-        Smartcard:                ${enable_smartcard}
+        LZ4 support:              ${enable_lz4}
+
+        Smartcard:                ${have_smartcard}
 
         SASL support:             ${enable_sasl}
 
@@ -544,10 +323,9 @@ echo "
         Manual:                   ${have_asciidoc}
 "
 
-if test $os_win32 == "yes" ; then
-echo \
-"        Copy & Paste Images:     ${have_cximage}
-"
+if test x"$arch_warn" != x; then
+        AC_MSG_WARN([$arch_warn])
+        echo ""
 fi
 
 echo \

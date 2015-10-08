@@ -32,7 +32,8 @@
 static int gdi_handlers = 0;
 #endif
 
-static void release_data(pixman_image_t *image, void *release_data)
+static void release_data(SPICE_GNUC_UNUSED pixman_image_t *image,
+                         void *release_data)
 {
     PixmanData *data = (PixmanData *)release_data;
 
@@ -164,6 +165,10 @@ pixman_image_t * surface_create(pixman_format_code_t format, int width, int heig
             bitmap_info.inf.bmiHeader.biBitCount = 32;
             nstride = width * 4;
             break;
+        case PIXMAN_r8g8b8:
+            bitmap_info.inf.bmiHeader.biBitCount = 24;
+            nstride = SPICE_ALIGN(width * 3, 4);
+            break;
         case PIXMAN_x1r5g5b5:
         case PIXMAN_r5g6b5:
             bitmap_info.inf.bmiHeader.biBitCount = 16;
@@ -231,6 +236,10 @@ pixman_image_t * surface_create(pixman_format_code_t format, int width, int heig
         case PIXMAN_a8r8g8b8:
         case PIXMAN_x8r8g8b8:
             stride = width * 4;
+            break;
+        case PIXMAN_r8g8b8:
+            // NOTE: LZ4 also decodes to RGB24
+            stride = SPICE_ALIGN(width * 3, 4);
             break;
         case PIXMAN_x1r5g5b5:
         case PIXMAN_r5g6b5:

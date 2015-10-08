@@ -75,13 +75,13 @@ enum {
 
 typedef uint32_t RedWorkerMessage;
 
-#define RED_MAX_RENDERERS 4
-
 enum {
     RED_RENDERER_INVALID,
     RED_RENDERER_SW,
     RED_RENDERER_OGL_PBUF,
     RED_RENDERER_OGL_PIXMAP,
+
+    RED_RENDERER_LAST
 };
 
 typedef struct RedDispatcher RedDispatcher;
@@ -91,8 +91,8 @@ typedef struct WorkerInitData {
     int id;
     uint32_t *pending;
     uint32_t num_renderers;
-    uint32_t renderers[RED_MAX_RENDERERS];
-    spice_image_compression_t image_compression;
+    uint32_t renderers[RED_RENDERER_LAST];
+    SpiceImageCompression image_compression;
     spice_wan_compression_t jpeg_state;
     spice_wan_compression_t zlib_glz_state;
     int streaming_video;

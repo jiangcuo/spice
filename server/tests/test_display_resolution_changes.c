@@ -22,7 +22,8 @@ void pinger(void *opaque)
     test->core->timer_start(ping_timer, ping_ms);
 }
 
-void set_primary_params(Test *test, Command *command)
+void set_primary_params(SPICE_GNUC_UNUSED Test *test,
+                        Command *command)
 {
 #if 0
     static int toggle = 0;
@@ -44,8 +45,8 @@ void set_primary_params(Test *test, Command *command)
 }
 
 static Command commands[] = {
-    {DESTROY_PRIMARY, NULL},
-    {CREATE_PRIMARY, set_primary_params},
+    {DESTROY_PRIMARY, NULL, .cb_opaque = NULL,},
+    {CREATE_PRIMARY, set_primary_params, .cb_opaque = NULL},
 };
 
 int main(void)
@@ -55,7 +56,7 @@ int main(void)
 
     core = basic_event_loop_init();
     test = test_new(core);
-    //spice_server_set_image_compression(server, SPICE_IMAGE_COMPRESS_OFF);
+    //spice_server_set_image_compression(server, SPICE_IMAGE_COMPRESSION_OFF);
     test_add_display_interface(test);
     test_set_command_list(test, commands, COUNT(commands));
 

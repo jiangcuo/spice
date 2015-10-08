@@ -162,9 +162,8 @@ struct MJpegEncoder {
     struct jpeg_error_mgr jerr;
 
     unsigned int bytes_per_pixel; /* bytes per pixel of the input buffer */
-    void (*pixel_converter)(uint8_t *src, uint8_t *dest);
+    void (*pixel_converter)(void *src, uint8_t *dest);
 
-    int rate_control_is_active;
     MJpegEncoderRateControl rate_control;
     MJpegEncoderRateControlCbs cbs;
     void *cbs_opaque;
@@ -185,21 +184,25 @@ static uint32_t get_min_required_playback_delay(uint64_t frame_enc_size,
                                                 uint64_t byte_rate,
                                                 uint32_t latency);
 
-MJpegEncoder *mjpeg_encoder_new(int bit_rate_control, uint64_t starting_bit_rate,
+static inline int rate_control_is_active(MJpegEncoder* encoder)
+{
+    return encoder->cbs.get_roundtrip_ms != NULL;
+}
+
+MJpegEncoder *mjpeg_encoder_new(uint64_t starting_bit_rate,
                                 MJpegEncoderRateControlCbs *cbs, void *opaque)
 {
     MJpegEncoder *enc;
 
-    spice_assert(!bit_rate_control || (cbs && cbs->get_roundtrip_ms && cbs->get_source_fps));
+    spice_assert(!cbs || (cbs && cbs->get_roundtrip_ms && cbs->get_source_fps));
 
     enc = spice_new0(MJpegEncoder, 1);
 
     enc->first_frame = TRUE;
-    enc->rate_control_is_active = bit_rate_control;
     enc->rate_control.byte_rate = starting_bit_rate / 8;
     enc->starting_bit_rate = starting_bit_rate;
 
-    if (bit_rate_control) {
+    if (cbs) {
         struct timespec time;
 
         clock_gettime(CLOCK_MONOTONIC, &time);
@@ -211,6 +214,7 @@ MJpegEncoder *mjpeg_encoder_new(int bit_rate_control, uint64_t starting_bit_rate
         enc->rate_control.quality_eval_data.reason = MJPEG_QUALITY_EVAL_REASON_RATE_CHANGE;
         enc->rate_control.warmup_start_time = ((uint64_t) time.tv_sec) * 1000000000 + time.tv_nsec;
     } else {
+        enc->cbs.get_roundtrip_ms = NULL;
         mjpeg_encoder_reset_quality(enc, MJPEG_LEGACY_STATIC_QUALITY_ID, MJPEG_MAX_FPS, 0);
     }
 
@@ -234,15 +238,16 @@ uint8_t mjpeg_encoder_get_bytes_per_pixel(MJpegEncoder *encoder)
 
 #ifndef JCS_EXTENSIONS
 /* Pixel conversion routines */
-static void pixel_rgb24bpp_to_24(uint8_t *src, uint8_t *dest)
+static void pixel_rgb24bpp_to_24(void *src_ptr, uint8_t *dest)
 {
+    uint8_t *src = src_ptr;
     /* libjpegs stores rgb, spice/win32 stores bgr */
     *dest++ = src[2]; /* red */
     *dest++ = src[1]; /* green */
     *dest++ = src[0]; /* blue */
 }
 
-static void pixel_rgb32bpp_to_24(uint8_t *src, uint8_t *dest)
+static void pixel_rgb32bpp_to_24(void *src, uint8_t *dest)
 {
     uint32_t pixel = *(uint32_t *)src;
     *dest++ = (pixel >> 16) & 0xff;
@@ -251,7 +256,7 @@ static void pixel_rgb32bpp_to_24(uint8_t *src, uint8_t *dest)
 }
 #endif
 
-static void pixel_rgb16bpp_to_24(uint8_t *src, uint8_t *dest)
+static void pixel_rgb16bpp_to_24(void *src, uint8_t *dest)
 {
     uint16_t pixel = *(uint16_t *)src;
     *dest++ = ((pixel >> 7) & 0xf8) | ((pixel >> 12) & 0x7);
@@ -607,9 +612,7 @@ static void mjpeg_encoder_adjust_params_to_bit_rate(MJpegEncoder *encoder)
     uint32_t latency = 0;
     uint32_t src_fps;
 
-    if (!encoder->rate_control_is_active) {
-        return;
-    }
+    spice_assert(rate_control_is_active(encoder));
 
     rate_control = &encoder->rate_control;
     quality_eval = &rate_control->quality_eval_data;
@@ -625,7 +628,10 @@ static void mjpeg_encoder_adjust_params_to_bit_rate(MJpegEncoder *encoder)
         return;
     }
 
-    spice_assert(rate_control->num_recent_enc_frames);
+    if (!rate_control->num_recent_enc_frames) {
+        spice_debug("No recent encoded frames");
+        return;
+    }
 
     if (rate_control->num_recent_enc_frames < MJPEG_AVERAGE_SIZE_WINDOW &&
         rate_control->num_recent_enc_frames < rate_control->fps) {
@@ -691,9 +697,8 @@ static void mjpeg_encoder_adjust_fps(MJpegEncoder *encoder, uint64_t now)
     MJpegEncoderRateControl *rate_control = &encoder->rate_control;
     uint64_t adjusted_fps_time_passed;
 
-    if (!encoder->rate_control_is_active) {
-        return;
-    }
+    spice_assert(rate_control_is_active(encoder));
+
     adjusted_fps_time_passed = (now - rate_control->adjusted_fps_start_time) / 1000 / 1000;
 
     if (!rate_control->during_quality_eval &&
@@ -734,7 +739,7 @@ int mjpeg_encoder_start_frame(MJpegEncoder *encoder, SpiceBitmapFmt format,
 {
     uint32_t quality;
 
-    if (encoder->rate_control_is_active) {
+    if (rate_control_is_active(encoder)) {
         MJpegEncoderRateControl *rate_control = &encoder->rate_control;
         struct timespec time;
         uint64_t now;
@@ -838,6 +843,7 @@ int mjpeg_encoder_encode_scanline(MJpegEncoder *encoder, uint8_t *src_pixels,
     if (encoder->pixel_converter) {
         unsigned int x;
         for (x = 0; x < image_width; x++) {
+            /* src_pixels is expected to be 4 bytes aligned */
             encoder->pixel_converter(src_pixels, row);
             row += 3;
             src_pixels += encoder->bytes_per_pixel;
@@ -1131,7 +1137,7 @@ void mjpeg_encoder_client_stream_report(MJpegEncoder *encoder,
                 end_frame_mm_time - start_frame_mm_time,
                 end_frame_delay, audio_delay);
 
-    if (!encoder->rate_control_is_active) {
+    if (!rate_control_is_active(encoder)) {
         spice_debug("rate control was not activated: ignoring");
         return;
     }

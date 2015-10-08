@@ -44,19 +44,11 @@ struct SpiceMigrateState {
     int dummy;
 };
 
-typedef struct RedsMigSpice {
-    char *host;
-    char *cert_subject;
-    int port;
-    int sport;
-} RedsMigSpice;
-
 /* main thread only */
 void reds_handle_channel_event(int event, SpiceChannelEventInfo *info);
 
-void reds_disable_mm_timer(void);
-void reds_enable_mm_timer(void);
-void reds_update_mm_timer(uint32_t mm_time);
+void reds_disable_mm_time(void);
+void reds_enable_mm_time(void);
 uint32_t reds_get_mm_time(void);
 void reds_set_client_mouse_allowed(int is_client_mouse_allowed,
                                    int x_res, int y_res);
