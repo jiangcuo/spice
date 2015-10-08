@@ -17,6 +17,7 @@ spice (0.12.6-1) UNRELEASED; urgency=medium
     spice_server_migrate_client_state@SPICE_SERVER_0.6.0 (from 0.8.2),
     but it looks like it was exported by mistake and has never been
     a public API, so we wont make new library package
+  * enable parallel build (dch --parallel)
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 08 Oct 2015 21:47:14 +0300
 
