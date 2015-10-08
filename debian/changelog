@@ -20,6 +20,9 @@ spice (0.12.6-1) UNRELEASED; urgency=medium
   * enable parallel build (dch --parallel)
   * add python-six to build-deps, needed for code generation
     (marshallers/demarshallers)
+  * remove libxinerama-dev, libssl-dev and libglib2.0-dev deps from
+    libspice-server-dev package, since spice headers does not include
+    these anymore, and the libs will be satisfied from the shared library
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 08 Oct 2015 21:47:14 +0300
 

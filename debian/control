@@ -59,7 +59,7 @@ Description: Debugging symbols for libspice-server1
 Package: libspice-server-dev
 Section: libdevel
 Architecture: i386 amd64
-Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libglib2.0-dev (>= 2.22~), libpixman-1-dev (>= 0.17.7~), libssl-dev, libspice-protocol-dev (>= 0.12.10~)
+Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libspice-protocol-dev (>= 0.12.10~)
 Suggests: pkg-config
 Description: Header files and development documentation for spice-server
  The Simple Protocol for Independent Computing Environments (SPICE) is
