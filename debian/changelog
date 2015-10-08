@@ -12,6 +12,11 @@ spice (0.12.6-1) UNRELEASED; urgency=medium
   * stop building spice-client, since upstream dropped it
     (Closes: #749331 #704229 #641772 #715179).
     Remove libxrandr-dev, libxfixes-dev, and mentions of mesa from build-deps.
+  * update libspice-server1.symbols file with new symbols.
+    Note: one symbol has been removed in this release,
+    spice_server_migrate_client_state@SPICE_SERVER_0.6.0 (from 0.8.2),
+    but it looks like it was exported by mistake and has never been
+    a public API, so we wont make new library package
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 08 Oct 2015 21:47:14 +0300
 
