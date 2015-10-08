@@ -22,6 +22,7 @@ Build-Depends: debhelper (>= 9), pkg-config,
  libxinerama-dev,
  python-pyparsing,
  libglib2.0-dev (>= 2.22~),
+ libcacard-dev (>= 0.1.2),
 Standards-Version: 3.9.4
 Homepage: http://spice-space.org/
 Vcs-Git: git://anonscm.debian.org/collab-maint/spice.git
@@ -78,7 +79,7 @@ Description: Debugging symbols for libspice-server1
 Package: libspice-server-dev
 Section: libdevel
 Architecture: i386 amd64
-Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libglib2.0-dev (>= 2.22~), libpixman-1-dev (>= 0.17.7~), libssl-dev, libxinerama-dev, libspice-protocol-dev (>= 0.12.0~)
+Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libglib2.0-dev (>= 2.22~), libpixman-1-dev (>= 0.17.7~), libssl-dev, libxinerama-dev, libspice-protocol-dev (>= 0.12.0~), libcacard-dev (>= 0.1.2)
 Suggests: pkg-config
 Description: Header files and development documentation for spice-server
  The Simple Protocol for Independent Computing Environments (SPICE) is
