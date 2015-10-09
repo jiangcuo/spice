@@ -47,7 +47,7 @@ spice (0.12.6-1) unstable; urgency=medium
 spice (0.12.5-1.3) unstable; urgency=high
 
   * Non-maintainer upload.
-  * Add series of patches for CVE-2015-5260 and CVE-2015-6261.
+  * Add series of patches for CVE-2015-5260 and CVE-2015-5261.
     CVE-2015-5260: insufficient validation of surface_id parameter can cause
     crash. (Closes: #801089)
     CVE-2015-5261: host memory access from guest using crafted images.
