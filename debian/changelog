@@ -1,3 +1,9 @@
+spice (0.12.6-3) UNRELEASED; urgency=medium
+
+  * update Standards-Version to 3.9.6 (no changes)
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Fri, 09 Oct 2015 11:10:48 +0300
+
 spice (0.12.6-2) unstable; urgency=medium
 
   * stop linking with libcacard as no symbols from it are

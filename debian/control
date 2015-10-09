@@ -16,7 +16,7 @@ Build-Depends: debhelper (>= 9), pkg-config,
  python-pyparsing,
  libglib2.0-dev (>= 2.22~),
  libcacard-dev,
-Standards-Version: 3.9.4
+Standards-Version: 3.9.6
 Homepage: http://spice-space.org/
 Vcs-Git: git://anonscm.debian.org/collab-maint/spice.git
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/spice.git
