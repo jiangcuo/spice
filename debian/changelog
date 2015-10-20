@@ -1,6 +1,8 @@
 spice (0.12.6-3) UNRELEASED; urgency=medium
 
   * update Standards-Version to 3.9.6 (no changes)
+  * add libcacard-dev to libspice-server-dev dependencies
+    (Closes: #802413)
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Fri, 09 Oct 2015 11:10:48 +0300
 
