@@ -1,3 +1,11 @@
+spice (0.12.6-4) UNRELEASED; urgency=medium
+
+  * stop depending libspice-server-dev on libcacard-dev (#802413).
+    Instead, remove mention of libcacard from the .pc file, as it
+    is not actually used when building with libspice-server.
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Tue, 20 Oct 2015 10:29:30 +0300
+
 spice (0.12.6-3) unstable; urgency=medium
 
   * update Standards-Version to 3.9.6 (no changes)

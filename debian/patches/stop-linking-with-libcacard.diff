@@ -20,3 +20,20 @@ index e4b2c8d..d1c39d0 100644
  ])
  
  
+diff --git a/configure.ac b/configure.ac
+index 8ab4c4a..982700b 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -106,9 +106,9 @@ AS_VAR_APPEND([SPICE_NONPKGCONFIG_LIBS], [" -pthread $LIBM $LIBRT"])
+ 
+ SPICE_REQUIRES=""
+ 
+-AS_IF([test x"$have_smartcard" = "xyes"], [
+-    AS_VAR_APPEND([SPICE_REQUIRES], [" libcacard >= 0.1.2"])
+-])
++dnl AS_IF([test x"$have_smartcard" = "xyes"], [
++dnl     AS_VAR_APPEND([SPICE_REQUIRES], [" libcacard >= 0.1.2"])
++dnl ])
+ 
+ SPICE_PROTOCOL_MIN_VER=0.12.10
+ PKG_CHECK_MODULES([SPICE_PROTOCOL], [spice-protocol >= $SPICE_PROTOCOL_MIN_VER])

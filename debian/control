@@ -60,7 +60,7 @@ Description: Debugging symbols for libspice-server1
 Package: libspice-server-dev
 Section: libdevel
 Architecture: i386 amd64
-Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libspice-protocol-dev (>= 0.12.10~), libcacard-dev
+Depends: libspice-server1 (= ${binary:Version}), ${misc:Depends}, libspice-protocol-dev (>= 0.12.10~)
 Suggests: pkg-config
 Description: Header files and development documentation for spice-server
  The Simple Protocol for Independent Computing Environments (SPICE) is
