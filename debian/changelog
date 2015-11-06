@@ -3,6 +3,9 @@ spice (0.12.6-4) UNRELEASED; urgency=medium
   * stop depending libspice-server-dev on libcacard-dev (#802413).
     Instead, remove mention of libcacard from the .pc file, as it
     is not actually used when building with libspice-server.
+  * remove Requires.private defs from .pc file -- we're not building static
+    libs, but if Requires.private is present, pkg-config requires the other
+    .pc files to be present too, which is wrong (Closes: #803926)
 
  -- Michael Tokarev <mjt@tls.msk.ru>  Tue, 20 Oct 2015 10:29:30 +0300
 
