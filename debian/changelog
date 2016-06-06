@@ -1,3 +1,13 @@
+spice (0.12.6-4.1) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * CVE-2016-0749: heap-based buffer overflow in smartcard interaction
+    (Closes: #826585)
+  * CVE-2016-2150: host memory access from guest using crafted primary surface
+    parameters (Closes: #826584)
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Mon, 06 Jun 2016 19:22:10 +0200
+
 spice (0.12.6-4) unstable; urgency=medium
 
   * stop depending libspice-server-dev on libcacard-dev (#802413).
