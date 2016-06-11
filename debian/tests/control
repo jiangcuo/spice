@@ -1,0 +1,2 @@
+Tests: automated-tests
+Depends: @, @builddeps@, spice-client-gtk

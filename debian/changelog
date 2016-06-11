@@ -1,5 +1,6 @@
 spice (0.13.90-0.1) UNRELEASED; urgency=medium
 
+  [ Laurent Bigonville ]
   * New upstream release (Closes: #849569)
     - Adjust the build-dependencies
     - Drop d/p/CVE-2016-9577-and-CVE-2016-9578.patch,
@@ -13,7 +14,11 @@ spice (0.13.90-0.1) UNRELEASED; urgency=medium
   * debian/rules: Drop override_dh_installdocs, this was only needed when we
     were building the -dbg package ourself
 
- -- Laurent Bigonville <bigon@debian.org>  Tue, 22 Aug 2017 18:08:59 +0200
+  [ Santiago Ruano Rincón ]
+  * debian/tests/automated-tests: Intial DEP-8 test, using upstream automated
+    test (Closes: #827027)
+
+ -- Santiago Ruano Rincón <santiago@debian.org>  Tue, 22 Aug 2017 18:33:06 +0200
 
 spice (0.12.8-2.2) unstable; urgency=medium
 
