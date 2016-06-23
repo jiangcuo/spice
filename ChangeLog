@@ -1,3 +1,427 @@
+2016-04-14  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Revert "Set TCP_KEEPINTVL when enabling TCP keepalive"
+	This reverts commit 3336d892c3d8647868423300905e5cad67de1db1.
+
+	This was NACK'ed for the master branch, but was pushed by mistake to the
+	0.12 branch
+
+	Update NEWS file for 0.12.7
+
+	Update libtool versioning for 0.12.7 release
+
+	Update spice-common
+	Revert spice-protocol/codegen changes.
+	This was causing build failures when trying to compile an older spice-server
+	release against a newer spice-protocol release with new message/channel
+	additions
+
+	spice-common changes this brings in:
+
+	Christophe Fergeau (2):
+	      proto: Rename image_compress to image_compression
+	      proto: Use proper type for preferred_compression field
+
+	Marc-André Lureau (1):
+	      Revert "Remove files moved to spice-protocol"
+
+2016-04-14  Frediano Ziglio  <fziglio@redhat.com>
+
+	red-channel: make red_client_{ref,unref} thread safe
+	These function are called on both sides of dispatcher so the
+	increment/decrement of the counter is done in multiple threads.
+	This caused the counter to not get incremented correctly and
+	freed the structure too early, leaving a dangling pointer in
+	the other thread.
+
+	This fixes https://bugzilla.redhat.com/show_bug.cgi?id=1253375.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2016-03-29  Frediano Ziglio  <fziglio@redhat.com>
+
+	memslot: do not crash if guest provide a wrong address
+	This could happen with buggy driver.
+
+	This fixes https://bugzilla.redhat.com/show_bug.cgi?id=1264356
+
+	Acked-by: Pavel Grunt <pgrunt@redhat.com>
+
+	channel: do not free rcc->stream in red_channel_client_disconnect
+	This fixes a crash if red_channel_client disconnect is called
+	handling a message.
+	This can happen for instance while handling SPICE_MSGC_ACK which calls
+	red_channel_client_push which tries to detect write errors while writing
+	to a socket (for instance socket disconnection).
+	Messages are read in a loop and red_channel_client_disconnect would
+	cause rcc->stream to be NULL which will result in a use-after-free
+	problem (stream in red_peer_handle_incoming will use cached stream value).
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2016-03-10  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Set TCP_KEEPINTVL when enabling TCP keepalive
+	Otherwise we are only changing the timeout before the first keepalive
+	probe is sent.
+
+	Remove spice_server_set_keepalive_timeout
+	This public API is no longer needed as the keepalive interval does not
+	need to be configurable. This API was never in a stable 0.12 release, so
+	it's OK to remove it now.
+
+	Always enable TCP keepalive
+	Always enabled, hardcoded interval
+	as per https://bugzilla.redhat.com/show_bug.cgi?id=1298590
+
+2016-01-13  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Update spice-common
+	This fixes a compilation problem on EL6. git shortlog of the
+	spice-common changes brought in by the submodule update:
+
+	Christophe Fergeau (2):
+	      m4: Fix SPICE_WARNING on el6
+	      test: Use _LDADD rather than _LDFLAGS
+
+	Frediano Ziglio (1):
+	      ring: use NULL instead of 0 for null pointers
+
+	Lukas Venhoda (9):
+	      pixman_utils: Add macros for color byte ordering
+	      pixman_utils: Use PIXMAN_LE_ constants in spice_bitmap_try_as_pixman()
+	      ppc: Add support for bigendian color byte order
+	      ppc: Fix colors on ppc when using QUIC
+	      ppc: Fix colors on ppc when using LZ
+	      ppc: Fix colors on ppc when using LZ4
+	      ppc: Fix colors on ppc when using jpeg
+	      ppc: Fix alpha state checking on BE machines
+	      Remove trailing whitespace
+
+	Pavel Grunt (1):
+	      m4: Add macro for --with-sasl
+
+	Victor Toso (1):
+	      Remove headers that are included in spice_common.h
+
+	Update NEWS for 0.12.7 release
+
+	spicevmc: Drop unsent data on client disconnection
+	When redirecting a USB webcam over a slow link, it's currently possible
+	to hit an assertion in spice-server by running cheese (application using
+	the webcam), killing the client with ctrl+c and then restarting the
+	client:
+	qemu-kvm: spicevmc.c:324: spicevmc_red_channel_alloc_msg_rcv_buf:
+	Assertion `!state->recv_from_client_buf' failed.
+
+	This happens when red_peer_handle_incoming tries to allocate memory for
+	a message using spicevmc:
+	handler->msg = handler->cb->alloc_msg_buf(handler->opaque, msg_type,
+	msg_size);
+
+	red_peer_handle_incoming() is called when there is client data to be
+	read, and does
+	- call alloc_msg_buf() to allocate memory for the message
+	- read the message
+	- if the read was partial, return early, the main loop will call again
+	  red_peer_handle_incoming() when there is more data available for that
+	  channel
+	- parse the message
+	- call release_msg_buf() to free the message
+
+	For channels based on spicevmc (usbredir and port), alloc_msg_buf()
+	stores message data in SpiceVmcState::recv_from_client_buf and before
+	allocating new memory, it asserts that it's NULL.
+
+	This is what causes this crash in the following scenario:
+	- SpiceVmc::alloc_msg_buf() is called and allocates memory for a new
+	  message in SpiceVmcState::recv_from_client_buf
+	- red_peer_handle_incoming() returns early as all the spicevmc message
+	  data hasn't been received yet
+	- the client gets killed
+	- the main channel notices the disconnect and calls
+	  main_dispatcher_client_disconnect() which will disconnect all the
+	  channels
+	- SpiceVmc::on_disconnect is called
+	- after the new client connects, SpiceVmc::alloc_msg_buf() is called,
+	  notices that SpiceVmcState::recv_from_client_buf is already set, and
+	  asserts()
+
+	This commit makes sure the partial SpiceVmcState::recv_from_client_buf
+	data is cleared on disconnect so that the assert does not trigger.
+
+	This fixes https://bugzilla.redhat.com/show_bug.cgi?id=1264113
+
+2016-01-13  Frediano Ziglio  <fziglio@redhat.com>
+
+	pass proper type to SPICE_CONTAINEROF
+	In some case the member specified to SPICE_CONTAINEROF was not
+	exactly the same type of the pointer passed.
+	This can cause issues if structure changes so use proper member.
+
+	Acked-by: Fabiano Fidêncio <fidencio@redhat.com>
+
+2016-01-13  Sunny Shin  <sunny4s.git@gmail.com>
+
+	channel: add option tcp keepalive timeout to channels
+
+2016-01-13  Francois Gouget  <fgouget@codeweavers.com>
+
+	server: Fix conversions between QXLPHYSICAL and pointers
+	This avoids compilation errors with -Werror on 32 bit systems as the
+	pointer size differs from that of a QXLPHYSICAL.
+
+	server: Simplify the next chunk initialization in red_replay_data_chunks()
+
+	server: Fix a pointer to uint64_t cast in spice_replay_next_cmd()
+	This avoids a compilation error with -Werror on 32 bit systems as the
+	pointer size differs from that of an uint64_t.
+
+	server: Use '%zu' to print size_t variables
+	The size_t definition is different between 32 and 64 bit systems so that
+	neither '%u' nor '%lu' work for both. '%zu' should be used instead.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	server: Use PRI macros in printf for 32/64 bit compatibility
+	Some integer type definitions are different between 32 and 64 bit
+	systems which causes problems in printf. The PRI macros automatically
+	provide the printf format appropriate for the system.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2016-01-13  Victor Toso  <victortoso@redhat.com>
+
+	spicevmc: set state of DeviceInstance to NULL
+	After spice_char_device_state_destroy is called spicevmc should not keep
+	reference to that memory. state->chardev_st and sin->st point to the
+	same SpiceCharDeviceState and both should be set to NULL when it is
+	destroyed.
+
+	char-device: set to NULL freed pointers on destroy
+	As SpiceCharDeviceState is only unref'ed on
+	spice_char_device_state_destroy the same device could be destroyed more
+	then once so the pointers that are freed should be set to NULL.
+
+	Related: https://bugzilla.redhat.com/show_bug.cgi?id=1281455
+
+	char-device: free all memory pool when no clients
+	When no client is connect we should not need to keep the memory pool
+	used by char-device. In most situations this is not significant but
+	when using webdav this could mean freeing MAX_POOL_SIZE bytes
+
+	Related: https://bugs.freedesktop.org/show_bug.cgi?id=91350
+
+	char-device: Define a memory pool limit
+	Otherwise the amount of unused memory could grow while transfering big
+	chunks of data. This change only means that once the memory was used it
+	will not be stored again after the limit was reached.
+
+	Related: https://bugs.freedesktop.org/show_bug.cgi?id=91350
+
+	char-device: fix usage of free/unref on WriteBuffer
+	There are places were the could should definetly free the
+	SpiceCharDeviceWriteBuffer and places that it should only unref it. The
+	current use of spice_char_device_write_buffer_free was missleading.
+
+	This patch creates the spice_char_device_write_buffer_unref and properly
+	call these two functions.
+
+	Related: https://bugs.freedesktop.org/show_bug.cgi?id=91350
+
+2016-01-13  Lukas Venhoda  <lvenhoda@redhat.com>
+
+	dcc: Don't disconnect channel, when compression is not supported
+	Don't disconnect the display channel, when unsupported compression is
+	requested from the client. Not changing the compression is enough.
+
+	https://bugs.freedesktop.org/show_bug.cgi?id=92821
+	Acked-by: Victor Toso <victortoso@redhat.com>
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2016-01-07  Pavel Grunt  <pgrunt@redhat.com>
+
+	spicevmc: Return early when instance has no device state
+	Same approach as in spice_server_char_device_wakeup().
+	Avoid segmentation fault when the webdav channel (spice port channel) is
+	used with the vnc display:
+	 #0  0x00007ffff7aab734 in spice_char_device_state_opaque_get (dev=0x0)
+	     at char_device.c:720
+	 #1  0x00007ffff7b0850c in spice_server_port_event (sin=<optimized out>, event=<optimized out>) at spicevmc.c:578
+	 #2  0x0000555555787ba4 in set_guest_connected (port=<optimized out>, guest_connected=1) at hw/char/virtio-console.c:89
+	 #3  0x0000555555678d7c in control_out (len=<optimized out>, buf=0x55555775c3a0, vser=0x5555578d1540) at /home/pgrunt/RH/qemu/hw/char/virtio-serial-bus.c:404
+	 #4  0x0000555555678d7c in control_out (vdev=0x5555578d1540, vq=0x555557941bc8)
+	     at /home/pgrunt/RH/qemu/hw/char/virtio-serial-bus.c:441
+	 #5  0x000055555588eb98 in aio_dispatch (ctx=0x5555562e1a50) at aio-posix.c:160
+	 #6  0x00005555558829ee in aio_ctx_dispatch (source=<optimized out>, callback=<optimized out>, user_data=<optimized out>) at async.c:226
+	 #7  0x00007ffff2010e3a in g_main_context_dispatch () at /lib64/libglib-2.0.so.0
+	 #8  0x000055555588d8fb in main_loop_wait () at main-loop.c:211
+	 #9  0x000055555588d8fb in main_loop_wait (timeout=<optimized out>)
+	     at main-loop.c:256
+	 #10 0x000055555588d8fb in main_loop_wait (nonblocking=<optimized out>)
+	     at main-loop.c:504
+	 #11 0x000055555561b664 in main () at vl.c:1891
+
+	reds: Do not abort due to wrong header
+	Just prevent the buggy client from connecting.
+
+	 #0  0x00007fffe83b2a98 in raise () at /lib64/libc.so.6
+	 #1  0x00007fffe83b469a in abort () at /lib64/libc.so.6
+	 #2  0x00007ffff7b1533d in spice_logv (log_domain=0x7ffff7b87226 "Spice", log_level=SPICE_LOG_LEVEL_ERROR, strloc=0x7ffff7b92aba "reds.c:1373", function=0x7ffff7b94f40 <__FUNCTION__.31775> "reds_send_link_ack", format=0x7ffff7b871fe "assertion `%s' failed", args=args@entry=0x7fffffffcb68) at log.c:109
+	 #3  0x00007ffff7b15468 in spice_log (log_domain=log_domain@entry=0x7ffff7b87226 "Spice", log_level=log_level@entry=SPICE_LOG_LEVEL_ERROR, strloc=strloc@entry=0x7ffff7b92aba "reds.c:1373", function=function@entry=0x7ffff7b94f40 <__FUNCTION__.31775> "reds_send_link_ack", format=format@entry=0x7ffff7b871fe "assertion `%s' failed") at log.c:123
+	 #4  0x00007ffff7aee335 in reds_handle_read_link_done (link=0x555556b27c70)
+	     at reds.c:1373
+	 #5  0x00007ffff7aee335 in reds_handle_read_link_done (opaque=0x555556b27c70)
+	     at reds.c:2139
+	 #6  0x000055555588acc6 in qemu_iohandler_poll ()
+	 #7  0x000055555588a8e1 in main_loop_wait ()
+	 #8  0x0000555555614064 in main ()
+
+	Resolves: https://bugzilla.redhat.com/show_bug.cgi?id=1281442
+
+	Acked-by: Fabiano Fidêncio <fidencio@redhat.com>
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2016-01-07  Marc-André Lureau  <mlureau@redhat.com>
+
+	build-sys: disable static lib by default
+	It's not used in general, so no need to build it by default.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2016-01-07  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build: Remove unused SPICEC_STATIC_LINKAGE_BSTATIC
+	A left-over from the client code.
+
+2016-01-07  Frediano Ziglio  <fziglio@redhat.com>
+
+	replay: better help for -s option
+	-s accepts an option to delay command queueing.
+
+	Acked-by: Marc-André Lureau <mlureau@redhat.com>
+
+2015-12-14  Jeremy White  <jwhite@codeweavers.com>
+
+	Flush display commands before validating the surface.
+	This fixes a display glitch in xspice which is caused when
+	a surface create is queued, but then a direct call to update
+	the area is issued.  Unless we flush the queue, the surface
+	does not exist, and we fail.
+
+2015-12-11  Frediano Ziglio  <fziglio@redhat.com>
+
+	dcc: do not cause problem with multiple threads.
+	With multiple cards configured you can have multiple workers running in
+	different thread.
+	With such configuration static variables not syncronized could lead
+	to undefined behavior.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2015-12-11  Marc-André Lureau  <marcandre.lureau@gmail.com>
+
+	smartcard: include libcacard.h if possible
+
+	Add travis CI file
+
+2015-12-11  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Update spice-common
+	shortlog for the spice-common changes this brings in:
+
+	Christophe Fergeau (3):
+	      build-sys: Add missing # to comment
+	      ssl-verify: Handle NULL return from g_inet_address_new_from_string()
+	      ssl-verify: Don't leak GInetAddress
+
+	Francois Gouget (3):
+	      build-sys: Add the SPICE_WARNING() and SPICE_PRINT_MESSAGES m4 macros
+	      build-sys: Add SPICE_CHECK_GSTREAMER()
+	      build-sys: Add SPICE_CHECK_GSTREAMER_ELEMENTS()
+
+	Lukas Venhoda (1):
+	      canvas_base: Remove redundant switch case block
+
+	Marc-André Lureau (2):
+	      Fix make distcheck
+	      Use new libcacard.h if possible
+
+	build-sys: Adjust to new spice-common spice-deps.m4
+	This commit also updates the spice-common submodule
+
+	Christophe Fergeau (7):
+	      Add marshaller test case
+	      build-sys: Use ${PKG_CONFIG} rather than pkg-config
+	      build-sys: Rework SPICE_CHECK_* m4 macros
+	      build-sys: Add gio-2.0 to SPICE_CHECK_GLIB2
+	      build-sys: Fix error in SPICE_CHECK_LZ4 description
+	      build-sys: Set automake conditional in SPICE_CHECK_SMARTCARD
+	      build-sys: Rename SUPPORT_GL to HAVE_GL
+
+	Javier Celaya (1):
+	      Fix linearization of several marshallers with one item
+
+	Lukas Venhoda (3):
+	      ssl-verify: Only check addr length when using IP addr
+	      m4: Require glib version >= 2.22
+	      ssl-verify: Changed IPv4 hostname to IPv6
+
+2015-12-11  Frediano Ziglio  <fziglio@redhat.com>
+
+	remove small leak in MJPEG code
+	cinfo.dest is allocated in spice_jpeg_mem_dest but never freed.
+	Note that jpeg_destroy_compress does not free this field as is
+	supposed to be a buffer provided by jpeg caller.
+
+2015-12-11  Christophe Fergeau  <cfergeau@redhat.com>
+
+	Add missing license headers
+
+	syntax-check: Exclude png files from sc_prohibit_empty_lines_at_EOF
+
+	syntax-check: Clean-up exception rules
+	Some files no longer exists, some exceptions are no longer needed, ...
+
+	syntax-check: Remove unused #include <strings.h>
+
+	syntax-check: Add missing #include <config.h>
+
+	syntax-check: Don't use tabs for indentation
+
+	syntax-check: Exclude red_replay_qxl.c from sc_cast_of_argument_to_free
+	red_replay_qxl.c stores some pointers QXLPHYSICAL data members (ie
+	uint64_t), and then needs to free them, so the cast is required.
+
+	syntax-check: Ignore .png files in sc_trailing_blank test
+
+	syntax-check: manual: Remove duplicate word
+
+	syntax-check: Add missing AUTHORS
+
+2015-12-11  snir sheriber  <ssheribe@redhat.com>
+
+	fix spelling mistakes in comments (reseting to resetting & dummym to dummy)
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2015-12-11  Jeremy White  <jwhite@codeweavers.com>
+
+	Update the .gitignore files for the new manual, for a few newly generated tests, and for the spice-server.h.
+
+2015-10-12  Frediano Ziglio  <fziglio@redhat.com>
+
+	Simplify pointer computation
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2015-10-07  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build-sys: Remove client check from configure.ac
+	configure.ac is checking for pyparsing availability if
+	client/generated_marshallers.cpp is missing. The client/ code is gone, and
+	the python modules checks are done in spice-common/configure.ac
+	nowadays, so we can get rid of this check.
+
 2015-10-06  Frediano Ziglio  <fziglio@redhat.com>
 
 	build-sys: bump libtool version information

@@ -401,7 +401,7 @@ static void reds_reset_vdp(void)
     state->write_filter.discard_all = TRUE;
     state->client_agent_started = FALSE;
 
-    /* reseting and not destroying the state as a workaround for a bad
+    /* resetting and not destroying the state as a workaround for a bad
      * tokens management in the vdagent protocol:
      *  The client tokens' are set only once, when the main channel is initialized.
      *  Instead, it would have been more appropriate to reset them upon AGEN_CONNECT.
@@ -1370,7 +1370,10 @@ static int reds_send_link_ack(RedLinkInfo *link)
     channel = reds_find_channel(link->link_mess->channel_type,
                                 link->link_mess->channel_id);
     if (!channel) {
-        spice_assert(link->link_mess->channel_type == SPICE_CHANNEL_MAIN);
+        if (link->link_mess->channel_type != SPICE_CHANNEL_MAIN) {
+            spice_warning("Received wrong header: channel_type != SPICE_CHANNEL_MAIN");
+            return FALSE;
+        }
         spice_assert(reds->main_channel);
         channel = &reds->main_channel->base;
     }
@@ -2246,6 +2249,31 @@ static void reds_handle_ssl_accept(int fd, int event, void *data)
     }
 }
 
+#define KEEPALIVE_TIMEOUT (10*60)
+
+static bool reds_init_keepalive(int socket)
+{
+    int keepalive = 1;
+    int keepalive_timeout = KEEPALIVE_TIMEOUT;
+
+    if (setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive)) == -1) {
+        if (errno != ENOTSUP) {
+            spice_printerr("setsockopt for keepalive failed, %s", strerror(errno));
+            return false;
+        }
+    }
+
+    if (setsockopt(socket, SOL_TCP, TCP_KEEPIDLE,
+                   &keepalive_timeout, sizeof(keepalive_timeout)) == -1) {
+        if (errno != ENOTSUP) {
+            spice_printerr("setsockopt for keepalive timeout failed, %s", strerror(errno));
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static RedLinkInfo *reds_init_client_connection(int socket)
 {
     RedLinkInfo *link;
@@ -2267,6 +2295,8 @@ static RedLinkInfo *reds_init_client_connection(int socket)
             spice_warning("setsockopt failed, %s", strerror(errno));
         }
     }
+
+    reds_init_keepalive(socket);
 
     link = spice_new0(RedLinkInfo, 1);
     link->stream = reds_stream_new(socket);

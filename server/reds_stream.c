@@ -326,7 +326,7 @@ RedsStream *reds_stream_new(int socket)
     RedsStream *stream;
 
     stream = spice_malloc0(sizeof(RedsStream) + sizeof(RedsStreamPrivate));
-    stream->priv = (RedsStreamPrivate *)(((char *)stream) + sizeof(RedsStream));
+    stream->priv = (RedsStreamPrivate *)(stream+1);
     stream->priv->info = spice_new0(SpiceChannelEventInfo, 1);
     reds_stream_set_socket(stream, socket);
 
@@ -448,16 +448,16 @@ static void async_read_handler(G_GNUC_UNUSED int fd,
                     break;
                 default:
                     async_read_clear_handlers(async);
-		    if (async->error) {
+                    if (async->error) {
                         async->error(async->opaque, errno);
-		    }
+                    }
                     return;
                 }
             } else {
                 async_read_clear_handlers(async);
-		if (async->error) {
-		    async->error(async->opaque, 0);
-		}
+                if (async->error) {
+                    async->error(async->opaque, 0);
+                }
                 return;
             }
         } else {

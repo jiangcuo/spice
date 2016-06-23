@@ -223,6 +223,11 @@ static void spicevmc_red_channel_client_on_disconnect(RedChannelClient *rcc)
     sin = state->chardev_sin;
     sif = SPICE_CONTAINEROF(sin->base.sif, SpiceCharDeviceInterface, base);
 
+    if (state->recv_from_client_buf) { /* partial message which wasn't pushed to device */
+        spice_char_device_write_buffer_release(state->chardev_st, state->recv_from_client_buf);
+        state->recv_from_client_buf = NULL;
+    }
+
     if (state->chardev_st) {
         if (spice_char_device_client_exists(state->chardev_st, rcc->client)) {
             spice_char_device_client_remove(state->chardev_st, rcc->client);
@@ -559,6 +564,7 @@ void spicevmc_device_disconnect(SpiceCharDeviceInstance *sin)
     }
     spice_char_device_state_destroy(sin->st);
     state->chardev_st = NULL;
+    sin->st = NULL;
 
     reds_unregister_channel(&state->channel);
     free(state->pipe_item);
@@ -568,6 +574,11 @@ void spicevmc_device_disconnect(SpiceCharDeviceInstance *sin)
 SPICE_GNUC_VISIBLE void spice_server_port_event(SpiceCharDeviceInstance *sin, uint8_t event)
 {
     SpiceVmcState *state;
+
+    if (sin->st == NULL) {
+        spice_warning("no SpiceCharDeviceState attached to instance %p", sin);
+        return;
+    }
 
     state = (SpiceVmcState *)spice_char_device_state_opaque_get(sin->st);
     if (event == SPICE_PORT_EVENT_OPENED) {
