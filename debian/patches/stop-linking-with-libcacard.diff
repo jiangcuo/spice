@@ -7,24 +7,9 @@ only the header files, so there's no need to link with libcacard.
 
 Signed-off-by: Michael Tokarev <mjt@tls.msk.ru>
 
-diff --git a/spice-common/m4/spice-deps.m4 b/spice-common/m4/spice-deps.m4
-index e4b2c8d..d1c39d0 100644
---- a/spice-common/m4/spice-deps.m4
-+++ b/spice-common/m4/spice-deps.m4
-@@ -58,7 +58,7 @@ AC_DEFUN([SPICE_CHECK_SMARTCARD], [
-       fi
-     fi
-     AS_VAR_APPEND([$1_CFLAGS], [" $SMARTCARD_CFLAGS"])
--    AS_VAR_APPEND([$1_LIBS], [" $SMARTCARD_LIBS"])
-+dnl   AS_VAR_APPEND([$1_LIBS], [" $SMARTCARD_LIBS"])
- ])
- 
- 
-diff --git a/configure.ac b/configure.ac
-index 8ab4c4a..982700b 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -106,9 +106,9 @@ AS_VAR_APPEND([SPICE_NONPKGCONFIG_LIBS], [" -pthread $LIBM $LIBRT"])
+@@ -105,9 +105,9 @@
  
  SPICE_REQUIRES=""
  
