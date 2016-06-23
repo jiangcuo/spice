@@ -455,7 +455,7 @@ static void red_channel_client_reset_send_data(RedChannelClient *rcc)
     rcc->send_data.header.set_msg_type(&rcc->send_data.header, 0);
     rcc->send_data.header.set_msg_size(&rcc->send_data.header, 0);
 
-    /* Keeping the serial consecutive: reseting it if reset_send_data
+    /* Keeping the serial consecutive: resetting it if reset_send_data
      * has been called before, but no message has been sent since then.
      */
     if (rcc->send_data.last_sent_serial != rcc->send_data.serial) {
@@ -1088,7 +1088,7 @@ static void dummy_watch_remove(SpiceWatch *watch)
 {
 }
 
-// TODO: actually, since I also use channel_client_dummym, no need for core. Can be NULL
+// TODO: actually, since I also use channel_client_dummy, no need for core. Can be NULL
 SpiceCoreInterface dummy_core = {
     .watch_update_mask = dummy_watch_update_mask,
     .watch_add = dummy_watch_add,
@@ -1235,6 +1235,10 @@ static void red_channel_client_unref(RedChannelClient *rcc)
 {
     if (!--rcc->refs) {
         spice_debug("destroy rcc=%p", rcc);
+
+        reds_stream_free(rcc->stream);
+        rcc->stream = NULL;
+
         if (rcc->send_data.main.marshaller) {
             spice_marshaller_destroy(rcc->send_data.main.marshaller);
         }
@@ -1758,7 +1762,7 @@ void red_channel_pipes_add_empty_msg(RedChannel *channel, int msg_type)
 int red_channel_client_is_connected(RedChannelClient *rcc)
 {
     if (!rcc->dummy) {
-        return rcc->stream != NULL;
+        return ring_item_is_linked(&rcc->channel_link);
     } else {
         return rcc->dummy_connected;
     }
@@ -1813,6 +1817,8 @@ static void red_channel_remove_client(RedChannelClient *rcc)
                       rcc->channel->type, rcc->channel->id,
                       rcc->channel->thread_id, pthread_self());
     }
+    spice_return_if_fail(ring_item_is_linked(&rcc->channel_link));
+
     ring_remove(&rcc->channel_link);
     spice_assert(rcc->channel->clients_num > 0);
     rcc->channel->clients_num--;
@@ -1854,8 +1860,6 @@ void red_channel_client_disconnect(RedChannelClient *rcc)
         rcc->channel->core->watch_remove(rcc->stream->watch);
         rcc->stream->watch = NULL;
     }
-    reds_stream_free(rcc->stream);
-    rcc->stream = NULL;
     if (rcc->latency_monitor.timer) {
         rcc->channel->core->timer_remove(rcc->latency_monitor.timer);
         rcc->latency_monitor.timer = NULL;
@@ -2069,13 +2073,13 @@ RedClient *red_client_new(int migrated)
 RedClient *red_client_ref(RedClient *client)
 {
     spice_assert(client);
-    client->refs++;
+    g_atomic_int_inc(&client->refs);
     return client;
 }
 
 RedClient *red_client_unref(RedClient *client)
 {
-    if (!--client->refs) {
+    if (g_atomic_int_dec_and_test(&client->refs)) {
         spice_debug("release client=%p", client);
         pthread_mutex_destroy(&client->lock);
         free(client);

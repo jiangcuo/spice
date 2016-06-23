@@ -1973,7 +1973,7 @@ static inline void current_remove(RedWorker *worker, TreeItem *item)
 
         if (now->type == TREE_ITEM_TYPE_DRAWABLE) {
             ring_item = now->siblings_link.prev;
-            remove_drawable(worker, SPICE_CONTAINEROF(now, Drawable, tree_item));
+            remove_drawable(worker, SPICE_CONTAINEROF(now, Drawable, tree_item.base));
         } else {
             Container *container = (Container *)now;
 
@@ -3063,7 +3063,7 @@ static void red_stream_update_client_playback_latency(void *opaque, uint32_t del
     if (delay_ms > agent->dcc->streams_max_latency) {
          agent->dcc->streams_max_latency = delay_ms;
     }
-    spice_debug("reseting client latency: %u", agent->dcc->streams_max_latency);
+    spice_debug("resetting client latency: %u", agent->dcc->streams_max_latency);
     main_dispatcher_set_mm_time_latency(agent->dcc->common.base.client, agent->dcc->streams_max_latency);
 }
 
@@ -7171,9 +7171,8 @@ static void red_pipe_replace_rendered_drawables_with_images(RedWorker *worker,
                                                             int first_surface_id,
                                                             SpiceRect *first_area)
 {
-    /* TODO: can't have those statics with multiple clients */
-    static int resent_surface_ids[MAX_PIPE_SIZE];
-    static SpiceRect resent_areas[MAX_PIPE_SIZE]; // not pointers since drawbales may be released
+    int resent_surface_ids[MAX_PIPE_SIZE];
+    SpiceRect resent_areas[MAX_PIPE_SIZE]; // not pointers since drawables may be released
     int num_resent;
     PipeItem *pipe_item;
     Ring *pipe;
@@ -9339,7 +9338,7 @@ static void __show_tree_call(TreeItem *item, void *data)
 
     switch (item->type) {
     case TREE_ITEM_TYPE_DRAWABLE: {
-        Drawable *drawable = SPICE_CONTAINEROF(item, Drawable, tree_item);
+        Drawable *drawable = SPICE_CONTAINEROF(item, Drawable, tree_item.base);
         const int max_indent = 200;
         char indent_str[max_indent + 1];
         int indent_str_len;
@@ -10271,11 +10270,11 @@ static int display_channel_handle_preferred_compression(DisplayChannelClient *dc
     case SPICE_IMAGE_COMPRESSION_GLZ:
     case SPICE_IMAGE_COMPRESSION_OFF:
         display_channel->common.worker->image_compression = pc->image_compression;
-        return TRUE;
+        break;
     default:
         spice_warning("preferred-compression: unsupported image compression setting");
-        return FALSE;
     }
+    return TRUE;
 }
 
 static int display_channel_handle_message(RedChannelClient *rcc, uint32_t size, uint16_t type,
@@ -11053,12 +11052,13 @@ void handle_dev_update(void *opaque, void *payload)
     QXLRect *qxl_dirty_rects = msg->qxl_dirty_rects;
     uint32_t clear_dirty_region = msg->clear_dirty_region;
 
+    flush_display_commands(worker);
+
     VALIDATE_SURFACE_RET(worker, surface_id);
 
     rect = spice_new0(SpiceRect, 1);
     surface = &worker->surfaces[surface_id];
     red_get_rect_ptr(rect, qxl_area);
-    flush_display_commands(worker);
 
     spice_assert(worker->running);
 
@@ -12117,7 +12117,7 @@ static void red_init(RedWorker *worker, WorkerInitData *init_data)
         if (worker->record_fd == NULL) {
             spice_error("failed to open recording file %s\n", record_filename);
         }
-	if (fwrite(header, sizeof(header)-1, 1, worker->record_fd) != 1) {
+        if (fwrite(header, sizeof(header)-1, 1, worker->record_fd) != 1) {
             spice_error("failed to write replay header");
         }
     }

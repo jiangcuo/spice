@@ -406,19 +406,19 @@ static pixman_image_t *canvas_get_quic(CanvasBase *canvas, SpiceImage *image,
     switch (type) {
     case QUIC_IMAGE_TYPE_RGBA:
         as_type = QUIC_IMAGE_TYPE_RGBA;
-        pixman_format = PIXMAN_a8r8g8b8;
+        pixman_format = PIXMAN_LE_a8r8g8b8;
         break;
     case QUIC_IMAGE_TYPE_RGB32:
     case QUIC_IMAGE_TYPE_RGB24:
         as_type = QUIC_IMAGE_TYPE_RGB32;
-        pixman_format = PIXMAN_x8r8g8b8;
+        pixman_format = PIXMAN_LE_x8r8g8b8;
         break;
     case QUIC_IMAGE_TYPE_RGB16:
         if (!want_original &&
             (canvas->format == SPICE_SURFACE_FMT_32_xRGB ||
              canvas->format == SPICE_SURFACE_FMT_32_ARGB)) {
             as_type = QUIC_IMAGE_TYPE_RGB32;
-            pixman_format = PIXMAN_x8r8g8b8;
+            pixman_format = PIXMAN_LE_x8r8g8b8;
         } else {
             as_type = QUIC_IMAGE_TYPE_RGB16;
             pixman_format = PIXMAN_x1r5g5b5;
@@ -501,7 +501,7 @@ static pixman_image_t *canvas_get_jpeg(CanvasBase *canvas, SpiceImage *image)
 #ifdef WIN32
                              canvas->dc,
 #endif
-                             PIXMAN_x8r8g8b8,
+                             PIXMAN_LE_x8r8g8b8,
                              width, height, FALSE);
     if (surface == NULL) {
         spice_warning("create surface failed");
@@ -545,15 +545,15 @@ static pixman_image_t *canvas_get_lz4(CanvasBase *canvas, SpiceImage *image)
             stride_encoded *= 2;
             break;
         case SPICE_BITMAP_FMT_24BIT:
-            format = PIXMAN_r8g8b8;
+            format = PIXMAN_LE_r8g8b8;
             stride_encoded *= 3;
             break;
         case SPICE_BITMAP_FMT_32BIT:
-            format = PIXMAN_x8r8g8b8;
+            format = PIXMAN_LE_x8r8g8b8;
             stride_encoded *= 4;
             break;
         case SPICE_BITMAP_FMT_RGBA:
-            format = PIXMAN_a8r8g8b8;
+            format = PIXMAN_LE_a8r8g8b8;
             stride_encoded *= 4;
             break;
         default:
@@ -648,7 +648,7 @@ static pixman_image_t *canvas_get_jpeg_alpha(CanvasBase *canvas, SpiceImage *ima
 #ifdef WIN32
     lz_data->decode_data.dc = canvas->dc;
 #endif
-    surface = alloc_lz_image_surface(&lz_data->decode_data, PIXMAN_a8r8g8b8,
+    surface = alloc_lz_image_surface(&lz_data->decode_data, PIXMAN_LE_a8r8g8b8,
                                      width, height, width*height, alpha_top_down);
 
     if (surface == NULL) {
@@ -825,7 +825,7 @@ static pixman_image_t *canvas_get_lz(CanvasBase *canvas, SpiceImage *image,
     switch (type) {
     case LZ_IMAGE_TYPE_RGBA:
         as_type = LZ_IMAGE_TYPE_RGBA;
-        pixman_format = PIXMAN_a8r8g8b8;
+        pixman_format = PIXMAN_LE_a8r8g8b8;
         break;
     case LZ_IMAGE_TYPE_RGB32:
     case LZ_IMAGE_TYPE_RGB24:
@@ -835,7 +835,7 @@ static pixman_image_t *canvas_get_lz(CanvasBase *canvas, SpiceImage *image,
     case LZ_IMAGE_TYPE_PLT4_BE:
     case LZ_IMAGE_TYPE_PLT8:
         as_type = LZ_IMAGE_TYPE_RGB32;
-        pixman_format = PIXMAN_x8r8g8b8;
+        pixman_format = PIXMAN_LE_x8r8g8b8;
         break;
     case LZ_IMAGE_TYPE_A8:
         as_type = LZ_IMAGE_TYPE_A8;
@@ -846,7 +846,7 @@ static pixman_image_t *canvas_get_lz(CanvasBase *canvas, SpiceImage *image,
             (canvas->format == SPICE_SURFACE_FMT_32_xRGB ||
              canvas->format == SPICE_SURFACE_FMT_32_ARGB)) {
             as_type = LZ_IMAGE_TYPE_RGB32;
-            pixman_format = PIXMAN_x8r8g8b8;
+            pixman_format = PIXMAN_LE_x8r8g8b8;
         } else {
             as_type = LZ_IMAGE_TYPE_RGB16;
             pixman_format = PIXMAN_x1r5g5b5;
@@ -1147,10 +1147,7 @@ static pixman_image_t *canvas_get_image_internal(CanvasBase *canvas, SpiceImage 
         break;
     }
 #if defined(SW_CANVAS_CACHE)
-    case SPICE_IMAGE_TYPE_LZ_PLT: {
-        surface = canvas_get_lz(canvas, image, want_original);
-        break;
-    }
+    case SPICE_IMAGE_TYPE_LZ_PLT:
     case SPICE_IMAGE_TYPE_LZ_RGB: {
         surface = canvas_get_lz(canvas, image, want_original);
         break;
@@ -1267,6 +1264,9 @@ static pixman_image_t *canvas_get_image_internal(CanvasBase *canvas, SpiceImage 
            If so we convert here. */
 
         wanted_format = canvas_get_target_format(canvas,
+#ifdef WORDS_BIGENDIAN
+                                                 surface_format == PIXMAN_b8g8r8a8 ||
+#endif
                                                  surface_format == PIXMAN_a8r8g8b8);
 
         if (surface_format != wanted_format) {

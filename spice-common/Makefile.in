@@ -226,7 +226,6 @@ CCDEPMODE = @CCDEPMODE@
 CELT051_CFLAGS = @CELT051_CFLAGS@
 CELT051_LIBS = @CELT051_LIBS@
 CFLAGS = @CFLAGS@
-CODE_GENERATOR_BASEDIR = @CODE_GENERATOR_BASEDIR@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
@@ -358,7 +357,14 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 NULL = 
 ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = common
+SUBDIRS = python_modules common tests
+EXTRA_DIST = \
+	spice_codegen.py		\
+	spice.proto			\
+	spice1.proto			\
+	$(NULL)
+
+DISTCLEANFILES = *.pyc
 MAINTAINERCLEANFILES = \
 	$(srcdir)/INSTALL					\
 	$(srcdir)/aclocal.m4					\
@@ -759,6 +765,7 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-test -z "$(DISTCLEANFILES)" || rm -f $(DISTCLEANFILES)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"

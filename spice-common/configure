@@ -637,8 +637,8 @@ am__EXEEXT_TRUE
 LTLIBOBJS
 SPICE_COMMON_LIBS
 SPICE_COMMON_CFLAGS
-SUPPORT_GL_FALSE
-SUPPORT_GL_TRUE
+HAVE_GL_FALSE
+HAVE_GL_TRUE
 HAVE_OPUS_FALSE
 HAVE_OPUS_TRUE
 OPUS_LIBS
@@ -649,6 +649,8 @@ HAVE_CELT051_FALSE
 HAVE_CELT051_TRUE
 CELT051_LIBS
 CELT051_CFLAGS
+HAVE_SMARTCARD_FALSE
+HAVE_SMARTCARD_TRUE
 SMARTCARD_LIBS
 SMARTCARD_CFLAGS
 PIXMAN_LIBS
@@ -662,7 +664,6 @@ PYTHON_EXEC_PREFIX
 PYTHON_PREFIX
 PYTHON_VERSION
 PYTHON
-CODE_GENERATOR_BASEDIR
 PROTOCOL_LIBS
 PROTOCOL_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -14423,8 +14424,6 @@ else
 $as_echo "yes" >&6; }
 
 fi
-CODE_GENERATOR_BASEDIR=`pkg-config --variable=codegendir spice-protocol`
-
 
 
 
@@ -14789,8 +14788,6 @@ else
 $as_echo "yes" >&6; }
 
 fi
-    SPICE_COMMON_CFLAGS=$SPICE_COMMON_CFLAGS" $PIXMAN_CFLAGS"
-    SPICE_COMMON_LIBS=$SPICE_COMMON_LIBS" $PIXMAN_LIBS"
 
 
     # Check whether --enable-smartcard was given.
@@ -14803,6 +14800,78 @@ fi
 
     have_smartcard=no
     if test "x$enable_smartcard" != "xno"; then
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for SMARTCARD" >&5
+$as_echo_n "checking for SMARTCARD... " >&6; }
+
+if test -n "$SMARTCARD_CFLAGS"; then
+    pkg_cv_SMARTCARD_CFLAGS="$SMARTCARD_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libcacard >= 2.5.1\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libcacard >= 2.5.1") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_SMARTCARD_CFLAGS=`$PKG_CONFIG --cflags "libcacard >= 2.5.1" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$SMARTCARD_LIBS"; then
+    pkg_cv_SMARTCARD_LIBS="$SMARTCARD_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libcacard >= 2.5.1\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libcacard >= 2.5.1") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_SMARTCARD_LIBS=`$PKG_CONFIG --libs "libcacard >= 2.5.1" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        SMARTCARD_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libcacard >= 2.5.1" 2>&1`
+        else
+	        SMARTCARD_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libcacard >= 2.5.1" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$SMARTCARD_PKG_ERRORS" >&5
+
+	have_smartcard=no
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	have_smartcard=no
+else
+	SMARTCARD_CFLAGS=$pkg_cv_SMARTCARD_CFLAGS
+	SMARTCARD_LIBS=$pkg_cv_SMARTCARD_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	have_smartcard=yes
+fi
+      if test "x$have_smartcard" = "xno"; then
 
 pkg_failed=no
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for SMARTCARD" >&5
@@ -14872,10 +14941,16 @@ else
 	SMARTCARD_LIBS=$pkg_cv_SMARTCARD_LIBS
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-	have_smartcard=yes
+	have_smartcard=yes have_smartcard_012=yes
 fi
+      fi
       if test "x$enable_smartcard" != "xauto" && test "x$have_smartcard" = "xno"; then
         as_fn_error $? "\"Smartcard support requested but libcacard could not be found\"" "$LINENO" 5
+      fi
+      if test "x$have_smartcard_012" = "xyes"; then
+
+$as_echo "#define USE_SMARTCARD_012 1" >>confdefs.h
+
       fi
       if test "x$have_smartcard" = "xyes"; then
 
@@ -14883,8 +14958,14 @@ $as_echo "#define USE_SMARTCARD 1" >>confdefs.h
 
       fi
     fi
-    SPICE_COMMON_CFLAGS=$SPICE_COMMON_CFLAGS" $SMARTCARD_CFLAGS"
-    SPICE_COMMON_LIBS=$SPICE_COMMON_LIBS" $SMARTCARD_LIBS"
+     if test "x$have_smartcard" = "xyes"; then
+  HAVE_SMARTCARD_TRUE=
+  HAVE_SMARTCARD_FALSE='#'
+else
+  HAVE_SMARTCARD_TRUE='#'
+  HAVE_SMARTCARD_FALSE=
+fi
+
 
 
     # Check whether --enable-celt051 was given.
@@ -14984,8 +15065,6 @@ fi
 $as_echo "#define HAVE_CELT051 1" >>confdefs.h
 
 fi
-    SPICE_COMMON_CFLAGS=$SPICE_COMMON_CFLAGS" $CELT051_CFLAGS"
-    SPICE_COMMON_LIBS=$SPICE_COMMON_LIBS" $CELT051_LIBS"
 
 
 
@@ -14997,12 +15076,12 @@ if test -n "$GLIB2_CFLAGS"; then
     pkg_cv_GLIB2_CFLAGS="$GLIB2_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glib-2.0\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "glib-2.0") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glib-2.0 >= 2.22 gio-2.0 >= 2.22\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "glib-2.0 >= 2.22 gio-2.0 >= 2.22") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_GLIB2_CFLAGS=`$PKG_CONFIG --cflags "glib-2.0" 2>/dev/null`
+  pkg_cv_GLIB2_CFLAGS=`$PKG_CONFIG --cflags "glib-2.0 >= 2.22 gio-2.0 >= 2.22" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -15014,12 +15093,12 @@ if test -n "$GLIB2_LIBS"; then
     pkg_cv_GLIB2_LIBS="$GLIB2_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glib-2.0\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "glib-2.0") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glib-2.0 >= 2.22 gio-2.0 >= 2.22\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "glib-2.0 >= 2.22 gio-2.0 >= 2.22") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_GLIB2_LIBS=`$PKG_CONFIG --libs "glib-2.0" 2>/dev/null`
+  pkg_cv_GLIB2_LIBS=`$PKG_CONFIG --libs "glib-2.0 >= 2.22 gio-2.0 >= 2.22" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -15040,14 +15119,14 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        GLIB2_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "glib-2.0" 2>&1`
+	        GLIB2_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "glib-2.0 >= 2.22 gio-2.0 >= 2.22" 2>&1`
         else
-	        GLIB2_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "glib-2.0" 2>&1`
+	        GLIB2_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "glib-2.0 >= 2.22 gio-2.0 >= 2.22" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$GLIB2_PKG_ERRORS" >&5
 
-	as_fn_error $? "Package requirements (glib-2.0) were not met:
+	as_fn_error $? "Package requirements (glib-2.0 >= 2.22 gio-2.0 >= 2.22) were not met:
 
 $GLIB2_PKG_ERRORS
 
@@ -15079,8 +15158,6 @@ else
 $as_echo "yes" >&6; }
 
 fi
-    SPICE_COMMON_CFLAGS=$SPICE_COMMON_CFLAGS" $GLIB2_CFLAGS"
-    SPICE_COMMON_LIBS=$SPICE_COMMON_LIBS" $GLIB2_LIBS"
 
 
 
@@ -15168,8 +15245,6 @@ fi
 $as_echo "#define HAVE_OPUS 1" >>confdefs.h
 
     fi
-    SPICE_COMMON_CFLAGS=$SPICE_COMMON_CFLAGS" $OPUS_CFLAGS"
-    SPICE_COMMON_LIBS=$SPICE_COMMON_LIBS" $OPUS_LIBS"
 
 
     # Check whether --enable-opengl was given.
@@ -15180,11 +15255,11 @@ else
 fi
 
      if test "x$enable_opengl" = "xyes"; then
-  SUPPORT_GL_TRUE=
-  SUPPORT_GL_FALSE='#'
+  HAVE_GL_TRUE=
+  HAVE_GL_FALSE='#'
 else
-  SUPPORT_GL_TRUE='#'
-  SUPPORT_GL_FALSE=
+  HAVE_GL_TRUE='#'
+  HAVE_GL_FALSE=
 fi
 
 
@@ -15284,14 +15359,15 @@ $as_echo "#define GL_GLEXT_PROTOTYPES /**/" >>confdefs.h
             as_fn_error $? "GL libraries not available" "$LINENO" 5
         fi
     fi
-    SPICE_COMMON_CFLAGS=$SPICE_COMMON_CFLAGS" $GL_CFLAGS"
-    SPICE_COMMON_LIBS=$SPICE_COMMON_LIBS" $GL_LIBS"
 
+
+SPICE_COMMON_CFLAGS='$(PIXMAN_CFLAGS) $(SMARTCARD_CFLAGS) $(CELT051_CFLAGS) $(GLIB2_CFLAGS) $(OPUS_CFLAGS) $(GL_CFLAGS)'
+SPICE_COMMON_LIBS='$(PIXMAN_LIBS) $(CELT051_LIBS) $(GLIB2_LIBS) $(OPUS_LIBS) $(GL_LIBS)'
 
 
 
 # The End!
-ac_config_files="$ac_config_files Makefile common/Makefile"
+ac_config_files="$ac_config_files Makefile common/Makefile python_modules/Makefile tests/Makefile"
 
 
 
@@ -15433,6 +15509,10 @@ if test -z "${MAINTAINER_MODE_TRUE}" && test -z "${MAINTAINER_MODE_FALSE}"; then
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 
+if test -z "${HAVE_SMARTCARD_TRUE}" && test -z "${HAVE_SMARTCARD_FALSE}"; then
+  as_fn_error $? "conditional \"HAVE_SMARTCARD\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
 if test -z "${HAVE_CELT051_TRUE}" && test -z "${HAVE_CELT051_FALSE}"; then
   as_fn_error $? "conditional \"HAVE_CELT051\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
@@ -15441,8 +15521,8 @@ if test -z "${HAVE_OPUS_TRUE}" && test -z "${HAVE_OPUS_FALSE}"; then
   as_fn_error $? "conditional \"HAVE_OPUS\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
-if test -z "${SUPPORT_GL_TRUE}" && test -z "${SUPPORT_GL_FALSE}"; then
-  as_fn_error $? "conditional \"SUPPORT_GL\" was never defined.
+if test -z "${HAVE_GL_TRUE}" && test -z "${HAVE_GL_FALSE}"; then
+  as_fn_error $? "conditional \"HAVE_GL\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 
@@ -16325,6 +16405,8 @@ do
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "common/Makefile") CONFIG_FILES="$CONFIG_FILES common/Makefile" ;;
+    "python_modules/Makefile") CONFIG_FILES="$CONFIG_FILES python_modules/Makefile" ;;
+    "tests/Makefile") CONFIG_FILES="$CONFIG_FILES tests/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

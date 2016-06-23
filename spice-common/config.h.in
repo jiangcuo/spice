@@ -149,6 +149,9 @@
 /* Define if supporting smartcard proxying */
 #undef USE_SMARTCARD
 
+/* Define if supporting smartcard proxying without libcacard.h */
+#undef USE_SMARTCARD_012
+
 /* Version number of package */
 #undef VERSION
 

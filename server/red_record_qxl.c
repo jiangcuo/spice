@@ -114,7 +114,7 @@ static void write_binary(FILE *fd, const char *prefix, size_t size, const uint8_
     }
 #endif
 
-    fprintf(fd, "binary %d %s %ld:", WITH_ZLIB, prefix, size);
+    fprintf(fd, "binary %d %s %zu:", WITH_ZLIB, prefix, size);
 #if WITH_ZLIB
     zlib_size = zlib_encode(enc, RECORD_ZLIB_DEFAULT_COMPRESSION_LEVEL, size,
         output, sizeof(output));
@@ -144,7 +144,7 @@ static size_t red_record_data_chunks_ptr(FILE *fd, const char *prefix,
         data_size += cur->data_size;
         count_chunks++;
     }
-    fprintf(fd, "data_chunks %d %ld\n", count_chunks, data_size);
+    fprintf(fd, "data_chunks %d %zu\n", count_chunks, data_size);
     validate_virt(slots, (intptr_t)qxl->data, memslot_id, qxl->data_size, group_id);
     write_binary(fd, prefix, qxl->data_size, qxl->data);
 
@@ -255,7 +255,7 @@ static void red_record_image(FILE *fd, RedMemSlotInfo *slots, int group_id,
 
     qxl = (QXLImage *)get_virt(slots, addr, sizeof(*qxl), group_id,
                                &error);
-    fprintf(fd, "descriptor.id %ld\n", qxl->descriptor.id);
+    fprintf(fd, "descriptor.id %"PRIu64"\n", qxl->descriptor.id);
     fprintf(fd, "descriptor.type %d\n", qxl->descriptor.type);
     fprintf(fd, "descriptor.flags %d\n", qxl->descriptor.flags);
     fprintf(fd, "descriptor.width %d\n", qxl->descriptor.width);
@@ -280,7 +280,7 @@ static void red_record_image(FILE *fd, RedMemSlotInfo *slots, int group_id,
             validate_virt(slots, (intptr_t)qp->ents,
                           get_memslot_id(slots, qxl->bitmap.palette),
                           num_ents * sizeof(qp->ents[0]), group_id);
-            fprintf(fd, "unique %ld\n", qp->unique);
+            fprintf(fd, "unique %"PRIu64"\n", qp->unique);
             for (i = 0; i < num_ents; i++) {
                 fprintf(fd, "ents %d\n", qp->ents[i]);
             }
@@ -742,7 +742,7 @@ static void red_record_cursor(FILE *fd, RedMemSlotInfo *slots, int group_id,
     qxl = (QXLCursor *)get_virt(slots, addr, sizeof(*qxl), group_id,
                                 &error);
 
-    fprintf(fd, "header.unique %ld\n", qxl->header.unique);
+    fprintf(fd, "header.unique %"PRIu64"\n", qxl->header.unique);
     fprintf(fd, "header.type %d\n", qxl->header.type);
     fprintf(fd, "header.width %d\n", qxl->header.width);
     fprintf(fd, "header.height %d\n", qxl->header.height);

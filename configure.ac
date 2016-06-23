@@ -12,7 +12,7 @@ AC_PREREQ([2.57])
 #   then set age to 0.
 #
 m4_define([SPICE_CURRENT], [11])
-m4_define([SPICE_REVISION], [0])
+m4_define([SPICE_REVISION], [1])
 m4_define([SPICE_AGE], [10])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
@@ -43,7 +43,7 @@ if test x"$ac_cv_prog_cc_c99" = xno; then
 fi
 AC_PROG_INSTALL
 AC_CANONICAL_HOST
-AC_PROG_LIBTOOL
+LT_INIT([disable-static])
 AM_PROG_CC_C_O
 AC_C_BIGENDIAN
 AC_PATH_PROGS(PYTHON, python2 python)
@@ -72,14 +72,13 @@ esac
 
 dnl =========================================================================
 dnl Check optional features
-SPICE_CHECK_OPENGL([GL])
+SPICE_CHECK_OPENGL
 AS_IF([test x"$enable_opengl" != "xno"], [
       AS_VAR_APPEND([SPICE_NONPKGCONFIG_LIBS], [" $GL_LIBS"])
 ])
 
 
-SPICE_CHECK_SMARTCARD([SMARTCARD])
-AM_CONDITIONAL(SUPPORT_SMARTCARD, test "x$have_smartcard" = "xyes")
+SPICE_CHECK_SMARTCARD
 
 AC_ARG_ENABLE([automated_tests],
               AS_HELP_STRING([--enable-automated-tests], [Enable automated tests using spicy-screenshot (part of spice--gtk)]),,
@@ -87,7 +86,7 @@ AC_ARG_ENABLE([automated_tests],
 AS_IF([test x"$enable_automated_tests" != "xno"], [enable_automated_tests="yes"])
 AM_CONDITIONAL(SUPPORT_AUTOMATED_TESTS, test "x$enable_automated_tests" != "xno")
 
-SPICE_CHECK_LZ4([LZ4])
+SPICE_CHECK_LZ4
 
 dnl =========================================================================
 dnl Check deps
@@ -128,16 +127,6 @@ AC_ARG_ENABLE([celt051],
 
 if test "x$enable_celt051" = "xyes"; then
     PKG_CHECK_MODULES(CELT051, celt051 >= 0.5.1.1, AS_VAR_APPEND([SPICE_REQUIRES], [" celt051 >= 0.5.1.1"]))
-fi
-
-if test ! -e client/generated_marshallers.cpp; then
-AC_MSG_CHECKING([for pyparsing python module])
-echo "import pyparsing" | ${PYTHON} - >/dev/null 2>&1
-if test $? -ne 0 ; then
-    AC_MSG_RESULT([not found])
-    AC_MSG_ERROR([pyparsing python module is required to compile this package])
-fi
-AC_MSG_RESULT([found])
 fi
 
 PKG_CHECK_MODULES(SSL, openssl)
@@ -284,8 +273,6 @@ AM_CONDITIONAL([HAVE_LD_VERSION_SCRIPT],
 AC_SUBST(SPICE_REQUIRES)
 AC_SUBST(SPICE_NONPKGCONFIG_CFLAGS)
 AC_SUBST(SPICE_NONPKGCONFIG_LIBS)
-
-AC_SUBST([SPICEC_STATIC_LINKAGE_BSTATIC])
 
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
