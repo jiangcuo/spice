@@ -3,7 +3,8 @@ Upstream-Name: spice
 Source: http://www.spice-space.org/
 
 Files: *
-Copyright: Copyright (C) 2009,2010,2011 Red Hat, Inc.
+Copyright: Copyright (C) 2009-2015 Red Hat, Inc.
+Copyright: Copyright (C) 2010-2016 Liang Guo <bluestonechina@gmail.com>
 License: LGPL-2.1+
 
 Files: spice-common/common/draw.h spice-common/common/messages.h 
@@ -66,10 +67,6 @@ License: LGPL-2.1+
 Files: spice-common/common/lz.h
 Copyright: NOT COPYRIGHTED
 License: MIT
-
-Files: debian/*
-Copyright: Copyright (C) 2010 Liang Guo <bluestonechina@gmail.com>
-License: LGPL-2.1+
 
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
