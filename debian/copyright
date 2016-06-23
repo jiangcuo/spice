@@ -4,7 +4,7 @@ Source: http://www.spice-space.org/
 
 Files: *
 Copyright: Copyright (C) 2009-2015 Red Hat, Inc.
-Copyright: Copyright (C) 2010-2016 Liang Guo <bluestonechina@gmail.com>
+           Copyright (C) 2010-2016 Liang Guo <bluestonechina@gmail.com>
 License: LGPL-2.1+
 
 Files: spice-common/common/draw.h spice-common/common/messages.h 
