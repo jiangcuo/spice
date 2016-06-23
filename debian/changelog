@@ -4,7 +4,8 @@ spice (0.12.7-1) unstable; urgency=medium
   * Update debian/copyright
   * Refresh debian/patches
   * Static build is disabled, remove lib*.a from libspice-server-dev
-  * update Standards-Version to 3.9.8 (no changes)
+  * Update Standards-Version to 3.9.8 (no changes)
+  * Use secure uri in vcs-*
 
  -- Liang Guo <guoliang@debian.org>  Thu, 23 Jun 2016 14:09:24 +0800
 

@@ -18,8 +18,8 @@ Build-Depends: debhelper (>= 9), pkg-config,
  libcacard-dev,
 Standards-Version: 3.9.8
 Homepage: http://spice-space.org/
-Vcs-Git: git://anonscm.debian.org/collab-maint/spice.git
-Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/spice.git
+Vcs-Git: https://anonscm.debian.org/git/collab-maint/spice.git
+Vcs-Browser: https://anonscm.debian.org/gitweb/?p=collab-maint/spice.git
 
 Package: libspice-server1
 Section: libs
