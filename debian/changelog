@@ -1,3 +1,11 @@
+spice (0.12.8-1) unstable; urgency=medium
+
+  * New upstream release
+  * Remove debian/patches/{CVE-2016-0749,CVE-2016-2150}, applied 
+    Upstream
+
+ -- Liang Guo <guoliang@debian.org>  Tue, 26 Jul 2016 11:06:19 +0800
+
 spice (0.12.7-1) unstable; urgency=medium
 
   * New upstream release

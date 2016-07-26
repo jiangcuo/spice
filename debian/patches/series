@@ -1,5 +1,1 @@
 stop-linking-with-libcacard.diff
-CVE-2016-0749/0001-smartcard-add-a-ref-to-item-before-adding-to-pipe.patch
-CVE-2016-0749/0002-smartcard-allocate-msg-with-the-expected-size.patch
-CVE-2016-2150/0001-create-a-function-to-validate-surface-parameters.patch
-CVE-2016-2150/0002-improve-primary-surface-parameter-checks.patch
