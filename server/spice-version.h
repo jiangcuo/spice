@@ -22,6 +22,6 @@
 #error "Only spice.h can be included directly."
 #endif
 
-#define SPICE_SERVER_VERSION 0x000c07
+#define SPICE_SERVER_VERSION 0x000c08
 
 #endif /* SPICE_VERSION_H_ */

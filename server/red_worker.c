@@ -4038,13 +4038,15 @@ static inline int red_handle_self_bitmap(RedWorker *worker, Drawable *drawable)
     return TRUE;
 }
 
-static void free_one_drawable(RedWorker *worker, int force_glz_free)
+static bool free_one_drawable(RedWorker *worker, int force_glz_free)
 {
     RingItem *ring_item = ring_get_tail(&worker->current_list);
     Drawable *drawable;
     Container *container;
 
-    spice_assert(ring_item);
+    if (!ring_item) {
+        return FALSE;
+    }
     drawable = SPICE_CONTAINEROF(ring_item, Drawable, list_link);
     if (force_glz_free) {
         RingItem *glz_item, *next_item;
@@ -4058,6 +4060,8 @@ static void free_one_drawable(RedWorker *worker, int force_glz_free)
 
     current_remove_drawable(worker, drawable);
     container_cleanup(worker, container);
+
+    return TRUE;
 }
 
 static Drawable *get_drawable(RedWorker *worker, uint8_t effect, RedDrawable *red_drawable,
@@ -4079,7 +4083,8 @@ static Drawable *get_drawable(RedWorker *worker, uint8_t effect, RedDrawable *re
     }
 
     while (!(drawable = alloc_drawable(worker))) {
-        free_one_drawable(worker, FALSE);
+        if (!free_one_drawable(worker, FALSE))
+            return NULL;
     }
     worker->drawable_count++;
     memset(drawable, 0, sizeof(Drawable));
@@ -4189,7 +4194,6 @@ static inline void red_process_drawable(RedWorker *worker, RedDrawable *red_draw
     Drawable *drawable = get_drawable(worker, red_drawable->effect, red_drawable, group_id);
 
     if (!drawable) {
-        rendering_incorrect("failed to get_drawable");
         return;
     }
 
@@ -11322,8 +11326,15 @@ static void dev_create_primary_surface(RedWorker *worker, uint32_t surface_id,
     spice_debug(NULL);
     spice_warn_if(surface_id != 0);
     spice_warn_if(surface.height == 0);
-    spice_warn_if(((uint64_t)abs(surface.stride) * (uint64_t)surface.height) !=
-             abs(surface.stride) * surface.height);
+
+    /* surface can arrive from guest unchecked so make sure
+     * guest is not a malicious one and drop invalid requests
+     */
+    if (!red_validate_surface(surface.width, surface.height,
+                              surface.stride, surface.format)) {
+        spice_warning("wrong primary surface creation request");
+        return;
+    }
 
     line_0 = (uint8_t*)get_virt(&worker->mem_slots, surface.mem,
                                 surface.height * abs(surface.stride),
