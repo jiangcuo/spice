@@ -178,14 +178,17 @@ static void smartcard_unref_msg_to_client(SpiceCharDeviceMsgToClient *msg,
     smartcard_unref_vsc_msg_item((MsgItem *)msg);
 }
 
-static void smartcard_send_msg_to_client(SpiceCharDeviceMsgToClient *msg,
+static void smartcard_send_msg_to_client(SpiceCharDeviceMsgToClient *message,
                                          RedClient *client,
                                          void *opaque)
 {
     SmartCardDeviceState *dev = opaque;
-    spice_assert(dev->scc && dev->scc->base.client == client);
-    smartcard_channel_client_pipe_add_push(&dev->scc->base, &((MsgItem *)msg)->base);
+    MsgItem *msg = (MsgItem *)message;
+    PipeItem *item = &msg->base;
 
+    spice_assert(dev->scc && dev->scc->base.client == client);
+    smartcard_ref_vsc_msg_item(msg);
+    smartcard_channel_client_pipe_add_push(&dev->scc->base, item);
 }
 
 static void smartcard_send_tokens_to_client(RedClient *client, uint32_t tokens, void *opaque)
@@ -328,7 +331,7 @@ static void smartcard_char_device_notify_reader_add(SmartCardDeviceState *st)
     SpiceCharDeviceWriteBuffer *write_buf;
     VSCMsgHeader *vheader;
 
-    write_buf = spice_char_device_write_buffer_get(st->chardev_st, NULL, sizeof(vheader));
+    write_buf = spice_char_device_write_buffer_get(st->chardev_st, NULL, sizeof(*vheader));
     if (!write_buf) {
         spice_error("failed to allocate write buffer");
         return;
@@ -375,7 +378,7 @@ static void smartcard_char_device_notify_reader_remove(SmartCardDeviceState *st)
         spice_debug("reader add was never sent to the device");
         return;
     }
-    write_buf = spice_char_device_write_buffer_get(st->chardev_st, NULL, sizeof(vheader));
+    write_buf = spice_char_device_write_buffer_get(st->chardev_st, NULL, sizeof(*vheader));
     if (!write_buf) {
         spice_error("failed to allocate write buffer");
         return;
