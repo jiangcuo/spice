@@ -1,3 +1,12 @@
+spice (0.12.8-2) unstable; urgency=medium
+
+  * Build on all little-endian architectures (Closes: #734218)
+  * Drop -dbg package and rely on the automatically built one (-dbgsym)
+  * Drop the libasound2-dev build-dependency, this was needed for the
+    spice-client which is gone since 0.12.6-1
+
+ -- Liang Guo <guoliang@debian.org>  Fri, 06 Jan 2017 21:50:55 +0800
+
 spice (0.12.8-1) unstable; urgency=medium
 
   * New upstream release
