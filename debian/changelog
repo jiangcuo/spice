@@ -1,3 +1,17 @@
+spice (0.12.8-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Add CVE-2016-9577-and-CVE-2016-9578.patch:
+    - CVE-2016-9577: A buffer overflow vulnerability in
+      main_channel_alloc_msg_rcv_buf was found that occurs when reading large
+      messages due to missing buffer size check.
+    - CVE-2016-9578: A vulnerability was discovered in the server's
+      protocol handling. An attacker able to connect to the spice server could
+      send crafted messages which would cause the process to crash.
+      (Closes: #854336)
+
+ -- Markus Koschany <apo@debian.org>  Mon, 13 Feb 2017 21:42:01 +0100
+
 spice (0.12.8-2) unstable; urgency=medium
 
   * Build on all little-endian architectures (Closes: #734218)
