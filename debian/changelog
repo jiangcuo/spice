@@ -1,3 +1,11 @@
+spice (0.12.8-2.2) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Fix CVE-2017-7506: (Closes: #868083)
+    Possible buffer overflow via invalid monitor configurations.
+
+ -- Markus Koschany <apo@debian.org>  Fri, 21 Jul 2017 23:34:38 +0200
+
 spice (0.12.8-2.1) unstable; urgency=medium
 
   * Non-maintainer upload.
