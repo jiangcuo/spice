@@ -7,7 +7,7 @@ Copyright: Copyright (C) 2009-2015 Red Hat, Inc.
            Copyright (C) 2010-2016 Liang Guo <bluestonechina@gmail.com>
 License: LGPL-2.1+
 
-Files: spice-common/common/draw.h spice-common/common/messages.h 
+Files: spice-common/common/draw.h spice-common/common/messages.h
        server/zlib_encoder.h server/jpeg_encoder.h
 Copyright: Copyright (C) 2009-2010 Red Hat, Inc.
 License: BSD-3-clause
@@ -15,7 +15,7 @@ License: BSD-3-clause
 Files: spice-common/common/lines.h spice-common/common/lines.c
 Copyright: Copyright 1987, 1998  The Open Group
            Copyright 1987 by Digital Equipment Corporation
-License: 
+License:
  Copyright 1987, 1998  The Open Group
  .
  Permission to use, copy, modify, distribute, and sell this software and its
@@ -58,7 +58,7 @@ License:
  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
  SOFTWARE.
 
-Files: spice-common/common/lz_decompress_tmpl.c spice-common/common/lz.c 
+Files: spice-common/common/lz_decompress_tmpl.c spice-common/common/lz.c
        spice-common/common/lz_compress_tmpl.c
 Copyright: Copyright 2009 Red Hat, Inc. and/or its affiliates
            Copyright (C) 2005, 2006, 2007 Ariya Hidayat (ariya@kde.org)
@@ -130,4 +130,3 @@ License: MIT
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
-

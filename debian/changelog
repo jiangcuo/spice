@@ -16,12 +16,13 @@ spice (0.13.90-0.1) UNRELEASED; urgency=medium
   * debian/control: Add liblz4-dev to the build-dependencies
   * debian/control: Add the needed gstreamer modules to the
     (build-)dependencies to enable gstreamer support
+  * Run wrap-and-sort -ts
 
   [ Santiago Ruano Rincón ]
   * debian/tests/automated-tests: Intial DEP-8 test, using upstream automated
     test (Closes: #827027)
 
- -- Laurent Bigonville <bigon@debian.org>  Tue, 22 Aug 2017 19:03:44 +0200
+ -- Laurent Bigonville <bigon@debian.org>  Tue, 22 Aug 2017 19:07:37 +0200
 
 spice (0.12.8-2.2) unstable; urgency=medium
 
