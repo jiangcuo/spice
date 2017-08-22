@@ -6,8 +6,8 @@
 override_dh_auto_configure:
 	dh_auto_configure --  --disable-celt051 --disable-silent-rules \
 		--enable-smartcard
-# remove Requires.private defs from .pc file -- we're not building static libs
-	sed -i '/^Requires\.private:/D' spice-server.pc
+# remove Requires.private and Libs.private defs from .pc file -- we're not building static libs
+	sed -E -i '/^(Libs|Requires)\.private:/D' spice-server.pc
 
 override_dh_installdocs:
 	dh_installdocs -plibspice-server1-dbg --link-doc=libspice-server1
