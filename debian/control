@@ -16,6 +16,7 @@ Build-Depends: debhelper (>= 9), pkg-config,
  libglib2.0-dev (>= 2.28),
  libcacard-dev,
  liblz4-dev,
+ libgstreamer1.0-dev, libgstreamer-plugins-base1.0-dev, gstreamer1.0-plugins-base, gstreamer1.0-libav, gstreamer1.0-plugins-good, gstreamer1.0-plugins-ugly, gstreamer1.0-tools,
 Standards-Version: 4.1.0
 Homepage: http://spice-space.org/
 Vcs-Git: https://anonscm.debian.org/git/collab-maint/spice.git
@@ -27,6 +28,7 @@ Architecture: alpha amd64 arm64 armel armhf i386 mips64el mipsel ppc64el sh4 x32
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: gstreamer1.0-plugins-base, gstreamer1.0-libav, gstreamer1.0-plugins-good, gstreamer1.0-plugins-ugly
 Breaks: spice-client-gtk (<= 0.12-2), python-spice-client-gtk (<= 0.12-2), 
  libspice-client-glib-2.0-1 (<= 0.12-2), libspice-client-gtk-2.0-1 (<= 0.12-2), 
  libspice-client-gtk-3.0-1 (<= 0.12-2)
