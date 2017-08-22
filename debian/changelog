@@ -1,3 +1,14 @@
+spice (0.13.90-0.1) UNRELEASED; urgency=medium
+
+  * New upstream release (Closes: #849569)
+    - Adjust the build-dependencies
+    - Drop d/p/CVE-2016-9577-and-CVE-2016-9578.patch,
+      d/p/CVE-2017-7506-1.patch, d/p/CVE-2017-7506-2.patch,
+      d/p/CVE-2017-7506-3.patch: All merged upstream
+    - Drop debian/patches/fix-tests-warnings.patch, unused
+
+ -- Laurent Bigonville <bigon@debian.org>  Tue, 22 Aug 2017 17:58:00 +0200
+
 spice (0.12.8-2.2) unstable; urgency=medium
 
   * Non-maintainer upload.
