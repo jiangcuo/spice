@@ -16,11 +16,17 @@
   License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <test-marshallers.h>
+#include "test-marshallers.h"
 #include <spice/protocol.h>
 #include "common/marshaller.h"
 
-#ifndef _GENERATED_HEADERS_H
-#define _GENERATED_HEADERS_H
+#ifndef _H_GENERATED_TEST_MARSHALLERS
+#define _H_GENERATED_TEST_MARSHALLERS
+
+SPICE_BEGIN_DECLS
+
 void spice_marshall_msg_main_ShortDataSubMarshall(SpiceMarshaller *m, SpiceMsgMainShortDataSubMarshall *msg);
+
+SPICE_END_DECLS
+
 #endif

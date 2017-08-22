@@ -48,7 +48,7 @@ int spice_server_set_compat_version(SpiceServer *s,
                                     spice_compat_version_t version);
 int spice_server_set_port(SpiceServer *s, int port);
 void spice_server_set_addr(SpiceServer *s, const char *addr, int flags);
-int spice_server_set_listen_socket_fd(SpiceServer *s, int listen_fd);
+int spice_server_set_listen_socket_fd(SpiceServer *s, int listen_fd) SPICE_GNUC_DEPRECATED;
 int spice_server_set_exit_on_disconnect(SpiceServer *s, int flag);
 int spice_server_set_noauth(SpiceServer *s);
 int spice_server_set_sasl(SpiceServer *s, int enabled);
@@ -65,7 +65,28 @@ int spice_server_add_ssl_client(SpiceServer *s, int socket, int skip_auth);
 
 int spice_server_add_interface(SpiceServer *s,
                                SpiceBaseInstance *sin);
+/**
+ * Remove an interface from SpiceServer.
+ * SpiceServer won't be using the interface anymore, so it can
+ * be freed or reused.
+ */
 int spice_server_remove_interface(SpiceBaseInstance *sin);
+
+/* XXX This definition is here only to make glib generation
+ * of enumerators possible
+ */
+#if 0
+typedef enum {
+    SPICE_IMAGE_COMPRESSION_INVALID  = 0,
+    SPICE_IMAGE_COMPRESSION_OFF      = 1,
+    SPICE_IMAGE_COMPRESSION_AUTO_GLZ = 2,
+    SPICE_IMAGE_COMPRESSION_AUTO_LZ  = 3,
+    SPICE_IMAGE_COMPRESSION_QUIC     = 4,
+    SPICE_IMAGE_COMPRESSION_GLZ      = 5,
+    SPICE_IMAGE_COMPRESSION_LZ       = 6,
+    SPICE_IMAGE_COMPRESSION_LZ4      = 7,
+} spice_image_compression_t;
+#endif
 
 // Needed for backward API compatibility
 typedef SpiceImageCompression spice_image_compression_t;
@@ -97,7 +118,7 @@ int spice_server_set_zlib_glz_compression(SpiceServer *s, spice_wan_compression_
 
 int spice_server_set_channel_security(SpiceServer *s, const char *channel, int security);
 
-int spice_server_add_renderer(SpiceServer *s, const char *name);
+int spice_server_add_renderer(SpiceServer *s, const char *name) SPICE_GNUC_DEPRECATED;
 
 enum {
     SPICE_STREAM_VIDEO_INVALID,
@@ -107,13 +128,21 @@ enum {
 };
 
 int spice_server_set_streaming_video(SpiceServer *s, int value);
+
+enum {
+    SPICE_STREAMING_INVALID,
+    SPICE_STREAMING_SPICE,
+    SPICE_STREAMING_GSTREAMER
+};
+
+int spice_server_set_video_codecs(SpiceServer *s, const char* video_codecs);
 int spice_server_set_playback_compression(SpiceServer *s, int enable);
 int spice_server_set_agent_mouse(SpiceServer *s, int enable);
 int spice_server_set_agent_copypaste(SpiceServer *s, int enable);
 int spice_server_set_agent_file_xfer(SpiceServer *s, int enable);
 
-int spice_server_get_sock_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen);
-int spice_server_get_peer_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen);
+int spice_server_get_sock_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen) SPICE_GNUC_DEPRECATED;
+int spice_server_get_peer_info(SpiceServer *s, struct sockaddr *sa, socklen_t *salen) SPICE_GNUC_DEPRECATED;
 
 int spice_server_is_server_mouse(SpiceServer *s);
 
@@ -123,6 +152,6 @@ void spice_server_set_uuid(SpiceServer *s, const uint8_t uuid[16]);
 void spice_server_vm_start(SpiceServer *s);
 void spice_server_vm_stop(SpiceServer *s);
 
-int spice_server_get_num_clients(SpiceServer *s);
+int spice_server_get_num_clients(SpiceServer *s) SPICE_GNUC_DEPRECATED;
 
 #endif /* SPICE_SERVER_H_ */

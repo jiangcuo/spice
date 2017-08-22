@@ -19,7 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#include <common/messages.h>
+#include "common/messages.h"
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -1054,6 +1054,32 @@ void spice_marshall_msg_display_stream_activate_report(SPICE_GNUC_UNUSED SpiceMa
     spice_marshaller_add_uint32(m, src->timeout_ms);
 }
 
+void spice_marshall_msg_display_gl_scanout_unix(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgDisplayGlScanoutUnix *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgDisplayGlScanoutUnix *src;
+    src = (SpiceMsgDisplayGlScanoutUnix *)msg;
+
+    spice_marshaller_add_fd(m, src->drm_dma_buf_fd);
+    spice_marshaller_add_uint32(m, src->width);
+    spice_marshaller_add_uint32(m, src->height);
+    spice_marshaller_add_uint32(m, src->stride);
+    spice_marshaller_add_uint32(m, src->drm_fourcc_format);
+    spice_marshaller_add_uint32(m, src->flags);
+}
+
+void spice_marshall_msg_display_gl_draw(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgDisplayGlDraw *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgDisplayGlDraw *src;
+    src = (SpiceMsgDisplayGlDraw *)msg;
+
+    spice_marshaller_add_uint32(m, src->x);
+    spice_marshaller_add_uint32(m, src->y);
+    spice_marshaller_add_uint32(m, src->w);
+    spice_marshaller_add_uint32(m, src->h);
+}
+
 void spice_marshall_msg_inputs_init(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgInputsInit *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
@@ -1332,10 +1358,24 @@ void spice_marshall_msg_smartcard_data(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPI
     spice_marshaller_add_uint32(m, src->type);
     spice_marshaller_add_uint32(m, src->reader_id);
     spice_marshaller_add_uint32(m, src->length);
-    /* Remaining data must be appended manually */
+    /* Don't marshall @nomarshal data */
 }
 
 #endif /* USE_SMARTCARD */
+void spice_marshall_SpiceMsgCompressedData(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgCompressedData *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgCompressedData *src;
+    src = (SpiceMsgCompressedData *)msg;
+
+    spice_marshaller_add_uint8(m, src->type);
+    if (src->type == SPICE_DATA_COMPRESSION_TYPE_NONE) {
+    } else if (1) {
+        spice_marshaller_add_uint32(m, src->uncompressed_size);
+    }
+    /* Remaining data must be appended manually */
+}
+
 void spice_marshall_msg_port_init(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgPortInit *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;

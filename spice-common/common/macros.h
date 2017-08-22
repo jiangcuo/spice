@@ -19,6 +19,8 @@
 #ifndef __MACROS_H
 #define __MACROS_H
 
+#include "verify.h"
+
 #if    __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 5)
 #define SPICE_ATTR_NORETURN                                  \
     __attribute__((noreturn))
@@ -29,5 +31,28 @@
 #define SPICE_ATTR_PRINTF
 #endif /* __GNUC__ */
 
+#ifdef __GNUC__
+#define SPICE_CONSTRUCTOR_FUNC(func_name) \
+    static void __attribute__((constructor)) func_name(void)
+#define SPICE_DESTRUCTOR_FUNC(func_name) \
+    static void __attribute__((destructor)) func_name(void)
+#elif defined(_MSC_VER)
+#define SPICE_CONSTRUCTOR_FUNC(func_name) \
+    static void func_name(void); \
+    static int func_name ## _wrapper(void) { func_name(); return 0; } \
+    __pragma(section(".CRT$XCU",read)) \
+    __declspec(allocate(".CRT$XCU")) static int (* _array ## func_name)(void) = func_name ## _wrapper; \
+    static void func_name(void)
+#define SPICE_DESTRUCTOR_FUNC(func_name) \
+    static void func_name(void); \
+    static int func_name ## _wrapper(void) { func_name(); return 0; } \
+    __pragma(section(".CRT$XPU",read)) \
+    __declspec(allocate(".CRT$XPU")) static int (* _array ## func_name)(void) = func_name ## _wrapper; \
+    static void func_name(void)
+#else
+#error Please implement SPICE_CONSTRUCTOR_FUNC and SPICE_DESTRUCTOR_FUNC for this compiler
+#endif
+
+#define SPICE_VERIFY(cond) verify_expr(cond, (void)1)
 
 #endif /* __MACROS_H */

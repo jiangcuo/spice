@@ -1,13 +1,25 @@
 
 from . import ptypes
 from . import codegen
+import re
 
 def write_includes(writer):
     writer.header.writeln("#include <spice/protocol.h>")
     writer.header.writeln('#include "common/marshaller.h"')
     writer.header.newline()
-    writer.header.writeln("#ifndef _GENERATED_HEADERS_H")
-    writer.header.writeln("#define _GENERATED_HEADERS_H")
+    if writer.header.has_option("dest_file"):
+        src = writer.header.options["dest_file"]
+    else:
+        src = "generated_headers.h"
+    src = re.sub(r'(?i)[^a-z0-9]+', '_', src)
+    src = src.upper()
+    if src.endswith("_H"):
+        src = "_H_"+src[:-2]
+    writer.header.writeln("#ifndef %s" % src)
+    writer.header.writeln("#define %s" % src)
+    writer.header.newline()
+    writer.header.writeln("SPICE_BEGIN_DECLS")
+    writer.header.newline()
 
     writer.writeln("#include <string.h>")
     writer.writeln("#include <assert.h>")
@@ -333,9 +345,10 @@ def write_container_marshaller(writer, container, src):
             writer.out_prefix = saved_out_prefix
             write_member_marshaller(writer, container, m, src, scope)
 
-def write_message_marshaller(writer, message, is_server, private):
+def write_message_marshaller(writer, message, private):
     if message.has_attr("ifdef"):
         writer.ifdef(message.attributes["ifdef"][0])
+        writer.header.ifdef(message.attributes["ifdef"][0])
     writer.out_prefix = ""
     function_name = "spice_marshall_" + message.c_name()
     if writer.is_generated("marshaller", function_name):
@@ -348,7 +361,15 @@ def write_message_marshaller(writer, message, is_server, private):
         n = [", SpiceMarshaller **%s_out" % name for name in names]
         names_args = "".join(n)
 
-    if not private:
+    if private:
+        message_name = message.c_name()
+        if (not message_name.startswith("msgc_")):
+            #small bug above, checks for startswith("msg") which
+            #matches "msgc" and appends "msg_" if this fails causing
+            #inconsistencies
+            message_name = "msg_" + message_name
+        writer.header.writeln("void (*" + message_name + ")(SpiceMarshaller *m, %s *msg" % message.c_type() + names_args + ");")
+    else:
         writer.header.writeln("void " + function_name + "(SpiceMarshaller *m, %s *msg" % message.c_type() + names_args + ");")
 
     scope = writer.function(function_name,
@@ -369,11 +390,15 @@ def write_message_marshaller(writer, message, is_server, private):
     writer.end_block()
     if message.has_attr("ifdef"):
         writer.endif(message.attributes["ifdef"][0])
+        writer.header.endif(message.attributes["ifdef"][0])
+
     writer.newline()
     return function_name
 
 def write_protocol_marshaller(writer, proto, is_server, private_marshallers):
     functions = {}
+    if private_marshallers:
+        writer.header.begin_block("typedef struct")
     for c in proto.channels:
         channel = c.channel_type
         if channel.has_attr("ifdef"):
@@ -385,7 +410,7 @@ def write_protocol_marshaller(writer, proto, is_server, private_marshallers):
             messages = channel.server_messages
         for m in messages:
             message = m.message_type
-            f = write_message_marshaller(writer, message, is_server, private_marshallers)
+            f = write_message_marshaller(writer, message, private_marshallers)
             if channel.has_attr("ifdef") and f not in functions:
                 functions[f] = channel.attributes["ifdef"][0]
             elif message.has_attr("ifdef") and f not in functions:
@@ -397,6 +422,12 @@ def write_protocol_marshaller(writer, proto, is_server, private_marshallers):
             writer.header.endif(channel.attributes["ifdef"][0])
 
     if private_marshallers:
+        writer.header.end_block(newline=False)
+        writer.header.writeln(" SpiceMessageMarshallers;")
+        writer.header.newline()
+        writer.header.statement("SpiceMessageMarshallers *spice_message_marshallers_get" + writer.public_prefix+"(void)")
+        writer.header.newline()
+
         scope = writer.function("spice_message_marshallers_get" +  writer.public_prefix,
                                 "SpiceMessageMarshallers *",
                                 "void")
@@ -417,4 +448,8 @@ def write_protocol_marshaller(writer, proto, is_server, private_marshallers):
         writer.newline()
 
 def write_trailer(writer):
+    writer.header.newline()
+    writer.header.writeln("SPICE_END_DECLS")
+    writer.header.newline()
+
     writer.header.writeln("#endif")

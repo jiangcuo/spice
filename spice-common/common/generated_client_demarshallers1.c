@@ -19,7 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#include <common/messages.h>
+#include "common/messages.h"
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -133,6 +133,10 @@ static uint64_t SPICE_GNUC_UNUSED consume_uint64(uint8_t **ptr)
     *ptr += 8;
     return val;
 }
+static int SPICE_GNUC_UNUSED consume_fd(uint8_t **ptr SPICE_GNUC_UNUSED)
+{
+    return -1;
+}
 
 typedef struct PointerInfo PointerInfo;
 typedef void (*message_destructor_t)(uint8_t *message);
@@ -185,9 +189,7 @@ static uint8_t * parse_msg_migrate(uint8_t *message_start, uint8_t *message_end,
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -264,9 +266,7 @@ static uint8_t * parse_msg_set_ack(uint8_t *message_start, uint8_t *message_end,
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -321,9 +321,7 @@ static uint8_t * parse_msg_ping(uint8_t *message_start, uint8_t *message_end, SP
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -390,9 +388,7 @@ static uint8_t * parse_msg_wait_for_channels(uint8_t *message_start, uint8_t *me
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -435,9 +431,7 @@ static uint8_t * parse_msg_disconnecting(uint8_t *message_start, uint8_t *messag
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -508,9 +502,7 @@ static uint8_t * parse_msg_notify(uint8_t *message_start, uint8_t *message_end, 
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -620,9 +612,7 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -660,9 +650,7 @@ static uint8_t * parse_SpiceMsgEmpty(uint8_t *message_start, uint8_t *message_en
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -711,9 +699,7 @@ static uint8_t * parse_msg_main_init(uint8_t *message_start, uint8_t *message_en
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -779,9 +765,7 @@ static uint8_t * parse_msg_main_channels_list(uint8_t *message_start, uint8_t *m
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -824,9 +808,7 @@ static uint8_t * parse_msg_main_mouse_mode(uint8_t *message_start, uint8_t *mess
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -868,9 +850,7 @@ static uint8_t * parse_msg_main_multi_media_time(uint8_t *message_start, uint8_t
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -912,9 +892,7 @@ static uint8_t * parse_msg_main_agent_disconnected(uint8_t *message_start, uint8
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -956,9 +934,7 @@ static uint8_t * parse_msg_main_agent_token(uint8_t *message_start, uint8_t *mes
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1039,9 +1015,7 @@ static uint8_t * parse_msg_main_migrate_switch_host(uint8_t *message_start, uint
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1119,9 +1093,7 @@ static uint8_t * parse_msg_display_mode(uint8_t *message_start, uint8_t *message
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1313,9 +1285,7 @@ static uint8_t * parse_msg_display_copy_bits(uint8_t *message_start, uint8_t *me
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1381,9 +1351,7 @@ static uint8_t * parse_msg_display_inval_list(uint8_t *message_start, uint8_t *m
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1450,9 +1418,7 @@ static uint8_t * parse_msg_display_inval_all_pixmaps(uint8_t *message_start, uin
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1494,9 +1460,7 @@ static uint8_t * parse_msg_display_inval_palette(uint8_t *message_start, uint8_t
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1616,9 +1580,7 @@ static uint8_t * parse_msg_display_stream_create(uint8_t *message_start, uint8_t
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1683,9 +1645,7 @@ static uint8_t * parse_msg_display_stream_data(uint8_t *message_start, uint8_t *
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1791,9 +1751,7 @@ static uint8_t * parse_msg_display_stream_clip(uint8_t *message_start, uint8_t *
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -1835,9 +1793,7 @@ static uint8_t * parse_msg_display_stream_destroy(uint8_t *message_start, uint8_
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -2441,9 +2397,7 @@ static uint8_t * parse_msg_display_draw_fill(uint8_t *message_start, uint8_t *me
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -2691,9 +2645,7 @@ static uint8_t * parse_msg_display_draw_opaque(uint8_t *message_start, uint8_t *
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -2880,9 +2832,7 @@ static uint8_t * parse_msg_display_draw_copy(uint8_t *message_start, uint8_t *me
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -3069,9 +3019,7 @@ static uint8_t * parse_msg_display_draw_blend(uint8_t *message_start, uint8_t *m
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -3231,9 +3179,7 @@ static uint8_t * parse_msg_display_draw_blackness(uint8_t *message_start, uint8_
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -3393,9 +3339,7 @@ static uint8_t * parse_msg_display_draw_whiteness(uint8_t *message_start, uint8_
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -3555,9 +3499,7 @@ static uint8_t * parse_msg_display_draw_invers(uint8_t *message_start, uint8_t *
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -3805,9 +3747,7 @@ static uint8_t * parse_msg_display_draw_rop3(uint8_t *message_start, uint8_t *me
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -4202,9 +4142,7 @@ static uint8_t * parse_msg_display_draw_stroke(uint8_t *message_start, uint8_t *
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -4770,9 +4708,7 @@ static uint8_t * parse_msg_display_draw_text(uint8_t *message_start, uint8_t *me
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -4927,9 +4863,7 @@ static uint8_t * parse_msg_display_draw_transparent(uint8_t *message_start, uint
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5084,9 +5018,7 @@ static uint8_t * parse_msg_display_draw_alpha_blend(uint8_t *message_start, uint
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5184,9 +5116,7 @@ static uint8_t * parse_msg_inputs_init(uint8_t *message_start, uint8_t *message_
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5228,9 +5158,7 @@ static uint8_t * parse_msg_inputs_key_modifiers(uint8_t *message_start, uint8_t 
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5339,9 +5267,7 @@ static uint8_t * parse_msg_cursor_init(uint8_t *message_start, uint8_t *message_
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5418,9 +5344,7 @@ static uint8_t * parse_msg_cursor_set(uint8_t *message_start, uint8_t *message_e
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5465,9 +5389,7 @@ static uint8_t * parse_msg_cursor_move(uint8_t *message_start, uint8_t *message_
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5510,9 +5432,7 @@ static uint8_t * parse_msg_cursor_trail(uint8_t *message_start, uint8_t *message
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5554,9 +5474,7 @@ static uint8_t * parse_msg_cursor_inval_one(uint8_t *message_start, uint8_t *mes
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5641,9 +5559,7 @@ static uint8_t * parse_msg_playback_data(uint8_t *message_start, uint8_t *messag
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5698,9 +5614,7 @@ static uint8_t * parse_msg_playback_mode(uint8_t *message_start, uint8_t *messag
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5745,9 +5659,7 @@ static uint8_t * parse_msg_playback_start(uint8_t *message_start, uint8_t *messa
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 
@@ -5818,9 +5730,7 @@ static uint8_t * parse_msg_record_start(uint8_t *message_start, uint8_t *message
     return data;
 
    error:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
     return NULL;
 }
 

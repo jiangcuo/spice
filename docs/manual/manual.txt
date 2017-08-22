@@ -240,8 +240,8 @@ population. I assume that you have a locally stored ISO of your
 favourite operating system so you can use it for installation.
 
 [source,sh]
-host$ sudo qemu-kvm -boot order=dc -vga qxl \
-        -spice port=3001,disable-ticketing -soundhw ac97 \
+host$ qemu-kvm -boot order=dc -vga qxl \
+        -spice port=3001,disable-ticketing -soundhw hda \
         -device virtio-serial -chardev spicevmc,id=vdagent,debug=0,name=vdagent \
         -device virtserialport,chardev=vdagent,name=com.redhat.spice.0 \
         -cdrom /path/to/your.iso /path/to/your.img
@@ -256,6 +256,12 @@ The Spice `port` option defines what port will be used for
 communication with the client. The Spice option `disable-ticketing` is
 specifying that ticketing (simple authentication method) is not
 used. The virtio and chardev devices are required by the guest agent.
+
+The `-soundhw hda` option provides an audio device for the guest to use for
+audio playback and recording. In order for spice audio to work properly, qemu
+must use the 'spice' audio driver. Depending on how qemu was built, however,
+this might not be the default audio driver. To ensure qemu uses the spice audio
+driver, you can set the environment variable `QEMU_AUDIO_DRV=spice`.
 
 Basic configuration
 -------------------
@@ -350,10 +356,6 @@ the machine which is running our qemu instance.
 
 [source,sh]
 client$ remote-viewer spice://myhost:3001
-
-.Established connection to Windows 2008 guest
-image::images/spicec01.png[]
-
 
 Ticketing
 =========
@@ -536,9 +538,8 @@ remote-viewer, you can select which USB devices to redirect in
 established. There are also various command line redirection options
 which are described when running remote-viewer with `--help-spice`.
 
-[NOTE]
-You may need additional services running in the client, such as the
-Spice USB Clerk service on Windows.
+To get USB redirection working on Windows clients, you need to install
+http://www.spice-space.org/download/windows/usbdk/[UsbDk]
 
 CAC smartcard redirection
 =========================
@@ -580,7 +581,7 @@ With the qemu command line, you must add a USB CCID device, and a
 name "smartcard":
 
 [source,sh]
--device usb-ccid -chardev spicevmc,name=smartcard -device ccid-card-passthru,chardev=ccid
+-device usb-ccid -chardev spicevmc,name=smartcard,id=ccid -device ccid-card-passthru,chardev=ccid
 
 Client
 ------
@@ -656,9 +657,8 @@ that is already there:
 Client
 ------
 
-You can enable additional displays either from the "Display/Displays"
-menu in remote-viewer, or from your guest OS display configuration
-tool.
+You can enable additional displays from the "View -> Displays"
+menu in remote-viewer.
 
 TLS
 ===
@@ -847,10 +847,11 @@ ticket was passed to the client.
 Folder sharing
 ==============
 
-The Spice client can share a folder with the remote guest. By default,
-the client will share the XDG Public Share directory (ie '~/Public' if
-you use a regular system).  You may specify a different folder with
-`--spice-share-dir` client option.
+The Spice client can share a folder with the remote guest. By default folder
+sharing is disabled. Use the remote-viewer "File" -> "Preferences" menu
+to enable it. The default shared directory is the XDG Public Share directory
+(ie '~/Public' if you use a regular system). You may specify a different folder
+with `--spice-share-dir` client option.
 
 Configuration
 -------------
@@ -889,9 +890,8 @@ Guest configuration
 
 .Windows
 In a Windows guest, you must then install
-http://elmarco.fedorapeople.org/spice-webdavd-x86-0.1.24.msi[spice-webdavd]
-service, and register the drive (by running 'map-drive.bat' from
-'Program Files/Spice webdav').
+https://www.spice-space.org/download/windows/spice-webdavd/[spice-webdavd]
+service.
 
 .Linux
 
@@ -900,6 +900,68 @@ sources are available at https://git.gnome.org/browse/phodav). The
 folder will show up in GNOME Files network places (or Nautilus). It
 can then be mounted and browsed in traditional applications thanks to
 `gvfs-fuse`.
+
+GL acceleration (virgl)
+=======================
+
+OpenGL acceleration is currently local only (it has to go through a Unix socket)
+and it needs guest support. It's currently limited to recent linux
+distributions (for example Fedora 24).
+
+Host-side, you need qemu 2.6, libvirt 1.3.3 and spice 0.13.1, as well as a 4.4
+Linux kernel and Mesa 11.1.
+
+Client-side, you need spice-gtk 0.31.
+
+Guest-side, you need Mesa 11.1 and a 4.4 Linux kernel.
+
+Configuration
+-------------
+
+.Using libvirt
+
+You need to add a virtio-gpu video device to your virtual machine instead of QXL.
+[source,xml]
+<video>
+  <model type='virtio' heads='1'>
+    <acceleration accel3d='yes'/>
+  </model>
+</video>
+
+Then you need to enable OpenGL on your SPICE graphics node:
+[source,xml]
+<graphics type='spice' autoport='no'>
+  <gl enable='yes'/>
+</graphics>
+
+You don't need any port/address as they won't be usable with
+GL.
+
+.Using QEMU
+
+You need to add a virtio-gpu device on QEMU command line,
+as well as enable GL with SPICE. port/tls-port/addr arguments
+won't be used in this setup. You need to configure a Unix socket to
+connect to the VM display.
+
+[source,sh]
+-device virtio-vga,virgl=on -spice gl=on,unix,addr=/run/user/1000/spice.sock
+
+Connecting to the guest
+-----------------------
+
+Connecting to the guest when virgl is in use is slightly different
+than usual
+
+.If libvirt is being used
+
+[source,sh]
+client$ virt-viewer -a $vmname
+
+.If a Unix socket has been set on QEMU command line
+
+[source,sh]
+client$ remote-viewer spice+unix:///run/user/1000/spice.sock
 
 QEMU Spice reference
 ====================
@@ -962,9 +1024,6 @@ Windows guest
 The recommended way of getting all the needed drivers installed is to
 use the all-in-one Spice guest tools installer which can be found on
 http://spice-space.org/download/windows/spice-guest-tools/[spice-space.org].
-
-To get USB redirection working on Windows, you need to install USB
-Clerk (TODO: add link)
 
 If you want to manually install them, the QXL driver can be downloaded
 from http://spice-space.org/download/windows/qxl/[this location] ,
@@ -1116,9 +1175,8 @@ this value to `/sys/module/drm/parameters/debug`.
 
 It's also possible to get some host-side debugging logs from the guest QXL driver.
 The driver reads a guestdebug parameter from the rom, which can be set when starting
-the VM. Only the Windows QXL driver is using this feature, see `qxl.cmdlog` for
-something guest-agnostic.  This can be enabled with `-global
-qxl-vga.guestdebug=3`, or `-global qxl.guestdebug=3` for secondary devices.
+the VM. This can be enabled with `-global qxl-vga.guestdebug=3`, or `-global
+qxl.guestdebug=3` for secondary devices.
 
 The corresponding libvirt XML is:
 
@@ -1134,7 +1192,7 @@ The corresponding libvirt XML is:
 -------------------------------------------------
 
 (don't forget to add the
-xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0' attribute to the
+`xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'` attribute to the
 toplevel `<domain>` node)
 
 
@@ -1142,7 +1200,7 @@ You can go up to 12 (or more, look for DEBUG_PRINT in the driver), you get reall
 
   * 3 - will give you all the highlevel commands (DrvCopyBits, DrvBitBlt, etc.)
   * 6 - will also show QXLGetBitMap
-  * 11 - will show caching of images (this is a driver cache, not to be confused with the server<->client shared cache).
+  * 11 - will show caching of images (this is a driver cache, not to be confused with the cache shared between server and client).
 
 
 .qxl.cmdlog QEMU parameter
@@ -1158,6 +1216,10 @@ Agent
 
 On Linux, `journalctl -t spice-vdagentd -t spice-vdagent` will display the agent log messages.
 spice-vdagent can also be restarted by hand with the `-d` argument in order to display more logs.
+
+On Windows, the agent logs can be found in `C:\WINDOWS\TEMP\VDAGENT.LOG` and
+`C:\WINDOWS\TEMP\VDSERVICE.LOG`
+
 
 Recording/replaying SPICE server traffic
 ----------------------------------------

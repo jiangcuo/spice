@@ -19,11 +19,14 @@
 #include <config.h>
 #endif
 
+#include "log.h"
 #include "marshaller.h"
 #include "mem.h"
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <unistd.h>
+#include <stdio.h>
 
 #ifdef WORDS_BIGENDIAN
 #define write_int8(ptr,v) (*((int8_t *)(ptr)) = v)
@@ -84,6 +87,8 @@ struct SpiceMarshaller {
     MarshallerItem *items;
 
     MarshallerItem static_items[N_STATIC_ITEMS];
+    bool has_fd;
+    int fd;
 };
 
 struct SpiceMarshallerData {
@@ -111,6 +116,8 @@ static void spice_marshaller_init(SpiceMarshaller *m,
     m->n_items = 0;
     m->items_size = N_STATIC_ITEMS;
     m->items = m->static_items;
+    m->fd = -1;
+    m->has_fd = false;
 }
 
 SpiceMarshaller *spice_marshaller_new(void)
@@ -310,8 +317,8 @@ void spice_marshaller_unreserve_space(SpiceMarshaller *m, size_t size)
     item->len -= size;
 }
 
-uint8_t *spice_marshaller_add_ref_full(SpiceMarshaller *m, uint8_t *data, size_t size,
-                                       spice_marshaller_item_free_func free_data, void *opaque)
+uint8_t *spice_marshaller_add_by_ref_full(SpiceMarshaller *m, uint8_t *data, size_t size,
+                                          spice_marshaller_item_free_func free_data, void *opaque)
 {
     MarshallerItem *item;
     SpiceMarshallerData *d;
@@ -342,18 +349,21 @@ uint8_t *spice_marshaller_add(SpiceMarshaller *m, const uint8_t *data, size_t si
     return ptr;
 }
 
-uint8_t *spice_marshaller_add_ref(SpiceMarshaller *m, uint8_t *data, size_t size)
+uint8_t *spice_marshaller_add_by_ref(SpiceMarshaller *m, const uint8_t *data, size_t size)
 {
-    return spice_marshaller_add_ref_full(m, data, size, NULL, NULL);
+    /* the cast to no-const here is safe as data is used for writing only if
+     * free_data pointer is not NULL
+     */
+    return spice_marshaller_add_by_ref_full(m, (uint8_t *) data, size, NULL, NULL);
 }
 
-void spice_marshaller_add_ref_chunks(SpiceMarshaller *m, SpiceChunks *chunks)
+void spice_marshaller_add_chunks_by_ref(SpiceMarshaller *m, SpiceChunks *chunks)
 {
     unsigned int i;
 
     for (i = 0; i < chunks->num_chunks; i++) {
-        spice_marshaller_add_ref(m, chunks->chunk[i].data,
-                                 chunks->chunk[i].len);
+        spice_marshaller_add_by_ref(m, chunks->chunk[i].data,
+                                    chunks->chunk[i].len);
     }
 }
 
@@ -612,4 +622,29 @@ void *spice_marshaller_add_int8(SpiceMarshaller *m, int8_t v)
     ptr = spice_marshaller_reserve_space(m, sizeof(int8_t));
     write_int8(ptr, v);
     return (void *)ptr;
+}
+
+void spice_marshaller_add_fd(SpiceMarshaller *m, int fd)
+{
+    spice_assert(m->has_fd == false);
+
+    m->has_fd = true;
+    if (fd != -1) {
+        m->fd = dup(fd);
+        if (m->fd == -1) {
+            perror("dup");
+        }
+    } else {
+        m->fd = -1;
+    }
+}
+
+bool spice_marshaller_get_fd(SpiceMarshaller *m, int *fd)
+{
+    bool had_fd = m->has_fd;
+
+    *fd = m->fd;
+    m->has_fd = false;
+
+    return had_fd;
 }

@@ -382,30 +382,23 @@ void lz_destroy(LzContext *lz)
 #endif
 
 
-#ifdef __GNUC__
-#define ATTR_PACKED __attribute__ ((__packed__))
-#else
-#define ATTR_PACKED
-#pragma pack(push)
-#pragma pack(1)
-#endif
-
+#include <spice/start-packed.h>
 
 /* the palette images will be treated as one byte pixels. Their width should be transformed
    accordingly.
 */
-typedef struct ATTR_PACKED one_byte_pixel_t {
+typedef struct SPICE_ATTR_PACKED one_byte_pixel_t {
     uint8_t a;
 } one_byte_pixel_t;
 
-typedef struct ATTR_PACKED rgb32_pixel_t {
+typedef struct SPICE_ATTR_PACKED rgb32_pixel_t {
     uint8_t b;
     uint8_t g;
     uint8_t r;
     uint8_t pad;
 } rgb32_pixel_t;
 
-typedef struct ATTR_PACKED rgb24_pixel_t {
+typedef struct SPICE_ATTR_PACKED rgb24_pixel_t {
     uint8_t b;
     uint8_t g;
     uint8_t r;
@@ -413,11 +406,7 @@ typedef struct ATTR_PACKED rgb24_pixel_t {
 
 typedef uint16_t rgb16_pixel_t;
 
-#ifndef __GNUC__
-#pragma pack(pop)
-#endif
-
-#undef ATTR_PACKED
+#include <spice/end-packed.h>
 
 
 #define MAX_COPY 32
@@ -647,6 +636,7 @@ void lz_decode(LzContext *lz, LzImageType to_type, uint8_t *buf)
             if (!encoder->palette) {
                 encoder->usr->error(encoder->usr,
                                     "a palette is missing (for bpp to rgb decoding)\n");
+                return;
             }
             switch (encoder->type) {
             case LZ_IMAGE_TYPE_PLT1_BE:

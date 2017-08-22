@@ -63,7 +63,7 @@ class FixedSize:
 propagated_attributes=["ptr_array", "nonnull", "chunk"]
 
 valid_attributes=set([
-    # embedded/appended at the end of the structure
+    # embedded/appended at the end of the resulting C structure
     'end',
     # the C structure contains a pointer to data
     # for instance we want to write an array to an allocated array
@@ -139,7 +139,7 @@ def fix_attributes(attribute_list):
 class Type:
     def __init__(self):
         self.attributes = {}
-        self.registred = False
+        self.registered = False
         self.name = None
 
     def has_name(self):
@@ -196,9 +196,9 @@ class Type:
         return self
 
     def register(self):
-        if self.registred or self.name == None:
+        if self.registered or self.name == None:
             return
-        self.registred = True
+        self.registered = True
         if self.name in _types_by_name:
             raise Exception("Type %s already defined" % self.name)
         _types.append(self)
@@ -223,7 +223,7 @@ class TypeRef(Type):
         return _types_by_name[self.name]
 
     def register(self):
-        assert True, "Can't register TypeRef!"
+        assert False, "Can't register TypeRef!"
 
 
 class IntegerType(Type):
@@ -686,6 +686,7 @@ class SwitchCase:
             if v == None:
                 return "1"
             elif var_type.is_enum():
+                assert v[0] == "", "Negation of enumeration in switch is not supported"
                 checks.append("%s == %s" % (var_cname, var_type.c_enumname_by_name(v[1])))
             else:
                 checks.append("%s(%s & %s)" % (v[0], var_cname, var_type.c_enumname_by_name(v[1])))
@@ -1119,6 +1120,14 @@ class ProtocolType(Type):
 
         return self
 
+class FdType(IntegerType):
+    def __init__(self):
+        IntegerType.__init__(self, 0, False)
+        self.name = "fd"
+
+    def c_type(self):
+        return "int"
+
 int8 = IntegerType(8, True)
 uint8 = IntegerType(8, False)
 int16 = IntegerType(16, True)
@@ -1127,3 +1136,4 @@ int32 = IntegerType(32, True)
 uint32 = IntegerType(32, False)
 int64 = IntegerType(64, True)
 uint64 = IntegerType(64, False)
+unix_fd = FdType()

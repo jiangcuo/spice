@@ -1083,8 +1083,8 @@ favourite operating system so you can use it for installation.</p></div>
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>host$ sudo qemu-kvm -boot <span style="color: #009900">order</span><span style="color: #990000">=</span>dc -vga qxl <span style="color: #990000">\</span>
-        -spice <span style="color: #009900">port</span><span style="color: #990000">=</span><span style="color: #993399">3001</span><span style="color: #990000">,</span>disable-ticketing -soundhw ac97 <span style="color: #990000">\</span>
+<pre><tt>host$ qemu-kvm -boot <span style="color: #009900">order</span><span style="color: #990000">=</span>dc -vga qxl <span style="color: #990000">\</span>
+        -spice <span style="color: #009900">port</span><span style="color: #990000">=</span><span style="color: #993399">3001</span><span style="color: #990000">,</span>disable-ticketing -soundhw hda <span style="color: #990000">\</span>
         -device virtio-serial -chardev spicevmc<span style="color: #990000">,</span><span style="color: #009900">id</span><span style="color: #990000">=</span>vdagent<span style="color: #990000">,</span><span style="color: #009900">debug</span><span style="color: #990000">=</span><span style="color: #993399">0</span><span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>vdagent <span style="color: #990000">\</span>
         -device virtserialport<span style="color: #990000">,</span><span style="color: #009900">chardev</span><span style="color: #990000">=</span>vdagent<span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>com<span style="color: #990000">.</span>redhat<span style="color: #990000">.</span>spice<span style="color: #990000">.</span><span style="color: #993399">0</span> <span style="color: #990000">\</span>
         -cdrom /path/to/your<span style="color: #990000">.</span>iso /path/to/your<span style="color: #990000">.</span>img</tt></pre></div></div>
@@ -1096,6 +1096,11 @@ specifies that qemu uses a qxl graphics device.</p></div>
 communication with the client. The Spice option <code>disable-ticketing</code> is
 specifying that ticketing (simple authentication method) is not
 used. The virtio and chardev devices are required by the guest agent.</p></div>
+<div class="paragraph"><p>The <code>-soundhw hda</code> option provides an audio device for the guest to use for
+audio playback and recording. In order for spice audio to work properly, qemu
+must use the <em>spice</em> audio driver. Depending on how qemu was built, however,
+this might not be the default audio driver. To ensure qemu uses the spice audio
+driver, you can set the environment variable <code>QEMU_AUDIO_DRV=spice</code>.</p></div>
 </div>
 <div class="sect2">
 <h3 id="_basic_configuration">Basic configuration</h3>
@@ -1186,12 +1191,6 @@ by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt>client$ remote-viewer spice<span style="color: #990000">:</span>//myhost<span style="color: #990000">:</span><span style="color: #993399">3001</span></tt></pre></div></div>
-<div class="imageblock">
-<div class="content">
-<img src="images/spicec01.png" alt="images/spicec01.png" />
-</div>
-<div class="title">Figure 1. Established connection to Windows 2008 guest</div>
-</div>
 </div>
 </div>
 </div>
@@ -1375,15 +1374,8 @@ remote-viewer, you can select which USB devices to redirect in
 "File/USB device" selection once the Spice connection is
 established. There are also various command line redirection options
 which are described when running remote-viewer with <code>--help-spice</code>.</p></div>
-<div class="admonitionblock">
-<table><tr>
-<td class="icon">
-<img src="./images/icons/note.png" alt="Note" />
-</td>
-<td class="content">You may need additional services running in the client, such as the
-Spice USB Clerk service on Windows.</td>
-</tr></table>
-</div>
+<div class="paragraph"><p>To get USB redirection working on Windows clients, you need to install
+<a href="http://www.spice-space.org/download/windows/usbdk/">UsbDk</a></p></div>
 </div>
 </div>
 </div>
@@ -1421,7 +1413,7 @@ name "smartcard":</p></div>
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>-device usb-ccid -chardev spicevmc<span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>smartcard -device ccid-card-passthru<span style="color: #990000">,</span><span style="color: #009900">chardev</span><span style="color: #990000">=</span>ccid</tt></pre></div></div>
+<pre><tt>-device usb-ccid -chardev spicevmc<span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>smartcard<span style="color: #990000">,</span><span style="color: #009900">id</span><span style="color: #990000">=</span>ccid -device ccid-card-passthru<span style="color: #990000">,</span><span style="color: #009900">chardev</span><span style="color: #990000">=</span>ccid</tt></pre></div></div>
 </div>
 <div class="sect2">
 <h3 id="_client_3">Client</h3>
@@ -1494,9 +1486,8 @@ http://www.gnu.org/software/src-highlite -->
 </div>
 <div class="sect2">
 <h3 id="_client_4">Client</h3>
-<div class="paragraph"><p>You can enable additional displays either from the "Display/Displays"
-menu in remote-viewer, or from your guest OS display configuration
-tool.</p></div>
+<div class="paragraph"><p>You can enable additional displays from the "View &#8594; Displays"
+menu in remote-viewer.</p></div>
 </div>
 </div>
 </div>
@@ -1700,10 +1691,11 @@ ticket was passed to the client.</p></div>
 <div class="sect1">
 <h2 id="_folder_sharing">Folder sharing</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>The Spice client can share a folder with the remote guest. By default,
-the client will share the XDG Public Share directory (ie <em>~/Public</em> if
-you use a regular system).  You may specify a different folder with
-<code>--spice-share-dir</code> client option.</p></div>
+<div class="paragraph"><p>The Spice client can share a folder with the remote guest. By default folder
+sharing is disabled. Use the remote-viewer "File" &#8594; "Preferences" menu
+to enable it. The default shared directory is the XDG Public Share directory
+(ie <em>~/Public</em> if you use a regular system). You may specify a different folder
+with <code>--spice-share-dir</code> client option.</p></div>
 <div class="sect2">
 <h3 id="_configuration_8">Configuration</h3>
 <div class="paragraph"><div class="title">Using virt-manager</div><p>In the hardware details, click on "Add Hardware", then select
@@ -1736,14 +1728,79 @@ http://www.gnu.org/software/src-highlite -->
 <div class="sect2">
 <h3 id="_guest_configuration">Guest configuration</h3>
 <div class="paragraph"><div class="title">Windows</div><p>In a Windows guest, you must then install
-<a href="http://elmarco.fedorapeople.org/spice-webdavd-x86-0.1.24.msi">spice-webdavd</a>
-service, and register the drive (by running <em>map-drive.bat</em> from
-<em>Program Files/Spice webdav</em>).</p></div>
+<a href="https://www.spice-space.org/download/windows/spice-webdavd/">spice-webdavd</a>
+service.</p></div>
 <div class="paragraph"><div class="title">Linux</div><p>With a Linux guest, you must install the spice-webdavd service (the
 sources are available at <a href="https://git.gnome.org/browse/phodav">https://git.gnome.org/browse/phodav</a>). The
 folder will show up in GNOME Files network places (or Nautilus). It
 can then be mounted and browsed in traditional applications thanks to
 <code>gvfs-fuse</code>.</p></div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_gl_acceleration_virgl">GL acceleration (virgl)</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>OpenGL acceleration is currently local only (it has to go through a Unix socket)
+and it needs guest support. It&#8217;s currently limited to recent linux
+distributions (for example Fedora 24).</p></div>
+<div class="paragraph"><p>Host-side, you need qemu 2.6, libvirt 1.3.3 and spice 0.13.1, as well as a 4.4
+Linux kernel and Mesa 11.1.</p></div>
+<div class="paragraph"><p>Client-side, you need spice-gtk 0.31.</p></div>
+<div class="paragraph"><p>Guest-side, you need Mesa 11.1 and a 4.4 Linux kernel.</p></div>
+<div class="sect2">
+<h3 id="_configuration_9">Configuration</h3>
+<div class="paragraph"><div class="title">Using libvirt</div><p>You need to add a virtio-gpu video device to your virtual machine instead of QXL.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #0000FF">&lt;video&gt;</span></span>
+  <span style="font-weight: bold"><span style="color: #0000FF">&lt;model</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'virtio'</span> <span style="color: #009900">heads</span><span style="color: #990000">=</span><span style="color: #FF0000">'1'</span><span style="font-weight: bold"><span style="color: #0000FF">&gt;</span></span>
+    <span style="font-weight: bold"><span style="color: #0000FF">&lt;acceleration</span></span> <span style="color: #009900">accel3d</span><span style="color: #990000">=</span><span style="color: #FF0000">'yes'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
+  <span style="font-weight: bold"><span style="color: #0000FF">&lt;/model&gt;</span></span>
+<span style="font-weight: bold"><span style="color: #0000FF">&lt;/video&gt;</span></span></tt></pre></div></div>
+<div class="paragraph"><p>Then you need to enable OpenGL on your SPICE graphics node:</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #0000FF">&lt;graphics</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'spice'</span> <span style="color: #009900">autoport</span><span style="color: #990000">=</span><span style="color: #FF0000">'no'</span><span style="font-weight: bold"><span style="color: #0000FF">&gt;</span></span>
+  <span style="font-weight: bold"><span style="color: #0000FF">&lt;gl</span></span> <span style="color: #009900">enable</span><span style="color: #990000">=</span><span style="color: #FF0000">'yes'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
+<span style="font-weight: bold"><span style="color: #0000FF">&lt;/graphics&gt;</span></span></tt></pre></div></div>
+<div class="paragraph"><p>You don&#8217;t need any port/address as they won&#8217;t be usable with
+GL.</p></div>
+<div class="paragraph"><div class="title">Using QEMU</div><p>You need to add a virtio-gpu device on QEMU command line,
+as well as enable GL with SPICE. port/tls-port/addr arguments
+won&#8217;t be used in this setup. You need to configure a Unix socket to
+connect to the VM display.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>-device virtio-vga<span style="color: #990000">,</span><span style="color: #009900">virgl</span><span style="color: #990000">=</span>on -spice <span style="color: #009900">gl</span><span style="color: #990000">=</span>on<span style="color: #990000">,</span>unix<span style="color: #990000">,</span><span style="color: #009900">addr</span><span style="color: #990000">=</span>/run/user<span style="color: #990000">/</span><span style="color: #993399">1000</span>/spice<span style="color: #990000">.</span>sock</tt></pre></div></div>
+</div>
+<div class="sect2">
+<h3 id="_connecting_to_the_guest_2">Connecting to the guest</h3>
+<div class="paragraph"><p>Connecting to the guest when virgl is in use is slightly different
+than usual</p></div>
+<div class="listingblock">
+<div class="title">If libvirt is being used</div>
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>client$ virt-viewer -a <span style="color: #009900">$vmname</span></tt></pre></div></div>
+<div class="listingblock">
+<div class="title">If a Unix socket has been set on QEMU command line</div>
+<div class="content"><!-- Generator: GNU source-highlight 3.1.8
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>client$ remote-viewer spice<span style="color: #990000">+</span>unix<span style="color: #990000">:</span>///run/user<span style="color: #990000">/</span><span style="color: #993399">1000</span>/spice<span style="color: #990000">.</span>sock</tt></pre></div></div>
 </div>
 </div>
 </div>
@@ -1866,8 +1923,6 @@ well as a Spice spicevmc channel.</p></div>
 <div class="paragraph"><p>The recommended way of getting all the needed drivers installed is to
 use the all-in-one Spice guest tools installer which can be found on
 <a href="http://spice-space.org/download/windows/spice-guest-tools/">spice-space.org</a>.</p></div>
-<div class="paragraph"><p>To get USB redirection working on Windows, you need to install USB
-Clerk (TODO: add link)</p></div>
 <div class="paragraph"><p>If you want to manually install them, the QXL driver can be downloaded
 from <a href="http://spice-space.org/download/windows/qxl/">this location</a> ,
 agent builds can be found
@@ -2015,9 +2070,8 @@ logs for the QXL kms driver. This can also be changed at runtime by echo&#8217;i
 this value to <code>/sys/module/drm/parameters/debug</code>.</p></div>
 <div class="paragraph"><div class="title">qxl.guestdebug QEMU parameter</div><p>It&#8217;s also possible to get some host-side debugging logs from the guest QXL driver.
 The driver reads a guestdebug parameter from the rom, which can be set when starting
-the VM. Only the Windows QXL driver is using this feature, see <code>qxl.cmdlog</code> for
-something guest-agnostic.  This can be enabled with <code>-global
-qxl-vga.guestdebug=3</code>, or <code>-global qxl.guestdebug=3</code> for secondary devices.</p></div>
+the VM. This can be enabled with <code>-global qxl-vga.guestdebug=3</code>, or <code>-global
+qxl.guestdebug=3</code> for secondary devices.</p></div>
 <div class="paragraph"><p>The corresponding libvirt XML is:</p></div>
 <div class="listingblock">
 <div class="content"><!-- Generator: GNU source-highlight 3.1.8
@@ -2032,7 +2086,7 @@ http://www.gnu.org/software/src-highlite -->
   <span style="font-weight: bold"><span style="color: #0000FF">&lt;/qemu:commandline&gt;</span></span>
 <span style="font-weight: bold"><span style="color: #0000FF">&lt;/domain&gt;</span></span></tt></pre></div></div>
 <div class="paragraph"><p>(don&#8217;t forget to add the
-xmlns:qemu=<em>http://libvirt.org/schemas/domain/qemu/1.0</em> attribute to the
+<code>xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'</code> attribute to the
 toplevel <code>&lt;domain&gt;</code> node)</p></div>
 <div class="paragraph"><p>You can go up to 12 (or more, look for DEBUG_PRINT in the driver), you get really a lot of debug information. Interesting values are:</p></div>
 <div class="ulist"><ul>
@@ -2048,7 +2102,7 @@ toplevel <code>&lt;domain&gt;</code> node)</p></div>
 </li>
 <li>
 <p>
-11 - will show caching of images (this is a driver cache, not to be confused with the server&lt;&#8594;client shared cache).
+11 - will show caching of images (this is a driver cache, not to be confused with the cache shared between server and client).
 </p>
 </li>
 </ul></div>
@@ -2060,6 +2114,8 @@ See the section above for the libvirt XML to use.</p></div>
 <h4 id="_agent">Agent</h4>
 <div class="paragraph"><p>On Linux, <code>journalctl -t spice-vdagentd -t spice-vdagent</code> will display the agent log messages.
 spice-vdagent can also be restarted by hand with the <code>-d</code> argument in order to display more logs.</p></div>
+<div class="paragraph"><p>On Windows, the agent logs can be found in <code>C:\WINDOWS\TEMP\VDAGENT.LOG</code> and
+<code>C:\WINDOWS\TEMP\VDSERVICE.LOG</code></p></div>
 </div>
 </div>
 <div class="sect2">
@@ -2126,7 +2182,7 @@ Client is referring to a system running the Spice client (the recommended one is
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-07-13 13:56:56 CEST
+Last updated 2017-07-17 09:05:39 CEST
 </div>
 </div>
 </body>

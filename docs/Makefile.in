@@ -89,9 +89,10 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = docs
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+am__aclocal_m4_deps = $(top_srcdir)/m4/ax_valgrind_check.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 \
 	$(top_srcdir)/m4/manywarnings.m4 \
 	$(top_srcdir)/m4/spice-compile-warnings.m4 \
 	$(top_srcdir)/m4/virt-linker-no-indirect.m4 \
@@ -217,11 +218,23 @@ ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
+ENABLE_VALGRIND_drd = @ENABLE_VALGRIND_drd@
+ENABLE_VALGRIND_helgrind = @ENABLE_VALGRIND_helgrind@
+ENABLE_VALGRIND_memcheck = @ENABLE_VALGRIND_memcheck@
+ENABLE_VALGRIND_sgcheck = @ENABLE_VALGRIND_sgcheck@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GLIB2_CFLAGS = @GLIB2_CFLAGS@
 GLIB2_LIBS = @GLIB2_LIBS@
+GOBJECT2_CFLAGS = @GOBJECT2_CFLAGS@
+GOBJECT2_LIBS = @GOBJECT2_LIBS@
 GREP = @GREP@
+GSTREAMER_0_10_CFLAGS = @GSTREAMER_0_10_CFLAGS@
+GSTREAMER_0_10_LIBS = @GSTREAMER_0_10_LIBS@
+GSTREAMER_1_0_CFLAGS = @GSTREAMER_1_0_CFLAGS@
+GSTREAMER_1_0_LIBS = @GSTREAMER_1_0_LIBS@
+GST_INSPECT_0_10 = @GST_INSPECT_0_10@
+GST_INSPECT_1_0 = @GST_INSPECT_1_0@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -265,7 +278,6 @@ PIXMAN_LIBS = @PIXMAN_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON = @PYTHON@
 RANLIB = @RANLIB@
 RELRO_LDFLAGS = @RELRO_LDFLAGS@
 SASL_CFLAGS = @SASL_CFLAGS@
@@ -286,6 +298,8 @@ SPICE_SERVER_VERSION = @SPICE_SERVER_VERSION@
 SSL_CFLAGS = @SSL_CFLAGS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+VALGRIND = @VALGRIND@
+VALGRIND_ENABLED = @VALGRIND_ENABLED@
 VERSION = @VERSION@
 VISIBILITY_HIDDEN_CFLAGS = @VISIBILITY_HIDDEN_CFLAGS@
 WARN_CFLAGS = @WARN_CFLAGS@
@@ -345,6 +359,15 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+valgrind_enabled_tools = @valgrind_enabled_tools@
+valgrind_tools = @valgrind_tools@
+NULL = 
+ASCIIDOC_FLAGS = -a icons -a toc
+EXTRA_DIST = \
+	spice_style.html			\
+	spice_style.txt				\
+	$(NULL)
+
 @BUILD_MANUAL_TRUE@SUBDIRS = manual
 all: all-recursive
 
@@ -541,7 +564,8 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-recursive
-all-am: Makefile
+@BUILD_MANUAL_FALSE@all-local:
+all-am: Makefile all-local
 installdirs: installdirs-recursive
 installdirs-am:
 install: install-recursive
@@ -576,7 +600,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-recursive
 
-clean-am: clean-generic clean-libtool mostlyclean-am
+clean-am: clean-generic clean-libtool clean-local mostlyclean-am
 
 distclean: distclean-recursive
 	-rm -f Makefile
@@ -642,21 +666,30 @@ uninstall-am:
 
 .MAKE: $(am__recursive_targets) install-am install-strip
 
-.PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am check \
-	check-am clean clean-generic clean-libtool cscopelist-am ctags \
-	ctags-am distclean distclean-generic distclean-libtool \
-	distclean-tags distdir dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	installdirs-am maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
-	ps ps-am tags tags-am uninstall uninstall-am
+.PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am all-local \
+	check check-am clean clean-generic clean-libtool clean-local \
+	cscopelist-am ctags ctags-am distclean distclean-generic \
+	distclean-libtool distclean-tags distdir dvi dvi-am html \
+	html-am info info-am install install-am install-data \
+	install-data-am install-dvi install-dvi-am install-exec \
+	install-exec-am install-html install-html-am install-info \
+	install-info-am install-man install-pdf install-pdf-am \
+	install-ps install-ps-am install-strip installcheck \
+	installcheck-am installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-am uninstall \
+	uninstall-am
 
 .PRECIOUS: Makefile
 
+
+@BUILD_MANUAL_TRUE@all-local: spice_style.html
+
+@BUILD_MANUAL_TRUE@spice_style.html: spice_style.txt
+@BUILD_MANUAL_TRUE@	$(AM_V_GEN) $(ASCIIDOC) -n $(ASCIIDOC_FLAGS) -o $@ $<
+
+clean-local:
+	rm -f spice_style.html
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -19,8 +19,8 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#include <common/messages.h>
-#include <client_marshallers.h>
+#include "common/messages.h"
+#include "client_marshallers.h"
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>

@@ -1,22 +1,28 @@
 NULL =
 SUBDIRS = . tests
 
+check-valgrind:
+	$(MAKE) -C tests check-valgrind
+
 AM_CPPFLAGS =					\
 	-DSPICE_SERVER_INTERNAL			\
-	-DRED_STATISTICS			\
 	$(COMMON_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
+	$(GOBJECT2_CFLAGS)			\
 	$(LZ4_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
 	$(SASL_CFLAGS)				\
 	$(SLIRP_CFLAGS)				\
 	$(SMARTCARD_CFLAGS)			\
+	$(GSTREAMER_0_10_CFLAGS)		\
+	$(GSTREAMER_1_0_CFLAGS)			\
 	$(SPICE_PROTOCOL_CFLAGS)		\
 	$(SSL_CFLAGS)				\
 	$(VISIBILITY_HIDDEN_CFLAGS)		\
 	$(WARN_CFLAGS)				\
 	$(NULL)
 
+noinst_LTLIBRARIES = libserver.la
 lib_LTLIBRARIES = libspice-server.la
 
 libspice_server_la_LDFLAGS =			\
@@ -31,17 +37,20 @@ libspice_server_la_LDFLAGS += \
 	-Wl,--version-script=$(top_srcdir)/server/spice-server.syms
 endif
 
-libspice_server_la_LIBADD =						\
+libserver_la_LIBADD =							\
 	$(top_builddir)/spice-common/common/libspice-common.la		\
 	$(top_builddir)/spice-common/common/libspice-common-server.la	\
 	$(GL_LIBS)							\
 	$(GLIB2_LIBS)							\
+	$(GOBJECT2_LIBS)						\
 	$(JPEG_LIBS)							\
 	$(LZ4_LIBS)							\
 	$(LIBRT)							\
 	$(PIXMAN_LIBS)							\
 	$(SASL_LIBS)							\
 	$(SLIRP_LIBS)							\
+	$(GSTREAMER_0_10_LIBS)						\
+	$(GSTREAMER_1_0_LIBS)						\
 	$(SSL_LIBS)							\
 	$(Z_LIBS)							\
 	$(SPICE_NONPKGCONFIG_LIBS)					\
@@ -58,96 +67,152 @@ libspice_serverinclude_HEADERS =		\
 	spice-qxl.h				\
 	spice-server.h				\
 	spice-version.h				\
+	spice-replay.h				\
 	spice.h					\
 	$(NULL)
 
-libspice_server_la_SOURCES =			\
+spice_built_sources = spice-server-enums.h spice-server-enums.c
+
+libserver_la_SOURCES =				\
 	$(libspice_serverinclude_HEADERS)	\
+	$(spice_built_sources)			\
 	agent-msg-filter.c			\
 	agent-msg-filter.h			\
-	char_device.c				\
-	char_device.h				\
+	cache-item.h				\
+	char-device.c				\
+	char-device.h				\
+	common-graphics-channel.c		\
+	common-graphics-channel.h		\
+	cursor-channel.c			\
+	cursor-channel-client.c			\
+	cursor-channel-client.h			\
+	cursor-channel.h			\
+	dcc.c					\
+	dcc.h					\
+	dcc-private.h				\
+	dcc-send.c				\
 	demarshallers.h				\
-	glz_encoder.c				\
-	glz_encoder.h				\
-	glz_encoder_config.h			\
-	glz_encoder_dictionary.c		\
-	glz_encoder_dictionary.h		\
-	glz_encoder_dictionary_protected.h	\
-	inputs_channel.c			\
-	inputs_channel.h			\
-	jpeg_encoder.c				\
-	jpeg_encoder.h				\
-	lz4_encoder.c				\
-	lz4_encoder.h				\
-	main_channel.c				\
-	main_channel.h				\
-	mjpeg_encoder.c				\
-	mjpeg_encoder.h				\
-	red_bitmap_utils.h			\
-	red_channel.c				\
-	red_channel.h				\
-	red_client_cache.h			\
-	red_client_shared_cache.h		\
-	red_common.h				\
 	dispatcher.c				\
 	dispatcher.h				\
-	red_dispatcher.c			\
-	red_dispatcher.h			\
-	main_dispatcher.c			\
-	main_dispatcher.h			\
-	migration_protocol.h		\
-	red_memslots.c				\
-	red_memslots.h				\
-	red_parse_qxl.c				\
-	red_record_qxl.c			\
-	red_record_qxl.h			\
-	red_replay_qxl.c			\
-	red_replay_qxl.h			\
-	red_parse_qxl.h				\
-	red_time.h				\
-	red_worker.c				\
-	red_worker.h				\
+	display-channel.c			\
+	display-channel.h			\
+	display-channel-private.h		\
+	display-limits.h			\
+	event-loop.c				\
+	glib-compat.h				\
+	glz-encoder.c				\
+	glz-encoder-dict.c			\
+	glz-encoder-dict.h			\
+	glz-encoder.h				\
+	glz-encoder-priv.h			\
+	image-cache.c				\
+	image-cache.h				\
+	image-encoders.c			\
+	image-encoders.h			\
+	inputs-channel.c			\
+	inputs-channel-client.c			\
+	inputs-channel-client.h			\
+	inputs-channel.h			\
+	jpeg-encoder.c				\
+	jpeg-encoder.h				\
+	main-channel.c				\
+	main-channel-client.c			\
+	main-channel-client.h			\
+	main-channel.h				\
+	main-dispatcher.c			\
+	main-dispatcher.h			\
+	memslot.c				\
+	memslot.h				\
+	migration-protocol.h			\
+	mjpeg-encoder.c				\
+	net-utils.c				\
+	net-utils.h				\
+	pixmap-cache.c				\
+	pixmap-cache.h				\
+	red-channel.c				\
+	red-channel-capabilities.c		\
+	red-channel-capabilities.h		\
+	red-channel-client.c			\
+	red-channel-client.h			\
+	red-channel.h				\
+	red-client.c				\
+	red-client.h				\
+	red-common.h				\
+	red-parse-qxl.c				\
+	red-parse-qxl.h				\
+	red-pipe-item.c				\
+	red-pipe-item.h				\
+	red-qxl.c				\
+	red-qxl.h				\
+	red-record-qxl.c			\
+	red-record-qxl.h			\
+	red-replay-qxl.c			\
 	reds.c					\
 	reds.h					\
 	reds-private.h				\
-	reds_stream.c				\
-	reds_stream.h				\
-	reds_sw_canvas.c			\
-	reds_sw_canvas.h			\
-	snd_worker.c				\
-	snd_worker.h				\
-	stat.h					\
+	reds-stream.c				\
+	reds-stream.h				\
+	red-worker.c				\
+	red-worker.h				\
+	sound.c					\
+	sound.h					\
+	spice-bitmap-utils.c			\
+	spice-bitmap-utils.h			\
 	spicevmc.c				\
-	spice_timer_queue.c			\
-	spice_timer_queue.h			\
-	zlib_encoder.c				\
-	zlib_encoder.h				\
-	spice_bitmap_utils.h		\
-	spice_bitmap_utils.c		\
-	spice_server_utils.h		\
-	spice_image_cache.h			\
-	spice_image_cache.c			\
+	stat-file.c				\
+	stat-file.h				\
+	stat.h					\
+	stream.c				\
+	stream.h				\
+	sw-canvas.c				\
+	tree.c					\
+	tree.h					\
+	utils.c					\
+	utils.h					\
+	video-encoder.h				\
+	zlib-encoder.c				\
+	zlib-encoder.h				\
 	$(NULL)
 
-if HAVE_GL
-libspice_server_la_SOURCES +=	\
-	reds_gl_canvas.c	\
-	reds_gl_canvas.h	\
+if HAVE_LZ4
+libserver_la_SOURCES +=				\
+	lz4-encoder.c				\
+	lz4-encoder.h				\
 	$(NULL)
 endif
 
 if HAVE_SMARTCARD
-libspice_server_la_SOURCES +=	\
-	smartcard.c		\
-	smartcard.h		\
+libserver_la_SOURCES +=			\
+	smartcard.c			\
+	smartcard.h			\
+	smartcard-channel-client.c	\
+	smartcard-channel-client.h	\
 	$(NULL)
 endif
 
+if HAVE_GSTREAMER
+libserver_la_SOURCES +=			\
+	gstreamer-encoder.c		\
+	$(NULL)
+endif
+
+libspice_server_la_LIBADD = libserver.la
+libspice_server_la_SOURCES =
+
+spice-server-enums.c: spice-server.h spice-server-enums.tmpl.c
+	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.tmpl.c $< > $@
+
+spice-server-enums.h: spice-server.h spice-server-enums.tmpl.h
+	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.tmpl.h $< > $@
+
 EXTRA_DIST =					\
-	glz_encode_match_tmpl.c			\
-	glz_encode_tmpl.c			\
+	spice-bitmap-utils.tmpl.c		\
+	cache-item.tmpl.c			\
+	glz-encode-match.tmpl.c			\
+	glz-encode.tmpl.c			\
 	spice-server.syms			\
+	spice-server-enums.tmpl.h		\
+	spice-server-enums.tmpl.c		\
 	$(NULL)
 
 BUILT_SOURCES = $(spice_built_sources)

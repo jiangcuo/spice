@@ -90,9 +90,10 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+am__aclocal_m4_deps = $(top_srcdir)/m4/ax_valgrind_check.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 \
 	$(top_srcdir)/m4/manywarnings.m4 \
 	$(top_srcdir)/m4/spice-compile-warnings.m4 \
 	$(top_srcdir)/m4/virt-linker-no-indirect.m4 \
@@ -271,11 +272,23 @@ ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
+ENABLE_VALGRIND_drd = @ENABLE_VALGRIND_drd@
+ENABLE_VALGRIND_helgrind = @ENABLE_VALGRIND_helgrind@
+ENABLE_VALGRIND_memcheck = @ENABLE_VALGRIND_memcheck@
+ENABLE_VALGRIND_sgcheck = @ENABLE_VALGRIND_sgcheck@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GLIB2_CFLAGS = @GLIB2_CFLAGS@
 GLIB2_LIBS = @GLIB2_LIBS@
+GOBJECT2_CFLAGS = @GOBJECT2_CFLAGS@
+GOBJECT2_LIBS = @GOBJECT2_LIBS@
 GREP = @GREP@
+GSTREAMER_0_10_CFLAGS = @GSTREAMER_0_10_CFLAGS@
+GSTREAMER_0_10_LIBS = @GSTREAMER_0_10_LIBS@
+GSTREAMER_1_0_CFLAGS = @GSTREAMER_1_0_CFLAGS@
+GSTREAMER_1_0_LIBS = @GSTREAMER_1_0_LIBS@
+GST_INSPECT_0_10 = @GST_INSPECT_0_10@
+GST_INSPECT_1_0 = @GST_INSPECT_1_0@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -319,7 +332,6 @@ PIXMAN_LIBS = @PIXMAN_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON = @PYTHON@
 RANLIB = @RANLIB@
 RELRO_LDFLAGS = @RELRO_LDFLAGS@
 SASL_CFLAGS = @SASL_CFLAGS@
@@ -340,6 +352,8 @@ SPICE_SERVER_VERSION = @SPICE_SERVER_VERSION@
 SSL_CFLAGS = @SSL_CFLAGS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+VALGRIND = @VALGRIND@
+VALGRIND_ENABLED = @VALGRIND_ENABLED@
 VERSION = @VERSION@
 VISIBILITY_HIDDEN_CFLAGS = @VISIBILITY_HIDDEN_CFLAGS@
 WARN_CFLAGS = @WARN_CFLAGS@
@@ -399,14 +413,15 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+valgrind_enabled_tools = @valgrind_enabled_tools@
+valgrind_tools = @valgrind_tools@
 NULL = 
 ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = spice-common server docs
+SUBDIRS = spice-common server docs tools
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = spice-server.pc
 DISTCHECK_CONFIGURE_FLAGS = \
 	--enable-automated-tests		\
-	--enable-opengl				\
 	--enable-smartcard			\
 	--with-sasl				\
 	--enable-manual				\
@@ -677,7 +692,7 @@ distdir: $(DISTFILES)
 	  ! -type d ! -perm -444 -exec $(install_sh) -c -m a+r {} {} \; \
 	|| chmod -R a+r "$(distdir)"
 dist-gzip: distdir
-	tardir=$(distdir) && $(am__tar) | GZIP=$(GZIP_ENV) gzip -c >$(distdir).tar.gz
+	tardir=$(distdir) && $(am__tar) | eval GZIP= gzip $(GZIP_ENV) -c >$(distdir).tar.gz
 	$(am__post_remove_distdir)
 dist-bzip2: distdir
 	tardir=$(distdir) && $(am__tar) | BZIP2=$${BZIP2--9} bzip2 -c >$(distdir).tar.bz2
@@ -702,7 +717,7 @@ dist-shar: distdir
 	@echo WARNING: "Support for shar distribution archives is" \
 	               "deprecated." >&2
 	@echo WARNING: "It will be removed altogether in Automake 2.0" >&2
-	shar $(distdir) | GZIP=$(GZIP_ENV) gzip -c >$(distdir).shar.gz
+	shar $(distdir) | eval GZIP= gzip $(GZIP_ENV) -c >$(distdir).shar.gz
 	$(am__post_remove_distdir)
 
 dist-zip: distdir
@@ -720,7 +735,7 @@ dist dist-all:
 distcheck: dist
 	case '$(DIST_ARCHIVES)' in \
 	*.tar.gz*) \
-	  GZIP=$(GZIP_ENV) gzip -dc $(distdir).tar.gz | $(am__untar) ;;\
+	  eval GZIP= gzip $(GZIP_ENV) -dc $(distdir).tar.gz | $(am__untar) ;;\
 	*.tar.bz2*) \
 	  bzip2 -dc $(distdir).tar.bz2 | $(am__untar) ;;\
 	*.tar.lz*) \
@@ -730,7 +745,7 @@ distcheck: dist
 	*.tar.Z*) \
 	  uncompress -c $(distdir).tar.Z | $(am__untar) ;;\
 	*.shar.gz*) \
-	  GZIP=$(GZIP_ENV) gzip -dc $(distdir).shar.gz | unshar ;;\
+	  eval GZIP= gzip $(GZIP_ENV) -dc $(distdir).shar.gz | unshar ;;\
 	*.zip*) \
 	  unzip $(distdir).zip ;;\
 	esac
@@ -933,6 +948,9 @@ uninstall-am: uninstall-pkgconfigDATA
 
 .PRECIOUS: Makefile
 
+
+check-valgrind:
+	$(MAKE) -C server check-valgrind
 
 # Generate the ChangeLog file (with all entries since the switch to git)
 # and insert it into the directory we're about to use to create a tarball.

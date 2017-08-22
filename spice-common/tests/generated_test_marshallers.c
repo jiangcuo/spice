@@ -19,7 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#include <test-marshallers.h>
+#include "test-marshallers.h"
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>

@@ -173,13 +173,13 @@ struct Encoder {
 };
 
 /* target wait mask index */
-static int wmimax = DEFwmimax;
+static const int wmimax = DEFwmimax;
 
 /* number of symbols to encode before increasing wait mask index */
-static int wminext = DEFwminext;
+static const int wminext = DEFwminext;
 
 /* model evolution mode */
-static int evol = DEFevol;
+static const int evol = DEFevol;
 
 /* bppmask[i] contains i ones as lsb-s */
 static const unsigned long int bppmask[33] = {
@@ -194,16 +194,7 @@ static const unsigned long int bppmask[33] = {
     0x1fffffff, 0x3fffffff, 0x7fffffff, 0xffffffff /* [32] */
 };
 
-static const unsigned int bitat[32] = {
-    0x00000001, 0x00000002, 0x00000004, 0x00000008,
-    0x00000010, 0x00000020, 0x00000040, 0x00000080,
-    0x00000100, 0x00000200, 0x00000400, 0x00000800,
-    0x00001000, 0x00002000, 0x00004000, 0x00008000,
-    0x00010000, 0x00020000, 0x00040000, 0x00080000,
-    0x00100000, 0x00200000, 0x00400000, 0x00800000,
-    0x01000000, 0x02000000, 0x04000000, 0x08000000,
-    0x10000000, 0x20000000, 0x40000000, 0x80000000 /* [31]*/
-};
+#define bitat(n) (1u<<(n))
 
 
 #define TABRAND_TABSIZE 256
@@ -371,7 +362,7 @@ static void golomb_coding_slow(QuicFamily *family, const BYTE n, const unsigned 
                                unsigned int * const codewordlen)
 {
     if (n < family->nGRcodewords[l]) {
-        (*codeword) = bitat[l] | (n & bppmask[l]);
+        (*codeword) = bitat(l) | (n & bppmask[l]);
         (*codewordlen) = (n >> l) + l + 1;
     } else {
         (*codeword) = n - family->nGRcodewords[l];
@@ -394,9 +385,9 @@ static void family_init(QuicFamily *family, int bpc, int limit)
         altcodewords = bppmask[bpc] + 1 - (altprefixlen << l);
 
         family->nGRcodewords[l] = (altprefixlen << l);
-        family->notGRcwlen[l] = altprefixlen + ceil_log_2(altcodewords);
-        family->notGRprefixmask[l] = bppmask[32 - altprefixlen]; /* needed for decoding only */
         family->notGRsuffixlen[l] = ceil_log_2(altcodewords); /* needed for decoding only */
+        family->notGRcwlen[l] = altprefixlen + family->notGRsuffixlen[l];
+        family->notGRprefixmask[l] = bppmask[32 - altprefixlen]; /* needed for decoding only */
 
         for (b = 0; b < 256; b++) {
             unsigned int code, len;
@@ -540,30 +531,10 @@ static inline void encode_ones(Encoder *encoder, unsigned int n)
 
 #define MELCSTATES 32 /* number of melcode states */
 
-static int zeroLUT[256]; /* table to find out number of leading zeros */
-
-static int J[MELCSTATES] = {
+static const int J[MELCSTATES] = {
     0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7,
     7, 8, 9, 10, 11, 12, 13, 14, 15
 };
-
-/* creates the bit counting look-up table. */
-static void init_zeroLUT(void)
-{
-    int i, j, k, l;
-
-    j = k = 1;
-    l = 8;
-    for (i = 0; i < 256; ++i) {
-        zeroLUT[i] = l;
-        --k;
-        if (k == 0) {
-            k = j;
-            --l;
-            j *= 2;
-        }
-    }
-}
 
 static void encoder_init_rle(CommonState *state)
 {
@@ -645,7 +616,7 @@ static int decode_run(Encoder *encoder)
 
     do {
         register int temp, hits;
-        temp = zeroLUT[(BYTE)(~(encoder->io_word >> 24))];/* number of leading ones in the
+        temp = lzeroes[(BYTE)(~(encoder->io_word >> 24))];/* number of leading ones in the
                                                                       input stream, up to 8 */
         for (hits = 1; hits <= temp; hits++) {
             runlen += encoder->rgb_state.melcorder;
@@ -686,7 +657,7 @@ static int decode_channel_run(Encoder *encoder, Channel *channel)
 
     do {
         register int temp, hits;
-        temp = zeroLUT[(BYTE)(~(encoder->io_word >> 24))];/* number of leading ones in the
+        temp = lzeroes[(BYTE)(~(encoder->io_word >> 24))];/* number of leading ones in the
                                                                       input stream, up to 8 */
         for (hits = 1; hits <= temp; hits++) {
             runlen += channel->state.melcorder;
@@ -770,39 +741,33 @@ static inline void init_decode_io(Encoder *encoder)
     encoder->io_available_bits = 0;
 }
 
-#ifdef __GNUC__
-#define ATTR_PACKED __attribute__ ((__packed__))
-#else
-#define ATTR_PACKED
-#pragma pack(push)
-#pragma pack(1)
-#endif
+#include <spice/start-packed.h>
 
-typedef struct ATTR_PACKED one_byte_pixel_t {
+typedef struct SPICE_ATTR_PACKED one_byte_pixel_t {
     BYTE a;
 } one_byte_t;
 
-typedef struct ATTR_PACKED three_bytes_pixel_t {
+typedef struct SPICE_ATTR_PACKED three_bytes_pixel_t {
     BYTE a;
     BYTE b;
     BYTE c;
 } three_bytes_t;
 
-typedef struct ATTR_PACKED four_bytes_pixel_t {
+typedef struct SPICE_ATTR_PACKED four_bytes_pixel_t {
     BYTE a;
     BYTE b;
     BYTE c;
     BYTE d;
 } four_bytes_t;
 
-typedef struct ATTR_PACKED rgb32_pixel_t {
+typedef struct SPICE_ATTR_PACKED rgb32_pixel_t {
     BYTE b;
     BYTE g;
     BYTE r;
     BYTE pad;
 } rgb32_pixel_t;
 
-typedef struct ATTR_PACKED rgb24_pixel_t {
+typedef struct SPICE_ATTR_PACKED rgb24_pixel_t {
     BYTE b;
     BYTE g;
     BYTE r;
@@ -810,11 +775,7 @@ typedef struct ATTR_PACKED rgb24_pixel_t {
 
 typedef uint16_t rgb16_pixel_t;
 
-#ifndef __GNUC__
-#pragma pack(pop)
-#endif
-
-#undef ATTR_PACKED
+#include <spice/end-packed.h>
 
 #define ONE_BYTE
 #include "quic_tmpl.c"
@@ -917,7 +878,7 @@ static void find_model_params(Encoder *encoder,
     /* The only valid values are 1, 3 and 5.
        0, 2 and 4 are obsolete and the rest of the
        values are considered out of the range. */
-    spice_static_assert (evol == 1 || evol == 3 || evol == 5);
+    SPICE_VERIFY(evol == 1 || evol == 3 || evol == 5);
     spice_assert(bpc <= 8 && bpc > 0);
 
     *ncounters = 8;
@@ -1100,9 +1061,9 @@ static int init_encoder(Encoder *encoder, QuicUsrContext *usr)
     return TRUE;
 }
 
-static int encoder_reste(Encoder *encoder, uint32_t *io_ptr, uint32_t *io_ptr_end)
+static int encoder_reset(Encoder *encoder, uint32_t *io_ptr, uint32_t *io_ptr_end)
 {
-    spice_assert(((unsigned long)io_ptr % 4) == ((unsigned long)io_ptr_end % 4));
+    spice_assert(((uintptr_t)io_ptr % 4) == ((uintptr_t)io_ptr_end % 4));
     spice_assert(io_ptr <= io_ptr_end);
 
     encoder->rgb_state.waitcnt = 0;
@@ -1123,7 +1084,7 @@ static int encoder_reste(Encoder *encoder, uint32_t *io_ptr, uint32_t *io_ptr_en
     return TRUE;
 }
 
-static int encoder_reste_channels(Encoder *encoder, int channels, int width, int bpc)
+static int encoder_reset_channels(Encoder *encoder, int channels, int width, int bpc)
 {
     int i;
 
@@ -1272,8 +1233,8 @@ int quic_encode(QuicContext *quic, QuicImageType type, int width, int height,
 
     quic_image_params(encoder, type, &channels, &bpc);
 
-    if (!encoder_reste(encoder, io_ptr, io_ptr_end) ||
-        !encoder_reste_channels(encoder, channels, width, bpc)) {
+    if (!encoder_reset(encoder, io_ptr, io_ptr_end) ||
+        !encoder_reset_channels(encoder, channels, width, bpc)) {
         return QUIC_ERROR;
     }
 
@@ -1408,7 +1369,7 @@ int quic_decode_begin(QuicContext *quic, uint32_t *io_ptr, unsigned int num_io_w
     int channels;
     int bpc;
 
-    if (!encoder_reste(encoder, io_ptr, io_ptr_end)) {
+    if (!encoder_reset(encoder, io_ptr, io_ptr_end)) {
         return QUIC_ERROR;
     }
 
@@ -1439,7 +1400,7 @@ int quic_decode_begin(QuicContext *quic, uint32_t *io_ptr, unsigned int num_io_w
 
     quic_image_params(encoder, type, &channels, &bpc);
 
-    if (!encoder_reste_channels(encoder, channels, width, bpc)) {
+    if (!encoder_reset_channels(encoder, channels, width, bpc)) {
         return QUIC_ERROR;
     }
 
@@ -1663,13 +1624,11 @@ int quic_decode(QuicContext *quic, QuicImageType type, uint8_t *buf, int stride)
     return QUIC_OK;
 }
 
-static int need_init = TRUE;
-
 QuicContext *quic_create(QuicUsrContext *usr)
 {
     Encoder *encoder;
 
-    if (!usr || need_init || !usr->error || !usr->warn || !usr->info || !usr->malloc ||
+    if (!usr || !usr->error || !usr->warn || !usr->info || !usr->malloc ||
         !usr->free || !usr->more_space || !usr->more_lines) {
         return NULL;
     }
@@ -1700,16 +1659,8 @@ void quic_destroy(QuicContext *quic)
     encoder->usr->free(encoder->usr, encoder);
 }
 
-void quic_init(void)
+SPICE_CONSTRUCTOR_FUNC(quic_global_init)
 {
-    if (!need_init) {
-        return;
-    }
-    need_init = FALSE;
-
     family_init(&family_8bpc, 8, DEFmaxclen);
     family_init(&family_5bpc, 5, DEFmaxclen);
-#if defined(RLE) && defined(RLE_STAT)
-    init_zeroLUT();
-#endif
 }

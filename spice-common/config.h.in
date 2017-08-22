@@ -11,9 +11,6 @@
 /* Define to 1 if using `alloca.c'. */
 #undef C_ALLOCA
 
-/* Enable GLExt prototypes */
-#undef GL_GLEXT_PROTOTYPES
-
 /* Define to 1 if you have `alloca', as a function or macro. */
 #undef HAVE_ALLOCA
 
@@ -132,6 +129,9 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* Enable runtime checks for cast alignment */
+#undef SPICE_DEBUG_ALIGNMENT
+
 /* If using the C implementation of alloca, define if you know the
    direction of stack growth for your system; otherwise it will be
    automatically deduced at runtime.
@@ -142,9 +142,6 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
-
-/* Define to build with OpenGL support */
-#undef USE_OPENGL
 
 /* Define if supporting smartcard proxying */
 #undef USE_SMARTCARD

@@ -19,8 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#include <common/messages.h>
-#include <client_marshallers.h>
+#include "client_marshallers.h"
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -153,6 +152,27 @@ static void spice_marshall_msgc_display_preferred_compression(SPICE_GNUC_UNUSED 
     src = (SpiceMsgcDisplayPreferredCompression *)msg;
 
     spice_marshaller_add_uint8(m, src->image_compression);
+}
+
+static void spice_marshall_msgc_display_gl_draw_done(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcDisplayGlDrawDone *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+}
+
+static void spice_marshall_msgc_display_preferred_video_codec_type(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcDisplayPreferredVideoCodecType *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgcDisplayPreferredVideoCodecType *src;
+    uint8_t *codecs__element;
+    uint32_t i;
+    src = (SpiceMsgcDisplayPreferredVideoCodecType *)msg;
+
+    spice_marshaller_add_uint8(m, src->num_of_codecs);
+    codecs__element = src->codecs;
+    for (i = 0; i < src->num_of_codecs; i++) {
+        spice_marshaller_add_uint8(m, *codecs__element);
+        codecs__element++;
+    }
 }
 
 static void spice_marshall_msgc_inputs_key_down(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcKeyDown *msg)
@@ -421,6 +441,20 @@ static void spice_marshall_msgc_smartcard_reader_add(SPICE_GNUC_UNUSED SpiceMars
 }
 
 #endif /* USE_SMARTCARD */
+static void spice_marshall_SpiceMsgCompressedData(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgCompressedData *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgCompressedData *src;
+    src = (SpiceMsgCompressedData *)msg;
+
+    spice_marshaller_add_uint8(m, src->type);
+    if (src->type == SPICE_DATA_COMPRESSION_TYPE_NONE) {
+    } else if (1) {
+        spice_marshaller_add_uint32(m, src->uncompressed_size);
+    }
+    /* Remaining data must be appended manually */
+}
+
 static void spice_marshall_msgc_port_event(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcPortEvent *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
@@ -434,12 +468,15 @@ SpiceMessageMarshallers * spice_message_marshallers_get(void)
 {
     static SpiceMessageMarshallers marshallers = {NULL};
 
+    marshallers.msg_SpiceMsgCompressedData = spice_marshall_SpiceMsgCompressedData;
     marshallers.msg_SpiceMsgData = spice_marshall_SpiceMsgData;
     marshallers.msg_SpiceMsgEmpty = spice_marshall_SpiceMsgEmpty;
     marshallers.msgc_ack_sync = spice_marshall_msgc_ack_sync;
     marshallers.msgc_disconnecting = spice_marshall_msgc_disconnecting;
+    marshallers.msgc_display_gl_draw_done = spice_marshall_msgc_display_gl_draw_done;
     marshallers.msgc_display_init = spice_marshall_msgc_display_init;
     marshallers.msgc_display_preferred_compression = spice_marshall_msgc_display_preferred_compression;
+    marshallers.msgc_display_preferred_video_codec_type = spice_marshall_msgc_display_preferred_video_codec_type;
     marshallers.msgc_display_stream_report = spice_marshall_msgc_display_stream_report;
     marshallers.msgc_inputs_key_down = spice_marshall_msgc_inputs_key_down;
     marshallers.msgc_inputs_key_modifiers = spice_marshall_msgc_inputs_key_modifiers;
