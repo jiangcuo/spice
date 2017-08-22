@@ -8,7 +8,3 @@ override_dh_auto_configure:
 		--enable-smartcard
 # remove Requires.private and Libs.private defs from .pc file -- we're not building static libs
 	sed -E -i '/^(Libs|Requires)\.private:/D' spice-server.pc
-
-override_dh_installdocs:
-	dh_installdocs -plibspice-server1-dbg --link-doc=libspice-server1
-	dh_installdocs -Nlibspice-server1-dbg

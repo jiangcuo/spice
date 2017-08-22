@@ -9,8 +9,10 @@ spice (0.13.90-0.1) UNRELEASED; urgency=medium
   * debian/watch: Enable gpg key verification of the upstream tarball
   * debian/rules: Also remove the Libs.private defs from .pc file
   * debian/control: Bump Standards-Version to 4.1.0 (no further changes)
+  * debian/rules: Drop override_dh_installdocs, this was only needed when we
+    were building the -dbg package ourself
 
- -- Laurent Bigonville <bigon@debian.org>  Tue, 22 Aug 2017 18:06:02 +0200
+ -- Laurent Bigonville <bigon@debian.org>  Tue, 22 Aug 2017 18:06:35 +0200
 
 spice (0.12.8-2.2) unstable; urgency=medium
 
