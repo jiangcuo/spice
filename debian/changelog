@@ -6,6 +6,7 @@ spice (0.13.90-0.1) UNRELEASED; urgency=medium
       d/p/CVE-2017-7506-1.patch, d/p/CVE-2017-7506-2.patch,
       d/p/CVE-2017-7506-3.patch: All merged upstream
     - Drop debian/patches/fix-tests-warnings.patch, unused
+  * debian/watch: Enable gpg key verification of the upstream tarball
 
  -- Laurent Bigonville <bigon@debian.org>  Tue, 22 Aug 2017 17:58:00 +0200
 
