@@ -15,14 +15,20 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef REDS_PRIVATE_H
-#define REDS_PRIVATE_H
 
-#include <time.h>
+#ifndef REDS_PRIVATE_H_
+#define REDS_PRIVATE_H_
 
 #include <spice/protocol.h>
+#include <spice/stats.h>
 
-#define MIGRATE_TIMEOUT (1000 * 10) /* 10sec */
+#include "main-dispatcher.h"
+#include "main-channel.h"
+#include "inputs-channel.h"
+#include "stat-file.h"
+#include "red-record-qxl.h"
+
+#define MIGRATE_TIMEOUT (MSEC_PER_SEC * 10)
 #define MM_TIME_DELTA 400 /*ms*/
 
 typedef struct TicketAuthentication {
@@ -42,117 +48,49 @@ typedef struct MonitorMode {
     uint32_t y_res;
 } MonitorMode;
 
-typedef struct VDIReadBuf {
-    RingItem link;
-    uint32_t refs;
-
-    int len;
-    uint8_t data[SPICE_AGENT_MAX_DATA_SIZE];
-} VDIReadBuf;
-
-enum {
-    VDI_PORT_READ_STATE_READ_HEADER,
-    VDI_PORT_READ_STATE_GET_BUFF,
-    VDI_PORT_READ_STATE_READ_DATA,
-};
-
-typedef struct VDIPortState {
-    SpiceCharDeviceState *base;
-    uint32_t plug_generation;
-    int client_agent_started;
-
-    /* write to agent */
-    SpiceCharDeviceWriteBuffer *recv_from_client_buf;
-    int recv_from_client_buf_pushed;
-    AgentMsgFilter write_filter;
-
-    /* read from agent */
-    Ring read_bufs;
-    uint32_t read_state;
-    uint32_t message_receive_len;
-    uint8_t *receive_pos;
-    uint32_t receive_len;
-    VDIReadBuf *current_read_buf;
-    AgentMsgFilter read_filter;
-
-    VDIChunkHeader vdi_chunk_header;
-
-    SpiceMigrateDataMain *mig_data; /* storing it when migration data arrives
-                                       before agent is attached */
-} VDIPortState;
-
-/* messages that are addressed to the agent and are created in the server */
-typedef struct __attribute__ ((__packed__)) VDInternalBuf {
-    VDIChunkHeader chunk_header;
-    VDAgentMessage header;
-    union {
-        VDAgentMouseState mouse_state;
-    }
-    u;
-} VDInternalBuf;
-
-#ifdef RED_STATISTICS
-
-#define REDS_MAX_STAT_NODES 100
-#define REDS_STAT_SHM_SIZE (sizeof(SpiceStat) + REDS_MAX_STAT_NODES * sizeof(SpiceStatNode))
-
-typedef struct RedsStatValue {
-    uint32_t value;
-    uint32_t min;
-    uint32_t max;
-    uint32_t average;
-    uint32_t count;
-} RedsStatValue;
-
-#endif
-
 typedef struct RedsMigPendingLink {
-    RingItem ring_link; // list of links that belongs to the same client
     SpiceLinkMess *link_msg;
     RedsStream *stream;
 } RedsMigPendingLink;
 
 typedef struct RedsMigTargetClient {
-    RingItem link;
+    RedsState *reds;
     RedClient *client;
-    Ring pending_links;
+    GList *pending_links;
 } RedsMigTargetClient;
 
-typedef struct RedsMigWaitDisconnectClient {
-    RingItem link;
-    RedClient *client;
-} RedsMigWaitDisconnectClient;
+typedef struct ChannelSecurityOptions ChannelSecurityOptions;
 
-typedef struct SpiceCharDeviceStateItem {
-    RingItem link;
-    SpiceCharDeviceState *st;
-} SpiceCharDeviceStateItem;
+typedef struct RedSSLParameters {
+    char keyfile_password[256];
+    char certs_file[256];
+    char private_key_file[256];
+    char ca_certificate_file[256];
+    char dh_key_file[256];
+    char ciphersuite[256];
+} RedSSLParameters;
 
-/* Intermediate state for on going monitors config message from a single
- * client, being passed to the guest */
-typedef struct RedsClientMonitorsConfig {
-    MainChannelClient *mcc;
-    uint8_t *buffer;
-    int buffer_size;
-    int buffer_pos;
-} RedsClientMonitorsConfig;
+typedef struct RedCharDeviceVDIPort RedCharDeviceVDIPort;
+typedef struct RedServerConfig RedServerConfig;
 
-typedef struct RedsState {
+struct RedsState {
+    RedServerConfig *config;
     int listen_socket;
     int secure_listen_socket;
     SpiceWatch *listen_watch;
     SpiceWatch *secure_listen_watch;
-    VDIPortState agent_state;
+    RedCharDeviceVDIPort *agent_dev;
     int pending_mouse_event;
-    Ring clients;
-    int num_clients;
+    GList *clients;
     MainChannel *main_channel;
+    InputsChannel *inputs_channel;
 
     int mig_wait_connect; /* src waits for clients to establish connection to dest
                              (before migration starts) */
     int mig_wait_disconnect; /* src waits for clients to disconnect (after migration completes) */
-    Ring mig_wait_disconnect_clients; /* List of RedsMigWaitDisconnectClient. Holds the clients
+    GList *mig_wait_disconnect_clients;/* List of RedsMigWaitDisconnectClient. Holds the clients
                                          which the src waits for their disconnection */
+
 
     int mig_inprogress;
     int expect_migrate;
@@ -160,12 +98,9 @@ typedef struct RedsState {
                                     between the 2 servers */
     int dst_do_seamless_migrate; /* per migration. Updated after the migration handshake
                                     between the 2 servers */
-    Ring mig_target_clients;
-    int num_mig_target_clients;
-    RedsMigSpice *mig_spice;
+    GList *mig_target_clients;
 
-    int num_of_channels;
-    Ring channels;
+    GList *channels;
     int mouse_mode;
     int is_client_mouse_allowed;
     int dispatcher_allows_client_mouse;
@@ -173,23 +108,33 @@ typedef struct RedsState {
     SpiceTimer *mig_timer;
 
     int vm_running;
-    Ring char_devs_states; /* list of SpiceCharDeviceStateItem */
+    GList *char_devices; /* list of SpiceCharDeviceState */
     int seamless_migration_enabled; /* command line arg */
 
     SSL_CTX *ctx;
 
 #ifdef RED_STATISTICS
-    char *stat_shm_name;
-    SpiceStat *stat;
-    pthread_mutex_t stat_lock;
-    RedsStatValue roundtrip_stat;
+    RedStatFile *stat_file;
 #endif
-    int peer_minor_version;
     int allow_multiple_clients;
 
-    RedsClientMonitorsConfig client_monitors_config;
+    /* Intermediate state for on going monitors config message from a single
+     * client, being passed to the guest */
+    SpiceBuffer client_monitors_config;
+
     int mm_time_enabled;
     uint32_t mm_time_latency;
-} RedsState;
 
-#endif
+    SpiceCharDeviceInstance *vdagent;
+    SpiceMigrateInstance *migration_interface;
+
+    SpiceCoreInterfaceInternal core;
+    GList *qxl_instances;
+    MainDispatcher *main_dispatcher;
+    RedRecord *record;
+};
+
+#define FOREACH_QXL_INSTANCE(_reds, _iter, _qxl) \
+    GLIST_FOREACH(_reds->qxl_instances, _iter, QXLInstance, _qxl)
+
+#endif /* REDS_PRIVATE_H_ */

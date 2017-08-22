@@ -1,115 +1,153 @@
 NULL =
 
+@VALGRIND_CHECK_RULES@
+VALGRIND_SUPPRESSIONS_FILES = $(top_srcdir)/server/tests/valgrind/glib.supp
+EXTRA_DIST =				\
+	$(VALGRIND_SUPPRESSIONS_FILES)	\
+	pki/ca-cert.pem			\
+	pki/server-cert.pem		\
+	pki/server-key.pem		\
+	$(NULL)
+
 AM_CPPFLAGS =					\
-	$(GLIB2_CFLAGS)				\
+	-DSPICE_TOP_SRCDIR=\"$(abs_top_srcdir)\"\
 	-I$(top_srcdir)				\
-	-I$(top_srcdir)/common			\
 	-I$(top_srcdir)/server			\
 	-I$(top_builddir)/server		\
 	-I$(top_srcdir)/server/tests		\
 	$(COMMON_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
+	$(GOBJECT2_CFLAGS)				\
 	$(SMARTCARD_CFLAGS)			\
 	$(SPICE_NONPKGCONFIG_CFLAGS)		\
 	$(SPICE_PROTOCOL_CFLAGS)		\
+	$(WARN_CFLAGS)				\
 	$(NULL)
 
-if SUPPORT_AUTOMATED_TESTS
+if HAVE_AUTOMATED_TESTS
 AM_CPPFLAGS += -DAUTOMATED_TESTS
 endif
 
+noinst_LIBRARIES = libtest.a
+
+libtest_a_SOURCES =				\
+	basic-event-loop.c			\
+	basic-event-loop.h			\
+	test-display-base.c			\
+	test-display-base.h			\
+	test-glib-compat.c			\
+	test-glib-compat.h			\
+	$(NULL)
+
 LDADD =								\
-	$(GLIB2_LIBS)						\
+	libtest.a						\
 	$(top_builddir)/spice-common/common/libspice-common.la	\
-	$(top_builddir)/server/libspice-server.la		\
+	$(top_builddir)/server/libserver.la			\
 	$(GLIB2_LIBS)						\
+	$(GOBJECT2_LIBS)					\
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
-COMMON_BASE =					\
-	basic_event_loop.c			\
-	basic_event_loop.h			\
-	test_util.h				\
+check_PROGRAMS =				\
+	test-codecs-parsing			\
+	test-options				\
+	test-stat				\
+	test-stream				\
+	test-agent-msg-filter			\
+	test-loop				\
+	test-qxl-parsing			\
+	test-stat-file				\
+	test-leaks				\
+	test-vdagent				\
 	$(NULL)
 
 noinst_PROGRAMS =				\
-	test_display_no_ssl			\
-	test_display_streaming			\
-	test_empty_success			\
-	test_fail_on_null_core_interface	\
-	test_just_sockets_no_ssl		\
-	test_playback				\
-	test_display_resolution_changes		\
-	test_two_servers			\
-	test_vdagent				\
-	test_display_width_stride		\
+	test-display-no-ssl			\
+	test-display-streaming			\
+	test-empty-success			\
+	test-fail-on-null-core-interface	\
+	test-just-sockets-no-ssl		\
+	test-playback				\
+	test-display-resolution-changes		\
+	test-two-servers			\
+	test-display-width-stride		\
 	spice-server-replay			\
+	$(check_PROGRAMS)			\
 	$(NULL)
 
-test_vdagent_SOURCES =		\
-	$(COMMON_BASE)				\
-	test_display_base.c			\
-	test_display_base.h			\
-	test_vdagent.c		\
+if HAVE_GSTREAMER
+noinst_PROGRAMS += test-gst
+endif
+
+TESTS = $(check_PROGRAMS)			\
 	$(NULL)
 
-test_display_streaming_SOURCES =		\
-	$(COMMON_BASE)				\
-	test_display_base.c			\
-	test_display_base.h			\
-	test_display_streaming.c		\
+if ENABLE_EXTRA_CHECKS
+if HAVE_GSTREAMER_1_0
+TESTS += video-encoders
+endif
+endif
+EXTRA_DIST += video-encoders
+
+noinst_LIBRARIES += \
+	libtest-stat1.a \
+	libtest-stat2.a \
+	libtest-stat3.a \
+	libtest-stat4.a \
 	$(NULL)
 
-test_display_no_ssl_SOURCES =			\
-	$(COMMON_BASE)				\
-	test_display_base.c			\
-	test_display_base.h			\
-	test_display_no_ssl.c 			\
+spice_server_replay_SOURCES = replay.c		\
+	../event-loop.c				\
+	basic-event-loop.c			\
+	basic-event-loop.h
+
+spice_server_replay_LDADD =					\
+	$(top_builddir)/spice-common/common/libspice-common.la	\
+	$(top_builddir)/server/libspice-server.la		\
+	$(GLIB2_LIBS)						\
+	$(GOBJECT2_LIBS)					\
+	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
-test_display_resolution_changes_SOURCES = \
-	$(COMMON_BASE)				\
-	test_display_base.c			\
-	test_display_base.h			\
-	test_display_resolution_changes.c	\
+test_stat_SOURCES = stat-main.c
+test_stat_LDADD = \
+	libtest-stat1.a \
+	libtest-stat2.a \
+	libtest-stat3.a \
+	libtest-stat4.a \
+	$(LDADD) \
 	$(NULL)
 
-test_just_sockets_no_ssl_SOURCES =		\
-	$(COMMON_BASE)				\
-	test_just_sockets_no_ssl.c		\
-	$(NULL)
+libtest_stat1_a_SOURCES = stat-test.c
+libtest_stat1_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=0 -DTEST_RED_WORKER_STAT=0 -DTEST_NAME=stat_test1
 
-test_playback_SOURCES =				\
-	$(COMMON_BASE)				\
-	test_playback.c				\
-	$(NULL)
+libtest_stat2_a_SOURCES = stat-test.c
+libtest_stat2_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=0 -DTEST_RED_WORKER_STAT=1 -DTEST_NAME=stat_test2
 
-test_empty_success_SOURCES =			\
-	test_empty_success.c			\
-	$(NULL)
+libtest_stat3_a_SOURCES = stat-test.c
+libtest_stat3_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORKER_STAT=0 -DTEST_NAME=stat_test3
 
-test_fail_on_null_core_interface_SOURCES =	\
-	test_fail_on_null_core_interface.c	\
-	$(NULL)
+libtest_stat4_a_SOURCES = stat-test.c
+libtest_stat4_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORKER_STAT=1 -DTEST_NAME=stat_test4
 
-test_two_servers_SOURCES =			\
-	$(COMMON_BASE)				\
-	test_display_base.c			\
-	test_display_base.h			\
-	test_two_servers.c 			\
-	$(NULL)
+test_qxl_parsing_LDADD = ../libserver.la $(LDADD)
 
-test_display_width_stride_SOURCES =		\
-	$(COMMON_BASE)				\
-	test_display_base.c			\
-	test_display_base.h			\
-	test_display_width_stride.c 		\
+# Fallback implementations are provided for older glibs for the recent glib
+# methods this test is using, so no need to warn about them
+test_vdagent_CPPFLAGS =			\
+	$(AM_CPPFLAGS)			\
+	-UGLIB_VERSION_MIN_REQUIRED	\
+	-UGLIB_VERSION_MAX_ALLOWED	\
 	$(NULL)
+test_codecs_parsing_CPPFLAGS = $(test_vdagent_CPPFLAGS)
+test_qxl_parsing_CPPFLAGS = $(test_vdagent_CPPFLAGS)
 
-spice_server_replay_SOURCES = 			\
-	replay.c				\
-	test_display_base.h			\
-	basic_event_loop.c			\
-	basic_event_loop.h			\
-	test_util.h				\
+if HAVE_GSTREAMER
+test_gst_SOURCES = test-gst.c \
 	$(NULL)
+test_gst_CPPFLAGS = \
+	$(AM_CPPFLAGS) \
+	$(GSTREAMER_0_10_CFLAGS)		\
+	$(GSTREAMER_1_0_CFLAGS)			\
+	$(NULL)
+endif

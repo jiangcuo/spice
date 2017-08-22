@@ -88,21 +88,13 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@HAVE_GL_TRUE@am__append_1 = \
-@HAVE_GL_TRUE@	gl_utils.h			\
-@HAVE_GL_TRUE@	glc.c				\
-@HAVE_GL_TRUE@	glc.h				\
-@HAVE_GL_TRUE@	ogl_ctx.c			\
-@HAVE_GL_TRUE@	ogl_ctx.h			\
-@HAVE_GL_TRUE@	$(NULL)
-
 subdir = common
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_python_module.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
 	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
 	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/m4/spice-deps.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/spice_manual.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -141,20 +133,9 @@ libspice_common_server_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 am__DEPENDENCIES_1 =
 libspice_common_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
-am__libspice_common_la_SOURCES_DIST = backtrace.c backtrace.h bitops.h \
-	canvas_utils.c canvas_utils.h client_demarshallers.h \
-	client_marshallers.h draw.h lines.c lines.h log.c log.h lz.c \
-	lz.h lz_common.h lz_config.h macros.h marshaller.c \
-	marshaller.h mem.c mem.h messages.h pixman_utils.c \
-	pixman_utils.h quic.c quic.h quic_config.h rect.h region.c \
-	region.h ring.h rop3.c rop3.h snd_codec.c snd_codec.h \
-	spice_common.h ssl_verify.c ssl_verify.h verify.h gl_utils.h \
-	glc.c glc.h ogl_ctx.c ogl_ctx.h
-@HAVE_GL_TRUE@am__objects_4 = glc.lo ogl_ctx.lo $(am__objects_1)
 am_libspice_common_la_OBJECTS = backtrace.lo canvas_utils.lo lines.lo \
 	log.lo lz.lo marshaller.lo mem.lo pixman_utils.lo quic.lo \
-	region.lo rop3.lo snd_codec.lo ssl_verify.lo $(am__objects_1) \
-	$(am__objects_4)
+	region.lo rop3.lo snd_codec.lo ssl_verify.lo $(am__objects_1)
 libspice_common_la_OBJECTS = $(am_libspice_common_la_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -196,7 +177,7 @@ SOURCES = $(libspice_common_client_la_SOURCES) \
 	$(EXTRA_libspice_common_la_SOURCES)
 DIST_SOURCES = $(libspice_common_client_la_SOURCES) \
 	$(libspice_common_server_la_SOURCES) \
-	$(am__libspice_common_la_SOURCES_DIST) \
+	$(libspice_common_la_SOURCES) \
 	$(EXTRA_libspice_common_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
@@ -225,11 +206,13 @@ CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in \
 	$(top_srcdir)/build-aux/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+A2X = @A2X@
 ACLOCAL = @ACLOCAL@
 ALLOCA = @ALLOCA@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
+ASCIIDOC = @ASCIIDOC@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -278,6 +261,8 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENSSL_CFLAGS = @OPENSSL_CFLAGS@
+OPENSSL_LIBS = @OPENSSL_LIBS@
 OPUS_CFLAGS = @OPUS_CFLAGS@
 OPUS_LIBS = @OPUS_LIBS@
 OTOOL = @OTOOL@
@@ -375,6 +360,7 @@ CLIENT_MARSHALLERS = \
 	generated_client_demarshallers.c	\
 	generated_client_demarshallers1.c	\
 	generated_client_marshallers.c		\
+	generated_client_marshallers.h		\
 	generated_client_marshallers1.c		\
 	$(NULL)
 
@@ -386,15 +372,48 @@ SERVER_MARSHALLERS = \
 
 BUILT_SOURCES = $(CLIENT_MARSHALLERS) $(SERVER_MARSHALLERS)
 noinst_LTLIBRARIES = libspice-common.la libspice-common-server.la libspice-common-client.la
-libspice_common_la_SOURCES = backtrace.c backtrace.h bitops.h \
-	canvas_utils.c canvas_utils.h client_demarshallers.h \
-	client_marshallers.h draw.h lines.c lines.h log.c log.h lz.c \
-	lz.h lz_common.h lz_config.h macros.h marshaller.c \
-	marshaller.h mem.c mem.h messages.h pixman_utils.c \
-	pixman_utils.h quic.c quic.h quic_config.h rect.h region.c \
-	region.h ring.h rop3.c rop3.h snd_codec.c snd_codec.h \
-	spice_common.h ssl_verify.c ssl_verify.h verify.h $(NULL) \
-	$(am__append_1)
+libspice_common_la_SOURCES = \
+	backtrace.c			\
+	backtrace.h			\
+	bitops.h			\
+	canvas_utils.c			\
+	canvas_utils.h			\
+	client_demarshallers.h		\
+	client_marshallers.h		\
+	draw.h				\
+	lines.c				\
+	lines.h				\
+	log.c				\
+	log.h				\
+	lz.c				\
+	lz.h				\
+	lz_common.h			\
+	lz_config.h			\
+	macros.h			\
+	marshaller.c			\
+	marshaller.h			\
+	mem.c				\
+	mem.h				\
+	messages.h			\
+	pixman_utils.c			\
+	pixman_utils.h			\
+	quic.c				\
+	quic.h				\
+	quic_config.h			\
+	rect.h				\
+	region.c			\
+	region.h			\
+	ring.h				\
+	rop3.c				\
+	rop3.h				\
+	snd_codec.c			\
+	snd_codec.h			\
+	spice_common.h			\
+	ssl_verify.c			\
+	ssl_verify.h			\
+	verify.h			\
+	$(NULL)
+
 
 # These 2 files are not build as part of spice-common
 # build system, but modules using spice-common will build
@@ -417,6 +436,7 @@ libspice_common_server_la_SOURCES = \
 libspice_common_server_la_CFLAGS = -DFIXME_SERVER_SMARTCARD
 AM_CPPFLAGS = \
 	-I$(top_srcdir)			\
+	-I$(top_builddir)		\
 	$(SPICE_COMMON_CFLAGS)		\
 	$(PROTOCOL_CFLAGS)		\
 	$(NULL)
@@ -443,8 +463,6 @@ EXTRA_DIST = \
 	canvas_base.h			\
 	gdi_canvas.c			\
 	gdi_canvas.h			\
-	gl_canvas.c			\
-	gl_canvas.h			\
 	lz_compress_tmpl.c		\
 	lz_decompress_tmpl.c		\
 	quic_family_tmpl.c		\
@@ -520,7 +538,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_client_demarshallers1.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_client_marshallers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generated_client_marshallers1.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libspice_common_server_la-generated_server_demarshallers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libspice_common_server_la-generated_server_marshallers.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lines.Plo@am__quote@
@@ -528,7 +545,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lz.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/marshaller.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mem.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ogl_ctx.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pixman_utils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/quic.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/region.Plo@am__quote@
@@ -795,8 +811,11 @@ generated_client_demarshallers.c: $(top_srcdir)/spice.proto $(MARSHALLERS_DEPS)
 generated_client_demarshallers1.c: $(top_srcdir)/spice1.proto $(MARSHALLERS_DEPS)
 	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-demarshallers --client --include common/messages.h --prefix 1 --ptrsize 8 $< $@ >/dev/null
 
+generated_client_marshallers.h: $(top_srcdir)/spice.proto $(MARSHALLERS_DEPS)
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P --client --include common/messages.h -H $< $@ >/dev/null
+
 generated_client_marshallers.c: $(top_srcdir)/spice.proto $(MARSHALLERS_DEPS)
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P --include common/messages.h --include client_marshallers.h --client $< $@ >/dev/null
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P --include client_marshallers.h --client $< $@ >/dev/null
 
 generated_client_marshallers1.c: $(top_srcdir)/spice1.proto $(MARSHALLERS_DEPS)
 	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P --include common/messages.h --include client_marshallers.h --client --prefix 1 --ptrsize 8 $< $@ >/dev/null

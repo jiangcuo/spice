@@ -92,21 +92,28 @@ host_triplet = @host@
 @HAVE_LD_VERSION_SCRIPT_TRUE@am__append_1 = \
 @HAVE_LD_VERSION_SCRIPT_TRUE@	-Wl,--version-script=$(top_srcdir)/server/spice-server.syms
 
-@HAVE_GL_TRUE@am__append_2 = \
-@HAVE_GL_TRUE@	reds_gl_canvas.c	\
-@HAVE_GL_TRUE@	reds_gl_canvas.h	\
-@HAVE_GL_TRUE@	$(NULL)
+@HAVE_LZ4_TRUE@am__append_2 = \
+@HAVE_LZ4_TRUE@	lz4-encoder.c				\
+@HAVE_LZ4_TRUE@	lz4-encoder.h				\
+@HAVE_LZ4_TRUE@	$(NULL)
 
 @HAVE_SMARTCARD_TRUE@am__append_3 = \
-@HAVE_SMARTCARD_TRUE@	smartcard.c		\
-@HAVE_SMARTCARD_TRUE@	smartcard.h		\
+@HAVE_SMARTCARD_TRUE@	smartcard.c			\
+@HAVE_SMARTCARD_TRUE@	smartcard.h			\
+@HAVE_SMARTCARD_TRUE@	smartcard-channel-client.c	\
+@HAVE_SMARTCARD_TRUE@	smartcard-channel-client.h	\
 @HAVE_SMARTCARD_TRUE@	$(NULL)
+
+@HAVE_GSTREAMER_TRUE@am__append_4 = \
+@HAVE_GSTREAMER_TRUE@	gstreamer-encoder.c		\
+@HAVE_GSTREAMER_TRUE@	$(NULL)
 
 subdir = server
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+am__aclocal_m4_deps = $(top_srcdir)/m4/ax_valgrind_check.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 \
 	$(top_srcdir)/m4/manywarnings.m4 \
 	$(top_srcdir)/m4/spice-compile-warnings.m4 \
 	$(top_srcdir)/m4/virt-linker-no-indirect.m4 \
@@ -151,59 +158,85 @@ am__uninstall_files_from_dir = { \
   }
 am__installdirs = "$(DESTDIR)$(libdir)" \
 	"$(DESTDIR)$(libspice_serverincludedir)"
-LTLIBRARIES = $(lib_LTLIBRARIES)
+LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-libspice_server_la_DEPENDENCIES =  \
+libserver_la_DEPENDENCIES =  \
 	$(top_builddir)/spice-common/common/libspice-common.la \
 	$(top_builddir)/spice-common/common/libspice-common-server.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am__libspice_server_la_SOURCES_DIST = spice-audio.h spice-char.h \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am__libserver_la_SOURCES_DIST = spice-audio.h spice-char.h \
 	spice-core.h spice-experimental.h spice-input.h \
 	spice-migration.h spice-qxl.h spice-server.h spice-version.h \
-	spice.h agent-msg-filter.c agent-msg-filter.h char_device.c \
-	char_device.h demarshallers.h glz_encoder.c glz_encoder.h \
-	glz_encoder_config.h glz_encoder_dictionary.c \
-	glz_encoder_dictionary.h glz_encoder_dictionary_protected.h \
-	inputs_channel.c inputs_channel.h jpeg_encoder.c \
-	jpeg_encoder.h lz4_encoder.c lz4_encoder.h main_channel.c \
-	main_channel.h mjpeg_encoder.c mjpeg_encoder.h \
-	red_bitmap_utils.h red_channel.c red_channel.h \
-	red_client_cache.h red_client_shared_cache.h red_common.h \
-	dispatcher.c dispatcher.h red_dispatcher.c red_dispatcher.h \
-	main_dispatcher.c main_dispatcher.h migration_protocol.h \
-	red_memslots.c red_memslots.h red_parse_qxl.c red_record_qxl.c \
-	red_record_qxl.h red_replay_qxl.c red_replay_qxl.h \
-	red_parse_qxl.h red_time.h red_worker.c red_worker.h reds.c \
-	reds.h reds-private.h reds_stream.c reds_stream.h \
-	reds_sw_canvas.c reds_sw_canvas.h snd_worker.c snd_worker.h \
-	stat.h spicevmc.c spice_timer_queue.c spice_timer_queue.h \
-	zlib_encoder.c zlib_encoder.h spice_bitmap_utils.h \
-	spice_bitmap_utils.c spice_server_utils.h spice_image_cache.h \
-	spice_image_cache.c reds_gl_canvas.c reds_gl_canvas.h \
-	smartcard.c smartcard.h
+	spice-replay.h spice.h spice-server-enums.h \
+	spice-server-enums.c agent-msg-filter.c agent-msg-filter.h \
+	cache-item.h char-device.c char-device.h \
+	common-graphics-channel.c common-graphics-channel.h \
+	cursor-channel.c cursor-channel-client.c \
+	cursor-channel-client.h cursor-channel.h dcc.c dcc.h \
+	dcc-private.h dcc-send.c demarshallers.h dispatcher.c \
+	dispatcher.h display-channel.c display-channel.h \
+	display-channel-private.h display-limits.h event-loop.c \
+	glib-compat.h glz-encoder.c glz-encoder-dict.c \
+	glz-encoder-dict.h glz-encoder.h glz-encoder-priv.h \
+	image-cache.c image-cache.h image-encoders.c image-encoders.h \
+	inputs-channel.c inputs-channel-client.c \
+	inputs-channel-client.h inputs-channel.h jpeg-encoder.c \
+	jpeg-encoder.h main-channel.c main-channel-client.c \
+	main-channel-client.h main-channel.h main-dispatcher.c \
+	main-dispatcher.h memslot.c memslot.h migration-protocol.h \
+	mjpeg-encoder.c net-utils.c net-utils.h pixmap-cache.c \
+	pixmap-cache.h red-channel.c red-channel-capabilities.c \
+	red-channel-capabilities.h red-channel-client.c \
+	red-channel-client.h red-channel.h red-client.c red-client.h \
+	red-common.h red-parse-qxl.c red-parse-qxl.h red-pipe-item.c \
+	red-pipe-item.h red-qxl.c red-qxl.h red-record-qxl.c \
+	red-record-qxl.h red-replay-qxl.c reds.c reds.h reds-private.h \
+	reds-stream.c reds-stream.h red-worker.c red-worker.h sound.c \
+	sound.h spice-bitmap-utils.c spice-bitmap-utils.h spicevmc.c \
+	stat-file.c stat-file.h stat.h stream.c stream.h sw-canvas.c \
+	tree.c tree.h utils.c utils.h video-encoder.h zlib-encoder.c \
+	zlib-encoder.h lz4-encoder.c lz4-encoder.h smartcard.c \
+	smartcard.h smartcard-channel-client.c \
+	smartcard-channel-client.h gstreamer-encoder.c
 am__objects_1 =
 am__objects_2 = $(am__objects_1)
-@HAVE_GL_TRUE@am__objects_3 = reds_gl_canvas.lo $(am__objects_1)
-@HAVE_SMARTCARD_TRUE@am__objects_4 = smartcard.lo $(am__objects_1)
-am_libspice_server_la_OBJECTS = $(am__objects_2) agent-msg-filter.lo \
-	char_device.lo glz_encoder.lo glz_encoder_dictionary.lo \
-	inputs_channel.lo jpeg_encoder.lo lz4_encoder.lo \
-	main_channel.lo mjpeg_encoder.lo red_channel.lo dispatcher.lo \
-	red_dispatcher.lo main_dispatcher.lo red_memslots.lo \
-	red_parse_qxl.lo red_record_qxl.lo red_replay_qxl.lo \
-	red_worker.lo reds.lo reds_stream.lo reds_sw_canvas.lo \
-	snd_worker.lo spicevmc.lo spice_timer_queue.lo zlib_encoder.lo \
-	spice_bitmap_utils.lo spice_image_cache.lo $(am__objects_1) \
-	$(am__objects_3) $(am__objects_4)
-libspice_server_la_OBJECTS = $(am_libspice_server_la_OBJECTS)
+am__objects_3 = spice-server-enums.lo
+@HAVE_LZ4_TRUE@am__objects_4 = lz4-encoder.lo $(am__objects_1)
+@HAVE_SMARTCARD_TRUE@am__objects_5 = smartcard.lo \
+@HAVE_SMARTCARD_TRUE@	smartcard-channel-client.lo \
+@HAVE_SMARTCARD_TRUE@	$(am__objects_1)
+@HAVE_GSTREAMER_TRUE@am__objects_6 = gstreamer-encoder.lo \
+@HAVE_GSTREAMER_TRUE@	$(am__objects_1)
+am_libserver_la_OBJECTS = $(am__objects_2) $(am__objects_3) \
+	agent-msg-filter.lo char-device.lo common-graphics-channel.lo \
+	cursor-channel.lo cursor-channel-client.lo dcc.lo dcc-send.lo \
+	dispatcher.lo display-channel.lo event-loop.lo glz-encoder.lo \
+	glz-encoder-dict.lo image-cache.lo image-encoders.lo \
+	inputs-channel.lo inputs-channel-client.lo jpeg-encoder.lo \
+	main-channel.lo main-channel-client.lo main-dispatcher.lo \
+	memslot.lo mjpeg-encoder.lo net-utils.lo pixmap-cache.lo \
+	red-channel.lo red-channel-capabilities.lo \
+	red-channel-client.lo red-client.lo red-parse-qxl.lo \
+	red-pipe-item.lo red-qxl.lo red-record-qxl.lo \
+	red-replay-qxl.lo reds.lo reds-stream.lo red-worker.lo \
+	sound.lo spice-bitmap-utils.lo spicevmc.lo stat-file.lo \
+	stream.lo sw-canvas.lo tree.lo utils.lo zlib-encoder.lo \
+	$(am__objects_1) $(am__objects_4) $(am__objects_5) \
+	$(am__objects_6)
+libserver_la_OBJECTS = $(am_libserver_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+libspice_server_la_DEPENDENCIES = libserver.la
+am_libspice_server_la_OBJECTS =
+libspice_server_la_OBJECTS = $(am_libspice_server_la_OBJECTS)
 libspice_server_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(AM_CFLAGS) $(CFLAGS) $(libspice_server_la_LDFLAGS) \
@@ -242,8 +275,9 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libspice_server_la_SOURCES)
-DIST_SOURCES = $(am__libspice_server_la_SOURCES_DIST)
+SOURCES = $(libserver_la_SOURCES) $(libspice_server_la_SOURCES)
+DIST_SOURCES = $(am__libserver_la_SOURCES_DIST) \
+	$(libspice_server_la_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -343,11 +377,23 @@ ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
+ENABLE_VALGRIND_drd = @ENABLE_VALGRIND_drd@
+ENABLE_VALGRIND_helgrind = @ENABLE_VALGRIND_helgrind@
+ENABLE_VALGRIND_memcheck = @ENABLE_VALGRIND_memcheck@
+ENABLE_VALGRIND_sgcheck = @ENABLE_VALGRIND_sgcheck@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GLIB2_CFLAGS = @GLIB2_CFLAGS@
 GLIB2_LIBS = @GLIB2_LIBS@
+GOBJECT2_CFLAGS = @GOBJECT2_CFLAGS@
+GOBJECT2_LIBS = @GOBJECT2_LIBS@
 GREP = @GREP@
+GSTREAMER_0_10_CFLAGS = @GSTREAMER_0_10_CFLAGS@
+GSTREAMER_0_10_LIBS = @GSTREAMER_0_10_LIBS@
+GSTREAMER_1_0_CFLAGS = @GSTREAMER_1_0_CFLAGS@
+GSTREAMER_1_0_LIBS = @GSTREAMER_1_0_LIBS@
+GST_INSPECT_0_10 = @GST_INSPECT_0_10@
+GST_INSPECT_1_0 = @GST_INSPECT_1_0@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -391,7 +437,6 @@ PIXMAN_LIBS = @PIXMAN_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON = @PYTHON@
 RANLIB = @RANLIB@
 RELRO_LDFLAGS = @RELRO_LDFLAGS@
 SASL_CFLAGS = @SASL_CFLAGS@
@@ -412,6 +457,8 @@ SPICE_SERVER_VERSION = @SPICE_SERVER_VERSION@
 SSL_CFLAGS = @SSL_CFLAGS@
 SSL_LIBS = @SSL_LIBS@
 STRIP = @STRIP@
+VALGRIND = @VALGRIND@
+VALGRIND_ENABLED = @VALGRIND_ENABLED@
 VERSION = @VERSION@
 VISIBILITY_HIDDEN_CFLAGS = @VISIBILITY_HIDDEN_CFLAGS@
 WARN_CFLAGS = @WARN_CFLAGS@
@@ -471,39 +518,47 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+valgrind_enabled_tools = @valgrind_enabled_tools@
+valgrind_tools = @valgrind_tools@
 NULL = 
 SUBDIRS = . tests
 AM_CPPFLAGS = \
 	-DSPICE_SERVER_INTERNAL			\
-	-DRED_STATISTICS			\
 	$(COMMON_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
+	$(GOBJECT2_CFLAGS)			\
 	$(LZ4_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
 	$(SASL_CFLAGS)				\
 	$(SLIRP_CFLAGS)				\
 	$(SMARTCARD_CFLAGS)			\
+	$(GSTREAMER_0_10_CFLAGS)		\
+	$(GSTREAMER_1_0_CFLAGS)			\
 	$(SPICE_PROTOCOL_CFLAGS)		\
 	$(SSL_CFLAGS)				\
 	$(VISIBILITY_HIDDEN_CFLAGS)		\
 	$(WARN_CFLAGS)				\
 	$(NULL)
 
+noinst_LTLIBRARIES = libserver.la
 lib_LTLIBRARIES = libspice-server.la
 libspice_server_la_LDFLAGS = -version-info $(SPICE_LT_VERSION) \
 	-no-undefined $(RELRO_LDFLAGS) $(NO_INDIRECT_LDFLAGS) $(NULL) \
 	$(am__append_1)
-libspice_server_la_LIBADD = \
+libserver_la_LIBADD = \
 	$(top_builddir)/spice-common/common/libspice-common.la		\
 	$(top_builddir)/spice-common/common/libspice-common-server.la	\
 	$(GL_LIBS)							\
 	$(GLIB2_LIBS)							\
+	$(GOBJECT2_LIBS)						\
 	$(JPEG_LIBS)							\
 	$(LZ4_LIBS)							\
 	$(LIBRT)							\
 	$(PIXMAN_LIBS)							\
 	$(SASL_LIBS)							\
 	$(SLIRP_LIBS)							\
+	$(GSTREAMER_0_10_LIBS)						\
+	$(GSTREAMER_1_0_LIBS)						\
 	$(SSL_LIBS)							\
 	$(Z_LIBS)							\
 	$(SPICE_NONPKGCONFIG_LIBS)					\
@@ -520,34 +575,51 @@ libspice_serverinclude_HEADERS = \
 	spice-qxl.h				\
 	spice-server.h				\
 	spice-version.h				\
+	spice-replay.h				\
 	spice.h					\
 	$(NULL)
 
-libspice_server_la_SOURCES = $(libspice_serverinclude_HEADERS) \
-	agent-msg-filter.c agent-msg-filter.h char_device.c \
-	char_device.h demarshallers.h glz_encoder.c glz_encoder.h \
-	glz_encoder_config.h glz_encoder_dictionary.c \
-	glz_encoder_dictionary.h glz_encoder_dictionary_protected.h \
-	inputs_channel.c inputs_channel.h jpeg_encoder.c \
-	jpeg_encoder.h lz4_encoder.c lz4_encoder.h main_channel.c \
-	main_channel.h mjpeg_encoder.c mjpeg_encoder.h \
-	red_bitmap_utils.h red_channel.c red_channel.h \
-	red_client_cache.h red_client_shared_cache.h red_common.h \
-	dispatcher.c dispatcher.h red_dispatcher.c red_dispatcher.h \
-	main_dispatcher.c main_dispatcher.h migration_protocol.h \
-	red_memslots.c red_memslots.h red_parse_qxl.c red_record_qxl.c \
-	red_record_qxl.h red_replay_qxl.c red_replay_qxl.h \
-	red_parse_qxl.h red_time.h red_worker.c red_worker.h reds.c \
-	reds.h reds-private.h reds_stream.c reds_stream.h \
-	reds_sw_canvas.c reds_sw_canvas.h snd_worker.c snd_worker.h \
-	stat.h spicevmc.c spice_timer_queue.c spice_timer_queue.h \
-	zlib_encoder.c zlib_encoder.h spice_bitmap_utils.h \
-	spice_bitmap_utils.c spice_server_utils.h spice_image_cache.h \
-	spice_image_cache.c $(NULL) $(am__append_2) $(am__append_3)
+spice_built_sources = spice-server-enums.h spice-server-enums.c
+libserver_la_SOURCES = $(libspice_serverinclude_HEADERS) \
+	$(spice_built_sources) agent-msg-filter.c agent-msg-filter.h \
+	cache-item.h char-device.c char-device.h \
+	common-graphics-channel.c common-graphics-channel.h \
+	cursor-channel.c cursor-channel-client.c \
+	cursor-channel-client.h cursor-channel.h dcc.c dcc.h \
+	dcc-private.h dcc-send.c demarshallers.h dispatcher.c \
+	dispatcher.h display-channel.c display-channel.h \
+	display-channel-private.h display-limits.h event-loop.c \
+	glib-compat.h glz-encoder.c glz-encoder-dict.c \
+	glz-encoder-dict.h glz-encoder.h glz-encoder-priv.h \
+	image-cache.c image-cache.h image-encoders.c image-encoders.h \
+	inputs-channel.c inputs-channel-client.c \
+	inputs-channel-client.h inputs-channel.h jpeg-encoder.c \
+	jpeg-encoder.h main-channel.c main-channel-client.c \
+	main-channel-client.h main-channel.h main-dispatcher.c \
+	main-dispatcher.h memslot.c memslot.h migration-protocol.h \
+	mjpeg-encoder.c net-utils.c net-utils.h pixmap-cache.c \
+	pixmap-cache.h red-channel.c red-channel-capabilities.c \
+	red-channel-capabilities.h red-channel-client.c \
+	red-channel-client.h red-channel.h red-client.c red-client.h \
+	red-common.h red-parse-qxl.c red-parse-qxl.h red-pipe-item.c \
+	red-pipe-item.h red-qxl.c red-qxl.h red-record-qxl.c \
+	red-record-qxl.h red-replay-qxl.c reds.c reds.h reds-private.h \
+	reds-stream.c reds-stream.h red-worker.c red-worker.h sound.c \
+	sound.h spice-bitmap-utils.c spice-bitmap-utils.h spicevmc.c \
+	stat-file.c stat-file.h stat.h stream.c stream.h sw-canvas.c \
+	tree.c tree.h utils.c utils.h video-encoder.h zlib-encoder.c \
+	zlib-encoder.h $(NULL) $(am__append_2) $(am__append_3) \
+	$(am__append_4)
+libspice_server_la_LIBADD = libserver.la
+libspice_server_la_SOURCES = 
 EXTRA_DIST = \
-	glz_encode_match_tmpl.c			\
-	glz_encode_tmpl.c			\
+	spice-bitmap-utils.tmpl.c		\
+	cache-item.tmpl.c			\
+	glz-encode-match.tmpl.c			\
+	glz-encode.tmpl.c			\
 	spice-server.syms			\
+	spice-server-enums.tmpl.h		\
+	spice-server-enums.tmpl.c		\
 	$(NULL)
 
 BUILT_SOURCES = $(spice_built_sources)
@@ -623,6 +695,20 @@ clean-libLTLIBRARIES:
 	  rm -f $${locs}; \
 	}
 
+clean-noinstLTLIBRARIES:
+	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
+	@list='$(noinst_LTLIBRARIES)'; \
+	locs=`for p in $$list; do echo $$p; done | \
+	      sed 's|^[^/]*$$|.|; s|/[^/]*$$||; s|$$|/so_locations|' | \
+	      sort -u`; \
+	test -z "$$locs" || { \
+	  echo rm -f $${locs}; \
+	  rm -f $${locs}; \
+	}
+
+libserver.la: $(libserver_la_OBJECTS) $(libserver_la_DEPENDENCIES) $(EXTRA_libserver_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(LINK)  $(libserver_la_OBJECTS) $(libserver_la_LIBADD) $(LIBS)
+
 libspice-server.la: $(libspice_server_la_OBJECTS) $(libspice_server_la_DEPENDENCIES) $(EXTRA_libspice_server_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(libspice_server_la_LINK) -rpath $(libdir) $(libspice_server_la_OBJECTS) $(libspice_server_la_LIBADD) $(LIBS)
 
@@ -633,34 +719,55 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/agent-msg-filter.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/char_device.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/char-device.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/common-graphics-channel.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cursor-channel-client.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cursor-channel.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dcc-send.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dcc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dispatcher.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glz_encoder.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glz_encoder_dictionary.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inputs_channel.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jpeg_encoder.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lz4_encoder.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_channel.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main_dispatcher.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mjpeg_encoder.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_channel.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_dispatcher.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_memslots.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_parse_qxl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_record_qxl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_replay_qxl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red_worker.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/display-channel.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/event-loop.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glz-encoder-dict.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glz-encoder.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gstreamer-encoder.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/image-cache.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/image-encoders.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inputs-channel-client.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inputs-channel.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jpeg-encoder.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lz4-encoder.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main-channel-client.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main-channel.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main-dispatcher.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memslot.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mjpeg-encoder.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/net-utils.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pixmap-cache.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-channel-capabilities.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-channel-client.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-channel.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-client.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-parse-qxl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-pipe-item.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-qxl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-record-qxl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-replay-qxl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/red-worker.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reds-stream.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reds.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reds_gl_canvas.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reds_stream.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/reds_sw_canvas.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/smartcard-channel-client.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/smartcard.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_worker.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spice_bitmap_utils.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spice_image_cache.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spice_timer_queue.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sound.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spice-bitmap-utils.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spice-server-enums.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spicevmc.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zlib_encoder.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stat-file.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stream.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sw-canvas.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tree.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zlib-encoder.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -911,7 +1018,7 @@ maintainer-clean-generic:
 clean: clean-recursive
 
 clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
-	mostlyclean-am
+	clean-noinstLTLIBRARIES mostlyclean-am
 
 distclean: distclean-recursive
 	-rm -rf ./$(DEPDIR)
@@ -985,23 +1092,33 @@ uninstall-am: uninstall-libLTLIBRARIES \
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am check \
 	check-am clean clean-generic clean-libLTLIBRARIES \
-	clean-libtool cscopelist-am ctags ctags-am distclean \
-	distclean-compile distclean-generic distclean-libtool \
-	distclean-tags distdir dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am \
-	install-libLTLIBRARIES install-libspice_serverincludeHEADERS \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am uninstall-libLTLIBRARIES \
+	clean-libtool clean-noinstLTLIBRARIES cscopelist-am ctags \
+	ctags-am distclean distclean-compile distclean-generic \
+	distclean-libtool distclean-tags distdir dvi dvi-am html \
+	html-am info info-am install install-am install-data \
+	install-data-am install-dvi install-dvi-am install-exec \
+	install-exec-am install-html install-html-am install-info \
+	install-info-am install-libLTLIBRARIES \
+	install-libspice_serverincludeHEADERS install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs installdirs-am \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
+	uninstall-libLTLIBRARIES \
 	uninstall-libspice_serverincludeHEADERS
 
 .PRECIOUS: Makefile
 
+
+check-valgrind:
+	$(MAKE) -C tests check-valgrind
+
+spice-server-enums.c: spice-server.h spice-server-enums.tmpl.c
+	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.tmpl.c $< > $@
+
+spice-server-enums.h: spice-server.h spice-server-enums.tmpl.h
+	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.tmpl.h $< > $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

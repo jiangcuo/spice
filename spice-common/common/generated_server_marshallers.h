@@ -16,12 +16,15 @@
   License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <common/messages.h>
+#include "common/messages.h"
 #include <spice/protocol.h>
 #include "common/marshaller.h"
 
-#ifndef _GENERATED_HEADERS_H
-#define _GENERATED_HEADERS_H
+#ifndef _H_GENERATED_SERVER_MARSHALLERS
+#define _H_GENERATED_SERVER_MARSHALLERS
+
+SPICE_BEGIN_DECLS
+
 void spice_marshall_msg_migrate(SpiceMarshaller *m, SpiceMsgMigrate *msg);
 void spice_marshall_SpiceMsgData(SpiceMarshaller *m, SpiceMsgData *msg);
 void spice_marshall_msg_set_ack(SpiceMarshaller *m, SpiceMsgSetAck *msg);
@@ -71,6 +74,8 @@ void spice_marshall_msg_display_stream_data_sized(SpiceMarshaller *m, SpiceMsgDi
 void spice_marshall_msg_display_monitors_config(SpiceMarshaller *m, SpiceMsgDisplayMonitorsConfig *msg);
 void spice_marshall_msg_display_draw_composite(SpiceMarshaller *m, SpiceMsgDisplayDrawComposite *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out);
 void spice_marshall_msg_display_stream_activate_report(SpiceMarshaller *m, SpiceMsgDisplayStreamActivateReport *msg);
+void spice_marshall_msg_display_gl_scanout_unix(SpiceMarshaller *m, SpiceMsgDisplayGlScanoutUnix *msg);
+void spice_marshall_msg_display_gl_draw(SpiceMarshaller *m, SpiceMsgDisplayGlDraw *msg);
 void spice_marshall_msg_inputs_init(SpiceMarshaller *m, SpiceMsgInputsInit *msg);
 void spice_marshall_msg_inputs_key_modifiers(SpiceMarshaller *m, SpiceMsgInputsKeyModifiers *msg);
 void spice_marshall_msg_cursor_init(SpiceMarshaller *m, SpiceMsgCursorInit *msg);
@@ -96,6 +101,7 @@ void spice_marshall_msg_tunnel_socket_token(SpiceMarshaller *m, SpiceMsgTunnelSo
 #ifdef USE_SMARTCARD
 void spice_marshall_msg_smartcard_data(SpiceMarshaller *m, SpiceMsgSmartcard *msg);
 #endif /* USE_SMARTCARD */
+void spice_marshall_SpiceMsgCompressedData(SpiceMarshaller *m, SpiceMsgCompressedData *msg);
 void spice_marshall_msg_port_init(SpiceMarshaller *m, SpiceMsgPortInit *msg);
 void spice_marshall_msg_port_event(SpiceMarshaller *m, SpiceMsgPortEvent *msg);
 void spice_marshall_String(SpiceMarshaller *m, SpiceString *msg);
@@ -116,4 +122,7 @@ void spice_marshall_Text(SpiceMarshaller *m, SpiceText *msg, SpiceMarshaller **f
 void spice_marshall_Transparent(SpiceMarshaller *m, SpiceTransparent *msg, SpiceMarshaller **src_bitmap_out);
 void spice_marshall_AlphaBlend(SpiceMarshaller *m, SpiceAlphaBlend *msg, SpiceMarshaller **src_bitmap_out);
 void spice_marshall_Composite(SpiceMarshaller *m, SpiceComposite *msg, SpiceMarshaller **src_bitmap_out, SpiceMarshaller **mask_bitmap_out);
+
+SPICE_END_DECLS
+
 #endif

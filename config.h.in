@@ -17,9 +17,6 @@
 #endif
 
 
-/* Enable GLExt prototypes */
-#undef GL_GLEXT_PROTOTYPES
-
 /* Define to 1 if you have `alloca', as a function or macro. */
 #undef HAVE_ALLOCA
 
@@ -33,11 +30,20 @@
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
+/* Define if supporting GStreamer 0.10 */
+#undef HAVE_GSTREAMER_0_10
+
+/* Define if supporting GStreamer 1.0 */
+#undef HAVE_GSTREAMER_1_0
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
 /* Define to 1 if you have the <linux/sockios.h> header file. */
 #undef HAVE_LINUX_SOCKIOS_H
+
+/* Define to 1 if you have the `LZ4_compress_fast_continue' function. */
+#undef HAVE_LZ4_COMPRESS_FAST_CONTINUE
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
@@ -66,6 +72,9 @@
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
 
+/* Define to 1 if <netinet/tcp.h> has a TCP_KEEPIDLE definition */
+#undef HAVE_TCP_KEEPIDLE
+
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
@@ -93,6 +102,12 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* Enable SPICE statistics */
+#undef RED_STATISTICS
+
+/* Enable more type safe version of SPICE_CONTAINEROF */
+#undef SPICE_USE_SAFER_CONTAINEROF
+
 /* If using the C implementation of alloca, define if you know the
    direction of stack growth for your system; otherwise it will be
    automatically deduced at runtime.
@@ -106,9 +121,6 @@
 
 /* Define to build with lz4 support */
 #undef USE_LZ4
-
-/* Define to build with OpenGL support */
-#undef USE_OPENGL
 
 /* Define if supporting smartcard proxying */
 #undef USE_SMARTCARD

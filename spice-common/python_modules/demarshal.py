@@ -72,6 +72,10 @@ def write_parser_helpers(writer):
             writer.statement("return val")
             writer.end_block()
 
+    writer.function("SPICE_GNUC_UNUSED consume_fd", "int", "uint8_t **ptr SPICE_GNUC_UNUSED", True)
+    writer.statement("return -1")
+    writer.end_block()
+
     writer.newline()
     writer.statement("typedef struct PointerInfo PointerInfo")
     writer.statement("typedef void (*message_destructor_t)(uint8_t *message)")
@@ -1094,8 +1098,7 @@ def write_msg_parser(writer, message):
     writer.newline()
     if writer.has_error_check:
         writer.label("error")
-        with writer.block("if (data != NULL)"):
-            writer.statement("free(data)")
+        writer.statement("free(data)")
         writer.statement("return NULL")
     writer.end_block()
 

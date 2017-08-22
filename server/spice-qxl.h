@@ -24,6 +24,10 @@
 
 #include "spice-core.h"
 
+#ifndef SPICE_CAPABILITIES_SIZE
+#define SPICE_CAPABILITIES_SIZE (sizeof(((QXLRom*)0)->client_capabilities))
+#endif
+
 /* qxl interface */
 
 #define SPICE_INTERFACE_QXL "qxl"
@@ -100,6 +104,16 @@ void spice_qxl_driver_unload(QXLInstance *instance);
 /* since spice 0.12.6 */
 void spice_qxl_set_max_monitors(QXLInstance *instance,
                                 unsigned int max_monitors);
+/* since spice 0.13.1 */
+void spice_qxl_gl_scanout(QXLInstance *instance,
+                          int fd,
+                          uint32_t width, uint32_t height,
+                          uint32_t stride, uint32_t format,
+                          int y_0_top);
+void spice_qxl_gl_draw_async(QXLInstance *instance,
+                             uint32_t x, uint32_t y,
+                             uint32_t w, uint32_t h,
+                             uint64_t cookie);
 
 typedef struct QXLDrawArea {
     uint8_t *buf;
@@ -162,7 +176,17 @@ struct QXLInterface {
     void (*set_mm_time)(QXLInstance *qin, uint32_t mm_time) SPICE_GNUC_DEPRECATED;
 
     void (*get_init_info)(QXLInstance *qin, QXLDevInitInfo *info);
+
+    /* Retrieve the next command to be processed
+     * This call should be non-blocking. If no commands are available, it
+     * should return 0, or 1 if a command was retrieved */
     int (*get_command)(QXLInstance *qin, struct QXLCommandExt *cmd);
+
+    /* Request notification when new commands are available
+     * When a new command becomes available, the spice server should be
+     * notified by calling spice_qxl_wakeup(). If commands are already
+     * available, this function should return false and no notification
+     * triggered */
     int (*req_cmd_notification)(QXLInstance *qin);
     void (*release_resource)(QXLInstance *qin, struct QXLReleaseInfoExt release_info);
     int (*get_cursor_command)(QXLInstance *qin, struct QXLCommandExt *cmd);
@@ -175,7 +199,7 @@ struct QXLInterface {
                                  uint32_t num_updated_rects);
     void (*set_client_capabilities)(QXLInstance *qin,
                                     uint8_t client_present,
-                                    uint8_t caps[58]);
+                                    uint8_t caps[SPICE_CAPABILITIES_SIZE]);
     /* returns 1 if the interface is supported, 0 otherwise.
      * if monitors_config is NULL nothing is done except reporting the
      * return code. */

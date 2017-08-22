@@ -19,6 +19,7 @@
 #ifndef _H_MEM
 #define _H_MEM
 
+#include "log.h"
 #include <stdlib.h>
 #include <spice/macros.h>
 
@@ -116,7 +117,7 @@ size_t spice_strnlen(const char *str, size_t max_len);
         __p;                                              \
     }))
 #  define _SPICE_RENEW(struct_type, mem, n_structs, func) \
-    (struct_type *) (__extension__ ({                             \
+    (struct_type *) (__extension__ ({                     \
         size_t __n = (size_t) (n_structs);                \
         size_t __s = sizeof (struct_type);                \
         void *__p = (void *) (mem);                       \
@@ -132,13 +133,52 @@ size_t spice_strnlen(const char *str, size_t max_len);
 #else
 
 /* Unoptimized version: always call the _n() function. */
-
 #define _SPICE_NEW(struct_type, n_structs, func)                        \
     ((struct_type *) spice_##func##_n ((n_structs), sizeof (struct_type)))
 #define _SPICE_RENEW(struct_type, mem, n_structs, func)                 \
     ((struct_type *) spice_##func##_n (mem, (n_structs), sizeof (struct_type)))
 
 #endif
+
+/* Cast to a type with stricter alignment constraints (to build with clang) */
+
+/* Misaligned cast to a type with stricter alignment */
+#ifndef SPICE_DEBUG_ALIGNMENT
+#define SPICE_UNALIGNED_CAST(type, value) ((type)(void *)(value))
+#define SPICE_ALIGNED_CAST(type, value)   ((type)(void *)(value))
+
+#else // SPICE_DEBUG_ALIGNMENT
+#define SPICE_ALIGNED_CAST(type, value)                                 \
+    ((type)spice_alignment_check(G_STRLOC,                              \
+                                 (void *)(value),                       \
+                                 __alignof(*((type)0))))
+
+#define SPICE_UNALIGNED_CAST(type, value)                               \
+    ((type)spice_alignment_weak_check(G_STRLOC,                         \
+                                      (void *)(value),                  \
+                                      __alignof(*((type)0))))
+
+extern void spice_alignment_warning(const char *loc, void *p, unsigned sz);
+extern void spice_alignment_debug(const char *loc, void *p, unsigned sz);
+
+static inline void *spice_alignment_check(const char *loc,
+                                          void *ptr, unsigned sz)
+{
+    if (G_UNLIKELY(((uintptr_t) ptr & (sz-1U)) != 0))
+        spice_alignment_warning(loc, ptr, sz);
+    return ptr;
+
+}
+
+static inline void *spice_alignment_weak_check(const char *loc,
+                                               void *ptr, unsigned sz)
+{
+    if (G_UNLIKELY(((uintptr_t) ptr & (sz-1U)) != 0))
+        spice_alignment_debug(loc, ptr, sz);
+    return ptr;
+
+}
+#endif // SPICE_DEBUG_ALIGNMENT
 
 #define spice_new(struct_type, n_structs) _SPICE_NEW(struct_type, n_structs, malloc)
 #define spice_new0(struct_type, n_structs) _SPICE_NEW(struct_type, n_structs, malloc0)

@@ -1,14 +1,16 @@
 NULL =
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = spice-common server docs
+SUBDIRS = spice-common server docs tools
+
+check-valgrind:
+	$(MAKE) -C server check-valgrind
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = spice-server.pc
 
 DISTCHECK_CONFIGURE_FLAGS =			\
 	--enable-automated-tests		\
-	--enable-opengl				\
 	--enable-smartcard			\
 	--with-sasl				\
 	--enable-manual				\

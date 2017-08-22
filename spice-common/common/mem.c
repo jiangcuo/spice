@@ -46,13 +46,15 @@ size_t spice_strnlen(const char *str, size_t max_len)
 char *spice_strdup(const char *str)
 {
     char *copy;
+    size_t len;
 
     if (str == NULL) {
         return NULL;
     }
 
-    copy = (char *)spice_malloc(strlen(str) + 1);
-    strcpy(copy, str);
+    len = strlen(str) + 1;
+    copy = (char *)spice_malloc(len);
+    memcpy(copy, str, len);
     return copy;
 }
 
@@ -292,3 +294,25 @@ size_t spice_buffer_remove(SpiceBuffer *buffer, size_t len)
     buffer->offset -= len;
     return len;
 }
+
+#ifdef SPICE_DEBUG_ALIGNMENT
+void spice_alignment_warning(const char *loc, void *p, unsigned sz)
+{
+    static const char *last_loc = NULL;
+    if (loc != last_loc) {
+        last_loc = loc;
+        spice_log(SPICE_LOG_DOMAIN, G_LOG_LEVEL_WARNING, loc, __FUNCTION__,
+                  "Misaligned access at %p, alignment %u", p, sz);
+    }
+}
+
+void spice_alignment_debug(const char *loc, void *p, unsigned sz)
+{
+    static const char *last_loc = NULL;
+    if (loc != last_loc) {
+        last_loc = loc;
+        spice_log(SPICE_LOG_DOMAIN, G_LOG_LEVEL_DEBUG, loc, __FUNCTION__,
+                  "Expected misaligned access at %p, alignment %u", p, sz);
+    }
+}
+#endif // SPICE_DEBUG_ALIGNMENT

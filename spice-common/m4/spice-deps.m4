@@ -128,35 +128,6 @@ AC_DEFUN([SPICE_CHECK_OPUS], [
 ])
 
 
-# SPICE_CHECK_OPENGL
-# ------------------
-# Adds a --disable-opengl switch in order to enable/disable OpenGL
-# support, and checks if the needed libraries are available. If found, it will
-# return the flags to use in the GL_CFLAGS and GL_LIBS variables, and
-# it will define USE_OPENGL and GL_GLEXT_PROTOTYPES preprocessor symbol as well
-# as a HAVE_GL Makefile conditional.
-# ------------------
-AC_DEFUN([SPICE_CHECK_OPENGL], [
-    AC_ARG_ENABLE([opengl],
-        AS_HELP_STRING([--enable-opengl=@<:@yes/no@:>@],
-                       [Enable opengl support (not recommended) @<:@default=no@:>@]),
-        [],
-        [enable_opengl="no"])
-    AM_CONDITIONAL(HAVE_GL, test "x$enable_opengl" = "xyes")
-
-    if test "x$enable_opengl" = "xyes"; then
-        AC_CHECK_LIB(GL, glBlendFunc, GL_LIBS="$GL_LIBS -lGL", enable_opengl=no)
-        AC_CHECK_LIB(GLU, gluSphere, GL_LIBS="$GL_LIBS -lGLU", enable_opengl=no)
-        AC_DEFINE([USE_OPENGL], [1], [Define to build with OpenGL support])
-        AC_DEFINE([GL_GLEXT_PROTOTYPES], [], [Enable GLExt prototypes])
-
-        if test "x$enable_opengl" = "xno"; then
-            AC_MSG_ERROR([GL libraries not available])
-        fi
-    fi
-])
-
-
 # SPICE_CHECK_PIXMAN
 # ------------------
 # Check for the availability of pixman. If found, it will return the flags to
@@ -173,7 +144,7 @@ AC_DEFUN([SPICE_CHECK_PIXMAN], [
 # use in the GLIB2_CFLAGS and GLIB2_LIBS variables.
 #------------------
 AC_DEFUN([SPICE_CHECK_GLIB2], [
-    PKG_CHECK_MODULES(GLIB2, glib-2.0 >= 2.22 gio-2.0 >= 2.22)
+    PKG_CHECK_MODULES(GLIB2, glib-2.0 >= 2.22 gio-2.0 >= 2.22 gthread-2.0 >= 2.22)
 ])
 
 # SPICE_CHECK_PYTHON_MODULES()
@@ -184,15 +155,29 @@ AC_DEFUN([SPICE_CHECK_GLIB2], [
 # tarballs so they are disabled by default.
 #---------------------------
 AC_DEFUN([SPICE_CHECK_PYTHON_MODULES], [
-    AM_PATH_PYTHON
     AC_ARG_ENABLE([python-checks],
         AS_HELP_STRING([--enable-python-checks=@<:@yes/no@:>@],
                        [Enable checks for Python modules needed to build from git @<:@default=no@:>@]),
                        [],
                        [enable_python_checks="no"])
     if test "x$enable_python_checks" != "xno"; then
-        AX_PYTHON_MODULE([six], [1])
-        AX_PYTHON_MODULE([pyparsing], [1])
+        AS_IF([test -n "$PYTHON"], # already set required PYTHON version
+              [AM_PATH_PYTHON
+               AX_PYTHON_MODULE([six], [1])
+               AX_PYTHON_MODULE([pyparsing], [1])],
+              [PYTHON=python3
+               AX_PYTHON_MODULE([six])
+               AX_PYTHON_MODULE([pyparsing])
+               test "$HAVE_PYMOD_SIX" = "yes" && test "$HAVE_PYMOD_PYPARSING" = "yes"],
+              [AM_PATH_PYTHON([3])],
+              [PYTHON=python2
+               AX_PYTHON_MODULE([six])
+               AX_PYTHON_MODULE([pyparsing])
+               test "$HAVE_PYMOD_SIX" = "yes" && test "$HAVE_PYMOD_PYPARSING" = "yes"],
+              [AM_PATH_PYTHON([2])],
+              [AC_MSG_ERROR([Python modules six and pyparsing are required])])
+    else
+        AM_PATH_PYTHON
     fi
 ])
 
@@ -202,20 +187,41 @@ AC_DEFUN([SPICE_CHECK_PYTHON_MODULES], [
 # Adds a --enable-lz4 switch in order to enable/disable LZ4 compression
 # support, and checks if the needed libraries are available. If found, it will
 # return the flags to use in the LZ4_CFLAGS and LZ4_LIBS variables, and
-# it will define a USE_LZ4 preprocessor symbol.
-# conditional.
+# it will define a USE_LZ4 preprocessor symbol and a HAVE_LZ4 conditional.
 # ---------------
 AC_DEFUN([SPICE_CHECK_LZ4], [
     AC_ARG_ENABLE([lz4],
-      AS_HELP_STRING([--enable-lz4=@<:@yes/no@:>@],
-                     [Enable LZ4 compression support @<:@default=no@:>@]),
+      AS_HELP_STRING([--enable-lz4=@<:@yes/no/auto@:>@],
+                     [Enable LZ4 compression support @<:@default=auto@:>@]),
       [],
-      [enable_lz4="no"])
+      [enable_lz4="auto"])
 
+    have_lz4="no"
     if test "x$enable_lz4" != "xno"; then
-      PKG_CHECK_MODULES([LZ4], [liblz4])
-      AC_DEFINE(USE_LZ4, [1], [Define to build with lz4 support])
+      # LZ4_compress_default is available in liblz4 >= 129, however liblz has changed
+      # versioning scheme making the check failing. Rather check for function definition
+      PKG_CHECK_MODULES([LZ4], [liblz4], [have_lz4="yes"], [have_lz4="no"])
+
+      if test "x$have_lz4" = "xyes"; then
+        # It is necessary to set LIBS and CFLAGS before AC_CHECK_FUNC
+        old_LIBS="$LIBS"
+        old_CFLAGS="$CFLAGS"
+        CFLAGS="$CFLAGS $LZ4_CFLAGS"
+        LIBS="$LIBS $LZ4_LIBS"
+
+        AC_CHECK_FUNC([LZ4_compress_default], [
+            AC_DEFINE(USE_LZ4, [1], [Define to build with lz4 support])],
+            [have_lz4="no"])
+        AC_CHECK_FUNCS([LZ4_compress_fast_continue])
+
+        LIBS="$old_LIBS"
+        CFLAGS="$old_CFLAGS"
+      fi
+      if test "x$enable_lz4" = "xyes" && test "x$have_lz4" = "xno"; then
+        AC_MSG_ERROR([lz4 support requested but liblz4 >= 129 could not be found])
+      fi
     fi
+    AM_CONDITIONAL(HAVE_LZ4, test "x$have_lz4" = "xyes")
 ])
 
 
@@ -295,4 +301,13 @@ AC_DEFUN([SPICE_CHECK_SASL], [
         AC_DEFINE([HAVE_SASL], 1, [whether Cyrus SASL is available for authentication])
       fi
     fi
+])
+
+# SPICE_CHECK_OPENSSL
+# -----------------
+# Check for the availability of openssl. If found, it will return the flags to
+# use in the OPENSSL_CFLAGS and OPENSSL_LIBS variables.
+#------------------
+AC_DEFUN([SPICE_CHECK_OPENSSL], [
+    PKG_CHECK_MODULES(OPENSSL, openssl)
 ])
