@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Liang Guo <guoliang@debian.org>
 Uploaders: Michael Tokarev <mjt@tls.msk.ru>
 Build-Depends:
- debhelper (>= 9),
+ debhelper (>= 10),
  dh-autoreconf,
  gstreamer1.0-libav,
  gstreamer1.0-plugins-base,
