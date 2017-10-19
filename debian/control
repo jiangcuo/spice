@@ -26,7 +26,8 @@ Build-Depends:
  python,
  python-pyparsing,
  python-six,
-Standards-Version: 4.1.0
+ liborc-0.4-dev,
+Standards-Version: 4.1.1
 Homepage: http://spice-space.org/
 Vcs-Git: https://anonscm.debian.org/git/collab-maint/spice.git
 Vcs-Browser: https://anonscm.debian.org/gitweb/?p=collab-maint/spice.git

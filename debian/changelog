@@ -2,6 +2,9 @@ spice (0.14.0-1) unstable; urgency=medium
 
   * New upstream release
   * d/copyright: refresh 
+  * debian/control:
+    - Add liborc-0.4-dev to Build-Depends, 
+    - Bump Standards-Version to 4.1.1 (no changes)
 
  -- Liang Guo <guoliang@debian.org>  Thu, 19 Oct 2017 14:35:54 +0800
 
