@@ -5,6 +5,7 @@ spice (0.14.0-1) unstable; urgency=medium
   * debian/control:
     - Add liborc-0.4-dev to Build-Depends, 
     - Bump Standards-Version to 4.1.1 (no changes)
+  * debian/compat, bump to 10
 
  -- Liang Guo <guoliang@debian.org>  Thu, 19 Oct 2017 14:35:54 +0800
 
