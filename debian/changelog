@@ -9,6 +9,7 @@ spice (0.14.0-1) unstable; urgency=medium
     - Bump Standards-Version to 4.1.1 (no changes)
     - Use https in Homepage
   * debian/compat, bump to 10
+  * debian/watch, switch to https
 
  -- Liang Guo <guoliang@debian.org>  Thu, 19 Oct 2017 14:35:54 +0800
 
