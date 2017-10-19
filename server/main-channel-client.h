@@ -69,7 +69,7 @@ void main_channel_client_start_net_test(MainChannelClient *mcc, int test_rate);
 // and calling from main.
 void main_channel_client_push_init(MainChannelClient *mcc,
                                    int display_channels_hint,
-                                   int current_mouse_mode,
+                                   SpiceMouseMode current_mouse_mode,
                                    int is_client_mouse_allowed,
                                    int multi_media_time,
                                    int ram_hint);
@@ -124,19 +124,9 @@ enum {
     RED_PIPE_ITEM_TYPE_MAIN_AGENT_CONNECTED_TOKENS,
 };
 
-typedef struct MainMouseModeItemInfo {
-    int current_mode;
-    int is_client_mouse_allowed;
-} MainMouseModeItemInfo;
+RedPipeItem *main_mouse_mode_item_new(SpiceMouseMode current_mode, int is_client_mouse_allowed);
 
-RedPipeItem *main_mouse_mode_item_new(RedChannelClient *rcc, void *data, int num);
-
-typedef struct MainMultiMediaTimeItemInfo {
-    int time;
-} MainMultiMediaTimeItemInfo;
-
-RedPipeItem *main_multi_media_time_item_new(RedChannelClient *rcc,
-                                            void *data, int num);
+RedPipeItem *main_multi_media_time_item_new(uint32_t mm_time);
 
 G_END_DECLS
 

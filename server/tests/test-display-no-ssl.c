@@ -27,22 +27,17 @@
 #include <stdlib.h>
 #include "test-display-base.h"
 
-SpiceCoreInterface *core;
-SpiceTimer *ping_timer;
+static SpiceCoreInterface *core;
+static SpiceTimer *ping_timer;
 
-void show_channels(SpiceServer *server);
-
-int ping_ms = 100;
+static int ping_ms = 100;
 
 static void pinger(SPICE_GNUC_UNUSED void *opaque)
 {
-    // show_channels is not thread safe - fails if disconnections / connections occur
-    //show_channels(server);
-
     core->timer_start(ping_timer, ping_ms);
 }
 
-int simple_commands[] = {
+static const int simple_commands[] = {
     //SIMPLE_CREATE_SURFACE,
     //SIMPLE_DRAW,
     //SIMPLE_DESTROY_SURFACE,
@@ -61,12 +56,13 @@ int main(void)
     //spice_server_set_image_compression(server, SPICE_IMAGE_COMPRESSION_OFF);
     test_add_display_interface(test);
     test_add_agent_interface(test->server);
-    test_set_simple_command_list(test, simple_commands, COUNT(simple_commands));
+    test_set_simple_command_list(test, simple_commands, G_N_ELEMENTS(simple_commands));
 
     ping_timer = core->timer_add(pinger, NULL);
     core->timer_start(ping_timer, ping_ms);
 
     basic_event_loop_mainloop();
+    test_destroy(test);
 
     return 0;
 }

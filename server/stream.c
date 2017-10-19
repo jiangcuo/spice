@@ -25,9 +25,7 @@
 
 #define FPS_TEST_INTERVAL 1
 #define FOREACH_STREAMS(display, item)                  \
-    for (item = ring_get_head(&(display)->priv->streams);     \
-         item != NULL;                                  \
-         item = ring_next(&(display)->priv->streams, item))
+    RING_FOREACH(item, &(display)->priv->streams)
 
 static void stream_agent_stats_print(StreamAgent *agent)
 {
@@ -70,12 +68,12 @@ static void stream_create_destroy_item_release(RedPipeItem *base)
     StreamCreateDestroyItem *item = SPICE_UPCAST(StreamCreateDestroyItem, base);
     DisplayChannel *display = DCC_TO_DC(item->agent->dcc);
     stream_agent_unref(display, item->agent);
-    free(item);
+    g_free(item);
 }
 
 static RedPipeItem *stream_create_destroy_item_new(StreamAgent *agent, gint type)
 {
-    StreamCreateDestroyItem *item = spice_new0(StreamCreateDestroyItem, 1);
+    StreamCreateDestroyItem *item = g_new0(StreamCreateDestroyItem, 1);
 
     red_pipe_item_init_full(&item->base, type,
                             stream_create_destroy_item_release);
@@ -98,13 +96,12 @@ static RedPipeItem *stream_destroy_item_new(StreamAgent *agent)
 void stream_stop(DisplayChannel *display, Stream *stream)
 {
     DisplayChannelClient *dcc;
-    GListIter iter;
 
     spice_return_if_fail(ring_item_is_linked(&stream->link));
     spice_return_if_fail(!stream->current);
 
     spice_debug("stream %d", display_channel_get_stream_id(display, stream));
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         StreamAgent *stream_agent;
 
         stream_agent = dcc_get_stream_agent(dcc, display_channel_get_stream_id(display, stream));
@@ -173,12 +170,12 @@ static void red_stream_clip_item_free(RedPipeItem *base)
 
     stream_agent_unref(display, item->stream_agent);
     free(item->rects);
-    free(item);
+    g_free(item);
 }
 
 RedStreamClipItem *red_stream_clip_item_new(StreamAgent *agent)
 {
-    RedStreamClipItem *item = spice_new(RedStreamClipItem, 1);
+    RedStreamClipItem *item = g_new(RedStreamClipItem, 1);
     red_pipe_item_init_full(&item->base, RED_PIPE_ITEM_TYPE_STREAM_CLIP,
                             red_stream_clip_item_free);
 
@@ -281,7 +278,6 @@ static bool is_next_stream_frame(DisplayChannel *display,
 static void attach_stream(DisplayChannel *display, Drawable *drawable, Stream *stream)
 {
     DisplayChannelClient *dcc;
-    GListIter iter;
 
     spice_assert(drawable && stream);
     spice_assert(!drawable->stream && !stream->current);
@@ -300,7 +296,7 @@ static void attach_stream(DisplayChannel *display, Drawable *drawable, Stream *s
         stream->num_input_frames++;
     }
 
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         StreamAgent *agent;
         QRegion clip_in_draw_dest;
 
@@ -381,7 +377,6 @@ static Stream *display_channel_stream_try_new(DisplayChannel *display)
 static void display_channel_create_stream(DisplayChannel *display, Drawable *drawable)
 {
     DisplayChannelClient *dcc;
-    GListIter iter;
     Stream *stream;
     SpiceRect* src_rect;
 
@@ -418,7 +413,7 @@ static void display_channel_create_stream(DisplayChannel *display, Drawable *dra
     stream->input_fps_start_time = drawable->creation_time;
     display->priv->streams_size_total += stream->width * stream->height;
     display->priv->stream_count++;
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         dcc_create_stream(dcc, stream);
     }
     spice_debug("stream %d %dx%d (%d, %d) (%d, %d) %u fps",
@@ -775,14 +770,15 @@ void stream_agent_stop(StreamAgent *agent)
 
 static void red_upgrade_item_free(RedPipeItem *base)
 {
+    g_return_if_fail(base != NULL);
+
     RedUpgradeItem *item = SPICE_UPCAST(RedUpgradeItem, base);
 
-    g_return_if_fail(item != NULL);
     g_return_if_fail(item->base.refcount == 0);
 
     drawable_unref(item->drawable);
     free(item->rects);
-    free(item);
+    g_free(item);
 }
 
 /*
@@ -823,7 +819,7 @@ static void dcc_detach_stream_gracefully(DisplayChannelClient *dcc,
         spice_debug("stream %d: upgrade by drawable. box ==>", stream_id);
         rect_debug(&stream->current->red_drawable->bbox);
         rcc = RED_CHANNEL_CLIENT(dcc);
-        upgrade_item = spice_new(RedUpgradeItem, 1);
+        upgrade_item = g_new(RedUpgradeItem, 1);
         red_pipe_item_init_full(&upgrade_item->base, RED_PIPE_ITEM_TYPE_UPGRADE,
                                 red_upgrade_item_free);
         upgrade_item->drawable = stream->current;
@@ -856,10 +852,9 @@ clear_vis_region:
 static void detach_stream_gracefully(DisplayChannel *display, Stream *stream,
                                      Drawable *update_area_limit)
 {
-    GListIter iter;
     DisplayChannelClient *dcc;
 
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         dcc_detach_stream_gracefully(dcc, stream, update_area_limit);
     }
     if (stream->current) {
@@ -881,7 +876,6 @@ void stream_detach_behind(DisplayChannel *display, QRegion *region, Drawable *dr
 {
     Ring *ring = &display->priv->streams;
     RingItem *item = ring_get_head(ring);
-    GListIter iter;
     DisplayChannelClient *dcc;
     bool is_connected = red_channel_is_connected(RED_CHANNEL(display));
 
@@ -890,7 +884,7 @@ void stream_detach_behind(DisplayChannel *display, QRegion *region, Drawable *dr
         int detach = 0;
         item = ring_next(ring, item);
 
-        FOREACH_DCC(display, iter, dcc) {
+        FOREACH_DCC(display, dcc) {
             StreamAgent *agent = dcc_get_stream_agent(dcc, display_channel_get_stream_id(display, stream));
 
             if (region_intersects(&agent->vis_region, region)) {

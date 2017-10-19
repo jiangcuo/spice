@@ -1083,15 +1083,18 @@ favourite operating system so you can use it for installation.</p></div>
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>host$ qemu-kvm -boot <span style="color: #009900">order</span><span style="color: #990000">=</span>dc -vga qxl <span style="color: #990000">\</span>
+<pre><tt>host$ qemu-kvm -machine <span style="color: #009900">vmport</span><span style="color: #990000">=</span>off <span style="color: #990000">\</span>
+        -boot <span style="color: #009900">order</span><span style="color: #990000">=</span>dc -vga qxl <span style="color: #990000">\</span>
         -spice <span style="color: #009900">port</span><span style="color: #990000">=</span><span style="color: #993399">3001</span><span style="color: #990000">,</span>disable-ticketing -soundhw hda <span style="color: #990000">\</span>
         -device virtio-serial -chardev spicevmc<span style="color: #990000">,</span><span style="color: #009900">id</span><span style="color: #990000">=</span>vdagent<span style="color: #990000">,</span><span style="color: #009900">debug</span><span style="color: #990000">=</span><span style="color: #993399">0</span><span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>vdagent <span style="color: #990000">\</span>
         -device virtserialport<span style="color: #990000">,</span><span style="color: #009900">chardev</span><span style="color: #990000">=</span>vdagent<span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>com<span style="color: #990000">.</span>redhat<span style="color: #990000">.</span>spice<span style="color: #990000">.</span><span style="color: #993399">0</span> <span style="color: #990000">\</span>
         -cdrom /path/to/your<span style="color: #990000">.</span>iso /path/to/your<span style="color: #990000">.</span>img</tt></pre></div></div>
 <div class="paragraph"><p>Let&#8217;s take a brief look at the qemu options that were used. The option
-<code>-boot order=dc</code> specifies that the guest system should try to boot
-from the first cdrom and then fallback to the first disk, <code>-vga qxl</code>
-specifies that qemu uses a qxl graphics device.</p></div>
+<code>-machine vmport=off</code> disables VMWare IO port emulation, which is
+necessary for server mode mouse to work properly with spice. The option <code>-boot
+order=dc</code> specifies that the guest system should try to boot from the first
+cdrom and then fallback to the first disk, <code>-vga qxl</code> specifies that qemu uses
+a qxl graphics device.</p></div>
 <div class="paragraph"><p>The Spice <code>port</code> option defines what port will be used for
 communication with the client. The Spice option <code>disable-ticketing</code> is
 specifying that ticketing (simple authentication method) is not
@@ -2182,7 +2185,7 @@ Client is referring to a system running the Spice client (the recommended one is
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-07-17 09:05:39 CEST
+Last updated 2017-10-10 15:50:12 CEST
 </div>
 </div>
 </body>

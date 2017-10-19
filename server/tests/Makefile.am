@@ -24,10 +24,6 @@ AM_CPPFLAGS =					\
 	$(WARN_CFLAGS)				\
 	$(NULL)
 
-if HAVE_AUTOMATED_TESTS
-AM_CPPFLAGS += -DAUTOMATED_TESTS
-endif
-
 noinst_LIBRARIES = libtest.a
 
 libtest_a_SOURCES =				\
@@ -59,42 +55,30 @@ check_PROGRAMS =				\
 	test-stat-file				\
 	test-leaks				\
 	test-vdagent				\
+	test-fail-on-null-core-interface	\
+	test-empty-success			\
+	test-channel				\
 	$(NULL)
 
 noinst_PROGRAMS =				\
 	test-display-no-ssl			\
 	test-display-streaming			\
-	test-empty-success			\
-	test-fail-on-null-core-interface	\
 	test-just-sockets-no-ssl		\
 	test-playback				\
 	test-display-resolution-changes		\
 	test-two-servers			\
 	test-display-width-stride		\
-	spice-server-replay			\
 	$(check_PROGRAMS)			\
 	$(NULL)
-
-if HAVE_GSTREAMER
-noinst_PROGRAMS += test-gst
-endif
 
 TESTS = $(check_PROGRAMS)			\
 	$(NULL)
 
-if ENABLE_EXTRA_CHECKS
-if HAVE_GSTREAMER_1_0
-TESTS += video-encoders
-endif
-endif
-EXTRA_DIST += video-encoders
+test_qxl_parsing_LDADD = ../libserver.la $(LDADD)
 
-noinst_LIBRARIES += \
-	libtest-stat1.a \
-	libtest-stat2.a \
-	libtest-stat3.a \
-	libtest-stat4.a \
-	$(NULL)
+## spice-server-replay
+
+noinst_PROGRAMS += spice-server-replay
 
 spice_server_replay_SOURCES = replay.c		\
 	../event-loop.c				\
@@ -109,7 +93,16 @@ spice_server_replay_LDADD =					\
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
-test_stat_SOURCES = stat-main.c
+## test-stat
+
+noinst_LIBRARIES += \
+	libtest-stat1.a \
+	libtest-stat2.a \
+	libtest-stat3.a \
+	libtest-stat4.a \
+	$(NULL)
+
+test_stat_SOURCES = test-stat.c
 test_stat_LDADD = \
 	libtest-stat1.a \
 	libtest-stat2.a \
@@ -130,19 +123,15 @@ libtest_stat3_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORK
 libtest_stat4_a_SOURCES = stat-test.c
 libtest_stat4_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORKER_STAT=1 -DTEST_NAME=stat_test4
 
-test_qxl_parsing_LDADD = ../libserver.la $(LDADD)
-
-# Fallback implementations are provided for older glibs for the recent glib
-# methods this test is using, so no need to warn about them
-test_vdagent_CPPFLAGS =			\
-	$(AM_CPPFLAGS)			\
-	-UGLIB_VERSION_MIN_REQUIRED	\
-	-UGLIB_VERSION_MAX_ALLOWED	\
-	$(NULL)
-test_codecs_parsing_CPPFLAGS = $(test_vdagent_CPPFLAGS)
-test_qxl_parsing_CPPFLAGS = $(test_vdagent_CPPFLAGS)
+## test-gst (helper) and video-encoders (test)
 
 if HAVE_GSTREAMER
+noinst_PROGRAMS += test-gst
+
+if ENABLE_EXTRA_CHECKS
+TESTS += video-encoders
+endif
+
 test_gst_SOURCES = test-gst.c \
 	$(NULL)
 test_gst_CPPFLAGS = \
@@ -151,3 +140,5 @@ test_gst_CPPFLAGS = \
 	$(GSTREAMER_1_0_CFLAGS)			\
 	$(NULL)
 endif
+
+EXTRA_DIST += video-encoders

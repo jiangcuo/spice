@@ -28,7 +28,8 @@ G_DEFINE_TYPE(DisplayChannel, display_channel, TYPE_COMMON_GRAPHICS_CHANNEL)
 enum {
     PROP0,
     PROP_N_SURFACES,
-    PROP_VIDEO_CODECS
+    PROP_VIDEO_CODECS,
+    PROP_QXL
 };
 
 static void
@@ -46,6 +47,9 @@ display_channel_get_property(GObject *object,
             break;
         case PROP_VIDEO_CODECS:
             g_value_set_static_boxed(value, self->priv->video_codecs);
+            break;
+        case PROP_QXL:
+            g_value_set_pointer(value, self->priv->qxl);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -68,6 +72,9 @@ display_channel_set_property(GObject *object,
         case PROP_VIDEO_CODECS:
             display_channel_set_video_codecs(self, g_value_get_boxed(value));
             break;
+        case PROP_QXL:
+            self->priv->qxl = g_value_get_pointer(value);
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
     }
@@ -80,6 +87,30 @@ display_channel_finalize(GObject *object)
 
     display_channel_destroy_surfaces(self);
     image_cache_reset(&self->priv->image_cache);
+
+    if (ENABLE_EXTRA_CHECKS) {
+        unsigned int count;
+        _Drawable *drawable;
+        Stream *stream;
+
+        count = 0;
+        for (drawable = self->priv->free_drawables; drawable; drawable = drawable->u.next) {
+            ++count;
+        }
+        spice_assert(count == NUM_DRAWABLES);
+
+        count = 0;
+        for (stream = self->priv->free_streams; stream; stream = stream->next) {
+            ++count;
+        }
+        spice_assert(count == NUM_STREAMS);
+        spice_assert(ring_is_empty(&self->priv->streams));
+
+        for (count = 0; count < NUM_SURFACES; ++count) {
+            spice_assert(self->priv->surfaces[count].context.canvas == NULL);
+        }
+    }
+
     monitors_config_unref(self->priv->monitors_config);
     g_array_unref(self->priv->video_codecs);
     g_free(self->priv);
@@ -254,9 +285,8 @@ static void stop_streams(DisplayChannel *display)
 void display_channel_surface_unref(DisplayChannel *display, uint32_t surface_id)
 {
     RedSurface *surface = &display->priv->surfaces[surface_id];
-    QXLInstance *qxl = common_graphics_channel_get_qxl(COMMON_GRAPHICS_CHANNEL(display));
+    QXLInstance *qxl = display->priv->qxl;
     DisplayChannelClient *dcc;
-    GListIter iter;
 
     if (--surface->refs != 0) {
         return;
@@ -278,7 +308,7 @@ void display_channel_surface_unref(DisplayChannel *display, uint32_t surface_id)
 
     region_destroy(&surface->draw_dirty_region);
     surface->context.canvas = NULL;
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         dcc_destroy_surface(dcc, surface_id);
     }
 
@@ -296,7 +326,6 @@ static void streams_update_visible_region(DisplayChannel *display, Drawable *dra
 {
     Ring *ring;
     RingItem *item;
-    GListIter iter;
     DisplayChannelClient *dcc;
 
     if (!red_channel_is_connected(RED_CHANNEL(display))) {
@@ -320,7 +349,7 @@ static void streams_update_visible_region(DisplayChannel *display, Drawable *dra
             continue;
         }
 
-        FOREACH_DCC(display, iter, dcc) {
+        FOREACH_DCC(display, dcc) {
             agent = dcc_get_stream_agent(dcc, display_channel_get_stream_id(display, stream));
 
             if (region_intersects(&agent->vis_region, &drawable->tree_item.base.rgn)) {
@@ -335,10 +364,9 @@ static void streams_update_visible_region(DisplayChannel *display, Drawable *dra
 static void pipes_add_drawable(DisplayChannel *display, Drawable *drawable)
 {
     DisplayChannelClient *dcc;
-    GListIter iter;
 
     spice_warn_if_fail(drawable->pipes == NULL);
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         dcc_prepend_drawable(dcc, drawable);
     }
 }
@@ -363,9 +391,8 @@ static void pipes_add_drawable_after(DisplayChannel *display,
         return;
     }
     if (num_other_linked != red_channel_get_n_clients(RED_CHANNEL(display))) {
-        GListIter iter;
         spice_debug("TODO: not O(n^2)");
-        FOREACH_DCC(display, iter, dcc) {
+        FOREACH_DCC(display, dcc) {
             int sent = 0;
             GList *l;
             for (l = pos_after->pipes; l != NULL; l = l->next) {
@@ -546,7 +573,6 @@ static bool current_add_equal(DisplayChannel *display, DrawItem *item, TreeItem 
 
             DisplayChannelClient *dcc;
             GList *dpi_item;
-            GListIter iter;
 
             other_drawable->refs++;
             current_remove_drawable(display, other_drawable);
@@ -555,7 +581,7 @@ static bool current_add_equal(DisplayChannel *display, DrawItem *item, TreeItem 
              * (or will receive) other_drawable */
             dpi_item = g_list_first(other_drawable->pipes);
             /* dpi contains a sublist of dcc's, ordered the same */
-            FOREACH_DCC(display, iter, dcc) {
+            FOREACH_DCC(display, dcc) {
                 if (dpi_item && dcc == ((RedDrawablePipeItem *) dpi_item->data)->dcc) {
                     dpi_item = dpi_item->next;
                 } else {
@@ -1481,24 +1507,22 @@ void display_channel_flush_all_surfaces(DisplayChannel *display)
 
 void display_channel_free_glz_drawables_to_free(DisplayChannel *display)
 {
-    GListIter iter;
     DisplayChannelClient *dcc;
 
     spice_return_if_fail(display);
 
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         image_encoders_free_glz_drawables_to_free(dcc_get_encoders(dcc));
     }
 }
 
 void display_channel_free_glz_drawables(DisplayChannel *display)
 {
-    GListIter iter;
     DisplayChannelClient *dcc;
 
     spice_return_if_fail(display);
 
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         image_encoders_free_glz_drawables(dcc_get_encoders(dcc));
     }
 }
@@ -1537,11 +1561,10 @@ void display_channel_free_some(DisplayChannel *display)
 {
     int n = 0;
     DisplayChannelClient *dcc;
-    GListIter iter;
 
     spice_debug("#draw=%d, #glz_draw=%d", display->priv->drawable_count,
                 display->priv->encoder_shared_data.glz_drawable_count);
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         ImageEncoders *encoders = dcc_get_encoders(dcc);
 
         // encoding using the dictionary is prevented since the following operations might
@@ -1555,7 +1578,7 @@ void display_channel_free_some(DisplayChannel *display)
         free_one_drawable(display, TRUE);
     }
 
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         ImageEncoders *encoders = dcc_get_encoders(dcc);
 
         image_encoders_glz_encode_unlock(encoders);
@@ -1991,7 +2014,7 @@ static void region_to_qxlrects(QRegion *region, QXLRect *qxl_rects, uint32_t num
     SpiceRect *rects;
     int i;
 
-    rects = spice_new0(SpiceRect, num_rects);
+    rects = g_new0(SpiceRect, num_rects);
     region_ret_rects(region, rects, num_rects);
     for (i = 0; i < num_rects; i++) {
         qxl_rects[i].top    = rects[i].top;
@@ -1999,7 +2022,7 @@ static void region_to_qxlrects(QRegion *region, QXLRect *qxl_rects, uint32_t num
         qxl_rects[i].bottom = rects[i].bottom;
         qxl_rects[i].right  = rects[i].right;
     }
-    free(rects);
+    g_free(rects);
 }
 
 void display_channel_update(DisplayChannel *display,
@@ -2017,7 +2040,7 @@ void display_channel_update(DisplayChannel *display,
     surface = &display->priv->surfaces[surface_id];
     if (*qxl_dirty_rects == NULL) {
         *num_dirty_rects = pixman_region32_n_rects(&surface->draw_dirty_region);
-        *qxl_dirty_rects = spice_new0(QXLRect, *num_dirty_rects);
+        *qxl_dirty_rects = g_new0(QXLRect, *num_dirty_rects);
     }
 
     region_to_qxlrects(&surface->draw_dirty_region, *qxl_dirty_rects, *num_dirty_rects);
@@ -2028,10 +2051,9 @@ void display_channel_update(DisplayChannel *display,
 static void clear_surface_drawables_from_pipes(DisplayChannel *display, int surface_id,
                                                int wait_if_used)
 {
-    GListIter iter;
     DisplayChannelClient *dcc;
 
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         if (!dcc_clear_surface_drawables_from_pipe(dcc, surface_id, wait_if_used)) {
             red_channel_client_disconnect(RED_CHANNEL_CLIENT(dcc));
         }
@@ -2095,9 +2117,8 @@ void display_channel_destroy_surfaces(DisplayChannel *display)
 static void send_create_surface(DisplayChannel *display, int surface_id, int image_ready)
 {
     DisplayChannelClient *dcc;
-    GListIter iter;
 
-    FOREACH_DCC(display, iter, dcc) {
+    FOREACH_DCC(display, dcc) {
         dcc_create_surface(dcc, surface_id);
         if (image_ready)
             dcc_push_surface_image(dcc, surface_id);
@@ -2173,26 +2194,6 @@ void display_channel_create_surface(DisplayChannel *display, uint32_t surface_id
     spice_return_if_fail(surface->context.canvas);
     if (send_client)
         send_create_surface(display, surface_id, data_is_valid);
-}
-
-static void on_disconnect(RedChannelClient *rcc)
-{
-    DisplayChannel *display;
-    DisplayChannelClient *dcc;
-
-    spice_debug("trace");
-    spice_return_if_fail(rcc != NULL);
-
-    dcc = DISPLAY_CHANNEL_CLIENT(rcc);
-    display = DCC_TO_DC(dcc);
-
-    dcc_stop(dcc); // TODO: start/stop -> connect/disconnect?
-    display_channel_compress_stats_print(display);
-
-    // this was the last channel client
-    spice_debug("#draw=%d, #glz_draw=%d",
-                display->priv->drawable_count,
-                display->priv->encoder_shared_data.glz_drawable_count);
 }
 
 static bool handle_migrate_flush_mark(RedChannelClient *rcc)
@@ -2382,17 +2383,15 @@ void display_channel_update_compression(DisplayChannel *display, DisplayChannelC
 
 void display_channel_gl_scanout(DisplayChannel *display)
 {
-    red_channel_pipes_new_add_push(RED_CHANNEL(display), dcc_gl_scanout_item_new, NULL);
+    red_channel_pipes_new_add(RED_CHANNEL(display), dcc_gl_scanout_item_new, NULL);
 }
 
 static void set_gl_draw_async_count(DisplayChannel *display, int num)
 {
-    QXLInstance *qxl = common_graphics_channel_get_qxl(COMMON_GRAPHICS_CHANNEL(display));
-
     display->priv->gl_draw_async_count = num;
 
     if (num == 0) {
-        red_qxl_gl_draw_async_complete(qxl);
+        red_qxl_gl_draw_async_complete(display->priv->qxl);
     }
 }
 
@@ -2402,7 +2401,7 @@ void display_channel_gl_draw(DisplayChannel *display, SpiceMsgDisplayGlDraw *dra
 
     spice_return_if_fail(display->priv->gl_draw_async_count == 0);
 
-    num = red_channel_pipes_new_add_push(RED_CHANNEL(display), dcc_gl_draw_item_new, draw);
+    num = red_channel_pipes_new_add(RED_CHANNEL(display), dcc_gl_draw_item_new, draw);
     set_gl_draw_async_count(display, num);
 }
 
@@ -2436,6 +2435,15 @@ gboolean display_channel_validate_surface(DisplayChannel *display, uint32_t surf
     return TRUE;
 }
 
+void display_channel_push_monitors_config(DisplayChannel *display)
+{
+    DisplayChannelClient *dcc;
+
+    FOREACH_DCC(display, dcc) {
+        dcc_push_monitors_config(dcc);
+    }
+}
+
 void display_channel_update_monitors_config(DisplayChannel *display,
                                             QXLMonitorsConfig *config,
                                             uint16_t count, uint16_t max_allowed)
@@ -2446,6 +2454,8 @@ void display_channel_update_monitors_config(DisplayChannel *display,
 
     display->priv->monitors_config =
         monitors_config_new(config->heads, count, max_allowed);
+
+    display_channel_push_monitors_config(display);
 }
 
 void display_channel_set_monitors_config_to_primary(DisplayChannel *display)
@@ -2485,7 +2495,6 @@ display_channel_class_init(DisplayChannelClass *klass)
     channel_class->parser = spice_get_client_channel_parser(SPICE_CHANNEL_DISPLAY, NULL);
     channel_class->handle_message = dcc_handle_message;
 
-    channel_class->on_disconnect = on_disconnect;
     channel_class->send_item = dcc_send_item;
     channel_class->handle_migrate_flush_mark = handle_migrate_flush_mark;
     channel_class->handle_migrate_data = handle_migrate_data;
@@ -2510,6 +2519,14 @@ display_channel_class_init(DisplayChannelClass *klass)
                                                        G_PARAM_CONSTRUCT_ONLY |
                                                        G_PARAM_READWRITE |
                                                        G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property(object_class,
+                                    PROP_QXL,
+                                    g_param_spec_pointer("qxl",
+                                                         "qxl",
+                                                         "QXLInstance for this channel",
+                                                         G_PARAM_READWRITE |
+                                                         G_PARAM_CONSTRUCT_ONLY |
+                                                         G_PARAM_STATIC_STRINGS));
 }
 
 void display_channel_debug_oom(DisplayChannel *display, const char *msg)

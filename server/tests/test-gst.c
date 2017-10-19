@@ -172,6 +172,7 @@ static TestFrame *gst_to_spice_frame(GstSample *sample);
 static void bitmap_free(SpiceBitmap *bitmap);
 static void frame_ref(TestFrame *frame);
 static void frame_unref(TestFrame *frame);
+static void pipeline_free(TestPipeline *pipeline);
 static void pipeline_send_raw_data(TestPipeline *pipeline, VideoBuffer *buffer);
 static void pipeline_wait_eos(TestPipeline *pipeline);
 static void create_input_pipeline(const char *input_pipeline,
@@ -296,6 +297,7 @@ output_frames(GstSample *sample, void *param)
 static const EncoderInfo encoder_infos[] = {
     { "mjpeg", mjpeg_encoder_new, SPICE_VIDEO_CODEC_TYPE_MJPEG,
       "caps=image/jpeg", "jpegdec" },
+#define encoder_info_mjpeg (&encoder_infos[0])
     { "gstreamer:mjpeg", gstreamer_encoder_new, SPICE_VIDEO_CODEC_TYPE_MJPEG,
       "caps=image/jpeg", "jpegdec" },
     { "gstreamer:vp8",   gstreamer_encoder_new, SPICE_VIDEO_CODEC_TYPE_VP8,
@@ -314,11 +316,11 @@ static const EncoderInfo encoder_infos[] = {
 int main(int argc, char *argv[])
 {
     gchar *input_pipeline_desc = NULL;
-    const gchar *image_format = "32BIT";
-    const gchar *encoder_name = "mjpeg";
+    gchar *image_format = NULL;
+    gchar *encoder_name = NULL;
     gchar *file_report_name = NULL;
     gboolean use_hw_encoder = FALSE; // TODO use
-    const gchar *clipping = "(0,0)x(100%,100%)";
+    gchar *clipping = NULL;
 
     // - input pipeline
     // - top/down
@@ -368,24 +370,24 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (!encoder_name) {
-        g_printerr("Encoder name option missing\n");
-        exit(1);
+    const EncoderInfo *encoder = encoder_info_mjpeg;
+    if (encoder_name != NULL) {
+        encoder = get_encoder_info(encoder_name);
+        if (!encoder) {
+            g_printerr("Encoder name unsupported: %s\n", encoder_name);
+            exit(1);
+        }
     }
 
-    const EncoderInfo *encoder = get_encoder_info(encoder_name);
-    if (!encoder) {
-        g_printerr("Encoder name unsupported: %s\n", encoder_name);
-        exit(1);
+    if (image_format != NULL) {
+        bitmap_format = get_bitmap_format(image_format);
+        if (bitmap_format == SPICE_BITMAP_FMT_INVALID) {
+            g_printerr("Invalid image format: %s\n", image_format);
+            exit(1);
+        }
     }
 
-    bitmap_format = get_bitmap_format(image_format);
-    if (bitmap_format == SPICE_BITMAP_FMT_INVALID) {
-        g_printerr("Invalid image format: %s\n", image_format);
-        exit(1);
-    }
-
-    parse_clipping(clipping);
+    parse_clipping(clipping ? clipping : "(0,0)x(100%,100%)");
 
     if (minimum_psnr < 0) {
         g_printerr("Invalid PSNR specified %f\n", minimum_psnr);
@@ -436,6 +438,15 @@ int main(int argc, char *argv[])
         g_printerr("Queue not empty at the end\n");
         exit(1);
     }
+
+    pipeline_free(input_pipeline);
+    pipeline_free(output_pipeline);
+
+    g_free(encoder_name);
+    g_free(image_format);
+    g_free(input_pipeline_desc);
+    g_free(clipping);
+    g_option_context_free(context);
 
     return 0;
 }
@@ -609,6 +620,17 @@ create_pipeline(const char *desc, SampleProc sample_proc, void *param)
     }
 
     return pipeline;
+}
+
+static void
+pipeline_free(TestPipeline *pipeline)
+{
+    if (pipeline->appsrc) {
+        gst_object_unref(pipeline->appsrc);
+    }
+    gst_object_unref(pipeline->appsink);
+    gst_object_unref(pipeline->gst_pipeline);
+    free(pipeline);
 }
 
 static void

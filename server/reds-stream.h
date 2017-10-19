@@ -34,10 +34,6 @@ struct RedsStream {
     int socket;
     SpiceWatch *watch;
 
-    /* set it to TRUE if you shutdown the socket. shutdown read doesn't work as accepted -
-       receive may return data afterward. check the flag before calling receive*/
-    int shutdown;
-
     RedsStreamPrivate *priv;
 };
 
@@ -67,6 +63,7 @@ void reds_stream_remove_watch(RedsStream* s);
 void reds_stream_set_channel(RedsStream *stream, int connection_id,
                              int channel_type, int channel_id);
 RedsStream *reds_stream_new(RedsState *reds, int socket);
+void reds_stream_set_core_interface(RedsStream *stream, SpiceCoreInterfaceInternal *core);
 bool reds_stream_is_ssl(RedsStream *stream);
 RedsStreamSslStatus reds_stream_ssl_accept(RedsStream *stream);
 int reds_stream_enable_ssl(RedsStream *stream, SSL_CTX *ctx);

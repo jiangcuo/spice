@@ -280,9 +280,9 @@ void main_dispatcher_client_disconnect(MainDispatcher *self, RedClient *client)
 
 static void dispatcher_handle_read(int fd, int event, void *opaque)
 {
-    MainDispatcher *self = opaque;
+    Dispatcher *dispatcher = opaque;
 
-    dispatcher_handle_recv_read(DISPATCHER(self));
+    dispatcher_handle_recv_read(dispatcher);
 }
 
 /*
@@ -311,19 +311,19 @@ void main_dispatcher_constructed(GObject *object)
         self->priv->core->watch_add(self->priv->core,
                                     dispatcher_get_recv_fd(DISPATCHER(self)),
                                     SPICE_WATCH_EVENT_READ, dispatcher_handle_read,
-                                    self);
+                                    DISPATCHER(self));
     dispatcher_register_handler(DISPATCHER(self), MAIN_DISPATCHER_CHANNEL_EVENT,
                                 main_dispatcher_handle_channel_event,
-                                sizeof(MainDispatcherChannelEventMessage), 0 /* no ack */);
+                                sizeof(MainDispatcherChannelEventMessage), false);
     dispatcher_register_handler(DISPATCHER(self), MAIN_DISPATCHER_MIGRATE_SEAMLESS_DST_COMPLETE,
                                 main_dispatcher_handle_migrate_complete,
-                                sizeof(MainDispatcherMigrateSeamlessDstCompleteMessage), 0 /* no ack */);
+                                sizeof(MainDispatcherMigrateSeamlessDstCompleteMessage), false);
     dispatcher_register_handler(DISPATCHER(self), MAIN_DISPATCHER_SET_MM_TIME_LATENCY,
                                 main_dispatcher_handle_mm_time_latency,
-                                sizeof(MainDispatcherMmTimeLatencyMessage), 0 /* no ack */);
+                                sizeof(MainDispatcherMmTimeLatencyMessage), false);
     dispatcher_register_handler(DISPATCHER(self), MAIN_DISPATCHER_CLIENT_DISCONNECT,
                                 main_dispatcher_handle_client_disconnect,
-                                sizeof(MainDispatcherClientDisconnectMessage), 0 /* no ack */);
+                                sizeof(MainDispatcherClientDisconnectMessage), false);
 }
 
 static void main_dispatcher_finalize(GObject *object)

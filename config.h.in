@@ -11,6 +11,9 @@
 /* Define to 1 if using `alloca.c'. */
 #undef C_ALLOCA
 
+/* Define to 1 to enable extra checks on code otherwise define to 0 */
+#undef ENABLE_EXTRA_CHECKS
+
 /* Enable compile-time and run-time bounds-checking, and some warnings. */
 #if !defined _FORTIFY_SOURCE &&  defined __OPTIMIZE__ && __OPTIMIZE__
 # define _FORTIFY_SOURCE 2

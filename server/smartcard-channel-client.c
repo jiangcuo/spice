@@ -48,6 +48,7 @@ smartcard_channel_client_alloc_msg_rcv_buf(RedChannelClient *rcc, uint16_t type,
 static void
 smartcard_channel_client_release_msg_rcv_buf(RedChannelClient *rcc, uint16_t type,
                                              uint32_t size, uint8_t *msg);
+static void smartcard_channel_client_on_disconnect(RedChannelClient *rcc);
 
 static void smart_card_channel_client_get_property(GObject *object,
                                                    guint property_id,
@@ -92,6 +93,7 @@ static void smart_card_channel_client_class_init(SmartCardChannelClientClass *kl
     RedChannelClientClass *client_class = RED_CHANNEL_CLIENT_CLASS(klass);
     client_class->alloc_recv_buf = smartcard_channel_client_alloc_msg_rcv_buf;
     client_class->release_recv_buf = smartcard_channel_client_release_msg_rcv_buf;
+    client_class->on_disconnect = smartcard_channel_client_on_disconnect;
 
     object_class->get_property = smart_card_channel_client_get_property;
     object_class->set_property = smart_card_channel_client_set_property;
@@ -133,7 +135,7 @@ smartcard_channel_client_alloc_msg_rcv_buf(RedChannelClient *rcc,
      * differenc channels */
     if (!scc->priv->smartcard) {
         scc->priv->msg_in_write_buf = FALSE;
-        return spice_malloc(size);
+        return g_malloc(size);
     } else {
         RedCharDeviceSmartcard *smartcard;
 
@@ -166,7 +168,7 @@ smartcard_channel_client_release_msg_rcv_buf(RedChannelClient *rcc,
 
     if (!scc->priv->msg_in_write_buf) {
         spice_assert(!scc->priv->write_buf);
-        free(msg);
+        g_free(msg);
     } else {
         if (scc->priv->write_buf) { /* msg hasn't been pushed to the guest */
             spice_assert(scc->priv->write_buf->buf == msg);
@@ -176,7 +178,7 @@ smartcard_channel_client_release_msg_rcv_buf(RedChannelClient *rcc,
     }
 }
 
-void smartcard_channel_client_on_disconnect(RedChannelClient *rcc)
+static void smartcard_channel_client_on_disconnect(RedChannelClient *rcc)
 {
     SmartCardChannelClient *scc = SMARTCARD_CHANNEL_CLIENT(rcc);
     RedCharDeviceSmartcard *device = scc->priv->smartcard;

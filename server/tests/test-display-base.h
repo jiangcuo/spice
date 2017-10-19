@@ -21,8 +21,6 @@
 #include <spice.h>
 #include "basic-event-loop.h"
 
-#define COUNT(x) ((sizeof(x)/sizeof(x[0])))
-
 /*
  * simple queue for commands.
  * each command can have up to two parameters (grow as needed)
@@ -132,7 +130,7 @@ struct Test {
     void (*on_client_disconnected)(Test *test);
 };
 
-void test_set_simple_command_list(Test *test, int *command, int num_commands);
+void test_set_simple_command_list(Test *test, const int *command, int num_commands);
 void test_set_command_list(Test *test, Command *command, int num_commands);
 void test_add_display_interface(Test *test);
 void test_add_agent_interface(SpiceServer *server); // TODO - Test *test

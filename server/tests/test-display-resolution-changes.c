@@ -24,17 +24,13 @@
 #include <stdlib.h>
 #include "test-display-base.h"
 
-SpiceTimer *ping_timer;
+static SpiceTimer *ping_timer;
 
-void show_channels(SpiceServer *server);
-
-int ping_ms = 100;
+static int ping_ms = 100;
 
 static void pinger(void *opaque)
 {
     Test *test = opaque;
-    // show_channels is not thread safe - fails if disconnections / connections occur
-    //show_channels(server);
 
     test->core->timer_start(ping_timer, ping_ms);
 }
@@ -75,12 +71,13 @@ int main(void)
     test = test_new(core);
     //spice_server_set_image_compression(server, SPICE_IMAGE_COMPRESSION_OFF);
     test_add_display_interface(test);
-    test_set_command_list(test, commands, COUNT(commands));
+    test_set_command_list(test, commands, G_N_ELEMENTS(commands));
 
     ping_timer = core->timer_add(pinger, test);
     core->timer_start(ping_timer, ping_ms);
 
     basic_event_loop_mainloop();
+    test_destroy(test);
 
     return 0;
 }

@@ -101,7 +101,7 @@ struct RedsState {
     GList *mig_target_clients;
 
     GList *channels;
-    int mouse_mode;
+    SpiceMouseMode mouse_mode;
     int is_client_mouse_allowed;
     int dispatcher_allows_client_mouse;
     MonitorMode monitor_mode;
@@ -134,7 +134,7 @@ struct RedsState {
     RedRecord *record;
 };
 
-#define FOREACH_QXL_INSTANCE(_reds, _iter, _qxl) \
-    GLIST_FOREACH(_reds->qxl_instances, _iter, QXLInstance, _qxl)
+#define FOREACH_QXL_INSTANCE(_reds, _qxl) \
+    GLIST_FOREACH(_reds->qxl_instances, QXLInstance, _qxl)
 
 #endif /* REDS_PRIVATE_H_ */
