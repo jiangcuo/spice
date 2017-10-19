@@ -1,7 +1,7 @@
 spice (0.14.0-1) unstable; urgency=medium
 
   * New upstream release
-  * d/copyright: refresh 
+  * debian/copyright: refresh 
   * debian/control:
     - Add liborc-0.4-dev to Build-Depends, 
     - Update Build-Depends on debhelper to >= 10 
