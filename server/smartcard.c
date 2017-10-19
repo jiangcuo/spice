@@ -490,7 +490,7 @@ void smartcard_channel_write_to_reader(RedCharDeviceWriteBuffer *write_buf)
     dev = RED_CHAR_DEVICE_SMARTCARD(sin->st);
     spice_assert(!dev->priv->scc ||
                  dev == smartcard_channel_client_get_char_device(dev->priv->scc));
-    /* protocol requires messages to be in network endianess */
+    /* protocol requires messages to be in network endianness */
     vheader->type = htonl(vheader->type);
     vheader->length = htonl(vheader->length);
     vheader->reader_id = htonl(vheader->reader_id);
@@ -574,7 +574,6 @@ red_smartcard_channel_class_init(RedSmartcardChannelClass *klass)
 
     channel_class->handle_message = smartcard_channel_client_handle_message,
 
-    channel_class->on_disconnect = smartcard_channel_client_on_disconnect;
     channel_class->send_item = smartcard_channel_send_item;
     channel_class->handle_migrate_flush_mark = smartcard_channel_client_handle_migrate_flush_mark;
     channel_class->handle_migrate_data = smartcard_channel_client_handle_migrate_data;

@@ -49,23 +49,11 @@ int main_channel_is_connected(MainChannel *main_chan)
     return red_channel_is_connected(RED_CHANNEL(main_chan));
 }
 
-/*
- * When the main channel is disconnected, disconnect the entire client.
- */
-static void main_channel_client_on_disconnect(RedChannelClient *rcc)
-{
-    RedsState *reds = red_channel_get_server(red_channel_client_get_channel(rcc));
-    spice_printerr("rcc=%p", rcc);
-    main_dispatcher_client_disconnect(reds_get_main_dispatcher(reds),
-                                      red_channel_client_get_client(rcc));
-}
-
 RedClient *main_channel_get_client_by_link_id(MainChannel *main_chan, uint32_t connection_id)
 {
-    GListIter iter;
     RedChannelClient *rcc;
 
-    FOREACH_CLIENT(main_chan, iter, rcc) {
+    FOREACH_CLIENT(main_chan, rcc) {
         MainChannelClient *mcc = MAIN_CHANNEL_CLIENT(rcc);
         if (main_channel_client_get_connection_id(mcc) == connection_id) {
             return red_channel_client_get_client(rcc);
@@ -85,23 +73,17 @@ static void main_channel_push_channels(MainChannelClient *mcc)
     red_channel_client_pipe_add_type(rcc, RED_PIPE_ITEM_TYPE_MAIN_CHANNELS_LIST);
 }
 
-void main_channel_push_mouse_mode(MainChannel *main_chan, int current_mode,
+void main_channel_push_mouse_mode(MainChannel *main_chan, SpiceMouseMode current_mode,
                                   int is_client_mouse_allowed)
 {
-    MainMouseModeItemInfo info = {
-        .current_mode=current_mode,
-        .is_client_mouse_allowed=is_client_mouse_allowed,
-    };
-
-    red_channel_pipes_new_add_push(RED_CHANNEL(main_chan),
-        main_mouse_mode_item_new, &info);
+    red_channel_pipes_add(RED_CHANNEL(main_chan),
+                          main_mouse_mode_item_new(current_mode, is_client_mouse_allowed));
 }
 
 void main_channel_push_agent_connected(MainChannel *main_chan)
 {
-    GListIter iter;
     RedChannelClient *rcc;
-    FOREACH_CLIENT(RED_CHANNEL(main_chan), iter, rcc) {
+    FOREACH_CLIENT(RED_CHANNEL(main_chan), rcc) {
         if (red_channel_client_test_remote_cap(rcc,
                                                SPICE_MAIN_CAP_AGENT_CONNECTED_TOKENS)) {
             red_channel_client_pipe_add_type(rcc,
@@ -147,24 +129,19 @@ static bool main_channel_handle_migrate_data(RedChannelClient *rcc,
                                     size);
 }
 
-void main_channel_push_multi_media_time(MainChannel *main_chan, int time)
+void main_channel_push_multi_media_time(MainChannel *main_chan, uint32_t time)
 {
-    MainMultiMediaTimeItemInfo info = {
-        .time = time,
-    };
-
-    red_channel_pipes_new_add_push(RED_CHANNEL(main_chan),
-        main_multi_media_time_item_new, &info);
+    red_channel_pipes_add(RED_CHANNEL(main_chan), main_multi_media_time_item_new(time));
 }
 
 static void main_channel_fill_mig_target(MainChannel *main_channel, RedsMigSpice *mig_target)
 {
     spice_assert(mig_target);
-    free(main_channel->mig_target.host);
-    main_channel->mig_target.host = spice_strdup(mig_target->host);
-    free(main_channel->mig_target.cert_subject);
+    g_free(main_channel->mig_target.host);
+    main_channel->mig_target.host = g_strdup(mig_target->host);
+    g_free(main_channel->mig_target.cert_subject);
     if (mig_target->cert_subject) {
-        main_channel->mig_target.cert_subject = spice_strdup(mig_target->cert_subject);
+        main_channel->mig_target.cert_subject = g_strdup(mig_target->cert_subject);
     } else {
         main_channel->mig_target.cert_subject = NULL;
     }
@@ -317,7 +294,6 @@ main_channel_class_init(MainChannelClass *klass)
     channel_class->handle_message = main_channel_handle_message;
 
     /* channel callbacks */
-    channel_class->on_disconnect = main_channel_client_on_disconnect;
     channel_class->send_item = main_channel_client_send_item;
     channel_class->handle_migrate_flush_mark = main_channel_handle_migrate_flush_mark;
     channel_class->handle_migrate_data = main_channel_handle_migrate_data;
@@ -325,10 +301,9 @@ main_channel_class_init(MainChannelClass *klass)
 
 static int main_channel_connect_semi_seamless(MainChannel *main_channel)
 {
-    GListIter iter;
     RedChannelClient *rcc;
 
-    FOREACH_CLIENT(main_channel, iter, rcc) {
+    FOREACH_CLIENT(main_channel, rcc) {
         MainChannelClient *mcc = MAIN_CHANNEL_CLIENT(rcc);
         if (main_channel_client_connect_semi_seamless(mcc))
             main_channel->num_clients_mig_wait++;
@@ -338,12 +313,11 @@ static int main_channel_connect_semi_seamless(MainChannel *main_channel)
 
 static int main_channel_connect_seamless(MainChannel *main_channel)
 {
-    GListIter iter;
     RedChannelClient *rcc;
 
     spice_assert(red_channel_get_n_clients(RED_CHANNEL(main_channel)) == 1);
 
-    FOREACH_CLIENT(main_channel, iter, rcc) {
+    FOREACH_CLIENT(main_channel, rcc) {
         MainChannelClient *mcc = MAIN_CHANNEL_CLIENT(rcc);
         main_channel_client_connect_seamless(mcc);
         main_channel->num_clients_mig_wait++;
@@ -382,10 +356,9 @@ int main_channel_migrate_connect(MainChannel *main_channel, RedsMigSpice *mig_ta
 
 void main_channel_migrate_cancel_wait(MainChannel *main_chan)
 {
-    GListIter iter;
     RedChannelClient *rcc;
 
-    FOREACH_CLIENT(main_chan, iter, rcc) {
+    FOREACH_CLIENT(main_chan, rcc) {
         MainChannelClient *mcc = MAIN_CHANNEL_CLIENT(rcc);
         main_channel_client_migrate_cancel_wait(mcc);
     }
@@ -394,7 +367,6 @@ void main_channel_migrate_cancel_wait(MainChannel *main_chan)
 
 int main_channel_migrate_src_complete(MainChannel *main_chan, int success)
 {
-    GListIter iter;
     int semi_seamless_count = 0;
     RedChannelClient *rcc;
 
@@ -405,7 +377,7 @@ int main_channel_migrate_src_complete(MainChannel *main_chan, int success)
         return 0;
     }
 
-    FOREACH_CLIENT(main_chan, iter, rcc) {
+    FOREACH_CLIENT(main_chan, rcc) {
         MainChannelClient *mcc = MAIN_CHANNEL_CLIENT(rcc);
         if (main_channel_client_migrate_src_complete(mcc, success))
             semi_seamless_count++;

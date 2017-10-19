@@ -263,6 +263,8 @@ NMEDIT = @NMEDIT@
 NO_INDIRECT_LDFLAGS = @NO_INDIRECT_LDFLAGS@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+ORC_CFLAGS = @ORC_CFLAGS@
+ORC_LIBS = @ORC_LIBS@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
@@ -366,6 +368,8 @@ ASCIIDOC_FLAGS = -a icons -a toc
 EXTRA_DIST = \
 	spice_style.html			\
 	spice_style.txt				\
+	spice_threading_model.html		\
+	spice_threading_model.txt		\
 	$(NULL)
 
 @BUILD_MANUAL_TRUE@SUBDIRS = manual
@@ -683,9 +687,9 @@ uninstall-am:
 .PRECIOUS: Makefile
 
 
-@BUILD_MANUAL_TRUE@all-local: spice_style.html
+@BUILD_MANUAL_TRUE@all-local: spice_style.html spice_threading_model.html
 
-@BUILD_MANUAL_TRUE@spice_style.html: spice_style.txt
+@BUILD_MANUAL_TRUE@%.html: %.txt
 @BUILD_MANUAL_TRUE@	$(AM_V_GEN) $(ASCIIDOC) -n $(ASCIIDOC_FLAGS) -o $@ $<
 
 clean-local:

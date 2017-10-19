@@ -42,6 +42,7 @@ enum
 
 static void on_display_video_codecs_update(GObject *gobject, GParamSpec *pspec, gpointer user_data);
 static bool dcc_config_socket(RedChannelClient *rcc);
+static void dcc_on_disconnect(RedChannelClient *rcc);
 
 static void
 display_channel_client_get_property(GObject *object,
@@ -133,6 +134,7 @@ display_channel_client_class_init(DisplayChannelClientClass *klass)
     object_class->finalize = display_channel_client_finalize;
 
     client_class->config_socket = dcc_config_socket;
+    client_class->on_disconnect = dcc_on_disconnect;
 
     g_object_class_install_property(object_class,
                                     PROP_IMAGE_COMPRESSION,
@@ -297,7 +299,7 @@ void dcc_create_surface(DisplayChannelClient *dcc, int surface_id)
     }
 
     display = DCC_TO_DC(dcc);
-    flags = is_primary_surface(DCC_TO_DC(dcc), surface_id) ? SPICE_SURFACE_FLAGS_PRIMARY : 0;
+    flags = is_primary_surface(display, surface_id) ? SPICE_SURFACE_FLAGS_PRIMARY : 0;
 
     /* don't send redundant create surface commands to client */
     if (!dcc ||
@@ -399,7 +401,6 @@ void dcc_push_surface_image(DisplayChannelClient *dcc, int surface_id)
     /* not allowing lossy compression because probably, especially if it is a primary surface,
        it combines both "picture-like" areas with areas that are more "artificial"*/
     dcc_add_surface_area_image(dcc, surface_id, &area, NULL, FALSE);
-    red_channel_client_push(RED_CHANNEL_CLIENT(dcc));
 }
 
 static void add_drawable_surface_images(DisplayChannelClient *dcc, Drawable *drawable)
@@ -469,7 +470,7 @@ void dcc_append_drawable(DisplayChannelClient *dcc, Drawable *drawable)
     RedDrawablePipeItem *dpi = red_drawable_pipe_item_new(dcc, drawable);
 
     add_drawable_surface_images(dcc, drawable);
-    red_channel_client_pipe_add_tail_and_push(RED_CHANNEL_CLIENT(dcc), &dpi->dpi_pipe_item);
+    red_channel_client_pipe_add_tail(RED_CHANNEL_CLIENT(dcc), &dpi->dpi_pipe_item);
 }
 
 void dcc_add_drawable_after(DisplayChannelClient *dcc, Drawable *drawable, RedPipeItem *pos)
@@ -517,7 +518,9 @@ DisplayChannelClient *dcc_new(DisplayChannel *display,
                          NULL);
     spice_debug("New display (client %p) dcc %p stream %p", client, dcc, stream);
     common_graphics_channel_set_during_target_migrate(COMMON_GRAPHICS_CHANNEL(display), mig_target);
-    dcc->priv->id = common_graphics_channel_get_qxl(COMMON_GRAPHICS_CHANNEL(display))->id;
+    if (dcc) {
+        dcc->priv->id = display->priv->qxl->id;
+    }
 
     return dcc;
 }
@@ -608,7 +611,7 @@ static void dcc_destroy_stream_agents(DisplayChannelClient *dcc)
     }
 }
 
-void dcc_stop(DisplayChannelClient *dcc)
+static void dcc_stop(DisplayChannelClient *dcc)
 {
     DisplayChannel *dc = DCC_TO_DC(dcc);
 
@@ -679,7 +682,6 @@ void dcc_push_monitors_config(DisplayChannelClient *dcc)
     mci = red_monitors_config_item_new(red_channel_client_get_channel(RED_CHANNEL_CLIENT(dcc)),
                                        monitors_config);
     red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &mci->pipe_item);
-    red_channel_client_push(RED_CHANNEL_CLIENT(dcc));
 }
 
 static RedSurfaceDestroyItem *red_surface_destroy_item_new(RedChannel *channel,
@@ -1429,6 +1431,26 @@ static bool dcc_config_socket(RedChannelClient *rcc)
     DISPLAY_CHANNEL_CLIENT(rcc)->is_low_bandwidth = main_channel_client_is_low_bandwidth(mcc);
 
     return common_channel_client_config_socket(rcc);
+}
+
+static void dcc_on_disconnect(RedChannelClient *rcc)
+{
+    DisplayChannel *display;
+    DisplayChannelClient *dcc;
+
+    spice_debug("trace");
+    spice_return_if_fail(rcc != NULL);
+
+    dcc = DISPLAY_CHANNEL_CLIENT(rcc);
+    display = DCC_TO_DC(dcc);
+
+    dcc_stop(dcc); // TODO: start/stop -> connect/disconnect?
+    display_channel_compress_stats_print(display);
+
+    // this was the last channel client
+    spice_debug("#draw=%d, #glz_draw=%d",
+                display->priv->drawable_count,
+                display->priv->encoder_shared_data.glz_drawable_count);
 }
 
 gboolean dcc_is_low_bandwidth(DisplayChannelClient *dcc)

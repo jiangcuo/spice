@@ -89,23 +89,24 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@HAVE_AUTOMATED_TESTS_TRUE@am__append_1 = -DAUTOMATED_TESTS
 check_PROGRAMS = test-codecs-parsing$(EXEEXT) test-options$(EXEEXT) \
 	test-stat$(EXEEXT) test-stream$(EXEEXT) \
 	test-agent-msg-filter$(EXEEXT) test-loop$(EXEEXT) \
 	test-qxl-parsing$(EXEEXT) test-stat-file$(EXEEXT) \
-	test-leaks$(EXEEXT) test-vdagent$(EXEEXT) $(am__EXEEXT_1)
-noinst_PROGRAMS = test-display-no-ssl$(EXEEXT) \
-	test-display-streaming$(EXEEXT) test-empty-success$(EXEEXT) \
+	test-leaks$(EXEEXT) test-vdagent$(EXEEXT) \
 	test-fail-on-null-core-interface$(EXEEXT) \
+	test-empty-success$(EXEEXT) test-channel$(EXEEXT) \
+	$(am__EXEEXT_1)
+noinst_PROGRAMS = test-display-no-ssl$(EXEEXT) \
+	test-display-streaming$(EXEEXT) \
 	test-just-sockets-no-ssl$(EXEEXT) test-playback$(EXEEXT) \
 	test-display-resolution-changes$(EXEEXT) \
 	test-two-servers$(EXEEXT) test-display-width-stride$(EXEEXT) \
-	spice-server-replay$(EXEEXT) $(check_PROGRAMS) $(am__EXEEXT_1) \
+	$(check_PROGRAMS) $(am__EXEEXT_1) spice-server-replay$(EXEEXT) \
 	$(am__EXEEXT_2)
-@HAVE_GSTREAMER_TRUE@am__append_2 = test-gst
-TESTS = $(check_PROGRAMS) $(am__EXEEXT_1) $(am__append_3)
-@ENABLE_EXTRA_CHECKS_TRUE@@HAVE_GSTREAMER_1_0_TRUE@am__append_3 = video-encoders
+TESTS = $(check_PROGRAMS) $(am__EXEEXT_1) $(am__append_2)
+@HAVE_GSTREAMER_TRUE@am__append_1 = test-gst
+@ENABLE_EXTRA_CHECKS_TRUE@@HAVE_GSTREAMER_TRUE@am__append_2 = video-encoders
 subdir = server/tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_valgrind_check.m4 \
@@ -180,9 +181,16 @@ test_agent_msg_filter_DEPENDENCIES = libtest.a \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
+test_channel_SOURCES = test-channel.c
+test_channel_OBJECTS = test-channel.$(OBJEXT)
+test_channel_LDADD = $(LDADD)
+test_channel_DEPENDENCIES = libtest.a \
+	$(top_builddir)/spice-common/common/libspice-common.la \
+	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 test_codecs_parsing_SOURCES = test-codecs-parsing.c
-test_codecs_parsing_OBJECTS =  \
-	test_codecs_parsing-test-codecs-parsing.$(OBJEXT)
+test_codecs_parsing_OBJECTS = test-codecs-parsing.$(OBJEXT)
 test_codecs_parsing_LDADD = $(LDADD)
 test_codecs_parsing_DEPENDENCIES = libtest.a \
 	$(top_builddir)/spice-common/common/libspice-common.la \
@@ -294,15 +302,14 @@ test_playback_DEPENDENCIES = libtest.a \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 test_qxl_parsing_SOURCES = test-qxl-parsing.c
-test_qxl_parsing_OBJECTS =  \
-	test_qxl_parsing-test-qxl-parsing.$(OBJEXT)
+test_qxl_parsing_OBJECTS = test-qxl-parsing.$(OBJEXT)
 am__DEPENDENCIES_2 = libtest.a \
 	$(top_builddir)/spice-common/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 test_qxl_parsing_DEPENDENCIES = ../libserver.la $(am__DEPENDENCIES_2)
-am_test_stat_OBJECTS = stat-main.$(OBJEXT)
+am_test_stat_OBJECTS = test-stat.$(OBJEXT)
 test_stat_OBJECTS = $(am_test_stat_OBJECTS)
 test_stat_DEPENDENCIES = libtest-stat1.a libtest-stat2.a \
 	libtest-stat3.a libtest-stat4.a $(am__DEPENDENCIES_2) \
@@ -332,7 +339,7 @@ test_two_servers_DEPENDENCIES = libtest.a \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 test_vdagent_SOURCES = test-vdagent.c
-test_vdagent_OBJECTS = test_vdagent-test-vdagent.$(OBJEXT)
+test_vdagent_OBJECTS = test-vdagent.$(OBJEXT)
 test_vdagent_LDADD = $(LDADD)
 test_vdagent_DEPENDENCIES = libtest.a \
 	$(top_builddir)/spice-common/common/libspice-common.la \
@@ -376,7 +383,7 @@ am__v_CCLD_1 =
 SOURCES = $(libtest_stat1_a_SOURCES) $(libtest_stat2_a_SOURCES) \
 	$(libtest_stat3_a_SOURCES) $(libtest_stat4_a_SOURCES) \
 	$(libtest_a_SOURCES) $(spice_server_replay_SOURCES) \
-	test-agent-msg-filter.c test-codecs-parsing.c \
+	test-agent-msg-filter.c test-channel.c test-codecs-parsing.c \
 	test-display-no-ssl.c test-display-resolution-changes.c \
 	test-display-streaming.c test-display-width-stride.c \
 	test-empty-success.c test-fail-on-null-core-interface.c \
@@ -387,7 +394,7 @@ SOURCES = $(libtest_stat1_a_SOURCES) $(libtest_stat2_a_SOURCES) \
 DIST_SOURCES = $(libtest_stat1_a_SOURCES) $(libtest_stat2_a_SOURCES) \
 	$(libtest_stat3_a_SOURCES) $(libtest_stat4_a_SOURCES) \
 	$(libtest_a_SOURCES) $(spice_server_replay_SOURCES) \
-	test-agent-msg-filter.c test-codecs-parsing.c \
+	test-agent-msg-filter.c test-channel.c test-codecs-parsing.c \
 	test-display-no-ssl.c test-display-resolution-changes.c \
 	test-display-streaming.c test-display-width-stride.c \
 	test-empty-success.c test-fail-on-null-core-interface.c \
@@ -700,6 +707,8 @@ NMEDIT = @NMEDIT@
 NO_INDIRECT_LDFLAGS = @NO_INDIRECT_LDFLAGS@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+ORC_CFLAGS = @ORC_CFLAGS@
+ORC_LIBS = @ORC_LIBS@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
@@ -802,12 +811,21 @@ NULL =
 VALGRIND_SUPPRESSIONS_FILES = $(top_srcdir)/server/tests/valgrind/glib.supp
 EXTRA_DIST = $(VALGRIND_SUPPRESSIONS_FILES) pki/ca-cert.pem \
 	pki/server-cert.pem pki/server-key.pem $(NULL) video-encoders
-AM_CPPFLAGS = -DSPICE_TOP_SRCDIR=\"$(abs_top_srcdir)\" -I$(top_srcdir) \
-	-I$(top_srcdir)/server -I$(top_builddir)/server \
-	-I$(top_srcdir)/server/tests $(COMMON_CFLAGS) $(GLIB2_CFLAGS) \
-	$(GOBJECT2_CFLAGS) $(SMARTCARD_CFLAGS) \
-	$(SPICE_NONPKGCONFIG_CFLAGS) $(SPICE_PROTOCOL_CFLAGS) \
-	$(WARN_CFLAGS) $(NULL) $(am__append_1)
+AM_CPPFLAGS = \
+	-DSPICE_TOP_SRCDIR=\"$(abs_top_srcdir)\"\
+	-I$(top_srcdir)				\
+	-I$(top_srcdir)/server			\
+	-I$(top_builddir)/server		\
+	-I$(top_srcdir)/server/tests		\
+	$(COMMON_CFLAGS)			\
+	$(GLIB2_CFLAGS)				\
+	$(GOBJECT2_CFLAGS)				\
+	$(SMARTCARD_CFLAGS)			\
+	$(SPICE_NONPKGCONFIG_CFLAGS)		\
+	$(SPICE_PROTOCOL_CFLAGS)		\
+	$(WARN_CFLAGS)				\
+	$(NULL)
+
 noinst_LIBRARIES = libtest.a libtest-stat1.a libtest-stat2.a \
 	libtest-stat3.a libtest-stat4.a $(NULL)
 libtest_a_SOURCES = \
@@ -828,6 +846,7 @@ LDADD = \
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
+test_qxl_parsing_LDADD = ../libserver.la $(LDADD)
 spice_server_replay_SOURCES = replay.c		\
 	../event-loop.c				\
 	basic-event-loop.c			\
@@ -841,7 +860,7 @@ spice_server_replay_LDADD = \
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
-test_stat_SOURCES = stat-main.c
+test_stat_SOURCES = test-stat.c
 test_stat_LDADD = \
 	libtest-stat1.a \
 	libtest-stat2.a \
@@ -858,18 +877,6 @@ libtest_stat3_a_SOURCES = stat-test.c
 libtest_stat3_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORKER_STAT=0 -DTEST_NAME=stat_test3
 libtest_stat4_a_SOURCES = stat-test.c
 libtest_stat4_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORKER_STAT=1 -DTEST_NAME=stat_test4
-test_qxl_parsing_LDADD = ../libserver.la $(LDADD)
-
-# Fallback implementations are provided for older glibs for the recent glib
-# methods this test is using, so no need to warn about them
-test_vdagent_CPPFLAGS = \
-	$(AM_CPPFLAGS)			\
-	-UGLIB_VERSION_MIN_REQUIRED	\
-	-UGLIB_VERSION_MAX_ALLOWED	\
-	$(NULL)
-
-test_codecs_parsing_CPPFLAGS = $(test_vdagent_CPPFLAGS)
-test_qxl_parsing_CPPFLAGS = $(test_vdagent_CPPFLAGS)
 @HAVE_GSTREAMER_TRUE@test_gst_SOURCES = test-gst.c \
 @HAVE_GSTREAMER_TRUE@	$(NULL)
 
@@ -975,6 +982,10 @@ test-agent-msg-filter$(EXEEXT): $(test_agent_msg_filter_OBJECTS) $(test_agent_ms
 	@rm -f test-agent-msg-filter$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_agent_msg_filter_OBJECTS) $(test_agent_msg_filter_LDADD) $(LIBS)
 
+test-channel$(EXEEXT): $(test_channel_OBJECTS) $(test_channel_DEPENDENCIES) $(EXTRA_test_channel_DEPENDENCIES) 
+	@rm -f test-channel$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_channel_OBJECTS) $(test_channel_LDADD) $(LIBS)
+
 test-codecs-parsing$(EXEEXT): $(test_codecs_parsing_OBJECTS) $(test_codecs_parsing_DEPENDENCIES) $(EXTRA_test_codecs_parsing_DEPENDENCIES) 
 	@rm -f test-codecs-parsing$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_codecs_parsing_OBJECTS) $(test_codecs_parsing_LDADD) $(LIBS)
@@ -1065,8 +1076,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libtest_stat3_a-stat-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libtest_stat4_a-stat-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/replay.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stat-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-agent-msg-filter.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-channel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-codecs-parsing.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-display-base.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-display-no-ssl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-display-resolution-changes.Po@am__quote@
@@ -1080,13 +1092,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-loop.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-options.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-playback.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-qxl-parsing.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stat-file.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stream.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-two-servers.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_codecs_parsing-test-codecs-parsing.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-vdagent.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_gst-test-gst.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_qxl_parsing-test-qxl-parsing.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_vdagent-test-vdagent.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -1168,20 +1180,6 @@ libtest_stat4_a-stat-test.obj: stat-test.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libtest_stat4_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libtest_stat4_a-stat-test.obj `if test -f 'stat-test.c'; then $(CYGPATH_W) 'stat-test.c'; else $(CYGPATH_W) '$(srcdir)/stat-test.c'; fi`
 
-test_codecs_parsing-test-codecs-parsing.o: test-codecs-parsing.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_codecs_parsing_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_codecs_parsing-test-codecs-parsing.o -MD -MP -MF $(DEPDIR)/test_codecs_parsing-test-codecs-parsing.Tpo -c -o test_codecs_parsing-test-codecs-parsing.o `test -f 'test-codecs-parsing.c' || echo '$(srcdir)/'`test-codecs-parsing.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_codecs_parsing-test-codecs-parsing.Tpo $(DEPDIR)/test_codecs_parsing-test-codecs-parsing.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-codecs-parsing.c' object='test_codecs_parsing-test-codecs-parsing.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_codecs_parsing_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_codecs_parsing-test-codecs-parsing.o `test -f 'test-codecs-parsing.c' || echo '$(srcdir)/'`test-codecs-parsing.c
-
-test_codecs_parsing-test-codecs-parsing.obj: test-codecs-parsing.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_codecs_parsing_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_codecs_parsing-test-codecs-parsing.obj -MD -MP -MF $(DEPDIR)/test_codecs_parsing-test-codecs-parsing.Tpo -c -o test_codecs_parsing-test-codecs-parsing.obj `if test -f 'test-codecs-parsing.c'; then $(CYGPATH_W) 'test-codecs-parsing.c'; else $(CYGPATH_W) '$(srcdir)/test-codecs-parsing.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_codecs_parsing-test-codecs-parsing.Tpo $(DEPDIR)/test_codecs_parsing-test-codecs-parsing.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-codecs-parsing.c' object='test_codecs_parsing-test-codecs-parsing.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_codecs_parsing_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_codecs_parsing-test-codecs-parsing.obj `if test -f 'test-codecs-parsing.c'; then $(CYGPATH_W) 'test-codecs-parsing.c'; else $(CYGPATH_W) '$(srcdir)/test-codecs-parsing.c'; fi`
-
 test_gst-test-gst.o: test-gst.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_gst-test-gst.o -MD -MP -MF $(DEPDIR)/test_gst-test-gst.Tpo -c -o test_gst-test-gst.o `test -f 'test-gst.c' || echo '$(srcdir)/'`test-gst.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_gst-test-gst.Tpo $(DEPDIR)/test_gst-test-gst.Po
@@ -1195,34 +1193,6 @@ test_gst-test-gst.obj: test-gst.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-gst.c' object='test_gst-test-gst.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_gst-test-gst.obj `if test -f 'test-gst.c'; then $(CYGPATH_W) 'test-gst.c'; else $(CYGPATH_W) '$(srcdir)/test-gst.c'; fi`
-
-test_qxl_parsing-test-qxl-parsing.o: test-qxl-parsing.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_qxl_parsing_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_qxl_parsing-test-qxl-parsing.o -MD -MP -MF $(DEPDIR)/test_qxl_parsing-test-qxl-parsing.Tpo -c -o test_qxl_parsing-test-qxl-parsing.o `test -f 'test-qxl-parsing.c' || echo '$(srcdir)/'`test-qxl-parsing.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_qxl_parsing-test-qxl-parsing.Tpo $(DEPDIR)/test_qxl_parsing-test-qxl-parsing.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-qxl-parsing.c' object='test_qxl_parsing-test-qxl-parsing.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_qxl_parsing_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_qxl_parsing-test-qxl-parsing.o `test -f 'test-qxl-parsing.c' || echo '$(srcdir)/'`test-qxl-parsing.c
-
-test_qxl_parsing-test-qxl-parsing.obj: test-qxl-parsing.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_qxl_parsing_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_qxl_parsing-test-qxl-parsing.obj -MD -MP -MF $(DEPDIR)/test_qxl_parsing-test-qxl-parsing.Tpo -c -o test_qxl_parsing-test-qxl-parsing.obj `if test -f 'test-qxl-parsing.c'; then $(CYGPATH_W) 'test-qxl-parsing.c'; else $(CYGPATH_W) '$(srcdir)/test-qxl-parsing.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_qxl_parsing-test-qxl-parsing.Tpo $(DEPDIR)/test_qxl_parsing-test-qxl-parsing.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-qxl-parsing.c' object='test_qxl_parsing-test-qxl-parsing.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_qxl_parsing_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_qxl_parsing-test-qxl-parsing.obj `if test -f 'test-qxl-parsing.c'; then $(CYGPATH_W) 'test-qxl-parsing.c'; else $(CYGPATH_W) '$(srcdir)/test-qxl-parsing.c'; fi`
-
-test_vdagent-test-vdagent.o: test-vdagent.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_vdagent_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_vdagent-test-vdagent.o -MD -MP -MF $(DEPDIR)/test_vdagent-test-vdagent.Tpo -c -o test_vdagent-test-vdagent.o `test -f 'test-vdagent.c' || echo '$(srcdir)/'`test-vdagent.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_vdagent-test-vdagent.Tpo $(DEPDIR)/test_vdagent-test-vdagent.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-vdagent.c' object='test_vdagent-test-vdagent.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_vdagent_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_vdagent-test-vdagent.o `test -f 'test-vdagent.c' || echo '$(srcdir)/'`test-vdagent.c
-
-test_vdagent-test-vdagent.obj: test-vdagent.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_vdagent_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_vdagent-test-vdagent.obj -MD -MP -MF $(DEPDIR)/test_vdagent-test-vdagent.Tpo -c -o test_vdagent-test-vdagent.obj `if test -f 'test-vdagent.c'; then $(CYGPATH_W) 'test-vdagent.c'; else $(CYGPATH_W) '$(srcdir)/test-vdagent.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_vdagent-test-vdagent.Tpo $(DEPDIR)/test_vdagent-test-vdagent.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-vdagent.c' object='test_vdagent-test-vdagent.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_vdagent_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_vdagent-test-vdagent.obj `if test -f 'test-vdagent.c'; then $(CYGPATH_W) 'test-vdagent.c'; else $(CYGPATH_W) '$(srcdir)/test-vdagent.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1489,6 +1459,27 @@ test-leaks.log: test-leaks$(EXEEXT)
 test-vdagent.log: test-vdagent$(EXEEXT)
 	@p='test-vdagent$(EXEEXT)'; \
 	b='test-vdagent'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test-fail-on-null-core-interface.log: test-fail-on-null-core-interface$(EXEEXT)
+	@p='test-fail-on-null-core-interface$(EXEEXT)'; \
+	b='test-fail-on-null-core-interface'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test-empty-success.log: test-empty-success$(EXEEXT)
+	@p='test-empty-success$(EXEEXT)'; \
+	b='test-empty-success'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test-channel.log: test-channel$(EXEEXT)
+	@p='test-channel$(EXEEXT)'; \
+	b='test-channel'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

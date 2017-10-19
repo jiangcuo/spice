@@ -12,14 +12,17 @@ also use a file as the disk image for the guest. I’ll use a file
 created by <code class="literal">qemu-img</code> as a demonstration.</p><p>The following command will allocate a 10GB file. See <code class="literal">qemu-img</code> man
 page for further information.</p><pre class="programlisting">host$ qemu-img create /path/to/xp.img 10G</pre><p>Now that we created an image, we can now start with image
 population. I assume that you have a locally stored ISO of your
-favourite operating system so you can use it for installation.</p><pre class="programlisting">host$ qemu-kvm -boot order=dc -vga qxl \
+favourite operating system so you can use it for installation.</p><pre class="programlisting">host$ qemu-kvm -machine vmport=off \
+        -boot order=dc -vga qxl \
         -spice port=3001,disable-ticketing -soundhw hda \
         -device virtio-serial -chardev spicevmc,id=vdagent,debug=0,name=vdagent \
         -device virtserialport,chardev=vdagent,name=com.redhat.spice.0 \
         -cdrom /path/to/your.iso /path/to/your.img</pre><p>Let’s take a brief look at the qemu options that were used. The option
-<code class="literal">-boot order=dc</code> specifies that the guest system should try to boot
-from the first cdrom and then fallback to the first disk, <code class="literal">-vga qxl</code>
-specifies that qemu uses a qxl graphics device.</p><p>The Spice <code class="literal">port</code> option defines what port will be used for
+<code class="literal">-machine vmport=off</code> disables VMWare IO port emulation, which is
+necessary for server mode mouse to work properly with spice. The option <code class="literal">-boot
+order=dc</code> specifies that the guest system should try to boot from the first
+cdrom and then fallback to the first disk, <code class="literal">-vga qxl</code> specifies that qemu uses
+a qxl graphics device.</p><p>The Spice <code class="literal">port</code> option defines what port will be used for
 communication with the client. The Spice option <code class="literal">disable-ticketing</code> is
 specifying that ticketing (simple authentication method) is not
 used. The virtio and chardev devices are required by the guest agent.</p><p>The <code class="literal">-soundhw hda</code> option provides an audio device for the guest to use for

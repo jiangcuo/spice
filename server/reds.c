@@ -304,7 +304,7 @@ static void reds_on_sv_change(RedsState *reds);
 static void reds_on_vc_change(RedsState *reds);
 static void reds_on_vm_stop(RedsState *reds);
 static void reds_on_vm_start(RedsState *reds);
-static void reds_set_mouse_mode(RedsState *reds, uint32_t mode);
+static void reds_set_mouse_mode(RedsState *reds, SpiceMouseMode mode);
 static uint32_t reds_qxl_ram_size(RedsState *reds);
 static int calc_compression_level(RedsState *reds);
 
@@ -345,7 +345,7 @@ static void reds_link_free(RedLinkInfo *link)
         link->tiTicketing.rsa = NULL;
     }
 
-    free(link);
+    g_free(link);
 }
 
 #ifdef RED_STATISTICS
@@ -391,19 +391,14 @@ void reds_register_channel(RedsState *reds, RedChannel *channel)
 
 void reds_unregister_channel(RedsState *reds, RedChannel *channel)
 {
-    if (g_list_find(reds->channels, channel)) {
-        reds->channels = g_list_remove(reds->channels, channel);
-    } else {
-        spice_warning("not found");
-    }
+    reds->channels = g_list_remove(reds->channels, channel);
 }
 
 RedChannel *reds_find_channel(RedsState *reds, uint32_t type, uint32_t id)
 {
-    GListIter it;
     RedChannel *channel;
 
-    GLIST_FOREACH(reds->channels, it, RedChannel, channel) {
+    GLIST_FOREACH(reds->channels, RedChannel, channel) {
         uint32_t this_type, this_id;
         g_object_get(channel, "channel-type", &this_type, "id", &this_id, NULL);
         if (this_type == type && this_id == id) {
@@ -411,6 +406,38 @@ RedChannel *reds_find_channel(RedsState *reds, uint32_t type, uint32_t id)
         }
     }
     return NULL;
+}
+
+/* Search for first free channel id for a specific channel type.
+ * Return first id free or <0 if not found. */
+int reds_get_free_channel_id(RedsState *reds, uint32_t type)
+{
+    RedChannel *channel;
+
+    // this mark if some IDs are used.
+    // The size of the array limits the possible id returned but
+    // usually the IDs used for a channel type are not much.
+    bool used_ids[256];
+
+    unsigned n;
+
+    // mark id used for the specific channel type
+    memset(used_ids, 0, sizeof(used_ids));
+    GLIST_FOREACH(reds->channels, RedChannel, channel) {
+        uint32_t this_type, this_id;
+        g_object_get(channel, "channel-type", &this_type, "id", &this_id, NULL);
+        if (this_type == type && this_id < SPICE_N_ELEMENTS(used_ids)) {
+            used_ids[this_id] = true;
+        }
+    }
+
+    // find first ID not marked as used
+    for (n = 0; n < SPICE_N_ELEMENTS(used_ids); ++n) {
+        if (!used_ids[n]) {
+            return n;
+        }
+    }
+    return -1;
 }
 
 static void reds_mig_cleanup(RedsState *reds)
@@ -563,7 +590,7 @@ void reds_client_disconnect(RedsState *reds, RedClient *client)
          *  messages read from the agent */
         reds->agent_dev->priv->read_filter.result = AGENT_MSG_FILTER_DISCARD;
         reds->agent_dev->priv->read_filter.discard_all = TRUE;
-        free(reds->agent_dev->priv->mig_data);
+        g_free(reds->agent_dev->priv->mig_data);
         reds->agent_dev->priv->mig_data = NULL;
 
         reds_mig_cleanup(reds);
@@ -574,11 +601,10 @@ void reds_client_disconnect(RedsState *reds, RedClient *client)
 // reds_client_disconnect
 static void reds_disconnect(RedsState *reds)
 {
-    GListIter iter;
     RedClient *client;
 
     spice_debug("trace");
-    GLIST_FOREACH(reds->clients, iter, RedClient, client) {
+    GLIST_FOREACH(reds->clients, RedClient, client) {
         reds_client_disconnect(reds, client);
     }
     reds_mig_cleanup(reds);
@@ -598,14 +624,13 @@ bool reds_config_get_playback_compression(RedsState *reds)
     return reds->config->playback_compression;
 }
 
-int reds_get_mouse_mode(RedsState *reds)
+SpiceMouseMode reds_get_mouse_mode(RedsState *reds)
 {
     return reds->mouse_mode;
 }
 
-static void reds_set_mouse_mode(RedsState *reds, uint32_t mode)
+static void reds_set_mouse_mode(RedsState *reds, SpiceMouseMode mode)
 {
-    GListIter it;
     QXLInstance *qxl;
 
     if (reds->mouse_mode == mode) {
@@ -613,7 +638,7 @@ static void reds_set_mouse_mode(RedsState *reds, uint32_t mode)
     }
     reds->mouse_mode = mode;
 
-    FOREACH_QXL_INSTANCE(reds, it, qxl) {
+    FOREACH_QXL_INSTANCE(reds, qxl) {
         red_qxl_set_mouse_mode(qxl, mode);
     }
 
@@ -931,14 +956,9 @@ void reds_handle_agent_mouse_event(RedsState *reds, const VDAgentMouseState *mou
     red_char_device_write_buffer_add(RED_CHAR_DEVICE(reds->agent_dev), char_dev_buf);
 }
 
-static int reds_get_n_clients(RedsState *reds)
-{
-    return reds ? g_list_length(reds->clients) : 0;
-}
-
 SPICE_GNUC_VISIBLE int spice_server_get_num_clients(SpiceServer *reds)
 {
-    return reds_get_n_clients(reds);
+    return reds ? g_list_length(reds->clients) : 0;
 }
 
 static bool channel_supports_multiple_clients(RedChannel *channel)
@@ -957,11 +977,10 @@ static bool channel_supports_multiple_clients(RedChannel *channel)
 
 static void reds_fill_channels(RedsState *reds, SpiceMsgChannels *channels_info)
 {
-    GListIter it;
     RedChannel *channel;
     int used_channels = 0;
 
-    GLIST_FOREACH(reds->channels, it, RedChannel, channel) {
+    GLIST_FOREACH(reds->channels, RedChannel, channel) {
         uint32_t type, id;
         if (g_list_length(reds->clients) > 1 &&
             !channel_supports_multiple_clients(channel)) {
@@ -985,7 +1004,7 @@ SpiceMsgChannels *reds_msg_channels_new(RedsState *reds)
 
     spice_assert(reds != NULL);
 
-    channels_info = (SpiceMsgChannels *)spice_malloc(sizeof(SpiceMsgChannels)
+    channels_info = (SpiceMsgChannels *)g_malloc(sizeof(SpiceMsgChannels)
                             + g_list_length(reds->channels) * sizeof(SpiceChannelId));
 
     reds_fill_channels(reds, channels_info);
@@ -1066,7 +1085,7 @@ uint8_t *reds_get_agent_data_buffer(RedsState *reds, MainChannelClient *mcc, siz
          * In such case, we will receive and discard the msgs (reds_reset_vdp takes care
          * of setting dev->write_filter.result = AGENT_MSG_FILTER_DISCARD).
          */
-        return spice_malloc(size);
+        return g_malloc(size);
     }
 
     spice_assert(dev->priv->recv_from_client_buf == NULL);
@@ -1088,7 +1107,7 @@ void reds_release_agent_data_buffer(RedsState *reds, uint8_t *buf)
     RedCharDeviceVDIPort *dev = reds->agent_dev;
 
     if (!dev->priv->recv_from_client_buf) {
-        free(buf);
+        g_free(buf);
         return;
     }
 
@@ -1459,7 +1478,7 @@ bool reds_handle_migrate_data(RedsState *reds, MainChannelClient *mcc,
             /* restore agent starte when the agent gets attached */
             spice_debug("saving mig_data");
             spice_assert(agent_dev->priv->plug_generation == 0);
-            agent_dev->priv->mig_data = spice_memdup(mig_data, size);
+            agent_dev->priv->mig_data = g_memdup(mig_data, size);
         }
     } else {
         spice_debug("agent was not attached on the source host");
@@ -1646,7 +1665,7 @@ static void reds_mig_target_client_add(RedsState *reds, RedClient *client)
 
     g_return_if_fail(reds);
     spice_debug("trace");
-    mig_client = spice_new0(RedsMigTargetClient, 1);
+    mig_client = g_new0(RedsMigTargetClient, 1);
     mig_client->client = client;
     mig_client->reds = reds;
     reds->mig_target_clients = g_list_append(reds->mig_target_clients, mig_client);
@@ -1673,7 +1692,7 @@ static void reds_mig_target_client_add_pending_link(RedsMigTargetClient *client,
     RedsMigPendingLink *mig_link;
 
     spice_assert(client);
-    mig_link = spice_new0(RedsMigPendingLink, 1);
+    mig_link = g_new0(RedsMigPendingLink, 1);
     mig_link->link_msg = link_msg;
     mig_link->stream = stream;
 
@@ -1684,25 +1703,23 @@ static void reds_mig_target_client_free(RedsState *reds, RedsMigTargetClient *mi
 {
     reds->mig_target_clients = g_list_remove(reds->mig_target_clients, mig_client);
     g_list_free_full(mig_client->pending_links, g_free);
-    free(mig_client);
+    g_free(mig_client);
 }
 
 static void reds_mig_target_client_disconnect_all(RedsState *reds)
 {
-    GListIter it;
     RedsMigTargetClient *mig_client;
 
-    GLIST_FOREACH(reds->mig_target_clients, it, RedsMigTargetClient, mig_client) {
+    GLIST_FOREACH(reds->mig_target_clients, RedsMigTargetClient, mig_client) {
         reds_client_disconnect(reds, mig_client->client);
     }
 }
 
 static bool reds_find_client(RedsState *reds, RedClient *client)
 {
-    GListIter iter;
     RedClient *list_client;
 
-    GLIST_FOREACH(reds->clients, iter, RedClient, list_client) {
+    GLIST_FOREACH(reds->clients, RedClient, list_client) {
         if (list_client == client) {
             return TRUE;
         }
@@ -1732,14 +1749,14 @@ red_channel_capabilities_init_from_link_message(RedChannelCapabilities *caps,
     caps->num_common_caps = link_mess->num_common_caps;
     caps->common_caps = NULL;
     if (caps->num_common_caps) {
-        caps->common_caps = spice_memdup(raw_caps,
-                                         link_mess->num_common_caps * sizeof(uint32_t));
+        caps->common_caps = g_memdup(raw_caps,
+                                     link_mess->num_common_caps * sizeof(uint32_t));
     }
     caps->num_caps = link_mess->num_channel_caps;
     caps->caps = NULL;
     if (link_mess->num_channel_caps) {
-        caps->caps = spice_memdup(raw_caps + link_mess->num_common_caps,
-                                  link_mess->num_channel_caps * sizeof(uint32_t));
+        caps->caps = g_memdup(raw_caps + link_mess->num_common_caps,
+                              link_mess->num_channel_caps * sizeof(uint32_t));
     }
 }
 
@@ -2034,7 +2051,7 @@ static void reds_handle_ticket(void *opaque)
                       RSA_size(link->tiTicketing.rsa), SPICE_MAX_PASSWORD_LENGTH);
     }
 
-    password = spice_malloc0(RSA_size(link->tiTicketing.rsa) + 1);
+    password = g_new0(char, RSA_size(link->tiTicketing.rsa) + 1);
     password_size = RSA_private_decrypt(link->tiTicketing.rsa_size,
                                         link->tiTicketing.encrypted_ticket.encrypted_data,
                                         (unsigned char *)password,
@@ -2075,7 +2092,7 @@ error:
     reds_link_free(link);
 
 end:
-    free(password);
+    g_free(password);
 }
 
 static void reds_get_spice_ticket(RedLinkInfo *link)
@@ -2438,7 +2455,7 @@ static RedLinkInfo *reds_init_client_connection(RedsState *reds, int socket)
 
     red_socket_set_keepalive(socket, TRUE, KEEPALIVE_TIMEOUT);
 
-    link = spice_new0(RedLinkInfo, 1);
+    link = g_new0(RedLinkInfo, 1);
     link->reds = reds;
     link->stream = reds_stream_new(reds, socket);
 
@@ -2486,9 +2503,10 @@ static RedLinkInfo *reds_init_client_ssl_connection(RedsState *reds, int socket)
     return link;
 
 error:
-    free(link->stream);
-    BN_free(link->tiTicketing.bn);
-    free(link);
+    /* close the stream but do not close the socket, this API is
+     * supposed to not close it if it fails */
+    link->stream->socket = -1;
+    reds_link_free(link);
     return NULL;
 }
 
@@ -2945,9 +2963,9 @@ static void reds_set_one_channel_security(RedsState *reds, int id, uint32_t secu
 static void reds_mig_release(RedServerConfig *config)
 {
     if (config->mig_spice) {
-        free(config->mig_spice->cert_subject);
-        free(config->mig_spice->host);
-        free(config->mig_spice);
+        g_free(config->mig_spice->cert_subject);
+        g_free(config->mig_spice->host);
+        g_free(config->mig_spice);
         config->mig_spice = NULL;
     }
 }
@@ -2964,13 +2982,12 @@ static void reds_mig_started(RedsState *reds)
 
 static void reds_mig_fill_wait_disconnect(RedsState *reds)
 {
-    GListIter iter;
     RedClient *client;
 
     spice_assert(reds->clients != NULL);
     /* tracking the clients, in order to ignore disconnection
      * of clients that got connected to the src after migration completion.*/
-    GLIST_FOREACH(reds->clients, iter, RedClient, client) {
+    GLIST_FOREACH(reds->clients, RedClient, client) {
         reds->mig_wait_disconnect_clients = g_list_append(reds->mig_wait_disconnect_clients, client);
     }
     reds->mig_wait_connect = FALSE;
@@ -3119,7 +3136,7 @@ static RedCharDevice *attach_to_red_agent(RedsState *reds, SpiceCharDeviceInstan
             spice_debug("restoring dev from stored migration data");
             spice_assert(dev->priv->plug_generation == 1);
             reds_agent_state_restore(reds, dev->priv->mig_data);
-            free(dev->priv->mig_data);
+            g_free(dev->priv->mig_data);
             dev->priv->mig_data = NULL;
         }
         else {
@@ -3483,9 +3500,9 @@ static const char default_video_codecs[] = "spice:mjpeg;" GSTREAMER_CODECS;
 SPICE_GNUC_VISIBLE SpiceServer *spice_server_new(void)
 {
     const char *record_filename;
-    RedsState *reds = spice_new0(RedsState, 1);
+    RedsState *reds = g_new0(RedsState, 1);
 
-    reds->config = spice_new0(RedServerConfig, 1);
+    reds->config = g_new0(RedServerConfig, 1);
     reds->config->default_channel_security =
         SPICE_CHANNEL_SECURITY_NONE | SPICE_CHANNEL_SECURITY_SSL;
     reds->config->renderers = g_array_sized_new(FALSE, TRUE, sizeof(uint32_t), RED_RENDERER_LAST);
@@ -3655,6 +3672,7 @@ static void reds_set_video_codecs_from_string(RedsState *reds, const char *codec
             g_array_append_val(video_codecs, new_codec);
         }
 
+        /* these are allocated by sscanf, do not use g_free */
         free(encoder_name);
         free(codec_name);
         codecs = c;
@@ -3693,12 +3711,12 @@ static void reds_config_free(RedServerConfig *config)
         free(curr);
     }
 #if HAVE_SASL
-    free(config->sasl_appname);
+    g_free(config->sasl_appname);
 #endif
-    free(config->spice_name);
+    g_free(config->spice_name);
     g_array_unref(config->renderers);
     g_array_unref(config->video_codecs);
-    free(config);
+    g_free(config);
 }
 
 SPICE_GNUC_VISIBLE void spice_server_destroy(SpiceServer *reds)
@@ -3712,7 +3730,6 @@ SPICE_GNUC_VISIBLE void spice_server_destroy(SpiceServer *reds)
     g_list_free_full(reds->qxl_instances, (GDestroyNotify)red_qxl_destroy);
 
     if (reds->inputs_channel) {
-        reds_unregister_channel(reds, RED_CHANNEL(reds->inputs_channel));
         red_channel_destroy(RED_CHANNEL(reds->inputs_channel));
     }
     if (reds->main_channel) {
@@ -3745,7 +3762,7 @@ SPICE_GNUC_VISIBLE void spice_server_destroy(SpiceServer *reds)
 #endif
 
     reds_config_free(reds->config);
-    free(reds);
+    g_free(reds);
 }
 
 SPICE_GNUC_VISIBLE spice_compat_version_t spice_get_current_compat_version(void)
@@ -3824,8 +3841,8 @@ SPICE_GNUC_VISIBLE int spice_server_set_sasl(SpiceServer *s, int enabled)
 SPICE_GNUC_VISIBLE int spice_server_set_sasl_appname(SpiceServer *s, const char *appname)
 {
 #if HAVE_SASL
-    free(s->config->sasl_appname);
-    s->config->sasl_appname = spice_strdup(appname);
+    g_free(s->config->sasl_appname);
+    s->config->sasl_appname = g_strdup(appname);
     return 0;
 #else
     return -1;
@@ -3834,8 +3851,8 @@ SPICE_GNUC_VISIBLE int spice_server_set_sasl_appname(SpiceServer *s, const char 
 
 SPICE_GNUC_VISIBLE void spice_server_set_name(SpiceServer *s, const char *name)
 {
-    free(s->config->spice_name);
-    s->config->spice_name = spice_strdup(name);
+    g_free(s->config->spice_name);
+    s->config->spice_name = g_strdup(name);
 }
 
 SPICE_GNUC_VISIBLE void spice_server_set_uuid(SpiceServer *s, const uint8_t uuid[16])
@@ -4097,12 +4114,12 @@ static int reds_set_migration_dest_info(RedsState *reds,
         return FALSE;
     }
 
-    spice_migration = spice_new0(RedsMigSpice, 1);
+    spice_migration = g_new0(RedsMigSpice, 1);
     spice_migration->port = port;
     spice_migration->sport = secure_port;
-    spice_migration->host = spice_strdup(dest);
+    spice_migration->host = g_strdup(dest);
     if (cert_subject) {
-        spice_migration->cert_subject = spice_strdup(cert_subject);
+        spice_migration->cert_subject = g_strdup(cert_subject);
     }
 
     reds->config->mig_spice = spice_migration;
@@ -4355,13 +4372,11 @@ void reds_update_client_mouse_allowed(RedsState *reds)
     int num_active_workers = g_list_length(reds->qxl_instances);
 
     if (num_active_workers > 0) {
-        GListIter it;
         QXLInstance *qxl;
 
         allow_now = TRUE;
-        FOREACH_QXL_INSTANCE(reds, it, qxl) {
-            if (red_qxl_get_primary_active(qxl)) {
-                allow_now = red_qxl_get_allow_client_mouse(qxl, &x_res, &y_res);
+        FOREACH_QXL_INSTANCE(reds, qxl) {
+            if (red_qxl_get_allow_client_mouse(qxl, &x_res, &y_res, &allow_now)) {
                 break;
             }
         }
@@ -4380,15 +4395,14 @@ void reds_update_client_mouse_allowed(RedsState *reds)
 
 static gboolean reds_use_client_monitors_config(RedsState *reds)
 {
-    GListIter it;
     QXLInstance *qxl;
 
     if (reds->qxl_instances == NULL) {
         return FALSE;
     }
 
-    FOREACH_QXL_INSTANCE(reds, it, qxl) {
-        if (!red_qxl_use_client_monitors_config(qxl))
+    FOREACH_QXL_INSTANCE(reds, qxl) {
+        if (!red_qxl_client_monitors_config(qxl, NULL))
             return FALSE;
     }
     return TRUE;
@@ -4396,10 +4410,9 @@ static gboolean reds_use_client_monitors_config(RedsState *reds)
 
 static void reds_client_monitors_config(RedsState *reds, VDAgentMonitorsConfig *monitors_config)
 {
-    GListIter it;
     QXLInstance *qxl;
 
-    FOREACH_QXL_INSTANCE(reds, it, qxl) {
+    FOREACH_QXL_INSTANCE(reds, qxl) {
         if (!red_qxl_client_monitors_config(qxl, monitors_config)) {
             /* this is a normal condition, some qemu devices might not implement it */
             spice_debug("QXLInterface::client_monitors_config failed\n");
@@ -4422,10 +4435,9 @@ static int calc_compression_level(RedsState *reds)
 void reds_on_ic_change(RedsState *reds)
 {
     int compression_level = calc_compression_level(reds);
-    GListIter it;
     QXLInstance *qxl;
 
-    FOREACH_QXL_INSTANCE(reds, it, qxl) {
+    FOREACH_QXL_INSTANCE(reds, qxl) {
         red_qxl_set_compression_level(qxl, compression_level);
         red_qxl_on_ic_change(qxl, spice_server_get_image_compression(reds));
     }
@@ -4434,10 +4446,9 @@ void reds_on_ic_change(RedsState *reds)
 void reds_on_sv_change(RedsState *reds)
 {
     int compression_level = calc_compression_level(reds);
-    GListIter it;
     QXLInstance *qxl;
 
-    FOREACH_QXL_INSTANCE(reds, it, qxl) {
+    FOREACH_QXL_INSTANCE(reds, qxl) {
         red_qxl_set_compression_level(qxl, compression_level);
         red_qxl_on_sv_change(qxl, reds_get_streaming_video(reds));
     }
@@ -4445,30 +4456,27 @@ void reds_on_sv_change(RedsState *reds)
 
 void reds_on_vc_change(RedsState *reds)
 {
-    GListIter it;
     QXLInstance *qxl;
 
-    FOREACH_QXL_INSTANCE(reds, it, qxl) {
+    FOREACH_QXL_INSTANCE(reds, qxl) {
         red_qxl_on_vc_change(qxl, reds_get_video_codecs(reds));
     }
 }
 
 void reds_on_vm_stop(RedsState *reds)
 {
-    GListIter it;
     QXLInstance *qxl;
 
-    FOREACH_QXL_INSTANCE(reds, it, qxl) {
+    FOREACH_QXL_INSTANCE(reds, qxl) {
         red_qxl_stop(qxl);
     }
 }
 
 void reds_on_vm_start(RedsState *reds)
 {
-    GListIter it;
     QXLInstance *qxl;
 
-    FOREACH_QXL_INSTANCE(reds, it, qxl) {
+    FOREACH_QXL_INSTANCE(reds, qxl) {
         red_qxl_start(qxl);
     }
 }
@@ -4536,7 +4544,7 @@ red_char_device_vdi_port_finalize(GObject *object)
 {
     RedCharDeviceVDIPort *dev = RED_CHAR_DEVICE_VDIPORT(object);
 
-   free(dev->priv->mig_data);
+    g_free(dev->priv->mig_data);
    /* FIXME: need to free the RedVDIReadBuf allocated previously */
 
     G_OBJECT_CLASS(red_char_device_vdi_port_parent_class)->finalize(object);

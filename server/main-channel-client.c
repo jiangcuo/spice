@@ -110,13 +110,13 @@ typedef struct RedNotifyPipeItem {
 
 typedef struct RedMouseModePipeItem {
     RedPipeItem base;
-    int current_mode;
+    SpiceMouseMode current_mode;
     int is_client_mouse_allowed;
 } RedMouseModePipeItem;
 
 typedef struct RedMultiMediaTimePipeItem {
     RedPipeItem base;
-    int time;
+    uint32_t time;
 } RedMultiMediaTimePipeItem;
 
 #define ZERO_BUF_SIZE 4096
@@ -189,6 +189,17 @@ main_channel_client_release_msg_rcv_buf(RedChannelClient *rcc,
     }
 }
 
+/*
+ * When the main channel is disconnected, disconnect the entire client.
+ */
+static void main_channel_client_on_disconnect(RedChannelClient *rcc)
+{
+    RedsState *reds = red_channel_get_server(red_channel_client_get_channel(rcc));
+    spice_printerr("rcc=%p", rcc);
+    main_dispatcher_client_disconnect(reds_get_main_dispatcher(reds),
+                                      red_channel_client_get_client(rcc));
+}
+
 static void main_channel_client_class_init(MainChannelClientClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
@@ -201,6 +212,7 @@ static void main_channel_client_class_init(MainChannelClientClass *klass)
 
     client_class->alloc_recv_buf = main_channel_client_alloc_msg_rcv_buf;
     client_class->release_recv_buf = main_channel_client_release_msg_rcv_buf;
+    client_class->on_disconnect = main_channel_client_on_disconnect;
 
     g_object_class_install_property(object_class,
                                     PROP_CONNECTION_ID,
@@ -226,17 +238,17 @@ static bool main_channel_client_push_ping(MainChannelClient *mcc, int size);
 static void main_notify_item_free(RedPipeItem *base)
 {
     RedNotifyPipeItem *data = SPICE_UPCAST(RedNotifyPipeItem, base);
-    free(data->msg);
-    free(data);
+    g_free(data->msg);
+    g_free(data);
 }
 
 static RedPipeItem *main_notify_item_new(const char *msg, int num)
 {
-    RedNotifyPipeItem *item = spice_malloc(sizeof(RedNotifyPipeItem));
+    RedNotifyPipeItem *item = g_new(RedNotifyPipeItem, 1);
 
     red_pipe_item_init_full(&item->base, RED_PIPE_ITEM_TYPE_MAIN_NOTIFY,
                             main_notify_item_free);
-    item->msg = spice_strdup(msg);
+    item->msg = g_strdup(msg);
     return &item->base;
 }
 
@@ -302,14 +314,14 @@ static void main_agent_data_item_free(RedPipeItem *base)
 {
     RedAgentDataPipeItem *item = SPICE_UPCAST(RedAgentDataPipeItem, base);
     item->free_data(item->data, item->opaque);
-    free(item);
+    g_free(item);
 }
 
 static RedPipeItem *main_agent_data_item_new(uint8_t* data, size_t len,
                                              spice_marshaller_item_free_func free_data,
                                              void *opaque)
 {
-    RedAgentDataPipeItem *item = spice_malloc(sizeof(RedAgentDataPipeItem));
+    RedAgentDataPipeItem *item = g_new(RedAgentDataPipeItem, 1);
 
     red_pipe_item_init_full(&item->base, RED_PIPE_ITEM_TYPE_MAIN_AGENT_DATA,
                             main_agent_data_item_free);
@@ -331,7 +343,7 @@ void main_channel_client_push_agent_data(MainChannelClient *mcc, uint8_t* data, 
 
 static RedPipeItem *main_init_item_new(int connection_id,
                                        int display_channels_hint,
-                                       int current_mouse_mode,
+                                       SpiceMouseMode current_mouse_mode,
                                        int is_client_mouse_allowed,
                                        int multi_media_time,
                                        int ram_hint)
@@ -350,7 +362,7 @@ static RedPipeItem *main_init_item_new(int connection_id,
 
 void main_channel_client_push_init(MainChannelClient *mcc,
                                    int display_channels_hint,
-                                   int current_mouse_mode,
+                                   SpiceMouseMode current_mouse_mode,
                                    int is_client_mouse_allowed,
                                    int multi_media_time,
                                    int ram_hint)
@@ -414,26 +426,23 @@ void main_channel_client_push_notify(MainChannelClient *mcc, const char *msg)
     red_channel_client_pipe_add_push(RED_CHANNEL_CLIENT(mcc), item);
 }
 
-RedPipeItem *main_mouse_mode_item_new(RedChannelClient *rcc, void *data, int num)
+RedPipeItem *main_mouse_mode_item_new(SpiceMouseMode current_mode, int is_client_mouse_allowed)
 {
     RedMouseModePipeItem *item = spice_malloc(sizeof(RedMouseModePipeItem));
-    MainMouseModeItemInfo *info = data;
 
     red_pipe_item_init(&item->base, RED_PIPE_ITEM_TYPE_MAIN_MOUSE_MODE);
-    item->current_mode = info->current_mode;
-    item->is_client_mouse_allowed = info->is_client_mouse_allowed;
+    item->current_mode = current_mode;
+    item->is_client_mouse_allowed = is_client_mouse_allowed;
     return &item->base;
 }
 
-RedPipeItem *main_multi_media_time_item_new(RedChannelClient *rcc,
-                                            void *data, int num)
+RedPipeItem *main_multi_media_time_item_new(uint32_t mm_time)
 {
-    MainMultiMediaTimeItemInfo *info = data;
     RedMultiMediaTimePipeItem *item;
 
     item = spice_malloc(sizeof(RedMultiMediaTimePipeItem));
     red_pipe_item_init(&item->base, RED_PIPE_ITEM_TYPE_MAIN_MULTI_MEDIA_TIME);
-    item->time = info->time;
+    item->time = mm_time;
     return &item->base;
 }
 
@@ -713,7 +722,7 @@ static void main_channel_marshall_channels(RedChannelClient *rcc,
     red_channel_client_init_send_data(rcc, SPICE_MSG_MAIN_CHANNELS_LIST);
     channels_info = reds_msg_channels_new(red_channel_get_server(channel));
     spice_marshall_msg_main_channels_list(m, channels_info);
-    free(channels_info);
+    g_free(channels_info);
 }
 
 static void main_channel_marshall_ping(RedChannelClient *rcc,

@@ -38,6 +38,13 @@
 static void setup_dummy_signal_handler(void);
 #endif
 
+typedef struct DispatcherMessage {
+    size_t size;
+    bool ack;
+    dispatcher_handle_message handler;
+} DispatcherMessage;
+
+
 G_DEFINE_TYPE(Dispatcher, dispatcher, G_TYPE_OBJECT)
 
 #define DISPATCHER_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), TYPE_DISPATCHER, DispatcherPrivate))
@@ -53,14 +60,12 @@ struct DispatcherPrivate {
     void *payload; /* allocated as max of message sizes */
     size_t payload_size; /* used to track realloc calls */
     void *opaque;
-    dispatcher_handle_async_done handle_async_done;
     dispatcher_handle_any_message any_handler;
 };
 
 enum {
     PROP_0,
-    PROP_MAX_MESSAGE_TYPE,
-    PROP_OPAQUE
+    PROP_MAX_MESSAGE_TYPE
 };
 
 static void
@@ -75,9 +80,6 @@ dispatcher_get_property(GObject    *object,
     {
         case PROP_MAX_MESSAGE_TYPE:
             g_value_set_uint(value, self->priv->max_message_type);
-            break;
-        case PROP_OPAQUE:
-            g_value_set_pointer(value, self->priv->opaque);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -96,9 +98,6 @@ dispatcher_set_property(GObject      *object,
     {
         case PROP_MAX_MESSAGE_TYPE:
             self->priv->max_message_type = g_value_get_uint(value);
-            break;
-        case PROP_OPAQUE:
-            dispatcher_set_opaque(self, g_value_get_pointer(value));
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -161,15 +160,6 @@ dispatcher_class_init(DispatcherClass *klass)
                                                       G_PARAM_STATIC_STRINGS |
                                                       G_PARAM_READWRITE |
                                                       G_PARAM_CONSTRUCT_ONLY));
-    g_object_class_install_property(object_class,
-                                    PROP_OPAQUE,
-                                    g_param_spec_pointer("opaque",
-                                                         "opaque",
-                                                         "User data to pass to callbacks",
-                                                         G_PARAM_STATIC_STRINGS |
-                                                         G_PARAM_READWRITE |
-                                                         G_PARAM_CONSTRUCT));
-
 }
 
 static void
@@ -179,11 +169,10 @@ dispatcher_init(Dispatcher *self)
 }
 
 Dispatcher *
-dispatcher_new(size_t max_message_type, void *opaque)
+dispatcher_new(size_t max_message_type)
 {
     return g_object_new(TYPE_DISPATCHER,
                         "max-message-type", (guint) max_message_type,
-                        "opaque", opaque,
                         NULL);
 }
 
@@ -278,6 +267,10 @@ static int dispatcher_handle_single_read(Dispatcher *dispatcher)
         /* no messsage */
         return 0;
     }
+    if (type >= dispatcher->priv->max_message_type) {
+        spice_error("Invalid message type for this dispatcher: %u", type);
+        return 0;
+    }
     msg = &dispatcher->priv->messages[type];
     if (read_safe(dispatcher->priv->recv_fd, payload, msg->size, 1) == -1) {
         spice_printerr("error reading from dispatcher: %d", errno);
@@ -292,14 +285,12 @@ static int dispatcher_handle_single_read(Dispatcher *dispatcher)
     } else {
         spice_printerr("error: no handler for message type %d", type);
     }
-    if (msg->ack == DISPATCHER_ACK) {
+    if (msg->ack) {
         if (write_safe(dispatcher->priv->recv_fd,
                        (uint8_t*)&ack, sizeof(ack)) == -1) {
             spice_printerr("error writing ack for message %d", type);
             /* TODO: close socketpair? */
         }
-    } else if (msg->ack == DISPATCHER_ASYNC && dispatcher->priv->handle_async_done) {
-        dispatcher->priv->handle_async_done(dispatcher->priv->opaque, type, payload);
     }
     return 1;
 }
@@ -335,7 +326,7 @@ void dispatcher_send_message(Dispatcher *dispatcher, uint32_t message_type,
                    message_type);
         goto unlock;
     }
-    if (msg->ack == DISPATCHER_ACK) {
+    if (msg->ack) {
         if (read_safe(send_fd, (uint8_t*)&ack, sizeof(ack), 1) == -1) {
             spice_printerr("error: failed to read ack");
         } else if (ack != ACK) {
@@ -348,17 +339,9 @@ unlock:
     pthread_mutex_unlock(&dispatcher->priv->lock);
 }
 
-void dispatcher_register_async_done_callback(
-                                        Dispatcher *dispatcher,
-                                        dispatcher_handle_async_done handler)
-{
-    assert(dispatcher->priv->handle_async_done == NULL);
-    dispatcher->priv->handle_async_done = handler;
-}
-
 void dispatcher_register_handler(Dispatcher *dispatcher, uint32_t message_type,
                                  dispatcher_handle_message handler,
-                                 size_t size, int ack)
+                                 size_t size, bool ack)
 {
     DispatcherMessage *msg;
 
@@ -408,7 +391,6 @@ static void setup_dummy_signal_handler(void)
 void dispatcher_set_opaque(Dispatcher *self, void *opaque)
 {
     self->priv->opaque = opaque;
-    g_object_notify(G_OBJECT(self), "opaque");
 }
 
 int dispatcher_get_recv_fd(Dispatcher *dispatcher)

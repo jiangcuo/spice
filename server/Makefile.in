@@ -169,7 +169,7 @@ libserver_la_DEPENDENCIES =  \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__libserver_la_SOURCES_DIST = spice-audio.h spice-char.h \
 	spice-core.h spice-experimental.h spice-input.h \
 	spice-migration.h spice-qxl.h spice-server.h spice-version.h \
@@ -422,6 +422,8 @@ NMEDIT = @NMEDIT@
 NO_INDIRECT_LDFLAGS = @NO_INDIRECT_LDFLAGS@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+ORC_CFLAGS = @ORC_CFLAGS@
+ORC_LIBS = @ORC_LIBS@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
@@ -538,6 +540,7 @@ AM_CPPFLAGS = \
 	$(SSL_CFLAGS)				\
 	$(VISIBILITY_HIDDEN_CFLAGS)		\
 	$(WARN_CFLAGS)				\
+	$(ORC_CFLAGS)				\
 	$(NULL)
 
 noinst_LTLIBRARIES = libserver.la
@@ -562,6 +565,7 @@ libserver_la_LIBADD = \
 	$(SSL_LIBS)							\
 	$(Z_LIBS)							\
 	$(SPICE_NONPKGCONFIG_LIBS)					\
+	$(ORC_LIBS)							\
 	$(NULL)
 
 libspice_serverincludedir = $(includedir)/spice-server

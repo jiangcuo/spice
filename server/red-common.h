@@ -81,16 +81,42 @@ typedef struct GListIter {
 } GListIter;
 
 #define GLIST_FOREACH_GENERIC(_list, _iter, _type, _data, _dir) \
-    for (_iter.link = _list; \
+    for (GListIter _iter = { .link = _list }; \
         (_data = (_type *) (_iter.link ? _iter.link->data : NULL), \
          _iter.next = (_iter.link ? _iter.link->_dir : NULL), \
          _iter.link) != NULL; \
          _iter.link = _iter.next)
 
-#define GLIST_FOREACH(_list, _iter, _type, _data) \
-    GLIST_FOREACH_GENERIC(_list, _iter, _type, _data, next)
+#define GLIST_FOREACH(_list, _type, _data) \
+    GLIST_FOREACH_GENERIC(_list, G_PASTE(_iter_, __LINE__), _type, _data, next)
 
-#define GLIST_FOREACH_REVERSED(_list, _iter, _type, _data) \
-    GLIST_FOREACH_GENERIC(_list, _iter, _type, _data, prev)
+#define GLIST_FOREACH_REVERSED(_list, _type, _data) \
+    GLIST_FOREACH_GENERIC(_list, G_PASTE(_iter_, __LINE__), _type, _data, prev)
+
+/* Helper to declare a GObject type
+ *
+ * @ModuleObjName     type identifier like MyObject
+ * @module_obj_name   method prefix like my_object (no need to add the
+ *                    underscore)
+ * @OBJ_NAME          macro common part like MY_OBJECT
+ */
+#define SPICE_DECLARE_TYPE(ModuleObjName, module_obj_name, OBJ_NAME) \
+    typedef struct ModuleObjName ModuleObjName; \
+    typedef struct ModuleObjName ## Class ModuleObjName ## Class; \
+    typedef struct ModuleObjName ## Private ModuleObjName ## Private; \
+    GType module_obj_name ## _get_type(void) G_GNUC_CONST; \
+    static inline ModuleObjName *G_PASTE(RED_,OBJ_NAME)(void *obj) \
+    { return G_TYPE_CHECK_INSTANCE_CAST(obj, \
+             module_obj_name ## _get_type(), ModuleObjName); } \
+    static inline ModuleObjName ## Class *G_PASTE(G_PASTE(RED_,OBJ_NAME),_CLASS)(void *klass) \
+    { return G_TYPE_CHECK_CLASS_CAST(klass, \
+             module_obj_name ## _get_type(), ModuleObjName ## Class); } \
+    static inline gboolean G_PASTE(RED_IS_,OBJ_NAME)(void *obj) \
+    { return G_TYPE_CHECK_INSTANCE_TYPE(obj, module_obj_name ## _get_type()); } \
+    static inline gboolean G_PASTE(G_PASTE(RED_IS_,OBJ_NAME),_CLASS)(void *klass) \
+    { return G_TYPE_CHECK_CLASS_TYPE((klass), module_obj_name ## _get_type()); } \
+    static inline ModuleObjName ## Class *G_PASTE(G_PASTE(RED_,OBJ_NAME),_GET_CLASS)(void *obj) \
+    { return G_TYPE_INSTANCE_GET_CLASS(obj, \
+             module_obj_name ## _get_type(), ModuleObjName ## Class); }
 
 #endif /* RED_COMMON_H_ */

@@ -789,17 +789,13 @@ static bool snd_channel_client_config_socket(RedChannelClient *rcc)
     return true;
 }
 
-static void snd_channel_on_disconnect(RedChannelClient *rcc)
-{
-}
-
 static uint8_t*
 snd_channel_client_alloc_recv_buf(RedChannelClient *rcc, uint16_t type, uint32_t size)
 {
     SndChannelClient *client = SND_CHANNEL_CLIENT(rcc);
     // If message is too big allocate one, this should never happen
     if (size > sizeof(client->receive_buf)) {
-        return spice_malloc(size);
+        return g_malloc(size);
     }
     return client->receive_buf;
 }
@@ -810,7 +806,7 @@ snd_channel_client_release_recv_buf(RedChannelClient *rcc, uint16_t type, uint32
 {
     SndChannelClient *client = SND_CHANNEL_CLIENT(rcc);
     if (msg != client->receive_buf) {
-        free(msg);
+        g_free(msg);
     }
 }
 
@@ -829,8 +825,8 @@ static void snd_channel_set_volume(SndChannel *channel,
     SndChannelClient *client = snd_channel_get_client(channel);
 
     st->volume_nchannels = nchannels;
-    free(st->volume);
-    st->volume = spice_memdup(volume, sizeof(uint16_t) * nchannels);
+    g_free(st->volume);
+    st->volume = g_memdup(volume, sizeof(uint16_t) * nchannels);
 
     if (!client || nchannels == 0)
         return;
@@ -955,7 +951,7 @@ SPICE_GNUC_VISIBLE void spice_server_playback_put_samples(SpicePlaybackInstance 
     if (frame->allocated) {
         frame->allocated = false;
         if (--frame->container->refs == 0) {
-            free(frame->container);
+            g_free(frame->container);
             return;
         }
     }
@@ -1029,7 +1025,7 @@ playback_channel_client_finalize(GObject *object)
         playback_client->frames->items[i].client = NULL;
     }
     if (--playback_client->frames->refs == 0) {
-        free(playback_client->frames);
+        g_free(playback_client->frames);
     }
 
     if (client->active) {
@@ -1306,7 +1302,7 @@ snd_channel_finalize(GObject *object)
 
     remove_channel(channel);
 
-    free(channel->volume.volume);
+    g_free(channel->volume.volume);
     channel->volume.volume = NULL;
 
     G_OBJECT_CLASS(snd_channel_parent_class)->finalize(object);
@@ -1316,11 +1312,8 @@ static void
 snd_channel_class_init(SndChannelClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
-    RedChannelClass *channel_class = RED_CHANNEL_CLASS(klass);
 
     object_class->finalize = snd_channel_finalize;
-
-    channel_class->on_disconnect = snd_channel_on_disconnect;
 }
 
 static void
@@ -1428,9 +1421,7 @@ static void snd_detach_common(SndChannel *channel)
     if (!channel) {
         return;
     }
-    RedsState *reds = red_channel_get_server(RED_CHANNEL(channel));
 
-    reds_unregister_channel(reds, RED_CHANNEL(channel));
     red_channel_destroy(RED_CHANNEL(channel));
 }
 
@@ -1499,7 +1490,7 @@ static void snd_playback_alloc_frames(PlaybackChannelClient *playback)
 {
     int i;
 
-    playback->frames = spice_new0(AudioFrameContainer, 1);
+    playback->frames = g_new0(AudioFrameContainer, 1);
     playback->frames->refs = 1;
     for (i = 0; i < NUM_AUDIO_FRAMES; ++i) {
         playback->frames->items[i].container = playback->frames;

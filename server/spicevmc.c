@@ -272,7 +272,6 @@ red_vmc_channel_finalize(GObject *object)
 static RedVmcChannel *red_vmc_channel_new(RedsState *reds, uint8_t channel_type)
 {
     GType gtype = G_TYPE_NONE;
-    static uint8_t id[SPICE_END_CHANNEL] = { 0, };
 
     switch (channel_type) {
         case SPICE_CHANNEL_USBREDIR:
@@ -288,11 +287,18 @@ static RedVmcChannel *red_vmc_channel_new(RedsState *reds, uint8_t channel_type)
             g_error("Unsupported channel_type for red_vmc_channel_new(): %u", channel_type);
             return NULL;
     }
+
+    int id = reds_get_free_channel_id(reds, channel_type);
+    if (id < 0) {
+        g_warning("Free ID not found creating new VMC channel");
+        return NULL;
+    }
+
     return g_object_new(gtype,
                         "spice-server", reds,
                         "core-interface", reds_get_core_interface(reds),
                         "channel-type", channel_type,
-                        "id", id[channel_type]++,
+                        "id", id,
                         "handle-acks", FALSE,
                         "migration-flags",
                         (SPICE_MIGRATE_NEED_FLUSH | SPICE_MIGRATE_NEED_DATA_TRANSFER),
@@ -763,7 +769,6 @@ red_vmc_channel_class_init(RedVmcChannelClass *klass)
 
     channel_class->handle_message = spicevmc_red_channel_client_handle_message;
 
-    channel_class->on_disconnect = spicevmc_red_channel_client_on_disconnect;
     channel_class->send_item = spicevmc_red_channel_send_item;
     channel_class->handle_migrate_flush_mark = spicevmc_channel_client_handle_migrate_flush_mark;
     channel_class->handle_migrate_data = spicevmc_channel_client_handle_migrate_data;
@@ -866,15 +871,10 @@ void spicevmc_device_disconnect(RedsState *reds, SpiceCharDeviceInstance *sin)
     sin->st = NULL;
 }
 
-SPICE_GNUC_VISIBLE void spice_server_port_event(SpiceCharDeviceInstance *sin, uint8_t event)
+static void spicevmc_port_event(RedCharDevice *char_dev, uint8_t event)
 {
     RedVmcChannel *channel;
-    RedCharDeviceSpiceVmc *device = RED_CHAR_DEVICE_SPICEVMC(sin->st);
-
-    if (sin->st == NULL) {
-        spice_warning("no SpiceCharDeviceState attached to instance %p", sin);
-        return;
-    }
+    RedCharDeviceSpiceVmc *device = RED_CHAR_DEVICE_SPICEVMC(char_dev);
 
     channel = RED_VMC_CHANNEL(device->channel);
 
@@ -897,17 +897,11 @@ red_char_device_spicevmc_dispose(GObject *object)
     RedCharDeviceSpiceVmc *self = RED_CHAR_DEVICE_SPICEVMC(object);
 
     if (self->channel) {
-        RedChannel *channel = RED_CHANNEL(self->channel);
-        RedsState *reds = red_char_device_get_server(RED_CHAR_DEVICE(self));
-
         // prevent possible recursive calls
         self->channel->chardev = NULL;
 
-        // prevent future connection
-        reds_unregister_channel(reds, channel);
-
         // close all current connections and drop the reference
-        red_channel_destroy(channel);
+        red_channel_destroy(RED_CHANNEL(self->channel));
         self->channel = NULL;
     }
     G_OBJECT_CLASS(red_char_device_spicevmc_parent_class)->dispose(object);
@@ -953,6 +947,7 @@ red_char_device_spicevmc_class_init(RedCharDeviceSpiceVmcClass *klass)
     char_dev_class->send_msg_to_client = spicevmc_chardev_send_msg_to_client;
     char_dev_class->send_tokens_to_client = spicevmc_char_dev_send_tokens_to_client;
     char_dev_class->remove_client = spicevmc_char_dev_remove_client;
+    char_dev_class->port_event = spicevmc_port_event;
 
     g_object_class_install_property(object_class,
                                     PROP_CHANNEL,
@@ -996,6 +991,7 @@ vmc_channel_client_class_init(VmcChannelClientClass *klass)
 
     client_class->alloc_recv_buf = spicevmc_red_channel_alloc_msg_rcv_buf;
     client_class->release_recv_buf = spicevmc_red_channel_release_msg_rcv_buf;
+    client_class->on_disconnect = spicevmc_red_channel_client_on_disconnect;
 }
 
 static RedChannelClient *

@@ -45,7 +45,6 @@ typedef struct MainChannelClient MainChannelClient;
 
 typedef bool (*channel_handle_message_proc)(RedChannelClient *rcc, uint16_t type,
                                             uint32_t size, void *msg);
-typedef void (*channel_disconnect_proc)(RedChannelClient *rcc);
 typedef bool (*channel_configure_socket_proc)(RedChannelClient *rcc);
 typedef void (*channel_send_pipe_item_proc)(RedChannelClient *rcc, RedPipeItem *item);
 
@@ -115,16 +114,15 @@ struct RedChannelClass
      * callbacks that are triggered from channel client stream events.
      * They are called from the thread that listen to the stream events.
      */
-    channel_disconnect_proc on_disconnect;
     channel_send_pipe_item_proc send_item;
     channel_handle_migrate_flush_mark_proc handle_migrate_flush_mark;
     channel_handle_migrate_data_proc handle_migrate_data;
     channel_handle_migrate_data_get_serial_proc handle_migrate_data_get_serial;
 };
 
-#define FOREACH_CLIENT(_channel, _iter, _data) \
+#define FOREACH_CLIENT(_channel, _data) \
     GLIST_FOREACH((_channel ? red_channel_get_clients(RED_CHANNEL(_channel)) : NULL), \
-                  _iter, RedChannelClient, _data)
+                  RedChannelClient, _data)
 
 /* Red Channel interface */
 
@@ -162,17 +160,19 @@ bool red_channel_test_remote_cap(RedChannel *channel, uint32_t cap);
 /* should be called when a new channel is ready to send messages */
 void red_channel_init_outgoing_messages_window(RedChannel *channel);
 
-// TODO: add back the channel_pipe_add functionality - by adding reference counting
-// to the RedPipeItem.
-
 // helper to push a new item to all channels
 typedef RedPipeItem *(*new_pipe_item_t)(RedChannelClient *rcc, void *data, int num);
-int red_channel_pipes_new_add_push(RedChannel *channel, new_pipe_item_t creator, void *data);
-void red_channel_pipes_new_add(RedChannel *channel, new_pipe_item_t creator, void *data);
+int red_channel_pipes_new_add(RedChannel *channel, new_pipe_item_t creator, void *data);
 
 void red_channel_pipes_add_type(RedChannel *channel, int pipe_item_type);
 
 void red_channel_pipes_add_empty_msg(RedChannel *channel, int msg_type);
+
+/* Add an item to all the clients connected.
+ * The same item is shared between all clients.
+ * Function will take ownership of the item.
+ */
+void red_channel_pipes_add(RedChannel *channel, RedPipeItem *item);
 
 /* return TRUE if all of the connected clients to this channel are blocked */
 bool red_channel_all_blocked(RedChannel *channel);
@@ -200,24 +200,15 @@ void red_channel_connect(RedChannel *channel, RedClient *client,
 
 /* return the sum of all the rcc pipe size */
 uint32_t red_channel_max_pipe_size(RedChannel *channel);
-/* return the min size of all the rcc pipe */
-uint32_t red_channel_min_pipe_size(RedChannel *channel);
 /* return the max size of all the rcc pipe */
 uint32_t red_channel_sum_pipes_size(RedChannel *channel);
 
-/* apply given function to all connected clients */
-typedef void (*channel_client_callback)(RedChannelClient *rcc);
-typedef void (*channel_client_callback_data)(RedChannelClient *rcc, void *data);
-void red_channel_apply_clients(RedChannel *channel, channel_client_callback v);
-void red_channel_apply_clients_data(RedChannel *channel, channel_client_callback_data v,
-                                    void *data);
 GList *red_channel_get_clients(RedChannel *channel);
 guint red_channel_get_n_clients(RedChannel *channel);
 struct RedsState* red_channel_get_server(RedChannel *channel);
 SpiceCoreInterfaceInternal* red_channel_get_core_interface(RedChannel *channel);
 
 /* channel callback function */
-void red_channel_on_disconnect(RedChannel *self, RedChannelClient *rcc);
 void red_channel_send_item(RedChannel *self, RedChannelClient *rcc, RedPipeItem *item);
 void red_channel_reset_thread_id(RedChannel *self);
 const RedStatNode *red_channel_get_stat_node(RedChannel *channel);
@@ -228,6 +219,11 @@ const RedChannelCapabilities* red_channel_get_local_capabilities(RedChannel *sel
  * blocking functions.
  *
  * timeout is in nano sec. -1 for no timeout.
+ *
+ * This method tries for up to @timeout nanoseconds to send all the
+ * items which are currently queued. If the timeout elapses,
+ * the RedChannelClient which are too slow (those which still have pending
+ * items) will be disconnected.
  *
  * Return: TRUE if waiting succeeded. FALSE if timeout expired.
  */

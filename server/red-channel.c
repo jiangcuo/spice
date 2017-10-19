@@ -198,7 +198,6 @@ red_channel_constructed(GObject *object)
 
     G_OBJECT_CLASS(red_channel_parent_class)->constructed(object);
 
-    spice_assert(klass->on_disconnect);
     spice_assert(klass->handle_migrate_data ||
                  !(self->priv->migration_flags & SPICE_MIGRATE_NEED_DATA_TRANSFER));
 }
@@ -316,10 +315,9 @@ void red_channel_add_client(RedChannel *channel, RedChannelClient *rcc)
 
 bool red_channel_test_remote_cap(RedChannel *channel, uint32_t cap)
 {
-    GListIter iter;
     RedChannelClient *rcc;
 
-    FOREACH_CLIENT(channel, iter, rcc) {
+    FOREACH_CLIENT(channel, rcc) {
         if (!red_channel_client_test_remote_cap(rcc, cap)) {
             return FALSE;
         }
@@ -402,6 +400,9 @@ void red_channel_destroy(RedChannel *channel)
         return;
     }
 
+    // prevent future connection
+    reds_unregister_channel(channel->priv->reds, channel);
+
     g_list_foreach(channel->priv->clients, (GFunc)red_channel_client_destroy, NULL);
     g_object_unref(channel);
 }
@@ -428,28 +429,30 @@ void red_channel_init_outgoing_messages_window(RedChannel *channel)
                    (GFunc)red_channel_client_init_outgoing_messages_window, NULL);
 }
 
-static void red_channel_client_pipe_add_type_proxy(gpointer data, gpointer user_data)
+void red_channel_pipes_add(RedChannel *channel, RedPipeItem *item)
 {
-    int type = GPOINTER_TO_INT(user_data);
-    red_channel_client_pipe_add_type(data, type);
+    RedChannelClient *rcc;
+
+    FOREACH_CLIENT(channel, rcc) {
+        red_pipe_item_ref(item);
+        red_channel_client_pipe_add(rcc, item);
+    }
+
+    red_pipe_item_unref(item);
 }
 
 void red_channel_pipes_add_type(RedChannel *channel, int pipe_item_type)
 {
-    g_list_foreach(channel->priv->clients, red_channel_client_pipe_add_type_proxy,
-                   GINT_TO_POINTER(pipe_item_type));
-}
+    RedPipeItem *item = spice_new(RedPipeItem, 1);
 
-static void red_channel_client_pipe_add_empty_msg_proxy(gpointer data, gpointer user_data)
-{
-    int type = GPOINTER_TO_INT(user_data);
-    red_channel_client_pipe_add_empty_msg(data, type);
+    red_pipe_item_init(item, pipe_item_type);
+
+    red_channel_pipes_add(channel, item);
 }
 
 void red_channel_pipes_add_empty_msg(RedChannel *channel, int msg_type)
 {
-    g_list_foreach(channel->priv->clients, red_channel_client_pipe_add_empty_msg_proxy,
-                   GINT_TO_POINTER(msg_type));
+    red_channel_pipes_add(channel, red_channel_client_new_empty_msg(msg_type));
 }
 
 int red_channel_is_connected(RedChannel *channel)
@@ -474,7 +477,7 @@ void red_channel_remove_client(RedChannel *channel, RedChannelClient *rcc)
     link = g_list_find(channel->priv->clients, rcc);
     spice_return_if_fail(link != NULL);
 
-    channel->priv->clients = g_list_remove_link(channel->priv->clients, link);
+    channel->priv->clients = g_list_delete_link(channel->priv->clients, link);
     // TODO: should we set rcc->channel to NULL???
 }
 
@@ -490,16 +493,6 @@ void red_channel_connect(RedChannel *channel, RedClient *client,
     channel->priv->client_cbs.connect(channel, client, stream, migration, caps);
 }
 
-void red_channel_apply_clients(RedChannel *channel, channel_client_callback cb)
-{
-    g_list_foreach(channel->priv->clients, (GFunc)cb, NULL);
-}
-
-void red_channel_apply_clients_data(RedChannel *channel, channel_client_callback_data cb, void *data)
-{
-    g_list_foreach(channel->priv->clients, (GFunc)cb, data);
-}
-
 GList *red_channel_get_clients(RedChannel *channel)
 {
     return channel->priv->clients;
@@ -511,13 +504,12 @@ guint red_channel_get_n_clients(RedChannel *channel)
 
 bool red_channel_all_blocked(RedChannel *channel)
 {
-    GListIter iter;
     RedChannelClient *rcc;
 
     if (!channel || !channel->priv->clients) {
         return FALSE;
     }
-    FOREACH_CLIENT(channel, iter, rcc) {
+    FOREACH_CLIENT(channel, rcc) {
         if (!red_channel_client_is_blocked(rcc)) {
             return FALSE;
         }
@@ -528,10 +520,9 @@ bool red_channel_all_blocked(RedChannel *channel)
 /* return TRUE if any of the connected clients to this channel are blocked */
 static bool red_channel_any_blocked(RedChannel *channel)
 {
-    GListIter iter;
     RedChannelClient *rcc;
 
-    FOREACH_CLIENT(channel, iter, rcc) {
+    FOREACH_CLIENT(channel, rcc) {
         if (red_channel_client_is_blocked(rcc)) {
             return TRUE;
         }
@@ -541,10 +532,9 @@ static bool red_channel_any_blocked(RedChannel *channel)
 
 static bool red_channel_no_item_being_sent(RedChannel *channel)
 {
-    GListIter iter;
     RedChannelClient *rcc;
 
-    FOREACH_CLIENT(channel, iter, rcc) {
+    FOREACH_CLIENT(channel, rcc) {
         if (!red_channel_client_no_item_being_sent(rcc)) {
             return FALSE;
         }
@@ -578,7 +568,6 @@ static int red_channel_pipes_create_batch(RedChannel *channel,
                                 new_pipe_item_t creator, void *data,
                                 rcc_item_t pipe_add)
 {
-    GListIter iter;
     RedChannelClient *rcc;
     RedPipeItem *item;
     int num = 0, n = 0;
@@ -586,7 +575,7 @@ static int red_channel_pipes_create_batch(RedChannel *channel,
     spice_assert(creator != NULL);
     spice_assert(pipe_add != NULL);
 
-    FOREACH_CLIENT(channel, iter, rcc) {
+    FOREACH_CLIENT(channel, rcc) {
         item = (*creator)(rcc, data, num++);
         if (item) {
             (*pipe_add)(rcc, item);
@@ -597,29 +586,19 @@ static int red_channel_pipes_create_batch(RedChannel *channel,
     return n;
 }
 
-int red_channel_pipes_new_add_push(RedChannel *channel,
-                                   new_pipe_item_t creator, void *data)
+int red_channel_pipes_new_add(RedChannel *channel,
+                              new_pipe_item_t creator, void *data)
 {
-    int n = red_channel_pipes_create_batch(channel, creator, data,
-                                           red_channel_client_pipe_add);
-    red_channel_push(channel);
-
-    return n;
-}
-
-void red_channel_pipes_new_add(RedChannel *channel, new_pipe_item_t creator, void *data)
-{
-    red_channel_pipes_create_batch(channel, creator, data,
-                                     red_channel_client_pipe_add);
+    return red_channel_pipes_create_batch(channel, creator, data,
+                                          red_channel_client_pipe_add);
 }
 
 uint32_t red_channel_max_pipe_size(RedChannel *channel)
 {
-    GListIter iter;
     RedChannelClient *rcc;
     uint32_t pipe_size = 0;
 
-    FOREACH_CLIENT(channel, iter, rcc) {
+    FOREACH_CLIENT(channel, rcc) {
         uint32_t new_size;
         new_size = red_channel_client_get_pipe_size(rcc);
         pipe_size = MAX(pipe_size, new_size);
@@ -627,30 +606,28 @@ uint32_t red_channel_max_pipe_size(RedChannel *channel)
     return pipe_size;
 }
 
-uint32_t red_channel_min_pipe_size(RedChannel *channel)
-{
-    GListIter iter;
-    RedChannelClient *rcc;
-    uint32_t pipe_size = ~0;
-
-    FOREACH_CLIENT(channel, iter, rcc) {
-        uint32_t new_size;
-        new_size = red_channel_client_get_pipe_size(rcc);
-        pipe_size = MIN(pipe_size, new_size);
-    }
-    return pipe_size == ~0 ? 0 : pipe_size;
-}
-
 uint32_t red_channel_sum_pipes_size(RedChannel *channel)
 {
-    GListIter iter;
     RedChannelClient *rcc;
     uint32_t sum = 0;
 
-    FOREACH_CLIENT(channel, iter, rcc) {
+    FOREACH_CLIENT(channel, rcc) {
         sum += red_channel_client_get_pipe_size(rcc);
     }
     return sum;
+}
+
+static void red_channel_disconnect_if_pending_send(RedChannel *channel)
+{
+    RedChannelClient *rcc;
+
+    FOREACH_CLIENT(channel, rcc) {
+        if (red_channel_client_is_blocked(rcc) || !red_channel_client_pipe_is_empty(rcc)) {
+            red_channel_client_disconnect(rcc);
+        } else {
+            spice_assert(red_channel_client_no_item_being_sent(rcc));
+        }
+    }
 }
 
 bool red_channel_wait_all_sent(RedChannel *channel,
@@ -680,6 +657,7 @@ bool red_channel_wait_all_sent(RedChannel *channel,
     if (max_pipe_size || blocked) {
         spice_warning("timeout: pending out messages exist (pipe-size %u, blocked %d)",
                       max_pipe_size, blocked);
+        red_channel_disconnect_if_pending_send(channel);
         return FALSE;
     } else {
         spice_assert(red_channel_no_item_being_sent(channel));
@@ -695,13 +673,6 @@ RedsState* red_channel_get_server(RedChannel *channel)
 SpiceCoreInterfaceInternal* red_channel_get_core_interface(RedChannel *channel)
 {
     return channel->priv->core;
-}
-
-void red_channel_on_disconnect(RedChannel *self, RedChannelClient *rcc)
-{
-    RedChannelClass *klass = RED_CHANNEL_GET_CLASS(self);
-
-    klass->on_disconnect(rcc);
 }
 
 void red_channel_send_item(RedChannel *self, RedChannelClient *rcc, RedPipeItem *item)

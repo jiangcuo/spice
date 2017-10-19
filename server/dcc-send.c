@@ -1922,8 +1922,8 @@ static void red_marshall_image(RedChannelClient *rcc,
                                SpiceMarshaller *m,
                                RedImageItem *item)
 {
-    DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
-    DisplayChannel *display = DCC_TO_DC(dcc);
+    DisplayChannelClient *dcc;
+    DisplayChannel *display;
     SpiceImage red_image;
     SpiceBitmap bitmap;
     SpiceChunks *chunks;
@@ -1932,7 +1932,12 @@ static void red_marshall_image(RedChannelClient *rcc,
     SpiceMarshaller *src_bitmap_out, *mask_bitmap_out;
     SpiceMarshaller *bitmap_palette_out, *lzplt_palette_out;
 
-    spice_assert(rcc && display && item);
+    spice_assert(rcc && item);
+
+    dcc = DISPLAY_CHANNEL_CLIENT(rcc);
+
+    display = DCC_TO_DC(dcc);
+    spice_assert(display);
 
     QXL_SET_IMAGE_ID(&red_image, QXL_IMAGE_GROUP_RED, display_channel_generate_uid(display));
     red_image.descriptor.type = SPICE_IMAGE_TYPE_BITMAP;
@@ -2275,7 +2280,7 @@ static void marshall_monitors_config(RedChannelClient *rcc, SpiceMarshaller *bas
 {
     int heads_size = sizeof(SpiceHead) * monitors_config->count;
     int i;
-    SpiceMsgDisplayMonitorsConfig *msg = spice_malloc0(sizeof(*msg) + heads_size);
+    SpiceMsgDisplayMonitorsConfig *msg = g_malloc0(sizeof(*msg) + heads_size);
     int count = 0; // ignore monitors_config->count, it may contain zero width monitors, remove them now
 
     red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_MONITORS_CONFIG);
@@ -2294,7 +2299,7 @@ static void marshall_monitors_config(RedChannelClient *rcc, SpiceMarshaller *bas
     msg->count = count;
     msg->max_allowed = monitors_config->max_allowed;
     spice_marshall_msg_display_monitors_config(base_marshaller, msg);
-    free(msg);
+    g_free(msg);
 }
 
 static void marshall_stream_activate_report(RedChannelClient *rcc,
@@ -2319,7 +2324,7 @@ static void marshall_gl_scanout(RedChannelClient *rcc,
 {
     DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
     DisplayChannel *display_channel = DCC_TO_DC(dcc);
-    QXLInstance* qxl = common_graphics_channel_get_qxl(COMMON_GRAPHICS_CHANNEL(display_channel));
+    QXLInstance* qxl = display_channel->priv->qxl;
 
     SpiceMsgDisplayGlScanoutUnix *scanout = red_qxl_get_gl_scanout(qxl);
     if (scanout != NULL) {

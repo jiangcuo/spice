@@ -1,3 +1,1097 @@
+2017-10-11  Christophe Fergeau  <cfergeau@redhat.com>
+
+	spice-server 0.14.0 release
+
+2017-10-10  Christophe Fergeau  <cfergeau@redhat.com>
+
+	dcc: Fix seamless migration
+	Since commit ef4b1bdb "red-channel-client: Prevent too tight loop
+	waiting for ACKs", after seamless migration, the display is no longer
+	updated on the client-side, even though the VM is functional (responds
+	to keyboard input, reconnecting the client restores the display
+	functionality, ...).
+
+	This is mainly caused because after migration,
+	red_channel_client_waiting_for_ack() will be true until
+	red_channel_client_ack_zero_messages_window() is called.
+
+	What happens is the following:
+	The dcc is created, and dcc_start() pushes a RED_PIPE_ITEM_TYPE_SET_ACK
+	message.
+	This calls prepare_pipe_add(), which will enable write event on the dcc
+	watch. red_channel_client_event() will be called, which will trigger a
+	red_channel_client_push(). Since red_channel_client_waiting_for_ack()
+	returns true, we won't get any item to push, and (because of commit
+	ef4b1bdb), we will disable write notifications on the watch.
+	At this point, rcc->priv->pipe is no longer empty, so prepare_pipe_add()
+	is not going to reenable the write notifications.
+
+	Then red_channel_client_ack_zero_messages_window() is finally called as
+	part of dcc_handle_migrate_data(), so from this point on,
+	red_channel_client_waiting_for_ack() is no longer true.
+
+	However, nothing ever reenables WRITE events, nor empties
+	rcc->priv->pipe, so nothing ever gets pushed, causing no display updates
+	at all after a migration, even if the VM is functional (input, ...)
+	apart from that.
+
+	This commit reenables WRITE events in
+	red_channel_client_ack_zero_messages_window() if we were waiting for
+	ack.
+
+2017-10-04  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Mention vmport in user manual
+	For server mode mouse to work properly with spice, vmport must be
+	disabled in qemu. To do this, we need to pass vmport=off to the -machine
+	option.
+
+2017-10-04  Frediano Ziglio  <fziglio@redhat.com>
+
+	gl: fix client mouse mode
+	Since 2.8, QEMU no longer creates QXL primary surfaces when using GL.
+	This change broke client-side mouse mode, because Spice server relies on
+	having a primary surface.
+
+	When GL is enabled, use GL scanout informations.
+	Mouse mode is always client when GL surfaces are used.
+
+	This patch and most of the message are based on a patch from
+	Marc-André Lureau, just moving responsibility from reds to RedQxl.
+
+	Reviewed-by: Jonathon Jongsma <jjongsma@redhat.com>
+	Acked-by: Christophe de Dinechin <dinechin@redhat.com>
+
+2017-09-25  Christophe Fergeau  <cfergeau@redhat.com>
+
+	build: Update spice-common submodule
+	Frediano Ziglio (1):
+	      quic: avoid crash on specific images
+
+	build: Prepare for 0.13.91 release
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-21  Christophe Fergeau  <cfergeau@redhat.com>
+
+	tests: Automatically determine free port to use
+	Currently, the port used by most tests is hardcoded to 5912. However,
+	the test suite can be run in parallel, so if 2 tests run in parallel,
+	the 2nd one is not going to be able to bind to port 5912 and will fail.
+
+	After this commit, test_new() will try to find a free port between 5912
+	and 5922 and will abort if it can't find any.
+
+	The issue can be reproduced by adding a usleep(1000000) to the beginning
+	of test_destroy().
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-19  Frediano Ziglio  <fziglio@redhat.com>
+
+	Use GLib memory functions for RedsMigSpice::cert_subject
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	reds: Use GLib memory functions for RedServerConfig
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	reds: Use GLib memory functions for RedServerConfig::mig_spice
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	Use GLib memory functions for RedsMigSpice::host
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	reds: Use GLib memory functions for migration data
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	reds: Use GLib memory functions for link
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	reds: Start using GLib memory functions
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	sound: Use GLib memory functions
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	image-encoders: Use GLib memory functions
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	Start using GLib memory allocation
+	Start reducing the usage of spice_new*/spice_malloc allocations.
+	They were designed in a similar way to GLib ones.
+	Now that we use GLib make sense to remove them.
+	However the versions we support for GLib can use different memory
+	allocators so we have to match g_free with GLib allocations
+	and spice_* ones (which uses always malloc allocator) with free().
+	This patch remove some easy ones.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	tests: Add a test to check tight loop during ack waiting
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Introduce a macro to help declaring new GObject
+	The macro will implement most of the boilerplate needed to declare an
+	object.
+	Its usage is similar to GLib G_DECLARE_*_TYPE macros.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-channel-client: Prevent too tight loop waiting for ACKs
+	RedChannelClient has a "handle-acks" feature.
+	If this feature is enabled, after the configured number of messages it
+	waits for an ACK from the client.
+	If is waiting for an ACK it stops sending messages.
+	However the write notification was not disabled, causing the loop event
+	to always trigger, as the socket in this case is ready to accept data.
+	Specifically red_channel_client_event is continuously called.
+	This is noticeable using slow network environments and having
+	some additional loop instrumentation.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-channel-client: Introduce a helper to update watch event mask
+	This helper will be reused by following patch.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-09-18  Frediano Ziglio  <fziglio@redhat.com>
+
+	red-qxl: Reuse red_qxl_async_complete
+	Now that the function is a wrapper reuse it.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-qxl: Remove AsyncCommand
+	This structure was used to store the cookie for the async
+	reply and the message for the generic async callback.
+	Most async messages do not require extra action beside sending back the
+	cookie for the reply so instead of having a switch on the message type
+	in red_qxl_async_complete, this commit moves the message-specific
+	behaviour to the callers, which allows us to store the cookie directly
+	in RedWorkerMessageAsync rather than needing an intermediate
+	AsyncCommand structure.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	channel-client: Remove red_channel_client_pipe_add_tail_push
+	Now the push is done automatically when a PipeItem is added
+	(cfr commit 5c460de1a3972b7cf2b9b2944d0b500c3affc363
+	"worker: push data when clients can receive them"),
+	forcing a push cause only network fragmentation and is required only if
+	you are handling data in a polling loop (and thus, you are preventing
+	the default event loop from running).
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-09-18  Christophe Fergeau  <cfergeau@redhat.com>
+
+	channel: Fix leak in red_channel_remove_client
+	It was using g_list_remove_link() to remove an element from the
+	RedChannel::clients list while it really meant to be using
+	g_list_delete_link() which frees the memory associated with the link.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-18  Frediano Ziglio  <fziglio@redhat.com>
+
+	tests: Rename stat-main.c to test-stat.c
+	All main test module have this test-XXXX.c naming, make
+	test-stat coherent.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	tests: Separate Makefile.am in sections
+	Put non-trivial programs in separate sections, which makes it easier to
+	understand the relationship between macros.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	tests: Ignore test output results
+	New automake test harness produce *.log and *.trs files for
+	each test.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	smartcard: Fix typo in comment
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-09-14  Frediano Ziglio  <fziglio@redhat.com>
+
+	reds_stat: Show single spice file if only one is present
+	Simple usage improvement.
+	If only one process using spice is present allow to call
+	reds_stat not passing any pid.
+
+	Acked-by: Christophe de Dinechin <cdupontd@redhat.com>
+
+2017-09-13  Frediano Ziglio  <fziglio@redhat.com>
+
+	stream: Simplify FOREACH_STREAMS macro
+	This macro is exactly doing what RING_FOREACH just passing streams
+	ring.
+
+	Acked-by: Christophe de Dinechin <cdupontd@redhat.com>
+
+2017-09-12  Christophe Fergeau  <cfergeau@redhat.com>
+
+	channel: Remove no longer used red_channel_apply_clients{_data,}
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+	channel: Remove red_channel_client_disconnect_if_pending_send()
+	There is exactly one user in RedChannel, and this can be reimplemented
+	using already public RedChannelClient API. No need for an extra
+	function very specialized function with a not great name.
+
+	This commit thus removes one method from RedChannelClient public API,
+	and replaces it with an equivalent private helper in RedChannel.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+	channel: Call red_channel_disconnect_if_pending_send() from red_channel_wait_all_sent()
+	red_channel_disconnect_if_pending_send() and red_channel_wait_all_sent() are
+	always called together, we can remove one of the 2 methods.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-12  Frediano Ziglio  <fziglio@redhat.com>
+
+	tests: Avoid to disable all deprecation warnings just for expect functions
+	In case GLib don't provide these functions we use replacements so
+	there's no need to have a warning if these functions are called.
+	This potentially capture other compatibility issues in the tests
+	that would be ignored having all deprecation warnings disabled.
+	Tested with GLib 2.28 and 2.52.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-worker: Start processing commands as soon as possible
+	When the worker is started it could take a while to start processing
+	commands.
+	The reason is that the dispatcher handler is called after the worker
+	so GLib will receive a FALSE answer to both prepare and check
+	callbacks of the RedWorkerSource causing GLib to wait till another
+	event is received.
+	This is a regression since the introduction of GLib event loop, before
+	the command processing was always attempted after any events.
+	Commands (from QXL interface for cursor and display) are processed
+	during the RedWorkerSource dispatch so if they are not processed just
+	when the VM is started they will be processed on next event which
+	could be from dispatcher (main thread requests), from existing
+	connections or from pending timers. However in the case there are no
+	clients connected and no other requests from main thread the worker
+	thread won't process them.
+	Setting the event_timeout to 0 cause the prepare callback to return
+	TRUE so GLib will dispatch the RedWorkerSource.
+	This was discovered attempting to use the tests in server/tests
+	directory to reproduce a leak in RedWorker.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-gst: Free pipelines
+	Pipelines are never freed.
+	These are detected as leaks by leak detector tools like address sanitizer.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-gst: Remove options parsing leaks
+	Command line options are not freed at the end of the program.
+	These are detected as leaks by leak detector tools like address sanitizer.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-gst: Remove useless check
+	encoder_name is never NULL as already initialized with "mjpeg" value.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	reds: Fix leaks if reds_init_client_ssl_connection fails
+	If a client is unable to complete the TLS handshake phase
+	reds_init_client_ssl_connection leaked some memory as the stream is not
+	correctly freed.
+	This also causes the stream to send the SPICE_CHANNEL_EVENT_DISCONNECTED
+	event. Otherwise only SPICE_CHANNEL_EVENT_CONNECTED was sent.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	tests: Check leaks in spice_server_add_ssl_client
+	Currently is possible to trigger a leak by passing an invalid
+	connection.
+	This can happen if the client opens a connection and then closes it
+	without writing or reading any data.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-channel-client: Early check for valid stream
+	The code tests for the presence of RedChannelClient::stream while
+	initializing RedChannelClient.
+	However, the check was done too late, and a
+	RedChannelClient::config_socket implementation (for example
+	snd_channel_client_config_socket) could have tried to use it before the
+	check that it's not NULL.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-09-11  Frediano Ziglio  <fziglio@redhat.com>
+
+	mjpeg: Reuse realloc instead of implementing it manually
+	This potentially can also save the copy if there is enough
+	space to resize the buffer in place.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	reds-stream: Remove shutdown field
+	This field was used only by RedChannelClient to mark when the socket
+	was shutdown. This condition can simply be tested by RedChannelClient
+	checking if there's a watch as is the only condition (beside object
+	destroying/disconnecting) where the watch is removed.
+	In any case the shutdown was used to understand if there were possible
+	data still to read.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	docs: Add some documentation on spice threading model
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-09-08  Frediano Ziglio  <fziglio@redhat.com>
+
+	red-qxl: Remove unused includes
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-qxl: Move private declarations to red-worker.h
+	RedQxl and RedWorker are quite bound together running
+	CursorChannel and DisplayChannel in a separate thread
+	marshalling (RedQxl) and unmarshalling and executing
+	(RedWorker) requests.
+	Make the communication between them private trying
+	to facilitate maintaining these two files.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-09-08  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	RedChannel: Remove obsolete TODO comment
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-07  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Add documentation for Dispatcher
+
+	MainDispatcher: use correct argument type
+	For dispatcher_register_handler(), use 'false' instead of 0 since the
+	last argument is a bool type now.
+
+	Dispatcher: remove async_done callback
+	This callback was only executed for message types that were registered
+	with DISPATCHER_ASYNC ack type. However, the async_done handler was
+	called immediately after the message-specific handler and was called in
+	the same thread, so the async_done stuff can just as easily be done from
+	within the message-specific handler. This allows to simplify the
+	dispatcher_register_handler() method to simply require a boolean
+	argument for whether the message type requires an ACK or not.
+
+2017-09-07  Frediano Ziglio  <fziglio@redhat.com>
+
+	main-dispatcher: Avoid type conversion in dispatcher_handle_read
+	Pass proper type to callback to avoid having to convert to
+	the right type for each call.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	dispatcher: Remove "opaque" property
+	Is supposed to be used during initialization but is never
+	used.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-qxl: Avoid to use AsyncCommand for GL_DRAW_ASYNC message
+	AsyncCommand is used to handle asynchronous messages from the
+	dispatcher.
+	GL_DRAW_ASYNC is mainly using it to store the cookie.
+
+	The value of GL_DRAW_COOKIE_INVALID was choosen to allow implementing
+	cookies (which basically are handles) either using indexes (where 0 is
+	valid) or pointers (where 0 is invalid). Currently Qemu uses pointers.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	spice-qxl: Add version information
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-qxl: Move QXLInterface wrappers together
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-qxl: Unify red_qxl_use_client_monitors_config and red_qxl_client_monitors_config
+	These 2 functions were doing the same stuff, calling
+	client_monitors_config callback in QXLInterface.
+	The only difference was that red_qxl_use_client_monitors_config
+	used a NULL value.
+	Added the check for proper version, QXLInstance before 3.3
+	did not have this callback.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-09-07  Christophe Fergeau  <cfergeau@redhat.com>
+
+	channel: Remove unused red_channel_min_pipe_size
+	This could have been removed as part of 6e6126e024.
+
+	Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-07  Frediano Ziglio  <fziglio@redhat.com>
+
+	Fix crash attempting to connect duplicate channels
+	You could easily trigger this issue using multiple monitors and a
+	modified spice-gtk client with this patch:
+
+	  --- a/src/channel-main.c
+	  +++ b/src/channel-main.c
+	  @@ -1699,6 +1699,7 @@ static gboolean _channel_new(channel_new_t *c)
+	   {
+	       g_return_val_if_fail(c != NULL, FALSE);
+
+	  +    if (c->type == SPICE_CHANNEL_DISPLAY) c->id = 0;
+	       spice_channel_new(c->session, c->type, c->id);
+
+	       g_object_unref(c->session);
+
+	which cause a crash like
+
+	(process:28742): Spice-WARNING **: Failed to create channel client: Client 0x40246f5d0: duplicate channel type 2 id 0
+	2017-08-24 09:36:57.451+0000: shutting down, reason=crashed
+
+	RedChannelClient is an GInitable type, which means that the object is
+	constructed, and then the _init() function is called, which can fail.
+	If the _init() fails, the newly-created object will be destroyed. As
+	part of _init(), we add a new watch for the stream using the core
+	interface that is associated with the channel. After adding the watch,
+	our rcc creation fails (due to duplicate ID), and the rcc object is
+	unreffed. This results in a call to reds_stream_free() (since the rcc
+	now owns the stream). But in reds_stream_free, we were trying to remove
+	the watch from the core interface associated with the RedsState. For
+	most channels, these two core interfaces are equivalent. But for the
+	Display and Cursor channels, it is the core Glib-based interface
+	associated with the RedWorker.
+
+	The watch in RedsStream by default is bound to the Qemu provided
+	SpiceCoreInterface while RedChannelClient bound it to Glib one causing
+	the crash when the watch is deleted from RedsStream. Change the bound
+	interface.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	reds-stream: Allows to change core interface
+	When a stream is moved from the main thread to a
+	secondary one the events are potentially registered
+	using a different core interface. This cause memory
+	corruption accessing the watch registered in RedsStream.
+	This patch allows to always use the right interface.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	dcc: Make dcc_stop static
+	Just used by dcc_on_disconnect.
+
+	Acked-by: Uri Lublin <uril@redhat.com>
+
+	tests: Make test-two-servers work
+	This test runs 2 spice server in one program.
+	Use two different tcp port to be able to connect to both servers.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	tests: Make test-empty-success automated
+	Add some check that something happened during creation/destruction.
+	Set as running on "make check".
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	tests: Make test-fail-on-null-core-interface an automated test
+	Update to Glib style to catch warning.
+	Initialize properly the structure (invalid) provided.
+	Check results of spice_server_init.
+	Remove leaks.
+	Enable as check.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	tests: Update README
+	Update tests names.
+	Remove tetris comments, never available and not planned.
+	Update some notes.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Always compile with AUTOMATED_TESTS enabled
+	There's no need to not compile this feature, it just enable
+	a parameters which must be passed in order to change test
+	behaviour.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	tests: Allow to quit the message loop
+	This allows to end the loop to end some tests.
+	Currently different tests enter the loop but never exit from
+	them.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Do not assume LP64 architecture on 64 bit
+	In C the sizeof(long) can be different than sizeof(void*),
+	use proper type.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Use spice allocation helpers
+	Do not use calloc and malloc directly without checking
+	the result. Use instead spice functions to get a nice
+	error in case of allocation failures.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Avoid cursor move command leaks
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Avoid global buffer overflow
+	For some reasons (documented in cursor_init) the function
+	uses 128 extra bytes of data causing a reading buffer overflow.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Protect the wake up timer start with a mutex
+	Timers in spice server are supposed to be used in a single thread
+	context. To avoid problems, protect the usage from multiple
+	thread with a mutex.
+	This sometimes caused a crash.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Avoid usage after free when the wakeup timer is freed
+	The wakeup timer is used by the worker thread and by the
+	main thread.
+	Destroying the object before destroying the worker thread
+	can lead to use after free.
+	Destroying the worker thread first makes sure we don't race.
+	This is detected easily when compiling the test with address sanitizer.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Protect command ring with a mutex
+	The ring is accessed by multiple thread.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	test-display-base: Use unsigned numbers for command ring indexes
+	As the indexes are used to compute the index inside an array
+	using modulo operation when a signed value overflows, the
+	modulo becames negative, causing a buffer underflow.
+	Unlikely to happens (take lot of time) but is safer that way.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	common-graphics-channel: Move "qxl" property to DisplayChannel
+	Only DisplayChannel uses this property.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	cursor-channel: Remove dependency from QXL
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	cursor-channel: Removed unused qxl field from RedCursorPipeItem
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	Release cursor as soon as possible
+	Cursor resources (basically the shape of it) was retained till
+	it was used however it was copied so there were no reason to not release
+	this resource.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2017-09-06  Frediano Ziglio  <fziglio@redhat.com>
+
+	dcc: Fix NULL pointer dereference attempting to connect duplicate channels
+	You could easily trigger this issue using multiple monitors and
+	a modified spice-gtk client with this patch:
+
+	--- a/src/channel-main.c
+	+++ b/src/channel-main.c
+	@@ -1699,6 +1699,7 @@ static gboolean _channel_new(channel_new_t *c)
+	 {
+	     g_return_val_if_fail(c != NULL, FALSE);
+
+	+    if (c->type == SPICE_CHANNEL_DISPLAY) c->id = 0;
+	     spice_channel_new(c->session, c->type, c->id);
+
+	     g_object_unref(c->session);
+
+	This as g_initable_new in this case returns NULL (dcc.c).
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2017-09-06  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Dispatcher: validate received message types
+	Although dispatcher_send_message() does not allow you to send a message
+	type that is invalid for a dispatcher, it still makes sense to verify
+	that the type is valid in the receiver. This should only be possible in
+	the case of some severe problem such as memory corruption, so if it is
+	invalid, we simply abort.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-06  Frediano Ziglio  <fziglio@redhat.com>
+
+	red-worker: Fix leak processing update commands
+	Is possible to have a leak processing update commands if
+	the update command is synchronous and the rectangle list
+	is empty. Note that Qemu always pass an empty list.
+
+	If the list is empty display_channel_update fill the list.
+	This is used to send back the list in case of asynchronous
+	requests. But in handle_dev_update_async (the callback that
+	handle the asynchronous case) the list is correctly freed.
+
+	This was discovered by accident looking at the code.
+
+	Reproduced with a Windows recording file using GCC address
+	sanitizer and this patch to spice-server-replay:
+
+	  --- a/server/red-replay-qxl.c
+	  +++ b/server/red-replay-qxl.c
+	  @@ -1280,7 +1280,13 @@ static void replay_handle_dev_input(QXLWorker *worker, SpiceReplay *replay,
+	           replay->created_primary = FALSE;
+	           worker->destroy_surfaces(worker);
+	           break;
+	  -    case RED_WORKER_MESSAGE_UPDATE:
+	  +    case RED_WORKER_MESSAGE_UPDATE: {
+	  +        static uint8_t count = 0;
+	  +        QXLRect dummy;
+	  +        QXLRect update = { 0, 0, 100, 100 };
+	  +        count ^= 1;
+	  +        worker->update_area(worker, 0, &update, count ? &dummy : NULL, count ? 1 : 0, 0);
+	  +        } break;
+	           // XXX do anything? we record the correct bitmaps already.
+	       case RED_WORKER_MESSAGE_DISPLAY_CONNECT:
+	           // we want to ignore this one - it is sent on client connection, we
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	cursor-channel: Use a single RedCursorPipeItem to hold the cursor
+	RedPipeItem already implements reference counting so
+	this avoid duplicating code to handle a object with reference
+	counting that points to another object with reference counting
+	that holds a RedCursorCmd.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-channel: Do not push data calling red_channel_pipes_new_add_push
+	Now the push is done automatically when a PipeItem is added
+	(cfr commit 5c460de1a3972b7cf2b9b2944d0b500c3affc363
+	"worker: push data when clients can receive them"),
+	forcing a push cause only network fragmentation and is required
+	only if you are handling data in a loop instead of using the
+	default loop.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-channel: Reuse red_channel_pipes_add
+	Implements red_channel_pipes_add_type and
+	red_channel_pipes_add_empty_msg using red_channel_pipes_add.
+	This avoid duplicating items for each client.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Use new red_channel_pipes_add instead of red_channel_pipes_new_add
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-channel: Add red_channel_pipes_add function
+	Considering that now RedPipeItem have reference counting
+	and that lot of items are just used to store constant
+	data to send, using reference counting instead of creating
+	different items for each client is easier to do.
+	So this new red_channel_pipes_add allows to add a single item
+	to all clients.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-channel-client: Remove push call where not necessary
+	Now the push is done automatically when a PipeItem is added
+	(cfr commit 5c460de1a3972b7cf2b9b2944d0b500c3affc363
+	"worker: push data when clients can receive them"),
+	forcing a push cause only network fragmentation and is required only if
+	you are handling data in a polling loop (and thus, you are preventing
+	the default event loop from running).
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-09-05  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Move DispatcherMessage to source file
+	This is an internal implementation detail
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-02  Frediano Ziglio  <fziglio@redhat.com>
+
+	display-channel: Make some declarations private
+	display-channel.h contains lots of information used by different
+	DisplayChannel components.
+	In the past all RedWorker, CursorChannel and DisplayChannel code was in
+	a single file. Since lots of code to handle DisplayChannel is still in
+	RedWorker, display-channel.h contains a lot of declarations so that they
+	can be accessed from RedWorker.
+	Moving declarations that are not needed by RedWorker and other external
+	class components helps to reduce dependencies between RedWorker and
+	DisplayChannel.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	Avoid using global variable for channel IDs
+	This patch allocates VMC IDs by finding the first ID not used
+	instead of using a global variable and incrementing the value
+	for each channel created.
+	This solves some potential issues:
+	- remove the global state potentially making possible
+	  to use multiple SpiceServer on the same process;
+	- don't potentially overflow the variable. This can happen if
+	  channels are allocated/deallocated multiple times
+	  (currently not done by Qemu).
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2017-09-02  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	tests: destroy test object
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-09-02  Frediano Ziglio  <fziglio@redhat.com>
+
+	tests: Make variables static where possible
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	tests: Remove unused declarations
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	tests: Avoid leaking list of commands
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	tests: Pass command list as constant
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	tests: Reuse G_N_ELEMENTS instead of COUNT
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2017-09-01  Frediano Ziglio  <fziglio@redhat.com>
+
+	build-sys: Fix syntax-check
+	This error was reported
+
+	configure.ac:119:if test "x$have_gstreamer_0_10" = "xyes" -o "x$have_gstreamer_1_0" = "xyes"; then
+	maint.mk: use "test C1 && test C2", not "test C1 -a C2"; use "test C1 || test C2", not "test C1 -o C2"
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	ci: Fix build on gitlab
+	The build dependencies are installed based on spice package which does
+	not still contains orc-devel package needed by ORC check (cfr commit
+	"gstreamer: Check if ORC library can work", 14aee7cd745cbb6d2f3d520).
+
+	Acked-by: Christophe de Dinechin <dinechin@redhat.com>
+
+2017-08-31  Frediano Ziglio  <fziglio@redhat.com>
+
+	red-client: Prevent RedChannelClient creation when the RedClient is being destroyed
+	This can happen as the connection is asynchronous so (MT main thread,
+	CT channel thread):
+	- MT you get a new connection;
+	- MT a connection is sent to CT;
+	- MT you get a disconnection of main channel;
+	- MT red_client_destroy is called;
+	- CT you attempt to add the RCC to RedClient.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-qxl: Remove redundant checks
+	A RedChannelClient is always attached to a valid RedChannel.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-worker: Set thread name if possible
+	Name will be visible in debugger and /proc filesystem
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-qxl: Update header guard names
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	red-qxl: Reference RCC pointer in migration request
+	The message is asynchronous so to avoid the object to potentially
+	been released before being processed keep a strong reference to
+	it.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-08-31  Christophe Fergeau  <cfergeau@redhat.com>
+
+	worker: Fix 'immediatly' typo in comment
+
+	worker: Simplify flush_commands()
+	red_disconnect_display() is duplicating what red_channel_disconnect()
+	already does, so red_disconnect_display() and red_disconnect_cursor()
+	are actually identical code-wise. We can directly call
+	red_channel_disconnect() from flush_commands() rather than passing a
+	'red_disconnect_t disconnect' argument to that function.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+	cursor: Remove cursor_channel_disconnect()
+	cursor_channel_disconnect() calls
+	cursor_channel_client_reset_cursor_cache() on all CursorChannelClient
+	associated with the current CursorChannel before calling
+	red_channel_disconnect().
+
+	red_channel_disconnect() will iterate over all CursorChannelClient
+	calling red_channel_client_disconnect(), which will eventually call
+	CursorChannelClient::on_disconnect. This will in turn
+	cursor_channel_client_reset_cursor_cache(), so calling it in
+	cursor_channel_disconnect() before calling red_channel_disconnect() is
+	redundant.
+
+	cursor_channel_disconnect() can thus be replaced by a direct call to
+	red_channel_disconnect().
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+	channel: Allow NULL RedChannelClient::on_disconnect()
+	SoundChannelClient has a stub implementation of
+	RedChannelClient::on_disconnect(), this commit removes the need for it.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+	channel: Move RedChannel::on_disconnect to RedChannelClient
+	This vfunc only has a RedChannelClient * argument, and most of the time,
+	it operates on RedChannelClient, not on RedChannel. Moreover, the only
+	time it's used is from RedChannelClient. This commit moves the vfunc to
+	RedChannelClient, which seems like a better fit for it.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-08-30  Frediano Ziglio  <fziglio@redhat.com>
+
+	gstreamer: Check if ORC library can work
+	ORC library is used internally by GStreamer to generate code
+	dynamically.
+	If ORC cannot allocate executable memory, the failure causes
+	an abort(3) to be called.
+	This happens on some SELinux configurations that disable executable
+	memory allocation (execmem boolean).
+	Check that ORC could work before attempting to use GStreamer to
+	avoid crashes.
+	While this check is done, the ORC library outputs an error which will
+	be well visible in Qemu output.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	Avoid to access data before a NULL check
+	If you are testing for NULL data this means that variable could be
+	NULL so avoid to access before the check to make sure the check is hit.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-08-29  Frediano Ziglio  <fziglio@redhat.com>
+
+	main-channel: Fix multimedia time argument type
+	The multimedia time is defined as uint32_t.
+	Use the proper type instead of int.
+	Currently no arithmetic is done on this value but
+	just copies so considering that on the architectures
+	we support sizeof(int) == sizeof(uint32_t) there's
+	no change in the resulting machine code.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	red-qxl: Avoid using dangling pointers to RedClient
+	A RedClient can be freed from the main thread following a main channel
+	disconnection (reds_client_disconnect). This can happen while another
+	thread is allocating a new channel client for that client.
+	To prevent the usage of a pointer which can be invalid
+	take ownership of the pointer.
+	Note that we don't need this when disconnecting as disconnection is
+	done synchronously (the dispatch messages are registered with
+	DISPATCH_ACK).
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	worker: Add some loop statistics
+	Trace the number of loops done processing display commands
+	and the number of loops in which the queue was full.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2017-08-25  Frediano Ziglio  <fziglio@redhat.com>
+
+	red-worker: Remove small memory leak
+	If a DisplayChannelClient cannot be instantiated capabilities
+	are not released correctly.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	dcc: Reuse display variable
+	display variable already contains the DCC_TO_DC(dcc) value so
+	reuse it.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-08-25  Christophe Fergeau  <cfergeau@redhat.com>
+
+	RedChannelClient: Mark some private data as bool
+	Some RedChannelClient data members were marked as int when they only
+	hold booleans.
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+2017-08-25  Frediano Ziglio  <fziglio@redhat.com>
+
+	reds: Inline very simple function
+	reds_get_n_clients is a single line and is used only by
+	spice_server_get_num_clients.
+	The 2 functions have very similar names so inlining
+	reds_get_n_clients does not make code less readable.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	display-channel: Check that all structure are destroyed during finalize
+	The leak detector we use currently is not enough to detect
+	some kind of leak in DisplayChannel so manually test.
+	These tests are enabled only when --enable-extra-checks is passed
+	to configure.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2017-08-23  Frediano Ziglio  <fziglio@redhat.com>
+
+	red-channel: unregister channel in red_channel_destroy
+	Mostly of red_channel_destroy calls were preceded by
+	a call to unregister the channel.
+	The only exception was the main channel as this channel is
+	always present and its initialisation is a bit different.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	display-channel: push monitor configuration
+	RedWorker should not handle directly to client but
+	defer the job to DisplayChannel.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	reds: use SpiceMouseMode for RedsState::mouse_mode
+	Make easier to understant the value to use in the code.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+	char-device: Allows to handle port events from any char device
+	From spice_server_port_event API you can send port events to
+	any char device. Although currently this is used only for "port"
+	devices implemented in spicevmc.c this will allow to support
+	such events using different objects.
+
+	This will be used for instance for a streaming device which
+	will be a specific SpicePort implementation.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2017-08-23  Jonathon Jongsma  <jjongsma@redhat.com>
+
+	Avoid leaking memory on invalid cursor commands
+	When a RedCursorCmd is passed to cursor_channel_process_cmd(), it
+	constructs a new CursorItem which takes ownership of that command. If
+	the cursor_cmd->type falls through to the default case of the switch
+	statement, we will print a warning and return without freeing the
+	CursorItem (and thus the RedCursorCmd).
+
+	Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+2017-08-21  Frediano Ziglio  <fziglio@redhat.com>
+
+	Remove iterator from list iteration macros
+	Avoid to have to declare iterator and pass as an argument.
+
+	Acked-by: Uri Lublin <uril@redhat.com>
+
+	red-client: Do not compute channel if client is not connected
+	Acked-by: Uri Lublin <uril@redhat.com>
+
+	red-client: Minor space fixes
+	Acked-by: Uri Lublin <uril@redhat.com>
+
+2017-08-15  Frediano Ziglio  <fziglio@redhat.com>
+
+	Remove call to red_channel_client_push outside RedChannel
+	Now the push is done automatically when a PipeItem is added
+	(cfr commit 5c460de1a3972b7cf2b9b2944d0b500c3affc363
+	"worker: push data when clients can receive them"),
+	forcing a push cause only network fragmentation and is required
+	only if you are handling data in a loop instead of using the
+	default loop.
+
+	Acked-by: Victor Toso <victortoso@redhat.com>
+
+2017-08-12  Frediano Ziglio  <fziglio@redhat.com>
+
+	build: Update spice-common
+	This include some Quic changes, particularly a compile fix
+	if no optimizations (-O0) are used.
+
+	Acked-by: Jonathon Jongsma <jjongsma@redhat.com>
+
+2017-07-28  Frediano Ziglio  <fziglio@redhat.com>
+
+	ci: Fix recent GitLab failures
+	Recent GitLab CI jobs are failing to run valgrind checks
+	(like https://gitlab.com/spice/spice/-/jobs/25220999).
+
+	This as recent distro changes cause valgrind not to find some
+	symbols required to detect some GLib suppression errors.
+
+	Adding debugging information for GLib solve the problem.
+
+	Acked-by: Victor Toso <victortoso@redhat.com>
+
+	README: Add missing optional dependencies
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	README: Fix minor dependency
+	Cyrus-SASL is not mandatory
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	README: Remove OpenGL dependency
+	OpenGL dependency was removed by Marc-André Lureau in 2015
+	(0dc98956).
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	README: Remove obsolete GUI dependencies
+	Remove old dependencies used by obsolete client code.
+	This code was removed from the git repository by
+	Christophe Fergeau in 2014 (18769714).
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	README: Update link to GIT
+	Really minor change, just use canonical URL using secure
+	HTTP instead of normal one.
+
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	README: Update required protocol version
+	Acked-by: Christophe Fergeau <cfergeau@redhat.com>
+
+	README: Fix typo (dependancies -> dependencies)
+	Acked by: Christophe de Dinechin <dinechin@redhat.com>
+
 2017-07-26  Christophe Fergeau  <cfergeau@redhat.com>
 
 	Prepare for 0.13.90 release

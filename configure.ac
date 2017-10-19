@@ -13,7 +13,7 @@ AC_PREREQ([2.57])
 #
 dnl TODO see server/spice-char.h TODO comment for API breakage
 m4_define([SPICE_CURRENT], [13])
-m4_define([SPICE_REVISION], [2])
+m4_define([SPICE_REVISION], [4])
 m4_define([SPICE_AGE], [12])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
@@ -116,11 +116,11 @@ AS_IF([test x"$missing_gstreamer_elements" = xyes],
     [SPICE_WARNING([The GStreamer video encoder can be built but may not work.])
 ])
 
-AC_ARG_ENABLE([automated_tests],
-              AS_HELP_STRING([--enable-automated-tests], [Enable automated tests using spicy-screenshot (part of spice-gtk)]),,
-              [enable_automated_tests="no"])
-AS_IF([test x"$enable_automated_tests" != "xno"], [enable_automated_tests="yes"])
-AM_CONDITIONAL(HAVE_AUTOMATED_TESTS, test "x$enable_automated_tests" != "xno")
+if test "x$have_gstreamer_0_10" = "xyes" || test "x$have_gstreamer_1_0" = "xyes"; then
+    PKG_CHECK_MODULES(ORC, orc-0.4)
+    AC_SUBST(ORC_CFLAGS)
+    AC_SUBST(ORC_LIBS)
+fi
 
 dnl Check for the presence of Valgrind and do the plumbing to allow
 dnl the running of "make check-valgrind".
@@ -208,16 +208,6 @@ AC_SUBST(JPEG_LIBS)
 AC_CHECK_LIB(z, deflate, Z_LIBS='-lz', AC_MSG_ERROR([zlib not found]))
 AC_SUBST(Z_LIBS)
 
-if test "x$enable_automated_tests" = "xyes"; then
-    AC_MSG_CHECKING([for spicy-screenshot])
-    spicy-screenshot --help >/dev/null 2>&1
-    if test $? -ne 0 ; then
-        AC_MSG_RESULT([not found])
-        AC_MSG_ERROR([spicy-screenshot was not found, this module is part of spice-gtk and is required to compile this package])
-    fi
-    AC_MSG_RESULT([found])
-fi
-
 
 AC_ARG_ENABLE([manual],
                AS_HELP_STRING([--enable-manual=@<:@auto/yes/no@:>@],
@@ -247,6 +237,9 @@ AC_ARG_ENABLE([extra-checks],
                AS_HELP_STRING([--enable-extra-checks=@<:@yes/no@:>@],
                               [Enable expensive checks @<:@default=no@:>@]))
 AM_CONDITIONAL(ENABLE_EXTRA_CHECKS, test "$enable_extra_checks" = "yes")
+AC_DEFINE_UNQUOTED([ENABLE_EXTRA_CHECKS],
+                   [$(test "x$enable_extra_checks" = xyes && echo 1 || echo 0)],
+                   [Define to 1 to enable extra checks on code otherwise define to 0])
 
 dnl ===========================================================================
 dnl check compiler flags
@@ -318,7 +311,6 @@ AC_MSG_NOTICE([
         Smartcard:                ${have_smartcard}
         GStreamer:                ${enable_gstreamer}
         SASL support:             ${have_sasl}
-        Automated tests:          ${enable_automated_tests}
         Manual:                   ${have_asciidoc}
 
         Now type 'make' to build $PACKAGE

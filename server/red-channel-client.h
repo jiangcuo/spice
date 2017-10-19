@@ -96,14 +96,14 @@ int red_channel_client_pipe_item_is_linked(RedChannelClient *rcc, RedPipeItem *i
 void red_channel_client_pipe_remove_and_release(RedChannelClient *rcc, RedPipeItem *item);
 void red_channel_client_pipe_remove_and_release_pos(RedChannelClient *rcc, GList *item_pos);
 void red_channel_client_pipe_add_tail(RedChannelClient *rcc, RedPipeItem *item);
-void red_channel_client_pipe_add_tail_and_push(RedChannelClient *rcc, RedPipeItem *item);
 /* for types that use this routine -> the pipe item should be freed */
 void red_channel_client_pipe_add_type(RedChannelClient *rcc, int pipe_item_type);
+RedPipeItem *red_channel_client_new_empty_msg(int msg_type);
 void red_channel_client_pipe_add_empty_msg(RedChannelClient *rcc, int msg_type);
 gboolean red_channel_client_pipe_is_empty(RedChannelClient *rcc);
 uint32_t red_channel_client_get_pipe_size(RedChannelClient *rcc);
 GQueue* red_channel_client_get_pipe(RedChannelClient *rcc);
-gboolean red_channel_client_is_mini_header(RedChannelClient *rcc);
+bool red_channel_client_is_mini_header(RedChannelClient *rcc);
 
 void red_channel_client_ack_zero_messages_window(RedChannelClient *rcc);
 void red_channel_client_ack_set_client_window(RedChannelClient *rcc, int client_window);
@@ -142,7 +142,6 @@ bool red_channel_client_wait_pipe_item_sent(RedChannelClient *rcc,
                                             int64_t timeout);
 bool red_channel_client_wait_outgoing_item(RedChannelClient *rcc,
                                            int64_t timeout);
-void red_channel_client_disconnect_if_pending_send(RedChannelClient *rcc);
 
 RedChannel* red_channel_client_get_channel(RedChannelClient *rcc);
 
@@ -151,7 +150,7 @@ void red_channel_client_init_outgoing_messages_window(RedChannelClient *rcc);
 
 gboolean red_channel_client_set_migration_seamless(RedChannelClient *rcc);
 void red_channel_client_set_destroying(RedChannelClient *rcc);
-gboolean red_channel_client_is_destroying(RedChannelClient *rcc);
+bool red_channel_client_is_destroying(RedChannelClient *rcc);
 
 struct RedChannelClient
 {
@@ -168,6 +167,8 @@ struct RedChannelClientClass
     bool (*config_socket)(RedChannelClient *rcc);
     uint8_t *(*alloc_recv_buf)(RedChannelClient *channel, uint16_t type, uint32_t size);
     void (*release_recv_buf)(RedChannelClient *channel, uint16_t type, uint32_t size, uint8_t *msg);
+
+    void (*on_disconnect)(RedChannelClient *rcc);
 };
 
 #define SPICE_SERVER_ERROR spice_server_error_quark()
