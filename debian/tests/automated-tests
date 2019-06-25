@@ -9,5 +9,8 @@ dh_auto_configure -- \
 make -C subprojects/spice-common/common libspice-common.la libspice-common-server.la
 make -C server libspice-server.la
 make -C server/tests all
-./server/tests/test-display-streaming  --automated-tests
+cp -av debian/tests/regression-test.py server/tests
+cp -av debian/tests/base_test.ppm server/tests
+cd server/tests
+./test-display-streaming  --automated-tests
 
