@@ -34,6 +34,8 @@
 
 #include <unistd.h>
 #include <glib.h>
+#include <common/macros.h>
+
 #include "../stat.h"
 
 #ifndef TEST_NAME
@@ -49,19 +51,19 @@ void TEST_NAME(void)
     stat_start_time_t start_time;
 
 #if !defined(COMPRESS_STAT) && !defined(RED_WORKER_STAT)
-    G_STATIC_ASSERT(sizeof(start_time) == 0);
-    G_STATIC_ASSERT(sizeof(info) == 0);
+    SPICE_VERIFY(sizeof(start_time) == 0);
+    SPICE_VERIFY(sizeof(info) == 0);
 #endif
 
     stat_init(&info, "test", CLOCK_MONOTONIC);
     stat_start_time_init(&start_time, &info);
-    usleep(2);
+    usleep(2000);
     stat_add(&info, start_time);
 
 #ifdef RED_WORKER_STAT
     g_assert_cmpuint(info.count, ==, 1);
     g_assert_cmpuint(info.min, ==, info.max);
-    g_assert_cmpuint(info.min, >=, 2000);
+    g_assert_cmpuint(info.min, >=, 2000000);
     g_assert_cmpuint(info.min, <, 100000000);
 #endif
 
@@ -69,17 +71,17 @@ void TEST_NAME(void)
 
     stat_compress_init(&info, "test", CLOCK_MONOTONIC);
     stat_start_time_init(&start_time, &info);
-    usleep(2);
+    usleep(2000);
     stat_compress_add(&info, start_time, 100, 50);
-    usleep(1);
+    usleep(1000);
     stat_compress_add(&info, start_time, 1000, 500);
 
 #ifdef COMPRESS_STAT
     g_assert_cmpuint(info.count, ==, 2);
     g_assert_cmpuint(info.min, !=, info.max);
-    g_assert_cmpuint(info.min, >=, 2000);
+    g_assert_cmpuint(info.min, >=, 2000000);
     g_assert_cmpuint(info.min, <, 100000000);
-    g_assert_cmpuint(info.total, >=, 5000);
+    g_assert_cmpuint(info.total, >=, 5000000);
     g_assert_cmpuint(info.orig_size, ==, 1100);
     g_assert_cmpuint(info.comp_size, ==, 550);
 #endif

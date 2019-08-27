@@ -20,12 +20,6 @@
 
 #include "smartcard-channel-client.h"
 
-G_DEFINE_TYPE(SmartCardChannelClient, smart_card_channel_client, RED_TYPE_CHANNEL_CLIENT)
-
-#define SMARTCARD_CHANNEL_CLIENT_PRIVATE(o) \
-    (G_TYPE_INSTANCE_GET_PRIVATE((o), TYPE_SMARTCARD_CHANNEL_CLIENT, \
-                                 SmartCardChannelClientPrivate))
-
 struct SmartCardChannelClientPrivate
 {
     RedCharDeviceSmartcard *smartcard;
@@ -36,6 +30,9 @@ struct SmartCardChannelClientPrivate
     int msg_in_write_buf; /* was the client msg received into a RedCharDeviceWriteBuffer
                            * or was it explicitly malloced */
 };
+
+G_DEFINE_TYPE_WITH_PRIVATE(SmartCardChannelClient, smart_card_channel_client,
+                           RED_TYPE_CHANNEL_CLIENT)
 
 typedef struct RedErrorItem {
     RedPipeItem base;
@@ -88,8 +85,6 @@ static void smart_card_channel_client_class_init(SmartCardChannelClientClass *kl
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
 
-    g_type_class_add_private(klass, sizeof(SmartCardChannelClientPrivate));
-
     RedChannelClientClass *client_class = RED_CHANNEL_CLIENT_CLASS(klass);
     client_class->alloc_recv_buf = smartcard_channel_client_alloc_msg_rcv_buf;
     client_class->release_recv_buf = smartcard_channel_client_release_msg_rcv_buf;
@@ -103,11 +98,11 @@ static void smart_card_channel_client_class_init(SmartCardChannelClientClass *kl
 static void
 smart_card_channel_client_init(SmartCardChannelClient *self)
 {
-    self->priv = SMARTCARD_CHANNEL_CLIENT_PRIVATE(self);
+    self->priv = smart_card_channel_client_get_instance_private(self);
 }
 
 SmartCardChannelClient* smartcard_channel_client_create(RedChannel *channel,
-                                                        RedClient *client, RedsStream *stream,
+                                                        RedClient *client, RedStream *stream,
                                                         RedChannelCapabilities *caps)
 {
     SmartCardChannelClient *rcc;
@@ -144,8 +139,7 @@ smartcard_channel_client_alloc_msg_rcv_buf(RedChannelClient *rcc,
         spice_assert(smartcard_char_device_get_client(smartcard) || scc->priv->smartcard);
         spice_assert(!scc->priv->write_buf);
         scc->priv->write_buf =
-            red_char_device_write_buffer_get(RED_CHAR_DEVICE(smartcard), client,
-                                             size);
+            red_char_device_write_buffer_get_client(RED_CHAR_DEVICE(smartcard), client, size);
 
         if (!scc->priv->write_buf) {
             spice_error("failed to allocate write buffer");
@@ -215,7 +209,7 @@ static void smartcard_channel_client_push_error(RedChannelClient *rcc,
                                                 uint32_t reader_id,
                                                 VSCErrorCode error)
 {
-    RedErrorItem *error_item = spice_new0(RedErrorItem, 1);
+    RedErrorItem *error_item = g_new0(RedErrorItem, 1);
 
     red_pipe_item_init(&error_item->base, RED_PIPE_ITEM_TYPE_ERROR);
 
@@ -318,8 +312,9 @@ bool smartcard_channel_client_handle_message(RedChannelClient *rcc,
 
     /* todo: fix */
     if (vheader->reader_id >= smartcard_get_n_readers()) {
-        spice_printerr("ERROR: received message for non existing reader: %d, %d, %d", vheader->reader_id,
-                       vheader->type, vheader->length);
+        red_channel_warning(red_channel_client_get_channel(rcc),
+                            "ERROR: received message for non existing reader: %d, %d, %d",
+                            vheader->reader_id, vheader->type, vheader->length);
         return FALSE;
     }
     spice_assert(scc->priv->write_buf->buf == msg);
@@ -389,8 +384,10 @@ void smartcard_channel_client_set_char_device(SmartCardChannelClient *scc,
     }
 
     scc->priv->smartcard = device;
-    g_object_add_weak_pointer(G_OBJECT(scc->priv->smartcard),
-                              (gpointer*)&scc->priv->smartcard);
+    if (scc->priv->smartcard) {
+        g_object_add_weak_pointer(G_OBJECT(scc->priv->smartcard),
+                                  (gpointer*)&scc->priv->smartcard);
+    }
 }
 
 RedCharDeviceSmartcard* smartcard_channel_client_get_char_device(SmartCardChannelClient *scc)

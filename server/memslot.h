@@ -58,8 +58,8 @@ int memslot_validate_virt(RedMemSlotInfo *info, unsigned long virt, int slot_id,
 unsigned long memslot_max_size_virt(RedMemSlotInfo *info,
                                     unsigned long virt, int slot_id,
                                     uint32_t group_id);
-unsigned long memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t add_size,
-                       int group_id, int *error);
+void *memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t add_size,
+                       int group_id);
 
 void memslot_info_init(RedMemSlotInfo *info,
                        uint32_t num_groups, uint32_t num_slots,

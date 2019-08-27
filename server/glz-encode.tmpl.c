@@ -68,9 +68,8 @@
 #ifdef LZ_RGB16
 #define PIXEL rgb16_pixel_t
 #define FNAME(name) glz_rgb16_##name
-#define GET_r(pix) (((pix) >> 10) & 0x1f)
-#define GET_g(pix) (((pix) >> 5) & 0x1f)
-#define GET_b(pix) ((pix) & 0x1f)
+#define GET_rgb(pix) ((pix) & 0x7fffu)
+#define SAME_PIXEL(p1, p2) (GET_rgb(p1) == GET_rgb(p2))
 #define ENCODE_PIXEL(e, pix) {encode(e, (pix) >> 8); encode(e, (pix) & 0xff);}
 #define MIN_REF_ENCODE_SIZE 2
 #define MAX_REF_ENCODE_SIZE 3
@@ -89,24 +88,19 @@
 #ifdef LZ_RGB24
 #define PIXEL rgb24_pixel_t
 #define FNAME(name) glz_rgb24_##name
-#define ENCODE_PIXEL(e, pix) {encode(e, (pix).b); encode(e, (pix).g); encode(e, (pix).r);}
-#define MIN_REF_ENCODE_SIZE 2
-#define MAX_REF_ENCODE_SIZE 2
 #endif
 
 #ifdef LZ_RGB32
 #define PIXEL rgb32_pixel_t
 #define FNAME(name) glz_rgb32_##name
-#define ENCODE_PIXEL(e, pix) {encode(e, (pix).b); encode(e, (pix).g); encode(e, (pix).r);}
-#define MIN_REF_ENCODE_SIZE 2
-#define MAX_REF_ENCODE_SIZE 2
 #endif
 
 
 #if  defined(LZ_RGB24) || defined(LZ_RGB32)
-#define GET_r(pix) ((pix).r)
-#define GET_g(pix) ((pix).g)
-#define GET_b(pix) ((pix).b)
+#define ENCODE_PIXEL(e, pix) {encode(e, (pix).b); encode(e, (pix).g); encode(e, (pix).r);}
+#define MIN_REF_ENCODE_SIZE 2
+#define MAX_REF_ENCODE_SIZE 2
+#define SAME_PIXEL(p1, p2) ((p1).r == (p2).r && (p1).g == (p2).g && (p1).b == (p2).b)
 #define HASH_FUNC(v, p) {    \
     v = DJB2_START;          \
     DJB2_HASH(v, p[0].r);    \
@@ -120,12 +114,6 @@
     DJB2_HASH(v, p[2].b);    \
     v &= HASH_MASK;          \
     }
-#endif
-
-#if defined(LZ_RGB16) || defined(LZ_RGB24) || defined(LZ_RGB32)
-#define SAME_PIXEL(p1, p2) (GET_r(p1) == GET_r(p2) && GET_g(p1) == GET_g(p2) && \
-                            GET_b(p1) == GET_b(p2))
-
 #endif
 
 #define PIXEL_ID(pix_ptr, seg_ptr, pix_per_byte) \
@@ -535,9 +523,7 @@ static void FNAME(compress)(Encoder *encoder)
 #undef ENCODE_PIXEL
 #undef SAME_PIXEL
 #undef HASH_FUNC
-#undef GET_r
-#undef GET_g
-#undef GET_b
+#undef GET_rgb
 #undef LZ_PLT
 #undef LZ_RGB_ALPHA
 #undef LZ_RGB16

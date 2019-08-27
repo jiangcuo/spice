@@ -32,6 +32,14 @@
 
 #define MAX_GLZ_DRAWABLE_INSTANCES 2
 
+#if 0
+#define COMPRESS_DEBUG(...) g_debug(__VA_ARGS__)
+#else
+#define COMPRESS_DEBUG(...) G_STMT_START { \
+        if (0) g_debug(__VA_ARGS__); \
+    } G_STMT_END
+#endif
+
 typedef struct RedGlzDrawable RedGlzDrawable;
 typedef struct GlzDrawableInstanceItem GlzDrawableInstanceItem;
 
@@ -443,12 +451,6 @@ static void image_encoders_init_zlib(ImageEncoders *enc)
 {
     enc->zlib_data.usr.more_space = zlib_usr_more_space;
     enc->zlib_data.usr.more_input = zlib_usr_more_input;
-
-    enc->zlib = zlib_encoder_create(&enc->zlib_data.usr, ZLIB_DEFAULT_COMPRESSION_LEVEL);
-
-    if (!enc->zlib) {
-        spice_critical("create zlib encoder failed");
-    }
 }
 
 void image_encoders_init(ImageEncoders *enc, ImageEncoderSharedData *shared_data)
@@ -486,8 +488,10 @@ void image_encoders_free(ImageEncoders *enc)
     lz4_encoder_destroy(enc->lz4);
     enc->lz4 = NULL;
 #endif
-    zlib_encoder_destroy(enc->zlib);
-    enc->zlib = NULL;
+    if (enc->zlib != NULL) {
+        zlib_encoder_destroy(enc->zlib);
+        enc->zlib = NULL;
+    }
     pthread_mutex_destroy(&enc->glz_drawables_inst_to_free_lock);
 }
 
@@ -837,9 +841,7 @@ bool image_encoders_compress_quic(ImageEncoders *enc, SpiceImage *dest,
     stat_start_time_t start_time;
     stat_start_time_init(&start_time, &enc->shared_data->quic_stat);
 
-#ifdef COMPRESS_DEBUG
-    spice_debug("QUIC compress");
-#endif
+    COMPRESS_DEBUG("QUIC compress");
 
     switch (src->format) {
     case SPICE_BITMAP_FMT_32BIT:
@@ -926,9 +928,7 @@ bool image_encoders_compress_lz(ImageEncoders *enc,
     stat_start_time_t start_time;
     stat_start_time_init(&start_time, &enc->shared_data->lz_stat);
 
-#ifdef COMPRESS_DEBUG
-    spice_debug("LZ LOCAL compress");
-#endif
+    COMPRESS_DEBUG("LZ LOCAL compress");
 
     encoder_data_init(&lz_data->data);
 
@@ -997,9 +997,7 @@ bool image_encoders_compress_jpeg(ImageEncoders *enc, SpiceImage *dest,
     stat_start_time_t start_time;
     stat_start_time_init(&start_time, &enc->shared_data->jpeg_alpha_stat);
 
-#ifdef COMPRESS_DEBUG
-    spice_debug("JPEG compress");
-#endif
+    COMPRESS_DEBUG("JPEG compress");
 
     switch (src->format) {
     case SPICE_BITMAP_FMT_16BIT:
@@ -1114,9 +1112,7 @@ bool image_encoders_compress_lz4(ImageEncoders *enc, SpiceImage *dest,
     stat_start_time_t start_time;
     stat_start_time_init(&start_time, &enc->shared_data->lz4_stat);
 
-#ifdef COMPRESS_DEBUG
-    spice_debug("LZ4 compress");
-#endif
+    COMPRESS_DEBUG("LZ4 compress");
 
     encoder_data_init(&lz4_data->data);
 
@@ -1226,9 +1222,7 @@ bool image_encoders_compress_glz(ImageEncoders *enc,
     int glz_size;
     int zlib_size;
 
-#ifdef COMPRESS_DEBUG
-    spice_debug("LZ global compress fmt=%d", src->format);
-#endif
+    COMPRESS_DEBUG("LZ global compress fmt=%d", src->format);
 
     if ((src->x * src->y) >= glz_enc_dictionary_get_size(enc->glz_dict->dict)) {
         return FALSE;
@@ -1262,6 +1256,13 @@ bool image_encoders_compress_glz(ImageEncoders *enc,
 
     if (!enable_zlib_glz_wrap || (glz_size < MIN_GLZ_SIZE_FOR_ZLIB)) {
         goto glz;
+    }
+    if (enc->zlib == NULL) {
+        enc->zlib = zlib_encoder_create(&enc->zlib_data.usr, ZLIB_DEFAULT_COMPRESSION_LEVEL);
+        if (enc->zlib == NULL) {
+            g_warning("creating zlib encoder failed");
+            goto glz;
+        }
     }
     stat_start_time_init(&start_time, &enc->shared_data->zlib_glz_stat);
     zlib_data = &enc->zlib_data;

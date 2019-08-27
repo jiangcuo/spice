@@ -23,29 +23,14 @@
 #include <common/marshaller.h>
 
 #include "red-pipe-item.h"
-#include "reds-stream.h"
+#include "red-stream.h"
 #include "red-channel.h"
 
 G_BEGIN_DECLS
 
 #define RED_TYPE_CHANNEL_CLIENT red_channel_client_get_type()
 
-#define RED_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), RED_TYPE_CHANNEL_CLIENT, RedChannelClient))
-#define RED_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), RED_TYPE_CHANNEL_CLIENT, RedChannelClientClass))
-#define RED_IS_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj), RED_TYPE_CHANNEL_CLIENT))
-#define RED_IS_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass), RED_TYPE_CHANNEL_CLIENT))
-#define RED_CHANNEL_CLIENT_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), RED_TYPE_CHANNEL_CLIENT, RedChannelClientClass))
-
-typedef struct RedChannelClient RedChannelClient;
-typedef struct RedChannelClientClass RedChannelClientClass;
-typedef struct RedChannelClientPrivate RedChannelClientPrivate;
-
-GType red_channel_client_get_type(void) G_GNUC_CONST;
+SPICE_DECLARE_TYPE(RedChannelClient, red_channel_client, CHANNEL_CLIENT);
 
 gboolean red_channel_client_is_connected(RedChannelClient *rcc);
 void red_channel_client_default_migrate(RedChannelClient *rcc);
@@ -122,7 +107,7 @@ void red_channel_client_disconnect(RedChannelClient *rcc);
 
 /* Note: the valid times to call red_channel_get_marshaller are just during send_item callback. */
 SpiceMarshaller *red_channel_client_get_marshaller(RedChannelClient *rcc);
-RedsStream *red_channel_client_get_stream(RedChannelClient *rcc);
+RedStream *red_channel_client_get_stream(RedChannelClient *rcc);
 RedClient *red_channel_client_get_client(RedChannelClient *rcc);
 
 /* Note that the header is valid only between red_channel_reset_send_data and

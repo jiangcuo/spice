@@ -109,6 +109,18 @@ static void codecs_bad(void)
             G_LOG_LEVEL_WARNING,
             "*spice: unknown video codec unknown_codec",
             TRUE,
+        },{
+            // invalid characters in encoder
+            "spice&:mjpeg",
+            G_LOG_LEVEL_WARNING,
+            "*spice: invalid encoder:codec value*",
+            TRUE,
+        },{
+            // invalid character in codec
+            "spice:mjpeg&",
+            G_LOG_LEVEL_WARNING,
+            "*spice: invalid encoder:codec value*",
+            TRUE,
         },
 #if !defined(HAVE_GSTREAMER_1_0) && !defined(HAVE_GSTREAMER_0_10)
         {

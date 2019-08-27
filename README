@@ -27,7 +27,7 @@ Or to install into a private user specific location
 The following mandatory dependencies are required in order to
 build SPICE
 
-    Spice protocol >= 0.12.13
+    Spice protocol >= 0.14.0
     Pixman         >= 0.17.7
     OpenSSL
     libjpeg
@@ -37,7 +37,7 @@ The following optional dependencies increase the available
 functionality
 
     Cyrus-SASL
-    libcacard      >= 0.1.2             (Smartcard support)
+    libcacard      >= 2.5.1             (Smartcard support)
     Opus           >= 1.0.0             (Opus audio encoding support)
     LZ4                                 (LZ4 compression support)
     GStreamer      >= 1.0.0
@@ -56,14 +56,14 @@ There is also a mailing list for new release announcements:
 
 To view known bugs, or report new bugs, in SPICE visit
 
-   https://bugs.freedesktop.org/describecomponents.cgi?product=Spice
+   https://gitlab.freedesktop.org/spice/spice/issues/new?
 
 Bugs found when using an OS distribution's binary packages should
 be reported to the OS vendors' own bug tracker first.
 
 The latest SPICE code can be found in GIT at:
 
-   https://cgit.freedesktop.org/spice/
+   https://gitlab.freedesktop.org/spice/
 
 Licensing
 ---------

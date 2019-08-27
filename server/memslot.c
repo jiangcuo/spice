@@ -61,7 +61,7 @@ int memslot_validate_virt(RedMemSlotInfo *info, unsigned long virt, int slot_id,
 
     if (virt < slot->virt_start_addr || (virt + add_size) > slot->virt_end_addr) {
         print_memslots(info);
-        spice_warning("virtual address out of range\n"
+        spice_warning("virtual address out of range"
               "    virt=0x%lx+0x%x slot_id=%d group_id=%d\n"
               "    slot=0x%lx-0x%lx delta=0x%lx",
               virt, add_size, slot_id, group_id,
@@ -86,11 +86,10 @@ unsigned long memslot_max_size_virt(RedMemSlotInfo *info,
 }
 
 /*
- * return virtual address if successful, which may be 0.
- * returns 0 and sets error to 1 if an error condition occurs.
+ * returns NULL on failure.
  */
-unsigned long memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t add_size,
-                               int group_id, int *error)
+void *memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t add_size,
+                       int group_id)
 {
     int slot_id;
     int generation;
@@ -98,19 +97,16 @@ unsigned long memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t 
 
     MemSlot *slot;
 
-    *error = 0;
-    if (group_id > info->num_memslots_groups) {
+    if (group_id >= info->num_memslots_groups) {
         spice_critical("group_id too big");
-        *error = 1;
-        return 0;
+        return NULL;
     }
 
     slot_id = memslot_get_id(info, addr);
-    if (slot_id > info->num_memslots) {
+    if (slot_id >= info->num_memslots) {
         print_memslots(info);
-        spice_critical("slot_id %d too big, addr=%" PRIx64, slot_id, addr);
-        *error = 1;
-        return 0;
+        spice_critical("slot_id %d too big, addr=%" G_GINT64_MODIFIER "x", slot_id, addr);
+        return NULL;
     }
 
     slot = &info->mem_slots[group_id][slot_id];
@@ -118,21 +114,21 @@ unsigned long memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t 
     generation = memslot_get_generation(info, addr);
     if (generation != slot->generation) {
         print_memslots(info);
-        spice_critical("address generation is not valid, group_id %d, slot_id %d, gen %d, slot_gen %d\n",
-              group_id, slot_id, generation, slot->generation);
-        *error = 1;
-        return 0;
+        spice_critical("address generation is not valid, group_id %d, slot_id %d, "
+                       "gen %d, slot_gen %d",
+                       group_id, slot_id,
+                       generation, slot->generation);
+        return NULL;
     }
 
     h_virt = __get_clean_virt(info, addr);
     h_virt += slot->address_delta;
 
     if (!memslot_validate_virt(info, h_virt, slot_id, add_size, group_id)) {
-        *error = 1;
-        return 0;
+        return NULL;
     }
 
-    return h_virt;
+    return (void*)(uintptr_t)h_virt;
 }
 
 void memslot_info_init(RedMemSlotInfo *info,

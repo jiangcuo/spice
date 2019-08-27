@@ -48,7 +48,7 @@ from_physical(QXLPHYSICAL physical)
 static void*
 create_chunk(size_t prefix, uint32_t size, QXLDataChunk* prev, int fill)
 {
-    uint8_t *ptr = spice_malloc0(prefix + sizeof(QXLDataChunk) + size);
+    uint8_t *ptr = g_malloc0(prefix + sizeof(QXLDataChunk) + size);
     QXLDataChunk *qxl = (QXLDataChunk *) (ptr + prefix);
     memset(&qxl->data[0], fill, size);
     qxl->data_size = size;
@@ -76,26 +76,53 @@ static void init_qxl_surface(QXLSurfaceCmd *qxl)
     qxl->u.surface_create.width = 128;
     qxl->u.surface_create.stride = 512;
     qxl->u.surface_create.height = 128;
-    surface_mem = malloc(0x10000);
+    surface_mem = g_malloc(0x10000);
     qxl->u.surface_create.data = to_physical(surface_mem);
 }
 
 static void deinit_qxl_surface(QXLSurfaceCmd *qxl)
 {
-    free(from_physical(qxl->u.surface_create.data));
+    g_free(from_physical(qxl->u.surface_create.data));
+}
+
+static void test_memslot_invalid_group_id(void)
+{
+    RedMemSlotInfo mem_info;
+    init_meminfo(&mem_info);
+
+    memslot_get_virt(&mem_info, 0, 16, 1);
+}
+
+static void test_memslot_invalid_slot_id(void)
+{
+    RedMemSlotInfo mem_info;
+    init_meminfo(&mem_info);
+
+    memslot_get_virt(&mem_info, 1 << mem_info.memslot_id_shift, 16, 0);
+}
+
+static void test_memslot_invalid_addresses(void)
+{
+    g_test_trap_subprocess("/server/memslot-invalid-addresses/subprocess/group_id", 0, 0);
+    g_test_trap_assert_stderr("*group_id too big*");
+
+    g_test_trap_subprocess("/server/memslot-invalid-addresses/subprocess/slot_id", 0, 0);
+    g_test_trap_assert_stderr("*slot_id 1 too big*");
 }
 
 static void test_no_issues(void)
 {
     RedMemSlotInfo mem_info;
-    RedSurfaceCmd cmd;
+    RedSurfaceCmd *cmd;
     QXLSurfaceCmd qxl;
 
     init_meminfo(&mem_info);
     init_qxl_surface(&qxl);
 
     /* try to create a surface with no issues, should succeed */
-    g_assert_true(red_get_surface_cmd(&mem_info, 0, &cmd, to_physical(&qxl)));
+    cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
+    g_assert_nonnull(cmd);
+    red_surface_cmd_unref(cmd);
 
     deinit_qxl_surface(&qxl);
     memslot_info_destroy(&mem_info);
@@ -104,7 +131,7 @@ static void test_no_issues(void)
 static void test_stride_too_small(void)
 {
     RedMemSlotInfo mem_info;
-    RedSurfaceCmd cmd;
+    RedSurfaceCmd *cmd;
     QXLSurfaceCmd qxl;
 
     init_meminfo(&mem_info);
@@ -115,7 +142,8 @@ static void test_stride_too_small(void)
      * This can be used to cause buffer overflows so refuse it.
      */
     qxl.u.surface_create.stride = 256;
-    g_assert_false(red_get_surface_cmd(&mem_info, 0, &cmd, to_physical(&qxl)));
+    cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
+    g_assert_null(cmd);
 
     deinit_qxl_surface(&qxl);
     memslot_info_destroy(&mem_info);
@@ -124,7 +152,7 @@ static void test_stride_too_small(void)
 static void test_too_big_image(void)
 {
     RedMemSlotInfo mem_info;
-    RedSurfaceCmd cmd;
+    RedSurfaceCmd *cmd;
     QXLSurfaceCmd qxl;
 
     init_meminfo(&mem_info);
@@ -140,7 +168,8 @@ static void test_too_big_image(void)
     qxl.u.surface_create.stride = 0x08000004 * 4;
     qxl.u.surface_create.width = 0x08000004;
     qxl.u.surface_create.height = 0x40000020;
-    g_assert_false(red_get_surface_cmd(&mem_info, 0, &cmd, to_physical(&qxl)));
+    cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
+    g_assert_null(cmd);
 
     deinit_qxl_surface(&qxl);
     memslot_info_destroy(&mem_info);
@@ -149,7 +178,7 @@ static void test_too_big_image(void)
 static void test_cursor_command(void)
 {
     RedMemSlotInfo mem_info;
-    RedCursorCmd red_cursor_cmd;
+    RedCursorCmd *red_cursor_cmd;
     QXLCursorCmd cursor_cmd;
     QXLCursor *cursor;
 
@@ -167,16 +196,17 @@ static void test_cursor_command(void)
 
     cursor_cmd.u.set.shape = to_physical(cursor);
 
-    g_assert_true(red_get_cursor_cmd(&mem_info, 0, &red_cursor_cmd, to_physical(&cursor_cmd)));
-    free(red_cursor_cmd.u.set.shape.data);
-    free(cursor);
+    red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
+    g_assert_nonnull(red_cursor_cmd);
+    red_cursor_cmd_unref(red_cursor_cmd);
+    g_free(cursor);
     memslot_info_destroy(&mem_info);
 }
 
 static void test_circular_empty_chunks(void)
 {
     RedMemSlotInfo mem_info;
-    RedCursorCmd red_cursor_cmd;
+    RedCursorCmd *red_cursor_cmd;
     QXLCursorCmd cursor_cmd;
     QXLCursor *cursor;
     QXLDataChunk *chunks[2];
@@ -200,25 +230,26 @@ static void test_circular_empty_chunks(void)
 
     cursor_cmd.u.set.shape = to_physical(cursor);
 
-    memset(&red_cursor_cmd, 0xaa, sizeof(red_cursor_cmd));
-    if (red_get_cursor_cmd(&mem_info, 0, &red_cursor_cmd, to_physical(&cursor_cmd))) {
+    red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
+    if (red_cursor_cmd != NULL) {
         /* function does not return errors so there should be no data */
-        g_assert_cmpuint(red_cursor_cmd.type, ==, QXL_CURSOR_SET);
-        g_assert_cmpuint(red_cursor_cmd.u.set.position.x, ==, 0);
-        g_assert_cmpuint(red_cursor_cmd.u.set.position.y, ==, 0);
-        g_assert_cmpuint(red_cursor_cmd.u.set.shape.data_size, ==, 0);
+        g_assert_cmpuint(red_cursor_cmd->type, ==, QXL_CURSOR_SET);
+        g_assert_cmpuint(red_cursor_cmd->u.set.position.x, ==, 0);
+        g_assert_cmpuint(red_cursor_cmd->u.set.position.y, ==, 0);
+        g_assert_cmpuint(red_cursor_cmd->u.set.shape.data_size, ==, 0);
+        red_cursor_cmd_unref(red_cursor_cmd);
     }
     g_test_assert_expected_messages();
 
-    free(cursor);
-    free(chunks[0]);
+    g_free(cursor);
+    g_free(chunks[0]);
     memslot_info_destroy(&mem_info);
 }
 
 static void test_circular_small_chunks(void)
 {
     RedMemSlotInfo mem_info;
-    RedCursorCmd red_cursor_cmd;
+    RedCursorCmd *red_cursor_cmd;
     QXLCursorCmd cursor_cmd;
     QXLCursor *cursor;
     QXLDataChunk *chunks[2];
@@ -242,18 +273,19 @@ static void test_circular_small_chunks(void)
 
     cursor_cmd.u.set.shape = to_physical(cursor);
 
-    memset(&red_cursor_cmd, 0xaa, sizeof(red_cursor_cmd));
-    if (red_get_cursor_cmd(&mem_info, 0, &red_cursor_cmd, to_physical(&cursor_cmd))) {
+    red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
+    if (red_cursor_cmd != NULL) {
         /* function does not return errors so there should be no data */
-        g_assert_cmpuint(red_cursor_cmd.type, ==, QXL_CURSOR_SET);
-        g_assert_cmpuint(red_cursor_cmd.u.set.position.x, ==, 0);
-        g_assert_cmpuint(red_cursor_cmd.u.set.position.y, ==, 0);
-        g_assert_cmpuint(red_cursor_cmd.u.set.shape.data_size, ==, 0);
+        g_assert_cmpuint(red_cursor_cmd->type, ==, QXL_CURSOR_SET);
+        g_assert_cmpuint(red_cursor_cmd->u.set.position.x, ==, 0);
+        g_assert_cmpuint(red_cursor_cmd->u.set.position.y, ==, 0);
+        g_assert_cmpuint(red_cursor_cmd->u.set.shape.data_size, ==, 0);
+        red_cursor_cmd_unref(red_cursor_cmd);
     }
     g_test_assert_expected_messages();
 
-    free(cursor);
-    free(chunks[0]);
+    g_free(cursor);
+    g_free(chunks[0]);
     memslot_info_destroy(&mem_info);
 }
 
@@ -261,6 +293,11 @@ static void test_circular_small_chunks(void)
 int main(int argc, char *argv[])
 {
     g_test_init(&argc, &argv, NULL);
+
+    /* try to use invalid memslot group/slot */
+    g_test_add_func("/server/memslot-invalid-addresses", test_memslot_invalid_addresses);
+    g_test_add_func("/server/memslot-invalid-addresses/subprocess/group_id", test_memslot_invalid_group_id);
+    g_test_add_func("/server/memslot-invalid-addresses/subprocess/slot_id", test_memslot_invalid_slot_id);
 
     /* try to create a surface with no issues, should succeed */
     g_test_add_func("/server/qxl-parsing-no-issues", test_no_issues);

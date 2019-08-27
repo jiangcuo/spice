@@ -37,7 +37,7 @@ struct SpiceTimer {
 static SpiceTimer* timer_add(const SpiceCoreInterfaceInternal *iface,
                              SpiceTimerFunc func, void *opaque)
 {
-    SpiceTimer *timer = spice_malloc0(sizeof(SpiceTimer));
+    SpiceTimer *timer = g_new0(SpiceTimer, 1);
 
     timer->context = iface->main_context;
     timer->func = func;
@@ -84,7 +84,7 @@ static void timer_remove(const SpiceCoreInterfaceInternal *iface,
 {
     timer_cancel(iface, timer);
     spice_assert(timer->source == NULL);
-    free(timer);
+    g_free(timer);
 }
 
 struct SpiceWatch {
@@ -123,6 +123,7 @@ static gboolean watch_func(GIOChannel *source, GIOCondition condition,
                            gpointer data)
 {
     SpiceWatch *watch = data;
+    // this works also under Windows despite the name
     int fd = g_io_channel_unix_get_fd(source);
 
     watch->func(fd, giocondition_to_spice_event(condition), watch->opaque);
@@ -143,7 +144,12 @@ static void watch_update_mask(const SpiceCoreInterfaceInternal *iface,
         return;
 
     watch->source = g_io_create_watch(watch->channel, spice_event_to_giocondition(event_mask));
-    g_source_set_callback(watch->source, (GSourceFunc)watch_func, watch, NULL);
+    /* g_source_set_callback() documentation says:
+     * "The exact type of func depends on the type of source; ie. you should
+     *  not count on func being called with data as its first parameter."
+     * In this case it is a GIOFunc. First cast to GIOFunc to make sure it is the right type.
+     * The other casts silence the warning from gcc */
+    g_source_set_callback(watch->source, (GSourceFunc)(void*)(GIOFunc)watch_func, watch, NULL);
     g_source_attach(watch->source, watch->context);
 }
 
@@ -155,9 +161,13 @@ static SpiceWatch *watch_add(const SpiceCoreInterfaceInternal *iface,
     spice_return_val_if_fail(fd != -1, NULL);
     spice_return_val_if_fail(func != NULL, NULL);
 
-    watch = spice_malloc0(sizeof(SpiceWatch));
+    watch = g_new0(SpiceWatch, 1);
     watch->context = iface->main_context;
+#ifndef _WIN32
     watch->channel = g_io_channel_unix_new(fd);
+#else
+    watch->channel = g_io_channel_win32_new_socket(fd);
+#endif
     watch->func = func;
     watch->opaque = opaque;
 
@@ -173,7 +183,7 @@ static void watch_remove(const SpiceCoreInterfaceInternal *iface,
     spice_assert(watch->source == NULL);
 
     g_io_channel_unref(watch->channel);
-    free(watch);
+    g_free(watch);
 }
 
 const SpiceCoreInterfaceInternal event_loop_core = {

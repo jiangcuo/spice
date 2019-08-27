@@ -54,8 +54,9 @@ typedef int64_t red_time_t;
 
 #define NSEC_PER_SEC      1000000000LL
 #define NSEC_PER_MILLISEC 1000000LL
+#define NSEC_PER_MICROSEC 1000
 
-/* FIXME: consider g_get_monotonic_time (), but in microseconds */
+/* g_get_monotonic_time() does not have enough precision */
 static inline red_time_t spice_get_monotonic_time_ns(void)
 {
     struct timespec time;
@@ -66,12 +67,12 @@ static inline red_time_t spice_get_monotonic_time_ns(void)
 
 #define MSEC_PER_SEC 1000
 
-static inline red_time_t spice_get_monotonic_time_ms(void)
-{
-    return g_get_monotonic_time() / 1000;
-}
-
 int rgb32_data_has_alpha(int width, int height, size_t stride,
-                         uint8_t *data, int *all_set_out);
+                         const uint8_t *data, int *all_set_out);
+
+const char *red_channel_type_to_str(int type);
+int red_channel_name_to_type(const char *name);
+
+void red_dump_openssl_errors(void);
 
 #endif /* UTILS_H_ */

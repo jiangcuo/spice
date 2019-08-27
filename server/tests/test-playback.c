@@ -17,7 +17,6 @@
 */
 #include <config.h>
 #include <stdio.h>
-#include <sys/select.h>
 #include <sys/time.h>
 #include <math.h>
 
@@ -73,12 +72,12 @@ static void playback_timer_cb(SPICE_GNUC_UNUSED void *opaque)
 
     get_frame();
     if (!frame) {
-        /* continue waiting until there is a channel */
+        /* continue waiting until there is a client */
         core->timer_start(playback_timer, 100);
         return;
     }
 
-    /* we have a channel */
+    /* we have a client */
     gettimeofday(&cur, NULL);
     cur_usec = cur.tv_usec + cur.tv_sec * 1e6;
     if (last_sent_usec == 0) {
@@ -88,18 +87,14 @@ static void playback_timer_cb(SPICE_GNUC_UNUSED void *opaque)
     }
     last_sent_usec = cur_usec;
     while (samples_to_send > num_samples && frame) {
-#if 0
-    printf("samples_to_send = %d\n", samples_to_send);
-#endif
         samples_to_send -= num_samples;
         for (i = 0 ; i < num_samples; ++i) {
-            frame[i] = (((uint16_t)((1<<14)*sin((t+i)/10))) << 16) + (((uint16_t)((1<<14)*sin((t+i)/10))));
+            uint16_t level = (1<<14) * sin((t+i)/10.0);
+            frame[i] = (level << 16) + level;
         }
         t += num_samples;
-        if (frame) {
-            spice_server_playback_put_samples(&playback_instance, frame);
-            frame = NULL;
-        }
+        spice_server_playback_put_samples(&playback_instance, frame);
+        frame = NULL;
         get_frame();
     }
     core->timer_start(playback_timer, playback_timer_ms);

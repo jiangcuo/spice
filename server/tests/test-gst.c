@@ -585,7 +585,7 @@ handle_pipeline_message(GstBus *bus, GstMessage *msg, gpointer test_pipeline)
 static TestPipeline*
 create_pipeline(const char *desc, SampleProc sample_proc, void *param)
 {
-    TestPipeline *pipeline = spice_new0(TestPipeline, 1);
+    TestPipeline *pipeline = g_new0(TestPipeline, 1);
 
     pipeline->sample_proc = sample_proc;
     pipeline->sample_param = param;
@@ -630,7 +630,7 @@ pipeline_free(TestPipeline *pipeline)
     }
     gst_object_unref(pipeline->appsink);
     gst_object_unref(pipeline->gst_pipeline);
-    free(pipeline);
+    g_free(pipeline);
 }
 
 static void
@@ -755,7 +755,7 @@ frame_unref(TestFrame *frame)
         return;
     }
     bitmap_free(frame->bitmap);
-    free(frame);
+    g_free(frame);
 }
 
 static void
@@ -767,7 +767,7 @@ bitmap_free(SpiceBitmap *bitmap)
     spice_assert(!bitmap->palette);
     spice_assert(bitmap->data);
     spice_chunks_destroy(bitmap->data);
-    free(bitmap);
+    g_free(bitmap);
 }
 
 static SpiceChunks* chunks_alloc(uint32_t stride, uint32_t height, uint32_t split);
@@ -788,11 +788,11 @@ gst_to_spice_bitmap(GstSample *sample)
     GstStructure *s = gst_caps_get_structure(caps, 0);
     spice_assert(s);
 
-    gint width, height;
+    gint width = 0, height = 0;
     spice_assert(gst_structure_get_int(s, "width", &width) &&
                  gst_structure_get_int(s, "height", &height));
 
-    SpiceBitmap *bitmap = spice_new0(SpiceBitmap, 1);
+    SpiceBitmap *bitmap = g_new0(SpiceBitmap, 1);
     bitmap->format = bitmap_format;
     bitmap->flags = top_down ? SPICE_BITMAP_FLAGS_TOP_DOWN : 0;
     bitmap->x = width;
@@ -905,7 +905,7 @@ get_convert_line(SpiceBitmapFmt format)
 static void
 convert_line16(uint8_t *dest, const uint8_t *src, uint32_t width)
 {
-    uint16_t *dest16 = (uint16_t *) dest;
+    uint16_t *dest16 = SPICE_ALIGNED_CAST(uint16_t *, dest);
     for (; width; --width) {
         *dest16++ = (src[0] >> 3) | ((src[1] & 0xf8) << 2) | ((src[2] & 0xf8) << 7);
         src += 4;
@@ -953,7 +953,7 @@ get_bitmap_format(const char *format)
 static TestFrame *
 gst_to_spice_frame(GstSample *sample)
 {
-    TestFrame *frame = spice_new0(TestFrame, 1);
+    TestFrame *frame = g_new0(TestFrame, 1);
     frame->refs = 1;
     frame->bitmap = gst_to_spice_bitmap(sample);
     return frame;
@@ -1055,7 +1055,7 @@ bitmap_extract32(SpiceBitmap *bitmap, uint8_t *buf, int32_t x, int32_t y, int32_
 static uint8_t *
 bitmap_extract16(SpiceBitmap *bitmap, uint8_t *buf, int32_t x, int32_t y, int32_t w)
 {
-    const uint16_t *line = (const uint16_t *)(bitmap_get_line(bitmap, y) + x * 2);
+    const uint16_t *line = SPICE_ALIGNED_CAST(const uint16_t *, bitmap_get_line(bitmap, y) + x * 2);
     uint8_t *dest = buf;
     for (; w; --w) {
         uint16_t pixel = *line++;

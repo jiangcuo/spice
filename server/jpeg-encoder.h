@@ -38,12 +38,11 @@ typedef enum {
     JPEG_IMAGE_TYPE_RGB16,
     /* in byte per color types, the notation is according to the order of the
        colors in the memory */
-    JPEG_IMAGE_TYPE_RGB24,
     JPEG_IMAGE_TYPE_BGR24,
     JPEG_IMAGE_TYPE_BGRX32,
 } JpegEncoderImageType;
 
-typedef void* JpegEncoderContext;
+typedef struct JpegEncoderContext JpegEncoderContext;
 typedef struct JpegEncoderUsrContext JpegEncoderUsrContext;
 
 struct JpegEncoderUsrContext {

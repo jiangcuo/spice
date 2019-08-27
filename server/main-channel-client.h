@@ -58,7 +58,7 @@ struct MainChannelClientClass
 GType main_channel_client_get_type(void) G_GNUC_CONST;
 
 MainChannelClient *main_channel_client_create(MainChannel *main_chan, RedClient *client,
-                                              RedsStream *stream, uint32_t connection_id,
+                                              RedStream *stream, uint32_t connection_id,
                                               RedChannelCapabilities *caps);
 
 void main_channel_client_push_agent_tokens(MainChannelClient *mcc, uint32_t num_tokens);
@@ -122,11 +122,14 @@ enum {
     RED_PIPE_ITEM_TYPE_MAIN_NAME,
     RED_PIPE_ITEM_TYPE_MAIN_UUID,
     RED_PIPE_ITEM_TYPE_MAIN_AGENT_CONNECTED_TOKENS,
+    RED_PIPE_ITEM_TYPE_MAIN_REGISTERED_CHANNEL,
 };
 
 RedPipeItem *main_mouse_mode_item_new(SpiceMouseMode current_mode, int is_client_mouse_allowed);
 
 RedPipeItem *main_multi_media_time_item_new(uint32_t mm_time);
+
+RedPipeItem *registered_channel_item_new(RedChannel *channel);
 
 G_END_DECLS
 

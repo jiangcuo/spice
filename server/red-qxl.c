@@ -24,7 +24,6 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
-#include <sys/socket.h>
 #include <inttypes.h>
 
 #include <spice/qxl_dev.h>
@@ -37,9 +36,12 @@
 #include "dispatcher.h"
 #include "red-parse-qxl.h"
 #include "red-channel-client.h"
+#include "display-limits.h"
 
 #include "red-qxl.h"
 
+
+#define MAX_MONITORS_COUNT 16
 
 struct QXLState {
     QXLWorker qxl_worker;
@@ -50,10 +52,14 @@ struct QXLState {
     int x_res;
     int y_res;
     int use_hardware_cursor;
-    QXLDevSurfaceCreate surface_create;
     unsigned int max_monitors;
     RedsState *reds;
     RedWorker *worker;
+    char device_address[MAX_DEVICE_ADDRESS_LEN];
+    uint32_t device_display_ids[MAX_MONITORS_COUNT];
+    size_t monitors_count;  // length of ^^^
+
+    bool running;
 
     pthread_mutex_t scanout_mutex;
     SpiceMsgDisplayGlScanoutUnix scanout;
@@ -62,6 +68,18 @@ struct QXLState {
 
 #define GL_DRAW_COOKIE_INVALID (~((uint64_t) 0))
 
+/* used by RedWorker */
+bool red_qxl_is_running(QXLInstance *qxl)
+{
+    return qxl->st->running;
+}
+
+/* used by RedWorker */
+void red_qxl_set_running(QXLInstance *qxl, bool running)
+{
+    qxl->st->running = running;
+}
+
 int red_qxl_check_qxl_version(QXLInstance *qxl, int major, int minor)
 {
     int qxl_major = qxl_get_interface(qxl)->base.major_version;
@@ -69,111 +87,6 @@ int red_qxl_check_qxl_version(QXLInstance *qxl, int major, int minor)
 
     return ((qxl_major > major) ||
             ((qxl_major == major) && (qxl_minor >= minor)));
-}
-
-static void red_qxl_set_display_peer(RedChannel *channel, RedClient *client,
-                                     RedsStream *stream, int migration,
-                                     RedChannelCapabilities *caps)
-{
-    RedWorkerMessageDisplayConnect payload = {0,};
-    Dispatcher *dispatcher;
-
-    spice_debug("%s", "");
-    dispatcher = (Dispatcher *)g_object_get_data(G_OBJECT(channel), "dispatcher");
-    // get a reference potentially the main channel can be destroyed in
-    // the main thread causing RedClient to be destroyed before using it
-    payload.client = g_object_ref(client);
-    payload.stream = stream;
-    payload.migration = migration;
-    red_channel_capabilities_init(&payload.caps, caps);
-
-    dispatcher_send_message(dispatcher,
-                            RED_WORKER_MESSAGE_DISPLAY_CONNECT,
-                            &payload);
-}
-
-static void red_qxl_disconnect_display_peer(RedChannelClient *rcc)
-{
-    RedWorkerMessageDisplayDisconnect payload;
-    Dispatcher *dispatcher;
-    RedChannel *channel = red_channel_client_get_channel(rcc);
-
-    dispatcher = (Dispatcher *)g_object_get_data(G_OBJECT(channel), "dispatcher");
-
-    spice_printerr("");
-    payload.rcc = rcc;
-
-    // TODO: we turned it to be sync, due to client_destroy . Should we support async? - for this we will need ref count
-    // for channels
-    dispatcher_send_message(dispatcher,
-                            RED_WORKER_MESSAGE_DISPLAY_DISCONNECT,
-                            &payload);
-}
-
-static void red_qxl_display_migrate(RedChannelClient *rcc)
-{
-    RedWorkerMessageDisplayMigrate payload;
-    Dispatcher *dispatcher;
-    RedChannel *channel = red_channel_client_get_channel(rcc);
-    uint32_t type, id;
-
-    g_object_get(channel, "channel-type", &type, "id", &id, NULL);
-    dispatcher = (Dispatcher *)g_object_get_data(G_OBJECT(channel), "dispatcher");
-    spice_printerr("channel type %u id %u", type, id);
-    payload.rcc = g_object_ref(rcc);
-    dispatcher_send_message(dispatcher,
-                            RED_WORKER_MESSAGE_DISPLAY_MIGRATE,
-                            &payload);
-}
-
-static void red_qxl_set_cursor_peer(RedChannel *channel, RedClient *client, RedsStream *stream,
-                                    int migration,
-                                    RedChannelCapabilities *caps)
-{
-    RedWorkerMessageCursorConnect payload = {0,};
-    Dispatcher *dispatcher = (Dispatcher *)g_object_get_data(G_OBJECT(channel), "dispatcher");
-    spice_printerr("");
-    // get a reference potentially the main channel can be destroyed in
-    // the main thread causing RedClient to be destroyed before using it
-    payload.client = g_object_ref(client);
-    payload.stream = stream;
-    payload.migration = migration;
-    red_channel_capabilities_init(&payload.caps, caps);
-
-    dispatcher_send_message(dispatcher,
-                            RED_WORKER_MESSAGE_CURSOR_CONNECT,
-                            &payload);
-}
-
-static void red_qxl_disconnect_cursor_peer(RedChannelClient *rcc)
-{
-    RedWorkerMessageCursorDisconnect payload;
-    Dispatcher *dispatcher;
-    RedChannel *channel = red_channel_client_get_channel(rcc);
-
-    dispatcher = (Dispatcher *)g_object_get_data(G_OBJECT(channel), "dispatcher");
-    spice_printerr("");
-    payload.rcc = rcc;
-
-    dispatcher_send_message(dispatcher,
-                            RED_WORKER_MESSAGE_CURSOR_DISCONNECT,
-                            &payload);
-}
-
-static void red_qxl_cursor_migrate(RedChannelClient *rcc)
-{
-    RedWorkerMessageCursorMigrate payload;
-    Dispatcher *dispatcher;
-    RedChannel *channel = red_channel_client_get_channel(rcc);
-    uint32_t type, id;
-
-    g_object_get(channel, "channel-type", &type, "id", &id, NULL);
-    dispatcher = (Dispatcher *)g_object_get_data(G_OBJECT(channel), "dispatcher");
-    spice_printerr("channel type %u id %u", type, id);
-    payload.rcc = g_object_ref(rcc);
-    dispatcher_send_message(dispatcher,
-                            RED_WORKER_MESSAGE_CURSOR_MIGRATE,
-                            &payload);
 }
 
 static void red_qxl_update_area(QXLState *qxl_state, uint32_t surface_id,
@@ -346,17 +259,15 @@ static void qxl_worker_destroy_primary_surface(QXLWorker *qxl_worker, uint32_t s
 }
 
 /* used by RedWorker */
-void red_qxl_create_primary_surface_complete(QXLState *qxl_state)
+void red_qxl_create_primary_surface_complete(QXLState *qxl_state, const QXLDevSurfaceCreate *surface)
 {
-    QXLDevSurfaceCreate *surface = &qxl_state->surface_create;
-
     qxl_state->x_res = surface->width;
     qxl_state->y_res = surface->height;
-    qxl_state->use_hardware_cursor = surface->mouse_mode;
+    // mouse_mode is a boolean value, enforce it
+    qxl_state->use_hardware_cursor = !!surface->mouse_mode;
     qxl_state->primary_active = TRUE;
 
     reds_update_client_mouse_allowed(qxl_state->reds);
-    memset(&qxl_state->surface_create, 0, sizeof(QXLDevSurfaceCreate));
 }
 
 static void
@@ -366,7 +277,6 @@ red_qxl_create_primary_surface_async(QXLState *qxl_state, uint32_t surface_id,
     RedWorkerMessageCreatePrimarySurfaceAsync payload;
     RedWorkerMessage message = RED_WORKER_MESSAGE_CREATE_PRIMARY_SURFACE_ASYNC;
 
-    qxl_state->surface_create = *surface;
     payload.base.cookie = cookie;
     payload.surface_id = surface_id;
     payload.surface = *surface;
@@ -379,31 +289,19 @@ red_qxl_create_primary_surface_sync(QXLState *qxl_state, uint32_t surface_id,
 {
     RedWorkerMessageCreatePrimarySurface payload = {0,};
 
-    qxl_state->surface_create = *surface;
     payload.surface_id = surface_id;
     payload.surface = *surface;
     dispatcher_send_message(qxl_state->dispatcher,
                             RED_WORKER_MESSAGE_CREATE_PRIMARY_SURFACE,
                             &payload);
-    red_qxl_create_primary_surface_complete(qxl_state);
-}
-
-static void
-red_qxl_create_primary_surface(QXLState *qxl_state, uint32_t surface_id,
-                               QXLDevSurfaceCreate *surface, int async, uint64_t cookie)
-{
-    if (async) {
-        red_qxl_create_primary_surface_async(qxl_state, surface_id, surface, cookie);
-    } else {
-        red_qxl_create_primary_surface_sync(qxl_state, surface_id, surface);
-    }
+    red_qxl_create_primary_surface_complete(qxl_state, surface);
 }
 
 static void qxl_worker_create_primary_surface(QXLWorker *qxl_worker, uint32_t surface_id,
                                       QXLDevSurfaceCreate *surface)
 {
     QXLState *qxl_state = SPICE_CONTAINEROF(qxl_worker, QXLState, qxl_worker);
-    red_qxl_create_primary_surface(qxl_state, surface_id, surface, 0, 0);
+    red_qxl_create_primary_surface_sync(qxl_state, surface_id, surface);
 }
 
 static void red_qxl_reset_image_cache(QXLState *qxl_state)
@@ -459,21 +357,10 @@ static void red_qxl_destroy_surface_wait_async(QXLState *qxl_state,
     dispatcher_send_message(qxl_state->dispatcher, message, &payload);
 }
 
-static void red_qxl_destroy_surface_wait(QXLState *qxl_state,
-                                         uint32_t surface_id,
-                                         int async, uint64_t cookie)
-{
-    if (async) {
-        red_qxl_destroy_surface_wait_async(qxl_state, surface_id, cookie);
-    } else {
-        red_qxl_destroy_surface_wait_sync(qxl_state, surface_id);
-    }
-}
-
 static void qxl_worker_destroy_surface_wait(QXLWorker *qxl_worker, uint32_t surface_id)
 {
     QXLState *qxl_state = SPICE_CONTAINEROF(qxl_worker, QXLState, qxl_worker);
-    red_qxl_destroy_surface_wait(qxl_state, surface_id, 0, 0);
+    red_qxl_destroy_surface_wait_sync(qxl_state, surface_id);
 }
 
 static void red_qxl_reset_memslots(QXLState *qxl_state)
@@ -608,7 +495,6 @@ static void red_qxl_loadvm_commands(QXLState *qxl_state,
 {
     RedWorkerMessageLoadvmCommands payload;
 
-    spice_printerr("");
     payload.count = count;
     payload.ext = ext;
     dispatcher_send_message(qxl_state->dispatcher,
@@ -700,7 +586,7 @@ SPICE_GNUC_VISIBLE
 void spice_qxl_create_primary_surface(QXLInstance *instance, uint32_t surface_id,
                                 QXLDevSurfaceCreate *surface)
 {
-    red_qxl_create_primary_surface(instance->st, surface_id, surface, 0, 0);
+    red_qxl_create_primary_surface_sync(instance->st, surface_id, surface);
 }
 
 SPICE_GNUC_VISIBLE
@@ -718,7 +604,7 @@ void spice_qxl_reset_cursor(QXLInstance *instance)
 SPICE_GNUC_VISIBLE
 void spice_qxl_destroy_surface_wait(QXLInstance *instance, uint32_t surface_id)
 {
-    red_qxl_destroy_surface_wait(instance->st, surface_id, 0, 0);
+    red_qxl_destroy_surface_wait_sync(instance->st, surface_id);
 }
 
 SPICE_GNUC_VISIBLE
@@ -757,13 +643,13 @@ SPICE_GNUC_VISIBLE
 void spice_qxl_create_primary_surface_async(QXLInstance *instance, uint32_t surface_id,
                                 QXLDevSurfaceCreate *surface, uint64_t cookie)
 {
-    red_qxl_create_primary_surface(instance->st, surface_id, surface, 1, cookie);
+    red_qxl_create_primary_surface_async(instance->st, surface_id, surface, cookie);
 }
 
 SPICE_GNUC_VISIBLE
 void spice_qxl_destroy_surface_async(QXLInstance *instance, uint32_t surface_id, uint64_t cookie)
 {
-    red_qxl_destroy_surface_wait(instance->st, surface_id, 1, cookie);
+    red_qxl_destroy_surface_wait_async(instance->st, surface_id, cookie);
 }
 
 SPICE_GNUC_VISIBLE
@@ -823,7 +709,7 @@ void spice_qxl_gl_scanout(QXLInstance *qxl,
 
     pthread_mutex_lock(&qxl_state->scanout_mutex);
 
-    if (qxl_state->scanout.drm_dma_buf_fd != -1) {
+    if (qxl_state->scanout.drm_dma_buf_fd >= 0) {
         close(qxl_state->scanout.drm_dma_buf_fd);
     }
 
@@ -864,7 +750,7 @@ void spice_qxl_gl_draw_async(QXLInstance *qxl,
 
     spice_return_if_fail(qxl != NULL);
     qxl_state = qxl->st;
-    if (qxl_state->scanout.drm_dma_buf_fd == -1) {
+    if (qxl_state->scanout.drm_dma_buf_fd < 0) {
         spice_warning("called spice_qxl_gl_draw_async without a buffer");
         red_qxl_async_complete(qxl, cookie);
         return;
@@ -883,11 +769,69 @@ void red_qxl_gl_draw_async_complete(QXLInstance *qxl)
     red_qxl_async_complete(qxl, cookie);
 }
 
+SPICE_GNUC_VISIBLE
+void spice_qxl_set_device_info(QXLInstance *instance,
+                               const char *device_address,
+                               uint32_t device_display_id_start,
+                               uint32_t device_display_id_count)
+{
+    g_return_if_fail(device_address != NULL);
+
+    size_t da_len = strnlen(device_address, MAX_DEVICE_ADDRESS_LEN);
+    if (da_len >= MAX_DEVICE_ADDRESS_LEN) {
+        spice_error("Device address too long: %"G_GSIZE_FORMAT" > %u",
+                    da_len, MAX_DEVICE_ADDRESS_LEN);
+        return;
+    }
+
+    if (device_display_id_count > MAX_MONITORS_COUNT) {
+        spice_error("Device display ID count (%u) is greater than limit %u",
+                    device_display_id_count,
+                    MAX_MONITORS_COUNT);
+        return;
+    }
+
+    g_strlcpy(instance->st->device_address, device_address, MAX_DEVICE_ADDRESS_LEN);
+
+    g_debug("QXL Instance %d setting device address \"%s\" and monitor -> device display mapping:",
+            instance->id,
+            device_address);
+
+    // store the mapping monitor_id -> device_display_id
+    for (uint32_t monitor_id = 0; monitor_id < device_display_id_count; ++monitor_id) {
+        uint32_t device_display_id = device_display_id_start + monitor_id;
+        instance->st->device_display_ids[monitor_id] = device_display_id;
+        g_debug("   monitor ID %u -> device display ID %u",
+                monitor_id, device_display_id);
+    }
+
+    instance->st->monitors_count = device_display_id_count;
+    instance->st->max_monitors = device_display_id_count;
+
+    reds_send_device_display_info(red_qxl_get_server(instance->st));
+}
+
+const char* red_qxl_get_device_address(const QXLInstance *qxl)
+{
+    const QXLState *qxl_state = qxl->st;
+    return qxl_state->device_address;
+}
+
+const uint32_t* red_qxl_get_device_display_ids(const QXLInstance *qxl)
+{
+    const QXLState *qxl_state = qxl->st;
+    return qxl_state->device_display_ids;
+}
+
+size_t red_qxl_get_monitors_count(const QXLInstance *qxl)
+{
+    const QXLState *qxl_state = qxl->st;
+    return qxl_state->monitors_count;
+}
+
 void red_qxl_init(RedsState *reds, QXLInstance *qxl)
 {
     QXLState *qxl_state;
-    ClientCbs client_cursor_cbs = { NULL, };
-    ClientCbs client_display_cbs = { NULL, };
 
     spice_return_if_fail(qxl != NULL);
 
@@ -920,17 +864,7 @@ void red_qxl_init(RedsState *reds, QXLInstance *qxl)
     qxl_state->max_monitors = UINT_MAX;
     qxl->st = qxl_state;
 
-    // TODO: move to their respective channel files
-    client_cursor_cbs.connect = red_qxl_set_cursor_peer;
-    client_cursor_cbs.disconnect = red_qxl_disconnect_cursor_peer;
-    client_cursor_cbs.migrate = red_qxl_cursor_migrate;
-
-    client_display_cbs.connect = red_qxl_set_display_peer;
-    client_display_cbs.disconnect = red_qxl_disconnect_display_peer;
-    client_display_cbs.migrate = red_qxl_display_migrate;
-
-    qxl_state->worker = red_worker_new(qxl, &client_cursor_cbs,
-                                       &client_display_cbs);
+    qxl_state->worker = red_worker_new(qxl);
 
     red_worker_run(qxl_state->worker);
 }
@@ -1115,7 +1049,9 @@ void red_qxl_set_client_capabilities(QXLInstance *qxl,
 {
     QXLInterface *interface = qxl_get_interface(qxl);
 
-    interface->set_client_capabilities(qxl, client_present, caps);
+    if (qxl->st->running) {
+        interface->set_client_capabilities(qxl, client_present, caps);
+    }
 }
 
 void red_qxl_async_complete(QXLInstance *qxl, uint64_t cookie)

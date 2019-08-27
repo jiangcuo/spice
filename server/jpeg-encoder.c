@@ -24,7 +24,7 @@
 #include "red-common.h"
 #include "jpeg-encoder.h"
 
-typedef struct JpegEncoder {
+struct JpegEncoderContext {
     JpegEncoderUsrContext *usr;
 
     struct jpeg_destination_mgr dest_mgr;
@@ -39,7 +39,9 @@ typedef struct JpegEncoder {
         unsigned int out_size;
         void (*convert_line_to_RGB24) (void *line, int width, uint8_t **out_line);
     } cur_image;
-} JpegEncoder;
+};
+
+typedef struct JpegEncoderContext JpegEncoder;
 
 /* jpeg destination manager callbacks */
 
@@ -97,12 +99,12 @@ JpegEncoderContext* jpeg_encoder_create(JpegEncoderUsrContext *usr)
     jpeg_create_compress(&enc->cinfo);
     enc->cinfo.client_data = enc;
     enc->cinfo.dest = &enc->dest_mgr;
-    return (JpegEncoderContext*)enc;
+    return enc;
 }
 
 void jpeg_encoder_destroy(JpegEncoderContext* encoder)
 {
-    jpeg_destroy_compress(&((JpegEncoder*)encoder)->cinfo);
+    jpeg_destroy_compress(&encoder->cinfo);
     g_free(encoder);
 }
 
@@ -159,11 +161,6 @@ static void convert_BGRX32_to_RGB24(void *line, int width, uint8_t **out_line)
     }
 }
 
-static void convert_RGB24_to_RGB24(void *line, int width, uint8_t **out_line)
-{
-    *out_line = line;
-}
-
 
 #define FILL_LINES() {                                                  \
     if (lines == lines_end) {                                           \
@@ -184,9 +181,7 @@ static void do_jpeg_encode(JpegEncoder *jpeg, uint8_t *lines, unsigned int num_l
     width = jpeg->cur_image.width;
     stride = jpeg->cur_image.stride;
 
-    if (jpeg->cur_image.type != JPEG_IMAGE_TYPE_RGB24) {
-        RGB24_line = g_new(uint8_t, width*3);
-    }
+    RGB24_line = g_new(uint8_t, width*3);
 
     lines_end = lines + (stride * num_lines);
 
@@ -197,17 +192,13 @@ static void do_jpeg_encode(JpegEncoder *jpeg, uint8_t *lines, unsigned int num_l
         jpeg_write_scanlines(&jpeg->cinfo, row_pointer, 1);
     }
 
-    if (jpeg->cur_image.type != JPEG_IMAGE_TYPE_RGB24) {
-        g_free(RGB24_line);
-    }
+    g_free(RGB24_line);
 }
 
-int jpeg_encode(JpegEncoderContext *jpeg, int quality, JpegEncoderImageType type,
+int jpeg_encode(JpegEncoderContext *enc, int quality, JpegEncoderImageType type,
                 int width, int height, uint8_t *lines, unsigned int num_lines, int stride,
                 uint8_t *io_ptr, unsigned int num_io_bytes)
 {
-    JpegEncoder *enc = (JpegEncoder *)jpeg;
-
     enc->cur_image.type = type;
     enc->cur_image.width = width;
     enc->cur_image.height = height;
@@ -217,9 +208,6 @@ int jpeg_encode(JpegEncoderContext *jpeg, int quality, JpegEncoderImageType type
     switch (type) {
     case JPEG_IMAGE_TYPE_RGB16:
         enc->cur_image.convert_line_to_RGB24 = convert_RGB16_to_RGB24;
-        break;
-    case JPEG_IMAGE_TYPE_RGB24:
-        enc->cur_image.convert_line_to_RGB24 = convert_RGB24_to_RGB24;
         break;
     case JPEG_IMAGE_TYPE_BGR24:
         enc->cur_image.convert_line_to_RGB24 = convert_BGR24_to_RGB24;

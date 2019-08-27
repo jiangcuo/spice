@@ -50,7 +50,7 @@ typedef struct MonitorMode {
 
 typedef struct RedsMigPendingLink {
     SpiceLinkMess *link_msg;
-    RedsStream *stream;
+    RedStream *stream;
 } RedsMigPendingLink;
 
 typedef struct RedsMigTargetClient {
@@ -81,6 +81,7 @@ struct RedsState {
     SpiceWatch *secure_listen_watch;
     RedCharDeviceVDIPort *agent_dev;
     int pending_mouse_event;
+    bool pending_device_display_info_message;
     GList *clients;
     MainChannel *main_channel;
     InputsChannel *inputs_channel;
@@ -117,6 +118,7 @@ struct RedsState {
     RedStatFile *stat_file;
 #endif
     int allow_multiple_clients;
+    bool late_initialization_done;
 
     /* Intermediate state for on going monitors config message from a single
      * client, being passed to the guest */

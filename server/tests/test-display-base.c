@@ -21,9 +21,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <signal.h>
-#include <wait.h>
+#ifndef _WIN32
+#include <sys/wait.h>
 #include <sys/select.h>
+#endif
 #include <sys/types.h>
 #include <getopt.h>
 #include <pthread.h>
@@ -64,11 +65,11 @@ static void test_spice_destroy_update(SimpleSpiceUpdate *update)
         return;
     }
     if (update->drawable.clip.type != SPICE_CLIP_TYPE_NONE) {
-        uint8_t *ptr = (uint8_t*)update->drawable.clip.data;
-        free(ptr);
+        uint8_t *ptr = (uint8_t*)(uintptr_t)update->drawable.clip.data;
+        g_free(ptr);
     }
-    free(update->bitmap);
-    free(update);
+    g_free(update->bitmap);
+    g_free(update);
 }
 
 #define DEFAULT_WIDTH 640
@@ -89,17 +90,19 @@ static int has_automated_tests = 0; //automated test flag
 // between multiple threads so use a mutex
 static pthread_mutex_t timer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-__attribute__((noreturn))
-static void sigchld_handler(SPICE_GNUC_UNUSED int signal_num) // wait for the child process and exit
+// wait for the child process and exit
+static void child_exited(GPid pid, gint status, gpointer user_data)
 {
-    int status;
-    wait(&status);
+    g_spawn_close_pid(pid);
     exit(0);
 }
 
 static void regression_test(void)
 {
-    pid_t pid;
+    GPid pid;
+    GError *error = NULL;
+    gboolean retval;
+    gchar **argv;
 
     if (--rects != 0) {
         return;
@@ -111,17 +114,17 @@ static void regression_test(void)
         return;
     }
 
-    pid = fork();
-    if (pid == 0) {
-        char buf[PATH_MAX];
-        char *argv[] = { NULL };
-        char *envp[] = {buf, NULL};
+    argv = g_strsplit("./regression-test.py", " ", -1);
+    retval = g_spawn_async(NULL, argv, NULL, G_SPAWN_SEARCH_PATH|G_SPAWN_DO_NOT_REAP_CHILD,
+                           NULL, NULL, &pid, &error);
+    g_strfreev(argv);
+    g_assert(retval);
 
-        snprintf(buf, sizeof(buf), "PATH=%s", getenv("PATH"));
-        execve("regression-test.py", argv, envp);
-    } else if (pid > 0) {
-        return;
-    }
+    GSource *source = g_child_watch_source_new(pid);
+    g_source_set_callback(source, (GSourceFunc)(void*)child_exited, NULL, NULL);
+    guint id = g_source_attach(source, basic_event_loop_get_context());
+    g_assert(id != 0);
+    g_source_unref(source);
 }
 
 static void set_cmd(QXLCommandExt *ext, uint32_t type, QXLPHYSICAL data)
@@ -186,7 +189,7 @@ test_spice_create_update_from_bitmap(uint32_t surface_id,
     bh = bbox.bottom - bbox.top;
     bw = bbox.right - bbox.left;
 
-    update   = spice_new0(SimpleSpiceUpdate, 1);
+    update   = g_new0(SimpleSpiceUpdate, 1);
     update->bitmap = bitmap;
     drawable = &update->drawable;
     image    = &update->image;
@@ -199,7 +202,7 @@ test_spice_create_update_from_bitmap(uint32_t surface_id,
     } else {
         QXLClipRects *cmd_clip;
 
-        cmd_clip = spice_malloc0(sizeof(QXLClipRects) + num_clip_rects*sizeof(QXLRect));
+        cmd_clip = g_malloc0(sizeof(QXLClipRects) + num_clip_rects*sizeof(QXLRect));
         cmd_clip->num_rects = num_clip_rects;
         cmd_clip->chunk.data_size = num_clip_rects*sizeof(QXLRect);
         cmd_clip->chunk.prev_chunk = cmd_clip->chunk.next_chunk = 0;
@@ -208,7 +211,7 @@ test_spice_create_update_from_bitmap(uint32_t surface_id,
         drawable->clip.type = SPICE_CLIP_TYPE_RECTS;
         drawable->clip.data = (intptr_t)cmd_clip;
 
-        free(clip_rects);
+        g_free(clip_rects);
     }
     drawable->effect          = QXL_EFFECT_OPAQUE;
     simple_set_release_info(&drawable->release_info, (intptr_t)update);
@@ -248,8 +251,8 @@ static SimpleSpiceUpdate *test_spice_create_update_solid(uint32_t surface_id, QX
     bw = bbox.right - bbox.left;
     bh = bbox.bottom - bbox.top;
 
-    bitmap = spice_malloc(bw * bh * 4);
-    dst = (uint32_t *)bitmap;
+    bitmap = g_malloc(bw * bh * 4);
+    dst = SPICE_ALIGNED_CAST(uint32_t *, bitmap);
 
     for (i = 0 ; i < bh * bw ; ++i, ++dst) {
         *dst = color;
@@ -283,7 +286,7 @@ static SimpleSpiceUpdate *test_spice_create_update_draw(Test *test, uint32_t sur
     bw       = test->primary_width/SINGLE_PART;
     bh       = 48;
 
-    bitmap = dst = spice_malloc(bw * bh * 4);
+    bitmap = dst = g_malloc(bw * bh * 4);
     //printf("allocated %p\n", dst);
 
     for (i = 0 ; i < bh * bw ; ++i, dst+=4) {
@@ -308,7 +311,7 @@ static SimpleSpiceUpdate *test_spice_create_update_copy_bits(Test *test, uint32_
         .top = 0,
     };
 
-    update   = spice_new0(SimpleSpiceUpdate, 1);
+    update   = g_new0(SimpleSpiceUpdate, 1);
     drawable = &update->drawable;
 
     bw       = test->primary_width/SINGLE_PART;
@@ -353,7 +356,7 @@ static int format_to_bpp(int format)
 
 static SimpleSurfaceCmd *create_surface(int surface_id, int format, int width, int height, uint8_t *data)
 {
-    SimpleSurfaceCmd *simple_cmd = spice_new0(SimpleSurfaceCmd, 1);
+    SimpleSurfaceCmd *simple_cmd = g_new0(SimpleSurfaceCmd, 1);
     QXLSurfaceCmd *surface_cmd = &simple_cmd->surface_cmd;
     int bpp = format_to_bpp(format);
 
@@ -372,7 +375,7 @@ static SimpleSurfaceCmd *create_surface(int surface_id, int format, int width, i
 
 static SimpleSurfaceCmd *destroy_surface(int surface_id)
 {
-    SimpleSurfaceCmd *simple_cmd = spice_new0(SimpleSurfaceCmd, 1);
+    SimpleSurfaceCmd *simple_cmd = g_new0(SimpleSurfaceCmd, 1);
     QXLSurfaceCmd *surface_cmd = &simple_cmd->surface_cmd;
 
     set_cmd(&simple_cmd->ext, QXL_CMD_SURFACE, (intptr_t)surface_cmd);
@@ -401,7 +404,7 @@ static void create_primary_surface(Test *test, uint32_t width,
     surface.flags      = 0;
     surface.type       = 0;    /* unused by red_worker */
     surface.position   = 0;    /* unused by red_worker */
-    surface.mem        = (uint64_t)&test->primary_surface;
+    surface.mem        = (uintptr_t)&test->primary_surface;
     surface.group_id   = MEM_SLOT_GROUP_ID;
 
     test->width = width;
@@ -443,11 +446,6 @@ static void set_compression_level(SPICE_GNUC_UNUSED QXLInstance *qin,
                                   SPICE_GNUC_UNUSED int level)
 {
     printf("%s\n", __func__);
-}
-
-static void set_mm_time(SPICE_GNUC_UNUSED QXLInstance *qin,
-                        SPICE_GNUC_UNUSED uint32_t mm_time)
-{
 }
 
 // we now have a secondary surface
@@ -675,14 +673,14 @@ static void release_resource(SPICE_GNUC_UNUSED QXLInstance *qin,
             test_spice_destroy_update((void*)ext);
             break;
         case QXL_CMD_SURFACE:
-            free(ext);
+            g_free(ext);
             break;
         case QXL_CMD_CURSOR: {
             QXLCursorCmd *cmd = (QXLCursorCmd *)(uintptr_t)ext->cmd.data;
             if (cmd->type == QXL_CURSOR_SET || cmd->type == QXL_CURSOR_MOVE) {
-                free(cmd);
+                g_free(cmd);
             }
-            free(ext);
+            g_free(ext);
             break;
         }
         default:
@@ -731,8 +729,8 @@ static int get_cursor_command(QXLInstance *qin, struct QXLCommandExt *ext)
     }
 
     test->cursor_notify--;
-    cmd = spice_new0(QXLCommandExt, 1);
-    cursor_cmd = spice_new0(QXLCursorCmd, 1);
+    cmd = g_new0(QXLCommandExt, 1);
+    cursor_cmd = g_new0(QXLCursorCmd, 1);
 
     cursor_cmd->release_info.id = (uintptr_t)cmd;
 
@@ -813,7 +811,6 @@ static QXLInterface display_sif = {
     },
     .attache_worker = attache_worker,
     .set_compression_level = set_compression_level,
-    .set_mm_time = set_mm_time,
     .get_init_info = get_init_info,
 
     /* the callbacks below are called from spice server thread context */
@@ -886,8 +883,8 @@ void test_set_simple_command_list(Test *test, const int *simple_commands, int nu
 {
     int i;
 
-    free(test->commands);
-    test->commands = spice_new0(Command, num_commands);
+    g_free(test->commands);
+    test->commands = g_new0(Command, num_commands);
     test->num_commands = num_commands;
     for (i = 0 ; i < num_commands; ++i) {
         test->commands[i].command = simple_commands[i];
@@ -900,10 +897,10 @@ void test_set_command_list(Test *test, Command *commands, int num_commands)
     test->num_commands = num_commands;
 }
 
-static gboolean ignore_bind_failures(const gchar *log_domain,
-                                     GLogLevelFlags log_level,
-                                     const gchar *message,
-                                     gpointer user_data)
+static gboolean ignore_in_use_failures(const gchar *log_domain,
+                                       GLogLevelFlags log_level,
+                                       const gchar *message,
+                                       gpointer user_data)
 {
     if (!g_str_equal (log_domain, G_LOG_DOMAIN)) {
         return true;
@@ -911,7 +908,9 @@ static gboolean ignore_bind_failures(const gchar *log_domain,
     if ((log_level & G_LOG_LEVEL_WARNING) == 0)  {
         return true;
     }
-    if (strstr(message, "reds_init_socket: binding socket to ") == NULL) {
+    if (strstr(message, "reds_init_socket: binding socket to ") == NULL && // bind failure
+        strstr(message, "reds_init_socket: listen: ") == NULL && // listen failure
+        strstr(message, "Failed to open SPICE sockets") == NULL) { // global
         g_print("XXX [%s]\n", message);
         return true;
     }
@@ -923,7 +922,7 @@ static gboolean ignore_bind_failures(const gchar *log_domain,
 
 Test* test_new(SpiceCoreInterface* core)
 {
-    Test *test = spice_new0(Test, 1);
+    Test *test = g_new0(Test, 1);
     int port = -1;
 
     test->qxl_instance.base.sif = &display_sif.base;
@@ -935,7 +934,7 @@ Test* test_new(SpiceCoreInterface* core)
     // some common initialization for all display tests
     port = BASE_PORT;
 
-    g_test_log_set_fatal_handler(ignore_bind_failures, NULL);
+    g_test_log_set_fatal_handler(ignore_in_use_failures, NULL);
     for (port = BASE_PORT; port < BASE_PORT + 10; port++) {
         SpiceServer* server = spice_server_new();
         spice_server_set_noauth(server);
@@ -947,7 +946,7 @@ Test* test_new(SpiceCoreInterface* core)
         spice_server_destroy(server);
     }
 
-    g_assert(test->server != NULL);
+    g_assert_nonnull(test->server);
 
     printf("TESTER: listening on port %d (unsecure)\n", port);
     g_test_log_set_fatal_handler(NULL, NULL);
@@ -965,17 +964,12 @@ void test_destroy(Test *test)
     // this timer is used by spice server so
     // avoid to free it while is running
     test->core->timer_remove(test->wakeup_timer);
-    free(test->commands);
-    free(test);
+    g_free(test->commands);
+    g_free(test);
 }
 
 static void init_automated(void)
 {
-    struct sigaction sa;
-
-    memset(&sa, 0, sizeof sa);
-    sa.sa_handler = &sigchld_handler;
-    sigaction(SIGCHLD, &sa, NULL);
 }
 
 static __attribute__((noreturn))

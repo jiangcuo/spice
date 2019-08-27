@@ -19,12 +19,13 @@
 #include <config.h>
 #endif
 
+#include <common/utils.h>
 #include "dcc-private.h"
 #include "display-channel.h"
 #include "display-channel-private.h"
 #include "red-client.h"
 #include "main-channel-client.h"
-#include "spice-server-enums.h"
+#include <spice-server-enums.h>
 #include "glib-compat.h"
 
 G_DEFINE_TYPE(DisplayChannelClient, display_channel_client, TYPE_COMMON_GRAPHICS_CHANNEL_CLIENT)
@@ -180,8 +181,8 @@ static void display_channel_client_init(DisplayChannelClient *self)
     self->priv->encoders.jpeg_quality = 85;
 
     self->priv->send_data.free_list.res =
-        spice_malloc(sizeof(SpiceResourceList) +
-                     DISPLAY_FREE_LIST_DEFAULT_SIZE * sizeof(SpiceResourceID));
+        g_malloc(sizeof(SpiceResourceList) +
+                 DISPLAY_FREE_LIST_DEFAULT_SIZE * sizeof(SpiceResourceID));
     self->priv->send_data.free_list.res_size = DISPLAY_FREE_LIST_DEFAULT_SIZE;
 }
 
@@ -194,7 +195,7 @@ static RedSurfaceCreateItem *red_surface_create_item_new(RedChannel* channel,
 {
     RedSurfaceCreateItem *create;
 
-    create = spice_new(RedSurfaceCreateItem, 1);
+    create = g_new(RedSurfaceCreateItem, 1);
 
     create->surface_create.surface_id = surface_id;
     create->surface_create.width = width;
@@ -202,7 +203,7 @@ static RedSurfaceCreateItem *red_surface_create_item_new(RedChannel* channel,
     create->surface_create.flags = flags;
     create->surface_create.format = format;
 
-    red_pipe_item_init(&create->pipe_item, RED_PIPE_ITEM_TYPE_CREATE_SURFACE);
+    red_pipe_item_init(&create->base, RED_PIPE_ITEM_TYPE_CREATE_SURFACE);
     return create;
 }
 
@@ -246,7 +247,7 @@ bool dcc_clear_surface_drawables_from_pipe(DisplayChannelClient *dcc, int surfac
 
         l = l->next;
         if (item->type == RED_PIPE_ITEM_TYPE_DRAW) {
-            dpi = SPICE_CONTAINEROF(item, RedDrawablePipeItem, dpi_pipe_item);
+            dpi = SPICE_UPCAST(RedDrawablePipeItem, item);
             drawable = dpi->drawable;
         } else if (item->type == RED_PIPE_ITEM_TYPE_UPGRADE) {
             drawable = SPICE_UPCAST(RedUpgradeItem, item)->drawable;
@@ -302,8 +303,7 @@ void dcc_create_surface(DisplayChannelClient *dcc, int surface_id)
     flags = is_primary_surface(display, surface_id) ? SPICE_SURFACE_FLAGS_PRIMARY : 0;
 
     /* don't send redundant create surface commands to client */
-    if (!dcc ||
-        common_graphics_channel_get_during_target_migrate(COMMON_GRAPHICS_CHANNEL(display)) ||
+    if (common_graphics_channel_get_during_target_migrate(COMMON_GRAPHICS_CHANNEL(display)) ||
         dcc->priv->surface_client_created[surface_id]) {
         return;
     }
@@ -313,7 +313,7 @@ void dcc_create_surface(DisplayChannelClient *dcc, int surface_id)
                                          surface->context.height,
                                          surface->context.format, flags);
     dcc->priv->surface_client_created[surface_id] = TRUE;
-    red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &create->pipe_item);
+    red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &create->base);
 }
 
 // adding the pipe item after pos. If pos == NULL, adding to head.
@@ -340,7 +340,7 @@ RedImageItem *dcc_add_surface_area_image(DisplayChannelClient *dcc,
     bpp = SPICE_SURFACE_FMT_DEPTH(surface->context.format) / 8;
     stride = width * bpp;
 
-    item = (RedImageItem *)spice_malloc_n_m(height, stride, sizeof(RedImageItem));
+    item = (RedImageItem *)g_malloc(height * stride + sizeof(RedImageItem));
 
     red_pipe_item_init(&item->base, RED_PIPE_ITEM_TYPE_IMAGE);
 
@@ -433,13 +433,12 @@ static void add_drawable_surface_images(DisplayChannelClient *dcc, Drawable *dra
 
 static void red_drawable_pipe_item_free(RedPipeItem *item)
 {
-    RedDrawablePipeItem *dpi = SPICE_CONTAINEROF(item, RedDrawablePipeItem,
-                                                 dpi_pipe_item);
+    RedDrawablePipeItem *dpi = SPICE_UPCAST(RedDrawablePipeItem, item);
     spice_assert(item->refcount == 0);
 
     dpi->drawable->pipes = g_list_remove(dpi->drawable->pipes, dpi);
     drawable_unref(dpi->drawable);
-    free(dpi);
+    g_free(dpi);
 }
 
 static RedDrawablePipeItem *red_drawable_pipe_item_new(DisplayChannelClient *dcc,
@@ -447,11 +446,11 @@ static RedDrawablePipeItem *red_drawable_pipe_item_new(DisplayChannelClient *dcc
 {
     RedDrawablePipeItem *dpi;
 
-    dpi = spice_malloc0(sizeof(*dpi));
+    dpi = g_new0(RedDrawablePipeItem, 1);
     dpi->drawable = drawable;
     dpi->dcc = dcc;
     drawable->pipes = g_list_prepend(drawable->pipes, dpi);
-    red_pipe_item_init_full(&dpi->dpi_pipe_item, RED_PIPE_ITEM_TYPE_DRAW,
+    red_pipe_item_init_full(&dpi->base, RED_PIPE_ITEM_TYPE_DRAW,
                             red_drawable_pipe_item_free);
     drawable->refs++;
     return dpi;
@@ -462,7 +461,7 @@ void dcc_prepend_drawable(DisplayChannelClient *dcc, Drawable *drawable)
     RedDrawablePipeItem *dpi = red_drawable_pipe_item_new(dcc, drawable);
 
     add_drawable_surface_images(dcc, drawable);
-    red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &dpi->dpi_pipe_item);
+    red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &dpi->base);
 }
 
 void dcc_append_drawable(DisplayChannelClient *dcc, Drawable *drawable)
@@ -470,7 +469,7 @@ void dcc_append_drawable(DisplayChannelClient *dcc, Drawable *drawable)
     RedDrawablePipeItem *dpi = red_drawable_pipe_item_new(dcc, drawable);
 
     add_drawable_surface_images(dcc, drawable);
-    red_channel_client_pipe_add_tail(RED_CHANNEL_CLIENT(dcc), &dpi->dpi_pipe_item);
+    red_channel_client_pipe_add_tail(RED_CHANNEL_CLIENT(dcc), &dpi->base);
 }
 
 void dcc_add_drawable_after(DisplayChannelClient *dcc, Drawable *drawable, RedPipeItem *pos)
@@ -478,7 +477,7 @@ void dcc_add_drawable_after(DisplayChannelClient *dcc, Drawable *drawable, RedPi
     RedDrawablePipeItem *dpi = red_drawable_pipe_item_new(dcc, drawable);
 
     add_drawable_surface_images(dcc, drawable);
-    red_channel_client_pipe_add_after(RED_CHANNEL_CLIENT(dcc), &dpi->dpi_pipe_item, pos);
+    red_channel_client_pipe_add_after(RED_CHANNEL_CLIENT(dcc), &dpi->base, pos);
 }
 
 static void dcc_init_stream_agents(DisplayChannelClient *dcc)
@@ -487,15 +486,15 @@ static void dcc_init_stream_agents(DisplayChannelClient *dcc)
     DisplayChannel *display = DCC_TO_DC(dcc);
 
     for (i = 0; i < NUM_STREAMS; i++) {
-        StreamAgent *agent = &dcc->priv->stream_agents[i];
-        agent->stream = display_channel_get_nth_stream(display, i);
+        VideoStreamAgent *agent = &dcc->priv->stream_agents[i];
+        agent->stream = display_channel_get_nth_video_stream(display, i);
         region_init(&agent->vis_region);
         region_init(&agent->clip);
     }
 }
 
 DisplayChannelClient *dcc_new(DisplayChannel *display,
-                              RedClient *client, RedsStream *stream,
+                              RedClient *client, RedStream *stream,
                               int mig_target,
                               RedChannelCapabilities *caps,
                               SpiceImageCompression image_compression,
@@ -531,7 +530,7 @@ static void dcc_create_all_streams(DisplayChannelClient *dcc)
     RingItem *item = ring;
 
     while ((item = ring_next(ring, item))) {
-        Stream *stream = SPICE_CONTAINEROF(item, Stream, link);
+        VideoStream *stream = SPICE_CONTAINEROF(item, VideoStream, link);
         dcc_create_stream(dcc, stream);
     }
 }
@@ -589,7 +588,7 @@ void dcc_start(DisplayChannelClient *dcc)
         dcc_create_all_streams(dcc);
     }
 
-    if (reds_stream_is_plain_unix(red_channel_client_get_stream(rcc)) &&
+    if (red_stream_is_plain_unix(red_channel_client_get_stream(rcc)) &&
         red_channel_client_test_remote_cap(rcc, SPICE_DISPLAY_CAP_GL_SCANOUT)) {
         red_channel_client_pipe_add(rcc, dcc_gl_scanout_item_new(rcc, NULL, 0));
         dcc_push_monitors_config(dcc);
@@ -601,7 +600,7 @@ static void dcc_destroy_stream_agents(DisplayChannelClient *dcc)
     int i;
 
     for (i = 0; i < NUM_STREAMS; i++) {
-        StreamAgent *agent = &dcc->priv->stream_agents[i];
+        VideoStreamAgent *agent = &dcc->priv->stream_agents[i];
         region_destroy(&agent->vis_region);
         region_destroy(&agent->clip);
         if (agent->video_encoder) {
@@ -618,7 +617,7 @@ static void dcc_stop(DisplayChannelClient *dcc)
     pixmap_cache_unref(dcc->priv->pixmap_cache);
     dcc->priv->pixmap_cache = NULL;
     dcc_palette_cache_reset(dcc);
-    free(dcc->priv->send_data.free_list.res);
+    g_free(dcc->priv->send_data.free_list.res);
     dcc_destroy_stream_agents(dcc);
     image_encoders_free(&dcc->priv->encoders);
 
@@ -627,27 +626,19 @@ static void dcc_stop(DisplayChannelClient *dcc)
     }
 }
 
-void dcc_stream_agent_clip(DisplayChannelClient* dcc, StreamAgent *agent)
+void dcc_video_stream_agent_clip(DisplayChannelClient* dcc, VideoStreamAgent *agent)
 {
-    RedStreamClipItem *item = red_stream_clip_item_new(agent);
-    int n_rects;
-
-    item->clip_type = SPICE_CLIP_TYPE_RECTS;
-
-    n_rects = pixman_region32_n_rects(&agent->clip);
-    item->rects = spice_malloc_n_m(n_rects, sizeof(SpiceRect), sizeof(SpiceClipRects));
-    item->rects->num_rects = n_rects;
-    region_ret_rects(&agent->clip, item->rects->rects, n_rects);
+    VideoStreamClipItem *item = video_stream_clip_item_new(agent);
 
     red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &item->base);
 }
 
-static void red_monitors_config_item_free(RedPipeItem *base)
+static void red_monitors_config_item_free(RedPipeItem *pipe_item)
 {
-    RedMonitorsConfigItem *item = SPICE_CONTAINEROF(base, RedMonitorsConfigItem, pipe_item);
+    RedMonitorsConfigItem *item = SPICE_UPCAST(RedMonitorsConfigItem, pipe_item);
 
     monitors_config_unref(item->monitors_config);
-    free(item);
+    g_free(item);
 }
 
 static RedMonitorsConfigItem *red_monitors_config_item_new(RedChannel* channel,
@@ -655,10 +646,10 @@ static RedMonitorsConfigItem *red_monitors_config_item_new(RedChannel* channel,
 {
     RedMonitorsConfigItem *mci;
 
-    mci = spice_new(RedMonitorsConfigItem, 1);
+    mci = g_new(RedMonitorsConfigItem, 1);
     mci->monitors_config = monitors_config_ref(monitors_config);
 
-    red_pipe_item_init_full(&mci->pipe_item, RED_PIPE_ITEM_TYPE_MONITORS_CONFIG,
+    red_pipe_item_init_full(&mci->base, RED_PIPE_ITEM_TYPE_MONITORS_CONFIG,
                             red_monitors_config_item_free);
     return mci;
 }
@@ -681,17 +672,16 @@ void dcc_push_monitors_config(DisplayChannelClient *dcc)
 
     mci = red_monitors_config_item_new(red_channel_client_get_channel(RED_CHANNEL_CLIENT(dcc)),
                                        monitors_config);
-    red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &mci->pipe_item);
+    red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &mci->base);
 }
 
-static RedSurfaceDestroyItem *red_surface_destroy_item_new(RedChannel *channel,
-                                                           uint32_t surface_id)
+static RedSurfaceDestroyItem *red_surface_destroy_item_new(uint32_t surface_id)
 {
     RedSurfaceDestroyItem *destroy;
 
-    destroy = spice_new(RedSurfaceDestroyItem, 1);
+    destroy = g_new(RedSurfaceDestroyItem, 1);
     destroy->surface_destroy.surface_id = surface_id;
-    red_pipe_item_init(&destroy->pipe_item, RED_PIPE_ITEM_TYPE_DESTROY_SURFACE);
+    red_pipe_item_init(&destroy->base, RED_PIPE_ITEM_TYPE_DESTROY_SURFACE);
 
     return destroy;
 }
@@ -701,14 +691,15 @@ RedPipeItem *dcc_gl_scanout_item_new(RedChannelClient *rcc, void *data, int num)
     RedGlScanoutUnixItem *item;
 
     /* FIXME: on !unix peer, start streaming with a video codec */
-    if (!reds_stream_is_plain_unix(red_channel_client_get_stream(rcc)) ||
+    if (!red_stream_is_plain_unix(red_channel_client_get_stream(rcc)) ||
         !red_channel_client_test_remote_cap(rcc, SPICE_DISPLAY_CAP_GL_SCANOUT)) {
-        spice_printerr("FIXME: client does not support GL scanout");
+        red_channel_warning(red_channel_client_get_channel(rcc),
+                            "FIXME: client does not support GL scanout");
         red_channel_client_disconnect(rcc);
         return NULL;
     }
 
-    item = spice_new(RedGlScanoutUnixItem, 1);
+    item = g_new(RedGlScanoutUnixItem, 1);
     red_pipe_item_init(&item->base, RED_PIPE_ITEM_TYPE_GL_SCANOUT);
 
     return &item->base;
@@ -720,15 +711,16 @@ RedPipeItem *dcc_gl_draw_item_new(RedChannelClient *rcc, void *data, int num)
     const SpiceMsgDisplayGlDraw *draw = data;
     RedGlDrawItem *item;
 
-    if (!reds_stream_is_plain_unix(red_channel_client_get_stream(rcc)) ||
+    if (!red_stream_is_plain_unix(red_channel_client_get_stream(rcc)) ||
         !red_channel_client_test_remote_cap(rcc, SPICE_DISPLAY_CAP_GL_SCANOUT)) {
-        spice_printerr("FIXME: client does not support GL scanout");
+        red_channel_warning(red_channel_client_get_channel(rcc),
+                            "FIXME: client does not support GL scanout");
         red_channel_client_disconnect(rcc);
         return NULL;
     }
 
     dcc->priv->gl_draw_ongoing = TRUE;
-    item = spice_new(RedGlDrawItem, 1);
+    item = g_new(RedGlDrawItem, 1);
     item->draw = *draw;
     red_pipe_item_init(&item->base, RED_PIPE_ITEM_TYPE_GL_DRAW);
 
@@ -738,7 +730,6 @@ RedPipeItem *dcc_gl_draw_item_new(RedChannelClient *rcc, void *data, int num)
 void dcc_destroy_surface(DisplayChannelClient *dcc, uint32_t surface_id)
 {
     DisplayChannel *display;
-    RedChannel *channel;
     RedSurfaceDestroyItem *destroy;
 
     if (!dcc) {
@@ -746,7 +737,6 @@ void dcc_destroy_surface(DisplayChannelClient *dcc, uint32_t surface_id)
     }
 
     display = DCC_TO_DC(dcc);
-    channel = RED_CHANNEL(display);
 
     if (common_graphics_channel_get_during_target_migrate(COMMON_GRAPHICS_CHANNEL(display)) ||
         !dcc->priv->surface_client_created[surface_id]) {
@@ -754,8 +744,8 @@ void dcc_destroy_surface(DisplayChannelClient *dcc, uint32_t surface_id)
     }
 
     dcc->priv->surface_client_created[surface_id] = FALSE;
-    destroy = red_surface_destroy_item_new(channel, surface_id);
-    red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &destroy->pipe_item);
+    destroy = red_surface_destroy_item_new(surface_id);
+    red_channel_client_pipe_add(RED_CHANNEL_CLIENT(dcc), &destroy->base);
 }
 
 #define MIN_DIMENSION_TO_QUIC 3
@@ -769,7 +759,7 @@ static bool can_quic_compress(SpiceBitmap *bitmap)
             bitmap->x >= MIN_DIMENSION_TO_QUIC && bitmap->y >= MIN_DIMENSION_TO_QUIC;
 }
 /**
- * lz doesn't handle:
+ * lz/glz doesn't handle:
  *       (1) bitmaps with strides that are larger than the width of the image in bytes
  *       (2) unstable bitmaps
  */
@@ -806,8 +796,10 @@ static SpiceImageCompression get_compression_for_bitmap(SpiceBitmap *bitmap,
                     bitmap_get_graduality_level(bitmap) == BITMAP_GRADUAL_HIGH) {
                     return SPICE_IMAGE_COMPRESSION_QUIC;
                 }
-            } else if (!can_lz_compress(bitmap) ||
-                       drawable->copy_bitmap_graduality == BITMAP_GRADUAL_HIGH) {
+            } else if (drawable->copy_bitmap_graduality == BITMAP_GRADUAL_HIGH) {
+                return SPICE_IMAGE_COMPRESSION_QUIC;
+            }
+            if (!can_lz_compress(bitmap)) {
                 return SPICE_IMAGE_COMPRESSION_QUIC;
             }
         }
@@ -940,9 +932,9 @@ static void dcc_push_release(DisplayChannelClient *dcc, uint8_t type, uint64_t i
     }
 
     if (free_list->res->count == free_list->res_size) {
-        free_list->res = spice_realloc(free_list->res,
-                                       sizeof(*free_list->res) +
-                                       free_list->res_size * sizeof(SpiceResourceID) * 2);
+        free_list->res = g_realloc(free_list->res,
+                                   sizeof(*free_list->res) +
+                                   free_list->res_size * sizeof(SpiceResourceID) * 2);
         free_list->res_size *= 2;
     }
     free_list->res->resources[free_list->res->count].type = type;
@@ -959,7 +951,7 @@ bool dcc_pixmap_cache_unlocked_add(DisplayChannelClient *dcc, uint64_t id,
 
     spice_assert(size > 0);
 
-    item = spice_new(NewCacheItem, 1);
+    item = g_new(NewCacheItem, 1);
     serial = red_channel_client_get_message_serial(RED_CHANNEL_CLIENT(dcc));
 
     if (cache->generation != dcc->priv->pixmap_cache_generation) {
@@ -968,7 +960,7 @@ bool dcc_pixmap_cache_unlocked_add(DisplayChannelClient *dcc, uint64_t id,
                                              RED_CHANNEL_CLIENT(dcc), RED_PIPE_ITEM_TYPE_PIXMAP_SYNC);
             dcc->priv->pending_pixmaps_sync = TRUE;
         }
-        free(item);
+        g_free(item);
         return FALSE;
     }
 
@@ -981,7 +973,7 @@ bool dcc_pixmap_cache_unlocked_add(DisplayChannelClient *dcc, uint64_t id,
         if (!(tail = (NewCacheItem *)ring_get_tail(&cache->lru)) ||
                                                    tail->sync[dcc->priv->id] == serial) {
             cache->available += size;
-            free(item);
+            g_free(item);
             return FALSE;
         }
 
@@ -999,7 +991,7 @@ bool dcc_pixmap_cache_unlocked_add(DisplayChannelClient *dcc, uint64_t id,
         cache->available += tail->size;
         cache->sync[dcc->priv->id] = serial;
         dcc_push_release(dcc, SPICE_RES_TYPE_PIXMAP, tail->id, tail->sync);
-        free(tail);
+        g_free(tail);
     }
     ++cache->items;
     item->next = cache->hash_table[(key = BITS_CACHE_HASH_KEY(id))];
@@ -1041,7 +1033,7 @@ static bool dcc_handle_init(DisplayChannelClient *dcc, SpiceMsgcDisplayInit *ini
 static bool dcc_handle_stream_report(DisplayChannelClient *dcc,
                                      SpiceMsgcDisplayStreamReport *report)
 {
-    StreamAgent *agent;
+    VideoStreamAgent *agent;
 
     if (report->stream_id >= NUM_STREAMS) {
         spice_warning("stream_report: invalid stream id %u",
@@ -1101,6 +1093,9 @@ static bool dcc_handle_preferred_compression(DisplayChannelClient *dcc,
     default:
         spice_warning("preferred-compression: unsupported image compression setting");
     }
+    g_debug("Setting preferred compression to %s",
+            spice_genum_get_nick(SPICE_TYPE_SPICE_IMAGE_COMPRESSION_T,
+                                 dcc->priv->image_compression));
     return TRUE;
 }
 
@@ -1383,7 +1378,7 @@ bool dcc_handle_migrate_data(DisplayChannelClient *dcc, uint32_t size, void *mes
     return TRUE;
 }
 
-StreamAgent* dcc_get_stream_agent(DisplayChannelClient *dcc, int stream_id)
+VideoStreamAgent* dcc_get_video_stream_agent(DisplayChannelClient *dcc, int stream_id)
 {
     return &dcc->priv->stream_agents[stream_id];
 }

@@ -78,8 +78,8 @@ GType display_channel_client_get_type(void) G_GNUC_CONST;
 #define MAX_PIPE_SIZE 50
 
 typedef struct DisplayChannel DisplayChannel;
-typedef struct Stream Stream;
-typedef struct StreamAgent StreamAgent;
+typedef struct VideoStream VideoStream;
+typedef struct VideoStreamAgent VideoStreamAgent;
 
 typedef struct WaitForChannels {
     SpiceMsgWaitForChannels header;
@@ -96,7 +96,7 @@ typedef struct FreeList {
 #define DCC_TO_DC(dcc) ((DisplayChannel*)red_channel_client_get_channel((RedChannelClient*)dcc))
 
 typedef struct RedSurfaceCreateItem {
-    RedPipeItem pipe_item;
+    RedPipeItem base;
     SpiceMsgSurfaceCreate surface_create;
 } RedSurfaceCreateItem;
 
@@ -124,14 +124,14 @@ typedef struct RedImageItem {
 } RedImageItem;
 
 typedef struct RedDrawablePipeItem {
-    RedPipeItem dpi_pipe_item; /* link for the client's pipe itself */
+    RedPipeItem base;
     Drawable *drawable;
     DisplayChannelClient *dcc;
 } RedDrawablePipeItem;
 
 DisplayChannelClient*      dcc_new                                   (DisplayChannel *display,
                                                                       RedClient *client,
-                                                                      RedsStream *stream,
+                                                                      RedStream *stream,
                                                                       int mig_target,
                                                                       RedChannelCapabilities *caps,
                                                                       SpiceImageCompression image_compression,
@@ -146,10 +146,10 @@ bool                       dcc_handle_migrate_data                   (DisplayCha
 void                       dcc_push_monitors_config                  (DisplayChannelClient *dcc);
 void                       dcc_destroy_surface                       (DisplayChannelClient *dcc,
                                                                       uint32_t surface_id);
-void                       dcc_stream_agent_clip                     (DisplayChannelClient* dcc,
-                                                                      StreamAgent *agent);
+void                       dcc_video_stream_agent_clip               (DisplayChannelClient* dcc,
+                                                                      VideoStreamAgent *agent);
 void                       dcc_create_stream                         (DisplayChannelClient *dcc,
-                                                                      Stream *stream);
+                                                                      VideoStream *stream);
 void                       dcc_create_surface                        (DisplayChannelClient *dcc,
                                                                       int surface_id);
 void                       dcc_push_surface_image                    (DisplayChannelClient *dcc,
@@ -189,7 +189,7 @@ int                        dcc_compress_image                        (DisplayCha
                                                                       int can_lossy,
                                                                       compress_send_data_t* o_comp_data);
 
-StreamAgent *              dcc_get_stream_agent                      (DisplayChannelClient *dcc, int stream_id);
+VideoStreamAgent *dcc_get_video_stream_agent(DisplayChannelClient *dcc, int stream_id);
 ImageEncoders *dcc_get_encoders(DisplayChannelClient *dcc);
 spice_wan_compression_t    dcc_get_jpeg_state                        (DisplayChannelClient *dcc);
 spice_wan_compression_t    dcc_get_zlib_glz_state                    (DisplayChannelClient *dcc);

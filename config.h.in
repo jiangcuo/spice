@@ -11,8 +11,11 @@
 /* Define to 1 if using `alloca.c'. */
 #undef C_ALLOCA
 
-/* Define to 1 to enable extra checks on code otherwise define to 0 */
+/* Enable extra checks on code */
 #undef ENABLE_EXTRA_CHECKS
+
+/* Define if recorder instrumentation is enabled */
+#undef ENABLE_RECORDER
 
 /* Enable compile-time and run-time bounds-checking, and some warnings. */
 #if !defined _FORTIFY_SOURCE &&  defined __OPTIMIZE__ && __OPTIMIZE__
@@ -26,6 +29,9 @@
 /* Define to 1 if you have <alloca.h> and it should be used (not on Ultrix).
    */
 #undef HAVE_ALLOCA_H
+
+/* Define if we have celt051 codec */
+#undef HAVE_CELT051
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
@@ -50,6 +56,9 @@
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
+
+/* Define to 1 if you have the <pthread_np.h> header file. */
+#undef HAVE_PTHREAD_NP_H
 
 /* whether Cyrus SASL is available for authentication */
 #undef HAVE_SASL
@@ -127,9 +136,6 @@
 
 /* Define if supporting smartcard proxying */
 #undef USE_SMARTCARD
-
-/* Define if supporting smartcard proxying without libcacard.h */
-#undef USE_SMARTCARD_012
 
 /* Version number of package */
 #undef VERSION

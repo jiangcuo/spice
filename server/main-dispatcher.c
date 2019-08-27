@@ -46,23 +46,17 @@
  * main_dispatcher_handle_<event_name> - handler for callback from main thread
  *   seperate from self because it may send an ack or do other work in the future.
  */
-
-G_DEFINE_TYPE(MainDispatcher, main_dispatcher, TYPE_DISPATCHER)
-
-#define MAIN_DISPATCHER_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE((o), TYPE_MAIN_DISPATCHER, MainDispatcherPrivate))
-
 struct MainDispatcherPrivate
 {
-    SpiceCoreInterfaceInternal *core; /* weak */
     RedsState *reds; /* weak */
     SpiceWatch *watch;
 };
 
+G_DEFINE_TYPE_WITH_PRIVATE(MainDispatcher, main_dispatcher, TYPE_DISPATCHER)
 
 enum {
     PROP0,
     PROP_SPICE_SERVER,
-    PROP_CORE_INTERFACE
 };
 
 static void
@@ -76,9 +70,6 @@ main_dispatcher_get_property(GObject    *object,
     switch (property_id) {
         case PROP_SPICE_SERVER:
              g_value_set_pointer(value, self->priv->reds);
-            break;
-        case PROP_CORE_INTERFACE:
-             g_value_set_pointer(value, self->priv->core);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -97,9 +88,6 @@ main_dispatcher_set_property(GObject      *object,
         case PROP_SPICE_SERVER:
             self->priv->reds = g_value_get_pointer(value);
             break;
-        case PROP_CORE_INTERFACE:
-            self->priv->core = g_value_get_pointer(value);
-            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
     }
@@ -113,8 +101,6 @@ main_dispatcher_class_init(MainDispatcherClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
 
-    g_type_class_add_private(klass, sizeof(MainDispatcherPrivate));
-
     object_class->constructed = main_dispatcher_constructed;
     object_class->finalize = main_dispatcher_finalize;
     object_class->get_property = main_dispatcher_get_property;
@@ -127,20 +113,12 @@ main_dispatcher_class_init(MainDispatcherClass *klass)
                                                          "The spice server associated with this dispatcher",
                                                          G_PARAM_READWRITE |
                                                          G_PARAM_CONSTRUCT_ONLY));
-
-    g_object_class_install_property(object_class,
-                                    PROP_CORE_INTERFACE,
-                                    g_param_spec_pointer("core-interface",
-                                                         "core-interface",
-                                                         "The SpiceCoreInterface server associated with this dispatcher",
-                                                         G_PARAM_READWRITE |
-                                                         G_PARAM_CONSTRUCT_ONLY));
 }
 
 static void
 main_dispatcher_init(MainDispatcher *self)
 {
-    self->priv = MAIN_DISPATCHER_PRIVATE(self);
+    self->priv = main_dispatcher_get_instance_private(self);
 }
 
 enum {
@@ -171,22 +149,13 @@ typedef struct MainDispatcherClientDisconnectMessage {
 } MainDispatcherClientDisconnectMessage;
 
 /* channel_event - calls core->channel_event, must be done in main thread */
-static void main_dispatcher_self_handle_channel_event(MainDispatcher *self,
-                                                      int event,
-                                                      SpiceChannelEventInfo *info)
-{
-    reds_handle_channel_event(self->priv->reds, event, info);
-}
-
 static void main_dispatcher_handle_channel_event(void *opaque,
                                                  void *payload)
 {
-    MainDispatcher *self = opaque;
+    RedsState *reds = opaque;
     MainDispatcherChannelEventMessage *channel_event = payload;
 
-    main_dispatcher_self_handle_channel_event(self,
-                                              channel_event->event,
-                                              channel_event->info);
+    reds_handle_channel_event(reds, channel_event->event, channel_event->info);
 }
 
 void main_dispatcher_channel_event(MainDispatcher *self, int event, SpiceChannelEventInfo *info)
@@ -194,7 +163,7 @@ void main_dispatcher_channel_event(MainDispatcher *self, int event, SpiceChannel
     MainDispatcherChannelEventMessage msg = {0,};
 
     if (pthread_self() == dispatcher_get_thread_id(DISPATCHER(self))) {
-        main_dispatcher_self_handle_channel_event(self, event, info);
+        reds_handle_channel_event(self->priv->reds, event, info);
         return;
     }
     msg.event = event;
@@ -207,30 +176,30 @@ void main_dispatcher_channel_event(MainDispatcher *self, int event, SpiceChannel
 static void main_dispatcher_handle_migrate_complete(void *opaque,
                                                     void *payload)
 {
-    MainDispatcher *self = opaque;
+    RedsState *reds = opaque;
     MainDispatcherMigrateSeamlessDstCompleteMessage *mig_complete = payload;
 
-    reds_on_client_seamless_migrate_complete(self->priv->reds, mig_complete->client);
+    reds_on_client_seamless_migrate_complete(reds, mig_complete->client);
     g_object_unref(mig_complete->client);
 }
 
 static void main_dispatcher_handle_mm_time_latency(void *opaque,
                                                    void *payload)
 {
-    MainDispatcher *self = opaque;
+    RedsState *reds = opaque;
     MainDispatcherMmTimeLatencyMessage *msg = payload;
-    reds_set_client_mm_time_latency(self->priv->reds, msg->client, msg->latency);
+    reds_set_client_mm_time_latency(reds, msg->client, msg->latency);
     g_object_unref(msg->client);
 }
 
 static void main_dispatcher_handle_client_disconnect(void *opaque,
                                                      void *payload)
 {
-    MainDispatcher *self = opaque;
+    RedsState *reds = opaque;
     MainDispatcherClientDisconnectMessage *msg = payload;
 
     spice_debug("client=%p", msg->client);
-    reds_client_disconnect(self->priv->reds, msg->client);
+    reds_client_disconnect(reds, msg->client);
     g_object_unref(msg->client);
 }
 
@@ -290,11 +259,10 @@ static void dispatcher_handle_read(int fd, int event, void *opaque)
  * Reds routines shouldn't be exposed. Instead reds.c should register the callbacks,
  * and the corresponding operations should be made only via main_dispatcher.
  */
-MainDispatcher* main_dispatcher_new(RedsState *reds, SpiceCoreInterfaceInternal *core)
+MainDispatcher* main_dispatcher_new(RedsState *reds)
 {
     MainDispatcher *self = g_object_new(TYPE_MAIN_DISPATCHER,
                                         "spice-server", reds,
-                                        "core-interface", core,
                                         "max-message-type", MAIN_DISPATCHER_NUM_MESSAGES,
                                         NULL);
     return self;
@@ -305,13 +273,13 @@ void main_dispatcher_constructed(GObject *object)
     MainDispatcher *self = MAIN_DISPATCHER(object);
 
     G_OBJECT_CLASS(main_dispatcher_parent_class)->constructed(object);
-    dispatcher_set_opaque(DISPATCHER(self), self);
+    dispatcher_set_opaque(DISPATCHER(self), self->priv->reds);
 
     self->priv->watch =
-        self->priv->core->watch_add(self->priv->core,
-                                    dispatcher_get_recv_fd(DISPATCHER(self)),
-                                    SPICE_WATCH_EVENT_READ, dispatcher_handle_read,
-                                    DISPATCHER(self));
+        reds_core_watch_add(self->priv->reds,
+                            dispatcher_get_recv_fd(DISPATCHER(self)),
+                            SPICE_WATCH_EVENT_READ, dispatcher_handle_read,
+                            DISPATCHER(self));
     dispatcher_register_handler(DISPATCHER(self), MAIN_DISPATCHER_CHANNEL_EVENT,
                                 main_dispatcher_handle_channel_event,
                                 sizeof(MainDispatcherChannelEventMessage), false);
@@ -330,7 +298,7 @@ static void main_dispatcher_finalize(GObject *object)
 {
     MainDispatcher *self = MAIN_DISPATCHER(object);
 
-    self->priv->core->watch_remove(self->priv->core, self->priv->watch);
+    reds_core_watch_remove(self->priv->reds, self->priv->watch);
     self->priv->watch = NULL;
     G_OBJECT_CLASS(main_dispatcher_parent_class)->finalize(object);
 }

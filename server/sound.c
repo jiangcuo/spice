@@ -22,9 +22,13 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/types.h>
+#ifndef _WIN32
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#endif
 
 #include <common/generated_server_marshallers.h>
 #include <common/snd_codec.h>
@@ -103,6 +107,11 @@ typedef struct SndChannelClientClass {
     RedChannelClientClass parent_class;
 } SndChannelClientClass;
 
+static void playback_channel_client_initable_interface_init(GInitableIface *iface);
+static void record_channel_client_initable_interface_init(GInitableIface *iface);
+static GInitableIface *playback_channel_client_parent_initable_iface;
+static GInitableIface *record_channel_client_parent_initable_iface;
+
 G_DEFINE_TYPE(SndChannelClient, snd_channel_client, RED_TYPE_CHANNEL_CLIENT)
 
 
@@ -149,8 +158,9 @@ typedef struct PlaybackChannelClientClass {
     SndChannelClientClass parent_class;
 } PlaybackChannelClientClass;
 
-G_DEFINE_TYPE(PlaybackChannelClient, playback_channel_client, TYPE_SND_CHANNEL_CLIENT)
-
+G_DEFINE_TYPE_WITH_CODE(PlaybackChannelClient, playback_channel_client, TYPE_SND_CHANNEL_CLIENT,
+                        G_IMPLEMENT_INTERFACE(G_TYPE_INITABLE,
+                                              playback_channel_client_initable_interface_init))
 
 typedef struct SpiceVolumeState {
     uint16_t *volume;
@@ -230,7 +240,9 @@ typedef struct RecordChannelClientClass {
     SndChannelClientClass parent_class;
 } RecordChannelClientClass;
 
-G_DEFINE_TYPE(RecordChannelClient, record_channel_client, TYPE_SND_CHANNEL_CLIENT)
+G_DEFINE_TYPE_WITH_CODE(RecordChannelClient, record_channel_client, TYPE_SND_CHANNEL_CLIENT,
+                        G_IMPLEMENT_INTERFACE(G_TYPE_INITABLE,
+                                              record_channel_client_initable_interface_init))
 
 
 /* A list of all Spice{Playback,Record}State objects */
@@ -279,7 +291,7 @@ static bool snd_record_handle_write(RecordChannelClient *record_client, size_t s
 {
     SpiceMsgcRecordPacket *packet;
     uint32_t write_pos;
-    uint32_t* data;
+    uint8_t* data;
     uint32_t len;
     uint32_t now;
 
@@ -290,7 +302,7 @@ static bool snd_record_handle_write(RecordChannelClient *record_client, size_t s
     packet = (SpiceMsgcRecordPacket *)message;
 
     if (record_client->mode == SPICE_AUDIO_DATA_MODE_RAW) {
-        data = (uint32_t *)packet->data;
+        data = packet->data;
         size = packet->data_size >> 2;
         size = MIN(size, RECORD_SAMPLES_SIZE);
      } else {
@@ -299,7 +311,7 @@ static bool snd_record_handle_write(RecordChannelClient *record_client, size_t s
         if (snd_codec_decode(record_client->codec, packet->data, packet->data_size,
                     record_client->decode_buf, &decode_size) != SND_CODEC_OK)
             return false;
-        data = (uint32_t *) record_client->decode_buf;
+        data = record_client->decode_buf;
         size = decode_size >> 2;
     }
 
@@ -354,12 +366,15 @@ record_channel_handle_message(RedChannelClient *rcc, uint16_t type, uint32_t siz
                                      SND_CODEC_DECODE) == SND_CODEC_OK) {
                     record_client->mode = mode->mode;
                 } else {
-                    spice_printerr("create decoder failed");
+                    red_channel_warning(red_channel_client_get_channel(rcc),
+                                        "create decoder failed");
                     return false;
                 }
             }
             else {
-                spice_printerr("unsupported mode %d", record_client->mode);
+                red_channel_warning(red_channel_client_get_channel(rcc),
+                                    "unsupported mode %d",
+                                    record_client->mode);
                 return false;
             }
         }
@@ -599,7 +614,7 @@ static bool snd_playback_send_write(PlaybackChannelClient *playback_client)
         if (snd_codec_encode(playback_client->codec, (uint8_t *) frame->samples,
                                     snd_codec_frame_size(playback_client->codec) * sizeof(frame->samples[0]),
                                     playback_client->encode_buf, &n) != SND_CODEC_OK) {
-            spice_printerr("encode failed");
+            red_channel_warning(red_channel_client_get_channel(rcc), "encode failed");
             red_channel_client_disconnect(rcc);
             return false;
         }
@@ -686,7 +701,8 @@ static void playback_channel_send_item(RedChannelClient *rcc, G_GNUC_UNUSED RedP
             if (snd_playback_send_write(playback_client)) {
                 break;
             }
-            spice_printerr("snd_send_playback_write failed");
+            red_channel_warning(red_channel_client_get_channel(rcc),
+                                "snd_send_playback_write failed");
         }
         if (client->command & SND_CTRL_MASK) {
             client->command &= ~SND_CTRL_MASK;
@@ -759,20 +775,18 @@ static void record_channel_send_item(RedChannelClient *rcc, G_GNUC_UNUSED RedPip
 
 static bool snd_channel_client_config_socket(RedChannelClient *rcc)
 {
-#ifdef SO_PRIORITY
-    int priority;
-#endif
     int tos;
-    RedsStream *stream = red_channel_client_get_stream(rcc);
+    RedStream *stream = red_channel_client_get_stream(rcc);
     RedClient *red_client = red_channel_client_get_client(rcc);
     MainChannelClient *mcc = red_client_get_main(red_client);
 
 #ifdef SO_PRIORITY
-    priority = 6;
+    int priority = 6;
     if (setsockopt(stream->socket, SOL_SOCKET, SO_PRIORITY, (void*)&priority,
                    sizeof(priority)) == -1) {
         if (errno != ENOTSUP) {
-            spice_printerr("setsockopt failed, %s", strerror(errno));
+            red_channel_warning(red_channel_client_get_channel(rcc),
+                                "setsockopt failed, %s", strerror(errno));
         }
     }
 #endif
@@ -780,11 +794,13 @@ static bool snd_channel_client_config_socket(RedChannelClient *rcc)
     tos = IPTOS_LOWDELAY;
     if (setsockopt(stream->socket, IPPROTO_IP, IP_TOS, (void*)&tos, sizeof(tos)) == -1) {
         if (errno != ENOTSUP) {
-            spice_printerr("setsockopt failed, %s", strerror(errno));
+            red_channel_warning(red_channel_client_get_channel(rcc),
+                                "setsockopt failed, %s",
+                                strerror(errno));
         }
     }
 
-    reds_stream_set_no_delay(stream, !main_channel_client_is_low_bandwidth(mcc));
+    red_stream_set_no_delay(stream, !main_channel_client_is_low_bandwidth(mcc));
 
     return true;
 }
@@ -1044,7 +1060,6 @@ playback_channel_client_constructed(GObject *object)
     RedChannelClient *rcc = RED_CHANNEL_CLIENT(playback_client);
     RedChannel *red_channel = red_channel_client_get_channel(rcc);
     SndChannel *channel = SND_CHANNEL(red_channel);
-    RedClient *red_client = red_channel_client_get_client(rcc);
     SndChannelClient *scc = SND_CHANNEL_CLIENT(playback_client);
 
     G_OBJECT_CLASS(playback_channel_client_parent_class)->constructed(object);
@@ -1064,12 +1079,28 @@ playback_channel_client_constructed(GObject *object)
                              SND_CODEC_ENCODE) == SND_CODEC_OK) {
             playback_client->mode = desired_mode;
         } else {
-            spice_printerr("create encoder failed");
+            red_channel_warning(red_channel, "create encoder failed");
         }
     }
 
     spice_debug("playback client %p using mode %s", playback_client,
                 spice_audio_data_mode_to_string(playback_client->mode));
+}
+
+static gboolean playback_channel_client_initable_init(GInitable *initable,
+                                                      GCancellable *cancellable,
+                                                      GError **error)
+{
+    gboolean success;
+    RedClient *red_client = red_channel_client_get_client(RED_CHANNEL_CLIENT(initable));
+    SndChannelClient *scc = SND_CHANNEL_CLIENT(initable);
+    RedChannel *red_channel = red_channel_client_get_channel(RED_CHANNEL_CLIENT(initable));
+    SndChannel *channel = SND_CHANNEL(red_channel);
+
+    success = playback_channel_client_parent_initable_iface->init(initable, cancellable, error);
+    if (!success) {
+        return FALSE;
+    }
 
     if (!red_client_during_migrate_at_target(red_client)) {
         snd_set_command(scc, SND_PLAYBACK_MODE_MASK);
@@ -1082,9 +1113,18 @@ playback_channel_client_constructed(GObject *object)
         playback_channel_client_start(scc);
     }
     snd_send(scc);
+
+    return TRUE;
 }
 
-static void snd_set_peer(RedChannel *red_channel, RedClient *client, RedsStream *stream,
+static void playback_channel_client_initable_interface_init(GInitableIface *iface)
+{
+    playback_channel_client_parent_initable_iface = g_type_interface_peek_parent(iface);
+
+    iface->init = playback_channel_client_initable_init;
+}
+
+static void snd_set_peer(RedChannel *red_channel, RedClient *client, RedStream *stream,
                          RedChannelCapabilities *caps, GType type)
 {
     SndChannel *channel = SND_CHANNEL(red_channel);
@@ -1105,7 +1145,7 @@ static void snd_set_peer(RedChannel *red_channel, RedClient *client, RedsStream 
     g_warn_if_fail(snd_client != NULL);
 }
 
-static void snd_set_playback_peer(RedChannel *red_channel, RedClient *client, RedsStream *stream,
+static void snd_set_playback_peer(RedChannel *red_channel, RedClient *client, RedStream *stream,
                                   G_GNUC_UNUSED int migration,
                                   RedChannelCapabilities *caps)
 {
@@ -1250,15 +1290,20 @@ record_channel_client_finalize(GObject *object)
     G_OBJECT_CLASS(record_channel_client_parent_class)->finalize(object);
 }
 
-static void
-record_channel_client_constructed(GObject *object)
+static gboolean record_channel_client_initable_init(GInitable *initable,
+                                                    GCancellable *cancellable,
+                                                    GError **error)
 {
-    RecordChannelClient *record_client = RECORD_CHANNEL_CLIENT(object);
+    gboolean success;
+    RecordChannelClient *record_client = RECORD_CHANNEL_CLIENT(initable);
     RedChannel *red_channel = red_channel_client_get_channel(RED_CHANNEL_CLIENT(record_client));
     SndChannel *channel = SND_CHANNEL(red_channel);
     SndChannelClient *scc = SND_CHANNEL_CLIENT(record_client);
 
-    G_OBJECT_CLASS(record_channel_client_parent_class)->constructed(object);
+    success = record_channel_client_parent_initable_iface->init(initable, cancellable, error);
+    if (!success) {
+        return FALSE;
+    }
 
     if (channel->volume.volume_nchannels) {
         snd_set_command(scc, SND_VOLUME_MUTE_MASK);
@@ -1268,10 +1313,18 @@ record_channel_client_constructed(GObject *object)
         record_channel_client_start(scc);
     }
     snd_send(scc);
+
+    return TRUE;
 }
 
+static void record_channel_client_initable_interface_init(GInitableIface *iface)
+{
+    record_channel_client_parent_initable_iface = g_type_interface_peek_parent(iface);
 
-static void snd_set_record_peer(RedChannel *red_channel, RedClient *client, RedsStream *stream,
+    iface->init = record_channel_client_initable_init;
+}
+
+static void snd_set_record_peer(RedChannel *red_channel, RedClient *client, RedStream *stream,
                                 G_GNUC_UNUSED int migration,
                                 RedChannelCapabilities *caps)
 {
@@ -1324,15 +1377,10 @@ playback_channel_init(PlaybackChannel *self)
 static void
 playback_channel_constructed(GObject *object)
 {
-    ClientCbs client_cbs = { NULL, };
     SndChannel *self = SND_CHANNEL(object);
     RedsState *reds = red_channel_get_server(RED_CHANNEL(self));
 
     G_OBJECT_CLASS(playback_channel_parent_class)->constructed(object);
-
-    client_cbs.connect = snd_set_playback_peer;
-    client_cbs.migrate = snd_migrate_channel_client;
-    red_channel_register_client_cbs(RED_CHANNEL(self), &client_cbs, self);
 
     if (snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_CELT_0_5_1, SND_CODEC_ANY_FREQUENCY)) {
         red_channel_set_cap(RED_CHANNEL(self), SPICE_PLAYBACK_CAP_CELT_0_5_1);
@@ -1354,6 +1402,10 @@ playback_channel_class_init(PlaybackChannelClass *klass)
     channel_class->parser = spice_get_client_channel_parser(SPICE_CHANNEL_PLAYBACK, NULL);
     channel_class->handle_message = red_channel_client_handle_message;
     channel_class->send_item = playback_channel_send_item;
+
+    // client callbacks
+    channel_class->connect = snd_set_playback_peer;
+    channel_class->migrate = snd_migrate_channel_client;
 }
 
 void snd_attach_playback(RedsState *reds, SpicePlaybackInstance *sin)
@@ -1374,15 +1426,10 @@ record_channel_init(RecordChannel *self)
 static void
 record_channel_constructed(GObject *object)
 {
-    ClientCbs client_cbs = { NULL, };
     SndChannel *self = SND_CHANNEL(object);
     RedsState *reds = red_channel_get_server(RED_CHANNEL(self));
 
     G_OBJECT_CLASS(record_channel_parent_class)->constructed(object);
-
-    client_cbs.connect = snd_set_record_peer;
-    client_cbs.migrate = snd_migrate_channel_client;
-    red_channel_register_client_cbs(RED_CHANNEL(self), &client_cbs, self);
 
     if (snd_codec_is_capable(SPICE_AUDIO_DATA_MODE_CELT_0_5_1, SND_CODEC_ANY_FREQUENCY)) {
         red_channel_set_cap(RED_CHANNEL(self), SPICE_RECORD_CAP_CELT_0_5_1);
@@ -1404,6 +1451,10 @@ record_channel_class_init(RecordChannelClass *klass)
     channel_class->parser = spice_get_client_channel_parser(SPICE_CHANNEL_RECORD, NULL);
     channel_class->handle_message = record_channel_handle_message;
     channel_class->send_item = record_channel_send_item;
+
+    // client callbacks
+    channel_class->connect = snd_set_record_peer;
+    channel_class->migrate = snd_migrate_channel_client;
 }
 
 void snd_attach_record(RedsState *reds, SpiceRecordInstance *sin)
@@ -1452,7 +1503,7 @@ void snd_set_playback_compression(bool on)
             bool client_can_opus = red_channel_client_test_remote_cap(rcc,
                                     SPICE_PLAYBACK_CAP_OPUS);
             int desired_mode = snd_desired_audio_mode(on, now->frequency,
-                                                      client_can_opus, client_can_celt);
+                                                      client_can_celt, client_can_opus);
             if (playback->mode != desired_mode) {
                 playback->mode = desired_mode;
                 snd_set_command(client, SND_PLAYBACK_MODE_MASK);
@@ -1509,7 +1560,6 @@ static void
 record_channel_client_class_init(RecordChannelClientClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
-    object_class->constructed = record_channel_client_constructed;
     object_class->finalize = record_channel_client_finalize;
 }
 

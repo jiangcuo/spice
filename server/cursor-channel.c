@@ -26,7 +26,6 @@
 #include "cursor-channel.h"
 #include "cursor-channel-client.h"
 #include "reds.h"
-#include "red-qxl.h"
 
 typedef struct RedCursorPipeItem {
     RedPipeItem base;
@@ -62,20 +61,16 @@ static RedCursorPipeItem *cursor_pipe_item_new(RedCursorCmd *cmd)
 
     red_pipe_item_init_full(&item->base, RED_PIPE_ITEM_TYPE_CURSOR,
                             cursor_pipe_item_free);
-    item->red_cursor = cmd;
+    item->red_cursor = red_cursor_cmd_ref(cmd);
 
     return item;
 }
 
 static void cursor_pipe_item_free(RedPipeItem *base)
 {
-    RedCursorCmd *cursor_cmd;
     RedCursorPipeItem *pipe_item = SPICE_UPCAST(RedCursorPipeItem, base);
 
-    cursor_cmd = pipe_item->red_cursor;
-    red_put_cursor_cmd(cursor_cmd);
-    free(cursor_cmd);
-
+    red_cursor_cmd_unref(pipe_item->red_cursor);
     g_free(pipe_item);
 }
 
@@ -142,9 +137,9 @@ static void red_marshall_cursor_init(CursorChannelClient *ccc, SpiceMarshaller *
     spice_marshall_msg_cursor_init(base_marshaller, &msg);
 }
 
-static void cursor_marshall(CursorChannelClient *ccc,
-                            SpiceMarshaller *m,
-                            RedCursorPipeItem *cursor_pipe_item)
+static void red_marshall_cursor(CursorChannelClient *ccc,
+                                SpiceMarshaller *m,
+                                RedCursorPipeItem *cursor_pipe_item)
 {
     RedChannelClient *rcc = RED_CHANNEL_CLIENT(ccc);
     CursorChannel *cursor_channel = CURSOR_CHANNEL(red_channel_client_get_channel(rcc));
@@ -212,7 +207,7 @@ static void cursor_channel_send_item(RedChannelClient *rcc, RedPipeItem *pipe_it
 
     switch (pipe_item->type) {
     case RED_PIPE_ITEM_TYPE_CURSOR:
-        cursor_marshall(ccc, m, SPICE_UPCAST(RedCursorPipeItem, pipe_item));
+        red_marshall_cursor(ccc, m, SPICE_UPCAST(RedCursorPipeItem, pipe_item));
         break;
     case RED_PIPE_ITEM_TYPE_INVAL_ONE:
         red_marshall_inval(rcc, m, SPICE_CONTAINEROF(pipe_item, RedCacheItem, u.pipe_data));
@@ -233,7 +228,8 @@ static void cursor_channel_send_item(RedChannelClient *rcc, RedPipeItem *pipe_it
 }
 
 CursorChannel* cursor_channel_new(RedsState *server, int id,
-                                  const SpiceCoreInterfaceInternal *core)
+                                  const SpiceCoreInterfaceInternal *core,
+                                  Dispatcher *dispatcher)
 {
     spice_debug("create cursor channel");
     return g_object_new(TYPE_CURSOR_CHANNEL,
@@ -243,6 +239,7 @@ CursorChannel* cursor_channel_new(RedsState *server, int id,
                         "id", id,
                         "migration-flags", 0,
                         "handle-acks", TRUE,
+                        "dispatcher", dispatcher,
                         NULL);
 }
 
@@ -338,9 +335,12 @@ void cursor_channel_set_mouse_mode(CursorChannel *cursor, uint32_t mode)
     cursor->mouse_mode = mode;
 }
 
-void cursor_channel_connect(CursorChannel *cursor, RedClient *client, RedsStream *stream,
-                            int migrate,
-                            RedChannelCapabilities *caps)
+/**
+ * Connect a new client to CursorChannel.
+ */
+static void
+cursor_channel_connect(CursorChannel *cursor, RedClient *client, RedStream *stream,
+                       int migrate, RedChannelCapabilities *caps)
 {
     CursorChannelClient *ccc;
 
@@ -372,17 +372,33 @@ cursor_channel_finalize(GObject *object)
 }
 
 static void
+cursor_channel_constructed(GObject *object)
+{
+    RedChannel *red_channel = RED_CHANNEL(object);
+    RedsState *reds = red_channel_get_server(red_channel);
+
+    G_OBJECT_CLASS(cursor_channel_parent_class)->constructed(object);
+
+    reds_register_channel(reds, red_channel);
+}
+
+static void
 cursor_channel_class_init(CursorChannelClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
     RedChannelClass *channel_class = RED_CHANNEL_CLASS(klass);
 
+    object_class->constructed = cursor_channel_constructed;
     object_class->finalize = cursor_channel_finalize;
 
     channel_class->parser = spice_get_client_channel_parser(SPICE_CHANNEL_CURSOR, NULL);
     channel_class->handle_message = red_channel_client_handle_message;
 
     channel_class->send_item = cursor_channel_send_item;
+
+    // client callbacks
+    channel_class->connect = (channel_client_connect_proc) cursor_channel_connect;
+    channel_class->migrate = cursor_channel_client_migrate;
 }
 
 static void

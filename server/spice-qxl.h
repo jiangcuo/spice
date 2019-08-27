@@ -101,9 +101,9 @@ void spice_qxl_monitors_config_async(QXLInstance *instance, QXLPHYSICAL monitors
                                      int group_id, uint64_t cookie);
 /* since spice 0.12.3 */
 void spice_qxl_driver_unload(QXLInstance *instance);
-/* since spice 0.12.6 */
+/* since spice 0.12.6, deprecated since 0.14.2, spice_qxl_set_device_info replaces it */
 void spice_qxl_set_max_monitors(QXLInstance *instance,
-                                unsigned int max_monitors);
+                                unsigned int max_monitors) SPICE_GNUC_DEPRECATED;
 /* since spice 0.13.1 */
 void spice_qxl_gl_scanout(QXLInstance *instance,
                           int fd,
@@ -115,25 +115,63 @@ void spice_qxl_gl_draw_async(QXLInstance *instance,
                              uint32_t w, uint32_t h,
                              uint64_t cookie);
 
-typedef struct QXLDrawArea {
-    uint8_t *buf;
-    uint32_t size;
-    uint8_t *line_0;
-    uint32_t width;
-    uint32_t heigth;
-    int stride;
-} QXLDrawArea;
+/* since spice 0.14.2 */
 
-typedef struct QXLDevInfo {
-    uint32_t x_res;
-    uint32_t y_res;
-    uint32_t bits;
-    uint32_t use_hardware_cursor;
-
-    QXLDrawArea draw_area;
-
-    uint32_t ram_size;
-} QXLDevInfo;
+/**
+ * spice_qxl_set_device_info:
+ * @instance the QXL instance to set the path to
+ * @device_address the path of the device this QXL instance belongs to
+ * @device_display_id_start the starting device display ID of this interface,
+ *                          i.e. the device display ID of monitor ID 0
+ * @device_display_id_count the total number of device display IDs on this
+ *                          interface
+ *
+ * Sets the device information for this QXL interface, i.e. the hardware
+ * address (e.g. PCI) of the graphics device and the IDs of the displays of the
+ * graphics device that are exposed by this interface (device display IDs).
+ *
+ * The supported device address format is:
+ * "pci/<DOMAIN>/<SLOT>.<FUNCTION>/.../<SLOT>.<FUNCTION>"
+ *
+ * The "pci" identifies the rest of the string as a PCI address. It is the only
+ * supported address at the moment, other identifiers can be introduced later.
+ * <DOMAIN> is the PCI domain, followed by <SLOT>.<FUNCTION> of any PCI bridges
+ * in the chain leading to the device. The last <SLOT>.<FUNCTION> is the
+ * graphics device. All of <DOMAIN>, <SLOT>, <FUNCTION> are hexadecimal numbers
+ * with the following number of digits:
+ *   <DOMAIN>: 4
+ *   <SLOT>: 2
+ *   <FUNCTION>: 1
+ *
+ * The device_display_id_{start,count} denotes the sequence of device display
+ * IDs that map to the zero-based sequence of monitor IDs provided by monitors
+ * config on this interface.
+ *
+ * Example 1:
+ *   A QXL graphics device with 3 heads (monitors).
+ *
+ *   device_display_id_start = 0
+ *   device_display_id_count = 3
+ *
+ *   Results in the following mapping of monitor_id  ->  device_display_id:
+ *   0  ->  0
+ *   1  ->  1
+ *   2  ->  2
+ *
+ * Example 2:
+ *   A virtio graphics device, multiple monitors, a QXL interface for each
+ *   monitor. On the QXL interface for the third monitor:
+ *
+ *   device_display_id_start = 2
+ *   device_display_id_count = 1
+ *
+ *   Results in the following mapping of monitor_id  ->  device_display_id:
+ *   0  ->  2
+ */
+void spice_qxl_set_device_info(QXLInstance *instance,
+                               const char *device_address,
+                               uint32_t device_display_id_start,
+                               uint32_t device_display_id_count);
 
 typedef struct QXLDevInitInfo {
     uint32_t num_memslots_groups;

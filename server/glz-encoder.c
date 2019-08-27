@@ -84,7 +84,7 @@ static inline void encode_32(Encoder *encoder, unsigned int word)
 static inline void encode_64(Encoder *encoder, uint64_t word)
 {
     encode_32(encoder, (uint32_t)(word >> 32));
-    encode_32(encoder, (uint32_t)(word & 0xffffff));
+    encode_32(encoder, (uint32_t)(word & 0xffffffffu));
 }
 
 static inline void encode_copy_count(Encoder *encoder, uint8_t copy_count)
@@ -262,7 +262,7 @@ int glz_encode(GlzEncoderContext *opaque_encoder,
     encoder->cur_image.id = dict_image->id;
     encoder->cur_image.first_win_seg = dict_image->first_seg;
 
-    encode_32(encoder, GUINT32_TO_LE(LZ_MAGIC));
+    encode_32(encoder, LZ_MAGIC);
     encode_32(encoder, LZ_VERSION);
     if (top_down) {
         encode(encoder, (type & LZ_IMAGE_TYPE_MASK) | (1 << LZ_IMAGE_TYPE_LOG));

@@ -1,9 +1,10 @@
 NULL =
 
 @VALGRIND_CHECK_RULES@
-VALGRIND_SUPPRESSIONS_FILES = $(top_srcdir)/server/tests/valgrind/glib.supp
+VALGRIND_SUPPRESSIONS_FILES = $(srcdir)/valgrind/glib.supp
 EXTRA_DIST =				\
 	$(VALGRIND_SUPPRESSIONS_FILES)	\
+	meson.build			\
 	pki/ca-cert.pem			\
 	pki/server-cert.pem		\
 	pki/server-key.pem		\
@@ -16,8 +17,9 @@ AM_CPPFLAGS =					\
 	-I$(top_builddir)/server		\
 	-I$(top_srcdir)/server/tests		\
 	$(COMMON_CFLAGS)			\
+	$(GIO_UNIX_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
-	$(GOBJECT2_CFLAGS)				\
+	$(GOBJECT2_CFLAGS)			\
 	$(SMARTCARD_CFLAGS)			\
 	$(SPICE_NONPKGCONFIG_CFLAGS)		\
 	$(SPICE_PROTOCOL_CFLAGS)		\
@@ -37,8 +39,9 @@ libtest_a_SOURCES =				\
 
 LDADD =								\
 	libtest.a						\
-	$(top_builddir)/spice-common/common/libspice-common.la	\
+	$(SPICE_COMMON_DIR)/common/libspice-common.la		\
 	$(top_builddir)/server/libserver.la			\
+	$(GIO_UNIX_LIBS)					\
 	$(GLIB2_LIBS)						\
 	$(GOBJECT2_LIBS)					\
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
@@ -58,12 +61,14 @@ check_PROGRAMS =				\
 	test-fail-on-null-core-interface	\
 	test-empty-success			\
 	test-channel				\
+	test-stream-device			\
+	test-listen				\
+	test-record				\
 	$(NULL)
 
 noinst_PROGRAMS =				\
 	test-display-no-ssl			\
 	test-display-streaming			\
-	test-just-sockets-no-ssl		\
 	test-playback				\
 	test-display-resolution-changes		\
 	test-two-servers			\
@@ -73,8 +78,6 @@ noinst_PROGRAMS =				\
 
 TESTS = $(check_PROGRAMS)			\
 	$(NULL)
-
-test_qxl_parsing_LDADD = ../libserver.la $(LDADD)
 
 ## spice-server-replay
 
@@ -86,7 +89,7 @@ spice_server_replay_SOURCES = replay.c		\
 	basic-event-loop.h
 
 spice_server_replay_LDADD =					\
-	$(top_builddir)/spice-common/common/libspice-common.la	\
+	$(SPICE_COMMON_DIR)/common/libspice-common.la		\
 	$(top_builddir)/server/libspice-server.la		\
 	$(GLIB2_LIBS)						\
 	$(GOBJECT2_LIBS)					\
@@ -142,3 +145,7 @@ test_gst_CPPFLAGS = \
 endif
 
 EXTRA_DIST += video-encoders
+
+if HAVE_SASL
+check_PROGRAMS += test-sasl
+endif

@@ -30,13 +30,16 @@
 #include <signal.h>
 #include <unistd.h>
 #include <pthread.h>
+#ifndef _WIN32
 #include <sys/wait.h>
+#endif
 #include <fcntl.h>
 #include <glib.h>
 #include <pthread.h>
 
 #include <spice/macros.h>
 #include "test-display-base.h"
+#include "test-glib-compat.h"
 #include <common/log.h>
 
 static SpiceCoreInterface *core;
@@ -49,7 +52,7 @@ static gint slow = 0;
 static gint skip = 0;
 static gboolean print_count = FALSE;
 static guint ncommands = 0;
-static pid_t client_pid;
+static GPid client_pid;
 static GMainLoop *loop = NULL;
 static GAsyncQueue *display_queue = NULL;
 static GAsyncQueue *cursor_queue = NULL;
@@ -91,16 +94,12 @@ static void set_compression_level(QXLInstance *qin, int level)
     g_debug("%s\n", __func__);
 }
 
-static void set_mm_time(QXLInstance *qin, uint32_t mm_time)
-{
-}
-
 // same as qemu/ui/spice-display.h
 #define MAX_SURFACE_NUM 1024
 
 static void get_init_info(QXLInstance *qin, QXLDevInitInfo *info)
 {
-    bzero(info, sizeof(*info));
+    memset(info, 0, sizeof(*info));
     info->num_memslots = 1;
     info->num_memslots_groups = 1;
     info->memslot_id_bits = 1;
@@ -211,21 +210,28 @@ static int req_display_notification(QXLInstance *qin)
 
 static void end_replay(void)
 {
-    int child_status;
-
     /* FIXME: wait threads and end cleanly */
     spice_replay_free(replay);
 
     if (client_pid) {
-        g_debug("kill %d", client_pid);
+        g_debug("kill %" G_PID_FORMAT, client_pid);
+#ifndef _WIN32
+        int child_status;
+
         kill(client_pid, SIGINT);
         waitpid(client_pid, &child_status, 0);
+#else
+        TerminateProcess(client_pid, 0);
+        WaitForSingleObject(client_pid, INFINITE);
+#endif
+        g_spawn_close_pid(client_pid);
+        client_pid = 0;
     }
 }
 
 static void release_resource(QXLInstance *qin, struct QXLReleaseInfoExt release_info)
 {
-    spice_replay_free_cmd(replay, (QXLCommandExt *)release_info.info->id);
+    spice_replay_free_cmd(replay, (QXLCommandExt *)(uintptr_t)release_info.info->id);
 }
 
 static int get_cursor_command(QXLInstance *qin, struct QXLCommandExt *ext)
@@ -256,7 +262,6 @@ static QXLInterface display_sif = {
     },
     .attache_worker = attach_worker,
     .set_compression_level = set_compression_level,
-    .set_mm_time = set_mm_time,
     .get_init_info = get_init_info,
     .get_command = get_display_command,
     .req_cmd_notification = req_display_notification,
@@ -356,17 +361,17 @@ int main(int argc, char **argv)
         "\t1=off 2=all 3=filter";
 
     /* these asserts are here to check that the documentation we state above is still correct */
-    G_STATIC_ASSERT(SPICE_STREAM_VIDEO_OFF == 1);
-    G_STATIC_ASSERT(SPICE_STREAM_VIDEO_ALL == 2);
-    G_STATIC_ASSERT(SPICE_STREAM_VIDEO_FILTER == 3);
-    G_STATIC_ASSERT(SPICE_IMAGE_COMPRESSION_INVALID == 0);
-    G_STATIC_ASSERT(SPICE_IMAGE_COMPRESSION_OFF == 1);
-    G_STATIC_ASSERT(SPICE_IMAGE_COMPRESSION_AUTO_GLZ == 2);
-    G_STATIC_ASSERT(SPICE_IMAGE_COMPRESSION_AUTO_LZ == 3);
-    G_STATIC_ASSERT(SPICE_IMAGE_COMPRESSION_QUIC == 4);
-    G_STATIC_ASSERT(SPICE_IMAGE_COMPRESSION_GLZ == 5);
-    G_STATIC_ASSERT(SPICE_IMAGE_COMPRESSION_LZ == 6);
-    G_STATIC_ASSERT(SPICE_IMAGE_COMPRESSION_LZ4 == 7);
+    SPICE_VERIFY(SPICE_STREAM_VIDEO_OFF == 1);
+    SPICE_VERIFY(SPICE_STREAM_VIDEO_ALL == 2);
+    SPICE_VERIFY(SPICE_STREAM_VIDEO_FILTER == 3);
+    SPICE_VERIFY(SPICE_IMAGE_COMPRESSION_INVALID == 0);
+    SPICE_VERIFY(SPICE_IMAGE_COMPRESSION_OFF == 1);
+    SPICE_VERIFY(SPICE_IMAGE_COMPRESSION_AUTO_GLZ == 2);
+    SPICE_VERIFY(SPICE_IMAGE_COMPRESSION_AUTO_LZ == 3);
+    SPICE_VERIFY(SPICE_IMAGE_COMPRESSION_QUIC == 4);
+    SPICE_VERIFY(SPICE_IMAGE_COMPRESSION_GLZ == 5);
+    SPICE_VERIFY(SPICE_IMAGE_COMPRESSION_LZ == 6);
+    SPICE_VERIFY(SPICE_IMAGE_COMPRESSION_LZ4 == 7);
 
     context = g_option_context_new("- replay spice server recording");
     g_option_context_add_main_entries(context, entries, NULL);
@@ -394,8 +399,11 @@ int main(int argc, char **argv)
 
     if (strncmp(file[0], "-", 1) == 0) {
         fd = stdin;
+#ifdef _WIN32
+        _setmode(fileno(fd), _O_BINARY);
+#endif
     } else {
-        fd = fopen(file[0], "r");
+        fd = fopen(file[0], "rb");
     }
     if (fd == NULL) {
         g_printerr("error opening %s\n", file[0]);

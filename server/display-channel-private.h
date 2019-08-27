@@ -52,7 +52,12 @@ typedef struct RedSurface {
     QRegion draw_dirty_region;
 
     //fix me - better handling here
-    QXLReleaseInfoExt create, destroy;
+    /* 'create_cmd' holds surface data through a pointer to guest memory, it
+     * must be valid as long as the surface is valid */
+    RedSurfaceCmd *create_cmd;
+    /* QEMU expects the guest data for the command to be valid as long as the
+     * surface is valid */
+    RedSurfaceCmd *destroy_cmd;
 } RedSurface;
 
 typedef struct MonitorsConfig {
@@ -82,6 +87,7 @@ struct DisplayChannelPrivate
     MonitorsConfig *monitors_config;
 
     uint32_t renderer;
+    SpiceImageCompression image_compression;
     int enable_jpeg;
     int enable_zlib_glz_wrap;
 
@@ -98,8 +104,8 @@ struct DisplayChannelPrivate
     int stream_video;
     GArray *video_codecs;
     uint32_t stream_count;
-    Stream streams_buf[NUM_STREAMS];
-    Stream *free_streams;
+    VideoStream streams_buf[NUM_STREAMS];
+    VideoStream *free_streams;
     Ring streams;
     ItemTrace items_trace[NUM_TRACE_ITEMS];
     uint32_t next_item_trace;
@@ -132,7 +138,7 @@ struct DisplayChannelPrivate
                   DisplayChannelClient, _data)
 
 typedef struct RedMonitorsConfigItem {
-    RedPipeItem pipe_item;
+    RedPipeItem base;
     MonitorsConfig *monitors_config;
 } RedMonitorsConfigItem;
 
@@ -170,19 +176,13 @@ void display_channel_current_flush(DisplayChannel *display,
                                    int surface_id);
 uint32_t display_channel_generate_uid(DisplayChannel *display);
 
-int display_channel_get_stream_id(DisplayChannel *display, Stream *stream);
-Stream *display_channel_get_nth_stream(DisplayChannel *display, gint i);
+int display_channel_get_video_stream_id(DisplayChannel *display, VideoStream *stream);
+VideoStream *display_channel_get_nth_video_stream(DisplayChannel *display, gint i);
 
 typedef struct RedSurfaceDestroyItem {
-    RedPipeItem pipe_item;
+    RedPipeItem base;
     SpiceMsgSurfaceDestroy surface_destroy;
 } RedSurfaceDestroyItem;
-
-typedef struct RedUpgradeItem {
-    RedPipeItem base;
-    Drawable *drawable;
-    SpiceClipRects *rects;
-} RedUpgradeItem;
 
 static inline int is_equal_path(SpicePath *path1, SpicePath *path2)
 {

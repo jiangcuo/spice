@@ -35,12 +35,13 @@ libspice_server_la_LDFLAGS =			\
 
 if HAVE_LD_VERSION_SCRIPT
 libspice_server_la_LDFLAGS += \
-	-Wl,--version-script=$(top_srcdir)/server/spice-server.syms
+	-Wl,--version-script=$(srcdir)/spice-server.syms
+EXTRA_libspice_server_la_DEPENDENCIES = $(srcdir)/spice-server.syms
 endif
 
 libserver_la_LIBADD =							\
-	$(top_builddir)/spice-common/common/libspice-common.la		\
-	$(top_builddir)/spice-common/common/libspice-common-server.la	\
+	$(SPICE_COMMON_DIR)/common/libspice-common.la			\
+	$(SPICE_COMMON_DIR)/common/libspice-common-server.la		\
 	$(GL_LIBS)							\
 	$(GLIB2_LIBS)							\
 	$(GOBJECT2_LIBS)						\
@@ -93,7 +94,6 @@ libserver_la_SOURCES =				\
 	dcc.h					\
 	dcc-private.h				\
 	dcc-send.c				\
-	demarshallers.h				\
 	dispatcher.c				\
 	dispatcher.h				\
 	display-channel.c			\
@@ -152,8 +152,8 @@ libserver_la_SOURCES =				\
 	reds.c					\
 	reds.h					\
 	reds-private.h				\
-	reds-stream.c				\
-	reds-stream.h				\
+	red-stream.c				\
+	red-stream.h				\
 	red-worker.c				\
 	red-worker.h				\
 	sound.c					\
@@ -164,14 +164,18 @@ libserver_la_SOURCES =				\
 	stat-file.c				\
 	stat-file.h				\
 	stat.h					\
-	stream.c				\
-	stream.h				\
+	stream-channel.c			\
+	stream-channel.h			\
+	red-stream-device.c			\
+	red-stream-device.h			\
 	sw-canvas.c				\
 	tree.c					\
 	tree.h					\
 	utils.c					\
 	utils.h					\
 	video-encoder.h				\
+	video-stream.c				\
+	video-stream.h				\
 	zlib-encoder.c				\
 	zlib-encoder.h				\
 	$(NULL)
@@ -201,20 +205,21 @@ endif
 libspice_server_la_LIBADD = libserver.la
 libspice_server_la_SOURCES =
 
-spice-server-enums.c: spice-server.h spice-server-enums.tmpl.c
-	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.tmpl.c $< > $@
+spice-server-enums.c: spice-server.h spice-server-enums.c.tmpl
+	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.c.tmpl $< > $@
 
-spice-server-enums.h: spice-server.h spice-server-enums.tmpl.h
-	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.tmpl.h $< > $@
+spice-server-enums.h: spice-server.h spice-server-enums.h.tmpl
+	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.h.tmpl $< > $@
 
 EXTRA_DIST =					\
+	meson.build				\
 	spice-bitmap-utils.tmpl.c		\
 	cache-item.tmpl.c			\
 	glz-encode-match.tmpl.c			\
 	glz-encode.tmpl.c			\
 	spice-server.syms			\
-	spice-server-enums.tmpl.h		\
-	spice-server-enums.tmpl.c		\
+	spice-server-enums.h.tmpl		\
+	spice-server-enums.c.tmpl		\
 	$(NULL)
 
 BUILT_SOURCES = $(spice_built_sources)

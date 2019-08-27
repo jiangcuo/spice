@@ -20,9 +20,12 @@
 #define DISPLAY_LIMITS_H_
 
 /** Maximum number of surfaces a guest can create */
-#define NUM_SURFACES 10000
+#define NUM_SURFACES 1024
 
 /** Maximum number of streams created by spice-server */
 #define NUM_STREAMS 50
+
+/** Maximum length of the device address string */
+#define MAX_DEVICE_ADDRESS_LEN 256
 
 #endif /* DISPLAY_LIMITS_H_ */

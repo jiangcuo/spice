@@ -25,7 +25,6 @@
 #include "red-common.h"
 #include "spice/macros.h"
 #include <common/ring.h>
-#include <common/mem.h>
 #include "basic-event-loop.h"
 
 int debug = 0;
@@ -47,7 +46,7 @@ GMainContext *basic_event_loop_get_context(void)
 
 static void event_loop_channel_event(int event, SpiceChannelEventInfo *info)
 {
-    DPRINTF(0, "channel event con, type, id, event: %d, %d, %d, %d",
+    DPRINTF(1, "channel event con, type, id, event: %d, %d, %d, %d",
             info->connection_id, info->type, info->id, event);
 }
 
@@ -131,6 +130,9 @@ SpiceCoreInterface *basic_event_loop_init(void)
 {
     ignore_sigpipe();
     spice_assert(main_context == NULL);
+    /* Qemu can use a context which is not the default one so to make
+     * sure we can handle this condition here we emulate it so don't
+     * use g_main_context_default */
     main_context = g_main_context_new();
     base_core_interface = event_loop_core;
     base_core_interface.main_context = main_context;

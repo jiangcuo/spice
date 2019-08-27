@@ -21,6 +21,7 @@
 
 #include "common-graphics-channel.h"
 #include "red-parse-qxl.h"
+#include "dispatcher.h"
 
 G_BEGIN_DECLS
 
@@ -47,39 +48,17 @@ GType cursor_channel_get_type(void) G_GNUC_CONST;
 /**
  * Create CursorChannel.
  * Since CursorChannel is intended to be run in a separate thread,
- * it does not register its own client callbacks since they would
- * be called from a different thread. Therefore users of this
- * class are responsible for registering their own client callbacks
- * for CursorChannel. These 'wrapper' client callbacks must forward
- * execution on to the CursorChannel thread.
- * cursor_channel_client_migrate() and cursor_channel_connect() are
- * provided as helper functions and should only be called from the
- * CursorChannel thread.
+ * the function accepts a dispatcher parameter to allows some
+ * operations to be executed in the channel thread.
  */
 CursorChannel* cursor_channel_new(RedsState *server, int id,
-                                  const SpiceCoreInterfaceInternal *core);
+                                  const SpiceCoreInterfaceInternal *core,
+                                  Dispatcher *dispatcher);
 
 void                 cursor_channel_reset       (CursorChannel *cursor);
 void                 cursor_channel_do_init     (CursorChannel *cursor);
 void                 cursor_channel_process_cmd (CursorChannel *cursor, RedCursorCmd *cursor_cmd);
 void                 cursor_channel_set_mouse_mode(CursorChannel *cursor, uint32_t mode);
-
-/**
- * Connect a new client to CursorChannel.
- * This is the equivalent of RedChannel client connect callback.
- * See comment on cursor_channel_new.
- */
-void                 cursor_channel_connect     (CursorChannel *cursor, RedClient *client,
-                                                 RedsStream *stream,
-                                                 int migrate,
-                                                 RedChannelCapabilities *caps);
-
-/**
- * Migrate a client channel from a CursorChannel.
- * This is the equivalent of RedChannel client migrate callback.
- * See comment on cursor_channel_new.
- */
-void                 cursor_channel_client_migrate(RedChannelClient *client);
 
 G_END_DECLS
 

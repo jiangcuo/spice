@@ -26,26 +26,33 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <poll.h>
 #include <pthread.h>
-#include <openssl/ssl.h>
 #include <inttypes.h>
 #include <glib.h>
 
 #include <spice/protocol.h>
 #include <spice/qxl_dev.h>
+#include <spice/stats.h>
 #include <common/lz.h>
 #include <common/rect.h>
 #include <common/region.h>
 #include <common/ring.h>
 
 #include "display-channel.h"
-#include "stream.h"
+#include "video-stream.h"
 
 #include "spice.h"
 #include "red-worker.h"
+#include "red-qxl.h"
 #include "cursor-channel.h"
 #include "tree.h"
+#include "red-record-qxl.h"
+
+// compatibility for FreeBSD
+#ifdef HAVE_PTHREAD_NP_H
+#include <pthread_np.h>
+#define pthread_setname_np pthread_set_name_np
+#endif
 
 #define CMD_RING_POLL_TIMEOUT 10 //milli
 #define CMD_RING_POLL_RETRIES 1
@@ -56,7 +63,6 @@ struct RedWorker {
     pthread_t thread;
     QXLInstance *qxl;
     SpiceWatch *dispatch_watch;
-    int running;
     SpiceCoreInterfaceInternal core;
 
     unsigned int event_timeout;
@@ -70,10 +76,6 @@ struct RedWorker {
 
     RedMemSlotInfo mem_slots;
 
-    SpiceImageCompression image_compression;
-    spice_wan_compression_t jpeg_state;
-    spice_wan_compression_t zlib_glz_state;
-
     uint32_t process_display_generation;
     RedStatNode stat;
     RedStatCounter wakeup_counter;
@@ -81,39 +83,25 @@ struct RedWorker {
     RedStatCounter full_loop_counter;
     RedStatCounter total_loop_counter;
 
-    int driver_cap_monitors_config;
+    bool driver_cap_monitors_config;
 
     RedRecord *record;
     GMainLoop *loop;
 };
 
-static int display_is_connected(RedWorker *worker)
-{
-    return worker->display_channel &&
-        red_channel_is_connected(RED_CHANNEL(worker->display_channel));
-}
-
-void red_drawable_unref(RedDrawable *red_drawable)
-{
-    if (--red_drawable->refs) {
-        return;
-    }
-    red_qxl_release_resource(red_drawable->qxl, red_drawable->release_info_ext);
-    red_put_drawable(red_drawable);
-    free(red_drawable);
-}
-
 static gboolean red_process_cursor_cmd(RedWorker *worker, const QXLCommandExt *ext)
 {
     RedCursorCmd *cursor_cmd;
 
-    cursor_cmd = spice_new0(RedCursorCmd, 1);
-    if (!red_get_cursor_cmd(&worker->mem_slots, ext->group_id, cursor_cmd, ext->cmd.data)) {
-        free(cursor_cmd);
+    cursor_cmd = red_cursor_cmd_new(worker->qxl, &worker->mem_slots,
+                                    ext->group_id, ext->cmd.data);
+    if (cursor_cmd == NULL) {
         return FALSE;
     }
-    red_qxl_release_resource(worker->qxl, cursor_cmd->release_info_ext);
+
     cursor_channel_process_cmd(worker->cursor_channel, cursor_cmd);
+    red_cursor_cmd_unref(cursor_cmd);
+
     return TRUE;
 }
 
@@ -122,7 +110,7 @@ static int red_process_cursor(RedWorker *worker, int *ring_is_empty)
     QXLCommandExt ext_cmd;
     int n = 0;
 
-    if (!worker->running) {
+    if (!red_qxl_is_running(worker->qxl)) {
         *ring_is_empty = TRUE;
         return n;
     }
@@ -159,28 +147,19 @@ static int red_process_cursor(RedWorker *worker, int *ring_is_empty)
     return n;
 }
 
-static RedDrawable *red_drawable_new(QXLInstance *qxl)
-{
-    RedDrawable * red = spice_new0(RedDrawable, 1);
-
-    red->refs = 1;
-    red->qxl = qxl;
-
-    return red;
-}
-
 static gboolean red_process_surface_cmd(RedWorker *worker, QXLCommandExt *ext, gboolean loadvm)
 {
-    RedSurfaceCmd surface_cmd;
+    RedSurfaceCmd *surface_cmd;
 
-    if (!red_get_surface_cmd(&worker->mem_slots, ext->group_id, &surface_cmd, ext->cmd.data)) {
-        return FALSE;
+    surface_cmd = red_surface_cmd_new(worker->qxl, &worker->mem_slots,
+                                      ext->group_id, ext->cmd.data);
+    if (surface_cmd == NULL) {
+        return false;
     }
-    display_channel_process_surface_cmd(worker->display_channel, &surface_cmd, loadvm);
-    // display_channel_process_surface_cmd() takes ownership of 'release_info_ext',
-    // we don't need to release it ourselves
-    red_put_surface_cmd(&surface_cmd);
-    return TRUE;
+    display_channel_process_surface_cmd(worker->display_channel, surface_cmd, loadvm);
+    red_surface_cmd_unref(surface_cmd);
+
+    return true;
 }
 
 static int red_process_display(RedWorker *worker, int *ring_is_empty)
@@ -189,7 +168,7 @@ static int red_process_display(RedWorker *worker, int *ring_is_empty)
     int n = 0;
     uint64_t start = spice_get_monotonic_time_ns();
 
-    if (!worker->running) {
+    if (!red_qxl_is_running(worker->qxl)) {
         *ring_is_empty = TRUE;
         return n;
     }
@@ -219,46 +198,47 @@ static int red_process_display(RedWorker *worker, int *ring_is_empty)
         worker->display_poll_tries = 0;
         switch (ext_cmd.cmd.type) {
         case QXL_CMD_DRAW: {
-            RedDrawable *red_drawable = red_drawable_new(worker->qxl); // returns with 1 ref
+            RedDrawable *red_drawable;
+            red_drawable = red_drawable_new(worker->qxl, &worker->mem_slots,
+                                            ext_cmd.group_id, ext_cmd.cmd.data,
+                                            ext_cmd.flags); // returns with 1 ref
 
-            if (red_get_drawable(&worker->mem_slots, ext_cmd.group_id,
-                                 red_drawable, ext_cmd.cmd.data, ext_cmd.flags)) {
+            if (red_drawable != NULL) {
                 display_channel_process_draw(worker->display_channel, red_drawable,
                                              worker->process_display_generation);
+                red_drawable_unref(red_drawable);
             }
-            // release the red_drawable
-            red_drawable_unref(red_drawable);
             break;
         }
         case QXL_CMD_UPDATE: {
-            RedUpdateCmd update;
+            RedUpdateCmd *update;
 
-            if (!red_get_update_cmd(&worker->mem_slots, ext_cmd.group_id,
-                                    &update, ext_cmd.cmd.data)) {
+            update = red_update_cmd_new(worker->qxl, &worker->mem_slots,
+                                        ext_cmd.group_id, ext_cmd.cmd.data);
+            if (update == NULL) {
                 break;
             }
-            if (!display_channel_validate_surface(worker->display_channel, update.surface_id)) {
+            if (!display_channel_validate_surface(worker->display_channel, update->surface_id)) {
                 spice_warning("Invalid surface in QXL_CMD_UPDATE");
             } else {
-                display_channel_draw(worker->display_channel, &update.area, update.surface_id);
-                red_qxl_notify_update(worker->qxl, update.update_id);
+                display_channel_draw(worker->display_channel, &update->area, update->surface_id);
+                red_qxl_notify_update(worker->qxl, update->update_id);
             }
-            red_qxl_release_resource(worker->qxl, update.release_info_ext);
-            red_put_update_cmd(&update);
+            red_update_cmd_unref(update);
             break;
         }
         case QXL_CMD_MESSAGE: {
-            RedMessage message;
+            RedMessage *message;
 
-            if (!red_get_message(&worker->mem_slots, ext_cmd.group_id,
-                                 &message, ext_cmd.cmd.data)) {
+            message = red_message_new(worker->qxl, &worker->mem_slots,
+                                      ext_cmd.group_id, ext_cmd.cmd.data);
+            if (message == NULL) {
                 break;
             }
 #ifdef DEBUG
             spice_warning("MESSAGE: %.*s", message.len, message.data);
 #endif
-            red_qxl_release_resource(worker->qxl, message.release_info_ext);
-            red_put_message(&message);
+            red_message_unref(message);
             break;
         }
         case QXL_CMD_SURFACE:
@@ -284,24 +264,6 @@ static bool red_process_is_blocked(RedWorker *worker)
 {
     return red_channel_max_pipe_size(RED_CHANNEL(worker->cursor_channel)) > MAX_PIPE_SIZE ||
            red_channel_max_pipe_size(RED_CHANNEL(worker->display_channel)) > MAX_PIPE_SIZE;
-}
-
-static void red_migrate_display(DisplayChannel *display, RedChannelClient *rcc)
-{
-    /* We need to stop the streams, and to send upgrade_items to the client.
-     * Otherwise, (1) the client might display lossy regions that we don't track
-     * (streams are not part of the migration data) (2) streams_timeout may occur
-     * after the MIGRATE message has been sent. This can result in messages
-     * being sent to the client after MSG_MIGRATE and before MSG_MIGRATE_DATA (e.g.,
-     * STREAM_CLIP, STREAM_DESTROY, DRAW_COPY)
-     * No message besides MSG_MIGRATE_DATA should be sent after MSG_MIGRATE.
-     * Notice that detach_and_stop_streams won't lead to any dev ram changes, since
-     * handle_dev_stop already took care of releasing all the dev ram resources.
-     */
-    stream_detach_and_stop(display);
-    if (red_channel_client_is_connected(rcc)) {
-        red_channel_client_default_migrate(rcc);
-    }
 }
 
 typedef int (*red_process_t)(RedWorker *worker, int *ring_is_empty);
@@ -368,52 +330,6 @@ static void flush_all_qxl_commands(RedWorker *worker)
     flush_cursor_commands(worker);
 }
 
-static void guest_set_client_capabilities(RedWorker *worker)
-{
-    int i;
-    RedChannelClient *rcc;
-    uint8_t caps[SPICE_CAPABILITIES_SIZE] = { 0 };
-    int caps_available[] = {
-        SPICE_DISPLAY_CAP_SIZED_STREAM,
-        SPICE_DISPLAY_CAP_MONITORS_CONFIG,
-        SPICE_DISPLAY_CAP_COMPOSITE,
-        SPICE_DISPLAY_CAP_A8_SURFACE,
-    };
-    QXLInterface *qif = qxl_get_interface(worker->qxl);
-
-    if (!red_qxl_check_qxl_version(worker->qxl, 3, 2)) {
-        return;
-    }
-    if (!qif->set_client_capabilities) {
-        return;
-    }
-#define SET_CAP(a,c)                                                    \
-        ((a)[(c) / 8] |= (1 << ((c) % 8)))
-
-#define CLEAR_CAP(a,c)                                                  \
-        ((a)[(c) / 8] &= ~(1 << ((c) % 8)))
-
-    if (!worker->running) {
-        return;
-    }
-    if ((worker->display_channel == NULL) ||
-        (red_channel_get_n_clients(RED_CHANNEL(worker->display_channel)) == 0)) {
-        red_qxl_set_client_capabilities(worker->qxl, FALSE, caps);
-    } else {
-        // Take least common denominator
-        for (i = 0 ; i < SPICE_N_ELEMENTS(caps_available); ++i) {
-            SET_CAP(caps, caps_available[i]);
-        }
-        FOREACH_CLIENT(worker->display_channel, rcc) {
-            for (i = 0 ; i < SPICE_N_ELEMENTS(caps_available); ++i) {
-                if (!red_channel_client_test_remote_cap(rcc, caps_available[i]))
-                    CLEAR_CAP(caps, caps_available[i]);
-            }
-        }
-        red_qxl_set_client_capabilities(worker->qxl, TRUE, caps);
-    }
-}
-
 static void handle_dev_update_async(void *opaque, void *payload)
 {
     RedWorker *worker = opaque;
@@ -421,7 +337,7 @@ static void handle_dev_update_async(void *opaque, void *payload)
     QXLRect *qxl_dirty_rects = NULL;
     uint32_t num_dirty_rects = 0;
 
-    spice_return_if_fail(worker->running);
+    spice_return_if_fail(red_qxl_is_running(worker->qxl));
     spice_return_if_fail(qxl_get_interface(worker->qxl)->update_area_complete);
 
     flush_display_commands(worker);
@@ -441,7 +357,7 @@ static void handle_dev_update(void *opaque, void *payload)
     RedWorkerMessageUpdate *msg = payload;
     QXLRect *qxl_dirty_rects = msg->qxl_dirty_rects;
 
-    spice_return_if_fail(worker->running);
+    spice_return_if_fail(red_qxl_is_running(worker->qxl));
 
     flush_display_commands(worker);
     display_channel_update(worker->display_channel,
@@ -487,7 +403,6 @@ static void dev_create_primary_surface(RedWorker *worker, uint32_t surface_id,
 {
     DisplayChannel *display = worker->display_channel;
     uint8_t *line_0;
-    int error;
 
     spice_debug("trace");
     spice_warn_if_fail(surface_id == 0);
@@ -504,8 +419,8 @@ static void dev_create_primary_surface(RedWorker *worker, uint32_t surface_id,
 
     line_0 = (uint8_t*)memslot_get_virt(&worker->mem_slots, surface.mem,
                                         surface.height * abs(surface.stride),
-                                        surface.group_id, &error);
-    if (error) {
+                                        surface.group_id);
+    if (line_0 == NULL) {
         return;
     }
     if (worker->record) {
@@ -521,17 +436,17 @@ static void dev_create_primary_surface(RedWorker *worker, uint32_t surface_id,
                                    line_0, surface.flags & QXL_SURF_FLAG_KEEP_DATA, TRUE);
     display_channel_set_monitors_config_to_primary(display);
 
-    CommonGraphicsChannel *common = COMMON_GRAPHICS_CHANNEL(worker->display_channel);
-    if (display_is_connected(worker) &&
+    CommonGraphicsChannel *common = COMMON_GRAPHICS_CHANNEL(display);
+    RedChannel *channel = RED_CHANNEL(display);
+    if (red_channel_is_connected(channel) &&
         !common_graphics_channel_get_during_target_migrate(common)) {
         /* guest created primary, so it will (hopefully) send a monitors_config
          * now, don't send our own temporary one */
         if (!worker->driver_cap_monitors_config) {
             display_channel_push_monitors_config(display);
         }
-        red_channel_pipes_add_empty_msg(RED_CHANNEL(worker->display_channel),
-                                        SPICE_MSG_DISPLAY_MARK);
-        red_channel_push(RED_CHANNEL(worker->display_channel));
+        red_channel_pipes_add_empty_msg(channel, SPICE_MSG_DISPLAY_MARK);
+        red_channel_push(channel);
     }
 
     cursor_channel_do_init(worker->cursor_channel);
@@ -602,9 +517,10 @@ static void handle_dev_stop(void *opaque, void *payload)
     RedWorker *worker = opaque;
 
     spice_debug("stop");
-    spice_assert(worker->running);
+    spice_assert(red_qxl_is_running(worker->qxl));
 
-    worker->running = FALSE;
+    red_qxl_set_running(worker->qxl, false);
+    display_channel_update_qxl_running(worker->display_channel, false);
 
     display_channel_free_glz_drawables(worker->display_channel);
     display_channel_flush_all_surfaces(worker->display_channel);
@@ -622,7 +538,7 @@ static void handle_dev_start(void *opaque, void *payload)
 {
     RedWorker *worker = opaque;
 
-    spice_assert(!worker->running);
+    spice_assert(!red_qxl_is_running(worker->qxl));
     if (worker->cursor_channel) {
         CommonGraphicsChannel *common = COMMON_GRAPHICS_CHANNEL(worker->cursor_channel);
         common_graphics_channel_set_during_target_migrate(common, FALSE);
@@ -632,9 +548,9 @@ static void handle_dev_start(void *opaque, void *payload)
         common_graphics_channel_set_during_target_migrate(common, FALSE);
         display_channel_wait_for_migrate_data(worker->display_channel);
     }
-    worker->running = TRUE;
+    red_qxl_set_running(worker->qxl, true);
+    display_channel_update_qxl_running(worker->display_channel, true);
     worker->event_timeout = 0;
-    guest_set_client_capabilities(worker);
 }
 
 static void handle_dev_wakeup(void *opaque, void *payload)
@@ -653,7 +569,7 @@ static void handle_dev_oom(void *opaque, void *payload)
     RedChannel *display_red_channel = RED_CHANNEL(display);
     int ring_is_empty;
 
-    spice_return_if_fail(worker->running);
+    spice_return_if_fail(red_qxl_is_running(worker->qxl));
     // streams? but without streams also leak
     display_channel_debug_oom(display, "OOM1");
     while (red_process_display(worker, &ring_is_empty)) {
@@ -707,56 +623,8 @@ static void handle_dev_create_primary_surface_async(void *opaque, void *payload)
     RedWorker *worker = opaque;
 
     dev_create_primary_surface(worker, msg->surface_id, msg->surface);
-    red_qxl_create_primary_surface_complete(worker->qxl->st);
+    red_qxl_create_primary_surface_complete(worker->qxl->st, &msg->surface);
     red_qxl_async_complete(worker->qxl, msg->base.cookie);
-}
-
-static void handle_dev_display_connect(void *opaque, void *payload)
-{
-    RedWorkerMessageDisplayConnect *msg = payload;
-    RedWorker *worker = opaque;
-    DisplayChannel *display = worker->display_channel;
-    DisplayChannelClient *dcc;
-
-    spice_debug("connect new client");
-    spice_return_if_fail(display);
-
-    dcc = dcc_new(display, msg->client, msg->stream, msg->migration, &msg->caps,
-                  worker->image_compression, worker->jpeg_state, worker->zlib_glz_state);
-    g_object_unref(msg->client);
-    red_channel_capabilities_reset(&msg->caps);
-    if (!dcc) {
-        return;
-    }
-    display_channel_update_compression(display, dcc);
-    guest_set_client_capabilities(worker);
-    dcc_start(dcc);
-}
-
-static void handle_dev_display_disconnect(void *opaque, void *payload)
-{
-    RedWorkerMessageDisplayDisconnect *msg = payload;
-    RedChannelClient *rcc = msg->rcc;
-    RedWorker *worker = opaque;
-
-    spice_debug("disconnect display client");
-    spice_assert(rcc);
-
-    guest_set_client_capabilities(worker);
-
-    red_channel_client_disconnect(rcc);
-}
-
-static void handle_dev_display_migrate(void *opaque, void *payload)
-{
-    RedWorkerMessageDisplayMigrate *msg = payload;
-    RedWorker *worker = opaque;
-
-    RedChannelClient *rcc = msg->rcc;
-    spice_debug("migrate display client");
-    spice_assert(rcc);
-    red_migrate_display(worker->display_channel, rcc);
-    g_object_unref(rcc);
 }
 
 static inline uint32_t qxl_monitors_config_size(uint32_t heads)
@@ -768,18 +636,17 @@ static void handle_dev_monitors_config_async(void *opaque, void *payload)
 {
     RedWorkerMessageMonitorsConfigAsync *msg = payload;
     RedWorker *worker = opaque;
-    int error;
     uint16_t count, max_allowed;
     QXLMonitorsConfig *dev_monitors_config =
         (QXLMonitorsConfig*)memslot_get_virt(&worker->mem_slots, msg->monitors_config,
                                              qxl_monitors_config_size(1),
-                                             msg->group_id, &error);
+                                             msg->group_id);
 
-    if (error) {
+    if (dev_monitors_config == NULL) {
         /* TODO: raise guest bug (requires added QXL interface) */
         goto async_complete;
     }
-    worker->driver_cap_monitors_config = 1;
+    worker->driver_cap_monitors_config = true;
     count = dev_monitors_config->count;
     max_allowed = dev_monitors_config->max_allowed;
     if (count == 0) {
@@ -797,8 +664,8 @@ static void handle_dev_monitors_config_async(void *opaque, void *payload)
     dev_monitors_config =
         (QXLMonitorsConfig*)memslot_get_virt(&worker->mem_slots, msg->monitors_config,
                                              qxl_monitors_config_size(count),
-                                             msg->group_id, &error);
-    if (error) {
+                                             msg->group_id);
+    if (dev_monitors_config == NULL) {
         /* TODO: raise guest bug (requires added QXL interface) */
         goto async_complete;
     }
@@ -809,75 +676,13 @@ async_complete:
     red_qxl_async_complete(worker->qxl, msg->base.cookie);
 }
 
-/* TODO: special, perhaps use another dispatcher? */
-static void handle_dev_cursor_connect(void *opaque, void *payload)
-{
-    RedWorkerMessageCursorConnect *msg = payload;
-    RedWorker *worker = opaque;
-
-    spice_debug("cursor connect");
-    cursor_channel_connect(worker->cursor_channel,
-                           msg->client, msg->stream, msg->migration,
-                           &msg->caps);
-    g_object_unref(msg->client);
-    red_channel_capabilities_reset(&msg->caps);
-}
-
-static void handle_dev_cursor_disconnect(void *opaque, void *payload)
-{
-    RedWorkerMessageCursorDisconnect *msg = payload;
-    RedChannelClient *rcc = msg->rcc;
-
-    spice_debug("disconnect cursor client");
-    spice_return_if_fail(rcc);
-    red_channel_client_disconnect(rcc);
-}
-
-static void handle_dev_cursor_migrate(void *opaque, void *payload)
-{
-    RedWorkerMessageCursorMigrate *msg = payload;
-    RedChannelClient *rcc = msg->rcc;
-
-    spice_debug("migrate cursor client");
-    cursor_channel_client_migrate(rcc);
-    g_object_unref(rcc);
-}
-
 static void handle_dev_set_compression(void *opaque, void *payload)
 {
     RedWorkerMessageSetCompression *msg = payload;
     RedWorker *worker = opaque;
     SpiceImageCompression image_compression = msg->image_compression;
 
-    switch (image_compression) {
-    case SPICE_IMAGE_COMPRESSION_AUTO_LZ:
-        spice_debug("ic auto_lz");
-        break;
-    case SPICE_IMAGE_COMPRESSION_AUTO_GLZ:
-        spice_debug("ic auto_glz");
-        break;
-    case SPICE_IMAGE_COMPRESSION_QUIC:
-        spice_debug("ic quic");
-        break;
-#ifdef USE_LZ4
-    case SPICE_IMAGE_COMPRESSION_LZ4:
-        spice_debug("ic lz4");
-        break;
-#endif
-    case SPICE_IMAGE_COMPRESSION_LZ:
-        spice_debug("ic lz");
-        break;
-    case SPICE_IMAGE_COMPRESSION_GLZ:
-        spice_debug("ic glz");
-        break;
-    case SPICE_IMAGE_COMPRESSION_OFF:
-        spice_debug("ic off");
-        break;
-    default:
-        spice_warning("ic invalid");
-        image_compression = worker->image_compression;
-    }
-    worker->image_compression = image_compression;
+    display_channel_set_image_compression(worker->display_channel, image_compression);
 
     display_channel_compress_stats_print(worker->display_channel);
     display_channel_compress_stats_reset(worker->display_channel);
@@ -947,7 +752,7 @@ static void handle_dev_driver_unload(void *opaque, void *payload)
 {
     RedWorker *worker = opaque;
 
-    worker->driver_cap_monitors_config = 0;
+    worker->driver_cap_monitors_config = false;
 }
 
 static
@@ -1016,36 +821,6 @@ static void worker_dispatcher_record(void *opaque, uint32_t message_type, void *
 static void register_callbacks(Dispatcher *dispatcher)
 {
     /* TODO: register cursor & display specific msg in respective channel files */
-    dispatcher_register_handler(dispatcher,
-                                RED_WORKER_MESSAGE_DISPLAY_CONNECT,
-                                handle_dev_display_connect,
-                                sizeof(RedWorkerMessageDisplayConnect),
-                                false);
-    dispatcher_register_handler(dispatcher,
-                                RED_WORKER_MESSAGE_DISPLAY_DISCONNECT,
-                                handle_dev_display_disconnect,
-                                sizeof(RedWorkerMessageDisplayDisconnect),
-                                true);
-    dispatcher_register_handler(dispatcher,
-                                RED_WORKER_MESSAGE_DISPLAY_MIGRATE,
-                                handle_dev_display_migrate,
-                                sizeof(RedWorkerMessageDisplayMigrate),
-                                false);
-    dispatcher_register_handler(dispatcher,
-                                RED_WORKER_MESSAGE_CURSOR_CONNECT,
-                                handle_dev_cursor_connect,
-                                sizeof(RedWorkerMessageCursorConnect),
-                                false);
-    dispatcher_register_handler(dispatcher,
-                                RED_WORKER_MESSAGE_CURSOR_DISCONNECT,
-                                handle_dev_cursor_disconnect,
-                                sizeof(RedWorkerMessageCursorDisconnect),
-                                true);
-    dispatcher_register_handler(dispatcher,
-                                RED_WORKER_MESSAGE_CURSOR_MIGRATE,
-                                handle_dev_cursor_migrate,
-                                sizeof(RedWorkerMessageCursorMigrate),
-                                false);
     dispatcher_register_handler(dispatcher,
                                 RED_WORKER_MESSAGE_UPDATE,
                                 handle_dev_update,
@@ -1242,7 +1017,7 @@ static gboolean worker_source_check(GSource *source)
     RedWorkerSource *wsource = SPICE_CONTAINEROF(source, RedWorkerSource, source);
     RedWorker *worker = wsource->worker;
 
-    return worker->running /* TODO && worker->pending_process */;
+    return red_qxl_is_running(worker->qxl) /* TODO && worker->pending_process */;
 }
 
 static gboolean worker_source_dispatch(GSource *source, GSourceFunc callback,
@@ -1260,7 +1035,7 @@ static gboolean worker_source_dispatch(GSource *source, GSourceFunc callback,
     display_channel_free_glz_drawables_to_free(display);
 
     /* TODO: could use its own source */
-    stream_timeout(display);
+    video_stream_timeout(display);
 
     worker->event_timeout = INF_EVENT_WAIT;
     worker->was_blocked = FALSE;
@@ -1277,9 +1052,7 @@ static GSourceFuncs worker_source_funcs = {
     .dispatch = worker_source_dispatch,
 };
 
-RedWorker* red_worker_new(QXLInstance *qxl,
-                          const ClientCbs *client_cursor_cbs,
-                          const ClientCbs *client_display_cbs)
+RedWorker* red_worker_new(QXLInstance *qxl)
 {
     QXLDevInitInfo init_info;
     RedWorker *worker;
@@ -1303,12 +1076,9 @@ RedWorker* red_worker_new(QXLInstance *qxl,
         dispatcher_register_universal_handler(dispatcher, worker_dispatcher_record);
     }
 
-    worker->image_compression = spice_server_get_image_compression(reds);
-    worker->jpeg_state = reds_get_jpeg_state(reds);
-    worker->zlib_glz_state = reds_get_zlib_glz_state(reds);
-    worker->driver_cap_monitors_config = 0;
-    char worker_str[20];
-    sprintf(worker_str, "display[%d]", worker->qxl->id);
+    worker->driver_cap_monitors_config = false;
+    char worker_str[SPICE_STAT_NODE_NAME_MAX];
+    snprintf(worker_str, sizeof(worker_str), "display[%d]", worker->qxl->id & 0xff);
     stat_init_node(&worker->stat, reds, NULL, worker_str, TRUE);
     stat_init_counter(&worker->wakeup_counter, reds, &worker->stat, "wakeups", TRUE);
     stat_init_counter(&worker->command_counter, reds, &worker->stat, "commands", TRUE);
@@ -1335,23 +1105,20 @@ RedWorker* red_worker_new(QXLInstance *qxl,
     worker->event_timeout = INF_EVENT_WAIT;
 
     worker->cursor_channel = cursor_channel_new(reds, qxl->id,
-                                                &worker->core);
+                                                &worker->core, dispatcher);
     channel = RED_CHANNEL(worker->cursor_channel);
     red_channel_init_stat_node(channel, &worker->stat, "cursor_channel");
-    red_channel_register_client_cbs(channel, client_cursor_cbs, dispatcher);
-    g_object_set_data(G_OBJECT(channel), "dispatcher", dispatcher);
-    reds_register_channel(reds, channel);
 
-    // TODO: handle seemless migration. Temp, setting migrate to FALSE
-    worker->display_channel = display_channel_new(reds, qxl, &worker->core, FALSE,
+    // TODO: handle seamless migration. Temp, setting migrate to FALSE
+    worker->display_channel = display_channel_new(reds, qxl, &worker->core, dispatcher,
+                                                  FALSE,
                                                   reds_get_streaming_video(reds),
                                                   reds_get_video_codecs(reds),
                                                   init_info.n_surfaces);
     channel = RED_CHANNEL(worker->display_channel);
     red_channel_init_stat_node(channel, &worker->stat, "display_channel");
-    red_channel_register_client_cbs(channel, client_display_cbs, dispatcher);
-    g_object_set_data(G_OBJECT(channel), "dispatcher", dispatcher);
-    reds_register_channel(reds, channel);
+    display_channel_set_image_compression(worker->display_channel,
+                                          spice_server_get_image_compression(reds));
 
     return worker;
 }

@@ -27,6 +27,7 @@ Patches also contributed by
     Axel Lin <axel.lin@ingics.com>
     소병철 <byungchul.so@samsung.com>
     Cédric Bosdonnat <cbosdonnat@suse.com>
+    Changqing Li <changqing.li@windriver.com>
     Christian Ruppert <idl0r@qasl.de>
     Christophe de Dinechin <dinechin@redhat.com>
     Cole Robinson <crobinso@redhat.com>
@@ -47,6 +48,7 @@ Patches also contributed by
     Jürg Billeter <j@bitron.ch>
     Li Zhijian <lizhijian@cn.fujitsu.com>
     Liang Guo <bluestonechina@gmail.com>
+    Lukáš Hrázký <lhrazky@redhat.com>
     Lukas Venhoda <lvenhoda@redhat.com>
     Michal Privoznik <mprivozn@redhat.com>
     Michael Tokarev <mjt@tls.msk.ru>
@@ -64,5 +66,9 @@ Patches also contributed by
     Wang Qiang <wangqiang.hunan@gmail.com>
     Yann E. MORIN <yann.morin.1998@free.fr>
     Zeeshan Ali (Khattak) <zeeshanak@gnome.org>
+    Douglas Paul <doug@bogon.ca>
+    谢 昆明 <kunming.xie@hotmail.com>
+    Benjamin Tissoires <benjamin.tissoires@redhat.com>
+    Olivier Fourdan <ofourdan@redhat.com>
 
    ....send patches to get your name here...

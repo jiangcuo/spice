@@ -19,21 +19,21 @@
 #ifndef RED_PIPE_ITEM_H_
 #define RED_PIPE_ITEM_H_
 
-#include <glib.h>
-#include <common/ring.h>
+#include <stddef.h>
+#include <inttypes.h>
 
-struct RedPipeItem;
+typedef struct RedPipeItem RedPipeItem;
 
-typedef void red_pipe_item_free_t(struct RedPipeItem *item);
+typedef void red_pipe_item_free_t(RedPipeItem *item);
 
-typedef struct RedPipeItem {
+struct RedPipeItem {
     int type;
 
     /* private */
     int refcount;
 
     red_pipe_item_free_t *free_func;
-} RedPipeItem;
+};
 
 void red_pipe_item_init_full(RedPipeItem *item, int type, red_pipe_item_free_t free_func);
 RedPipeItem *red_pipe_item_ref(RedPipeItem *item);

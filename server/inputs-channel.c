@@ -27,12 +27,12 @@
 #include <common/marshaller.h>
 #include <common/messages.h>
 #include <common/generated_server_marshallers.h>
+#include <common/demarshallers.h>
 
-#include "demarshallers.h"
 #include "spice.h"
 #include "red-common.h"
 #include "reds.h"
-#include "reds-stream.h"
+#include "red-stream.h"
 #include "red-channel.h"
 #include "red-channel-client.h"
 #include "red-client.h"
@@ -49,6 +49,11 @@ struct InputsChannel
     VDAgentMouseState mouse_state;
     int src_during_migrate;
     SpiceTimer *key_modifiers_timer;
+
+    // actual ideal modifier states, that the guest should have
+    uint8_t modifiers;
+    // current pressed modifiers
+    uint8_t modifiers_pressed;
 
     SpiceKbdInstance *keyboard;
     SpiceMouseInstance *mouse;
@@ -68,23 +73,18 @@ struct SpiceKbdState {
     /* track key press state */
     bool key[0x80];
     bool key_ext[0x80];
-    RedsState *reds;
+    InputsChannel *inputs;
 };
 
 static SpiceKbdInstance* inputs_channel_get_keyboard(InputsChannel *inputs);
 static SpiceMouseInstance* inputs_channel_get_mouse(InputsChannel *inputs);
 static SpiceTabletInstance* inputs_channel_get_tablet(InputsChannel *inputs);
 
-static SpiceKbdState* spice_kbd_state_new(RedsState *reds)
+static SpiceKbdState* spice_kbd_state_new(InputsChannel *inputs)
 {
-    SpiceKbdState *st = spice_new0(SpiceKbdState, 1);
-    st->reds = reds;
+    SpiceKbdState *st = g_new0(SpiceKbdState, 1);
+    st->inputs = inputs;
     return st;
-}
-
-RedsState* spice_kbd_state_get_server(SpiceKbdState *dev)
-{
-    return dev->reds;
 }
 
 struct SpiceMouseState {
@@ -93,16 +93,23 @@ struct SpiceMouseState {
 
 static SpiceMouseState* spice_mouse_state_new(void)
 {
-    return spice_new0(SpiceMouseState, 1);
+    return g_new0(SpiceMouseState, 1);
 }
 
 struct SpiceTabletState {
     RedsState *reds;
 };
 
-static SpiceTabletState* spice_tablet_state_new(void)
+static SpiceTabletState* spice_tablet_state_new(RedsState* reds)
 {
-    return spice_new0(SpiceTabletState, 1);
+    SpiceTabletState *st = g_new0(SpiceTabletState, 1);
+    st->reds = reds;
+    return st;
+}
+
+static void spice_tablet_state_free(SpiceTabletState* st)
+{
+    g_free(st);
 }
 
 RedsState* spice_tablet_state_get_server(SpiceTabletState *st)
@@ -155,9 +162,10 @@ const VDAgentMouseState *inputs_channel_get_mouse_state(InputsChannel *inputs)
      ((state & SPICE_MOUSE_BUTTON_MASK_MIDDLE) ? VD_AGENT_MBUTTON_MASK : 0) |    \
      ((state & SPICE_MOUSE_BUTTON_MASK_RIGHT) ? VD_AGENT_RBUTTON_MASK : 0))
 
-static void activate_modifiers_watch(InputsChannel *inputs, RedsState *reds)
+static void activate_modifiers_watch(InputsChannel *inputs)
 {
-    reds_core_timer_start(reds, inputs->key_modifiers_timer, KEY_MODIFIERS_TTL);
+    SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(RED_CHANNEL(inputs));
+    core->timer_start(core, inputs->key_modifiers_timer, KEY_MODIFIERS_TTL);
 }
 
 static void kbd_push_scan(SpiceKbdInstance *sin, uint8_t scan)
@@ -167,7 +175,7 @@ static void kbd_push_scan(SpiceKbdInstance *sin, uint8_t scan)
     if (!sin) {
         return;
     }
-    sif = SPICE_CONTAINEROF(sin->base.sif, SpiceKbdInterface, base);
+    sif = SPICE_UPCAST(SpiceKbdInterface, sin->base.sif);
 
     /* track XT scan code set 1 key state */
     if (scan >= 0xe0 && scan <= 0xe2) {
@@ -183,6 +191,34 @@ static void kbd_push_scan(SpiceKbdInstance *sin, uint8_t scan)
     sif->push_scan_freg(sin, scan);
 }
 
+static uint8_t scancode_to_modifier_flag(uint8_t scancode)
+{
+    switch (scancode & ~SCAN_CODE_RELEASE) {
+    case CAPS_LOCK_SCAN_CODE:
+        return SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK;
+    case NUM_LOCK_SCAN_CODE:
+        return SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK;
+    case SCROLL_LOCK_SCAN_CODE:
+        return SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK;
+    }
+    return 0;
+}
+
+static void inputs_channel_sync_locks(InputsChannel *inputs_channel, uint8_t scan)
+{
+    uint8_t change_modifier = scancode_to_modifier_flag(scan);
+
+    if (scan & SCAN_CODE_RELEASE) { /* KEY_UP */
+        inputs_channel->modifiers_pressed &= ~change_modifier;
+    } else {  /* KEY_DOWN */
+        if (change_modifier && !(inputs_channel->modifiers_pressed & change_modifier)) {
+            inputs_channel->modifiers ^= change_modifier;
+            inputs_channel->modifiers_pressed |= change_modifier;
+            activate_modifiers_watch(inputs_channel);
+        }
+    }
+}
+
 static uint8_t kbd_get_leds(SpiceKbdInstance *sin)
 {
     SpiceKbdInterface *sif;
@@ -190,13 +226,13 @@ static uint8_t kbd_get_leds(SpiceKbdInstance *sin)
     if (!sin) {
         return 0;
     }
-    sif = SPICE_CONTAINEROF(sin->base.sif, SpiceKbdInterface, base);
+    sif = SPICE_UPCAST(SpiceKbdInterface, sin->base.sif);
     return sif->get_leds(sin);
 }
 
 static RedPipeItem *red_inputs_key_modifiers_item_new(uint8_t modifiers)
 {
-    RedKeyModifiersPipeItem *item = spice_malloc(sizeof(RedKeyModifiersPipeItem));
+    RedKeyModifiersPipeItem *item = g_new(RedKeyModifiersPipeItem, 1);
 
     red_pipe_item_init(&item->base, RED_PIPE_ITEM_KEY_MODIFIERS);
     item->modifiers = modifiers;
@@ -253,11 +289,7 @@ static bool inputs_channel_handle_message(RedChannelClient *rcc, uint16_t type,
     switch (type) {
     case SPICE_MSGC_INPUTS_KEY_DOWN: {
         SpiceMsgcKeyDown *key_down = message;
-        if (key_down->code == CAPS_LOCK_SCAN_CODE ||
-            key_down->code == NUM_LOCK_SCAN_CODE ||
-            key_down->code == SCROLL_LOCK_SCAN_CODE) {
-            activate_modifiers_watch(inputs_channel, reds);
-        }
+        inputs_channel_sync_locks(inputs_channel, key_down->code);
     }
         /* fallthrough */
     case SPICE_MSGC_INPUTS_KEY_UP: {
@@ -268,6 +300,7 @@ static bool inputs_channel_handle_message(RedChannelClient *rcc, uint16_t type,
                 break;
             }
             kbd_push_scan(inputs_channel_get_keyboard(inputs_channel), code);
+            inputs_channel_sync_locks(inputs_channel, code);
         }
         break;
     }
@@ -275,6 +308,7 @@ static bool inputs_channel_handle_message(RedChannelClient *rcc, uint16_t type,
         uint8_t *code = message;
         for (i = 0; i < size; i++) {
             kbd_push_scan(inputs_channel_get_keyboard(inputs_channel), code[i]);
+            inputs_channel_sync_locks(inputs_channel, code[i]);
         }
         break;
     }
@@ -285,7 +319,7 @@ static bool inputs_channel_handle_message(RedChannelClient *rcc, uint16_t type,
         inputs_channel_client_on_mouse_motion(icc);
         if (mouse && reds_get_mouse_mode(reds) == SPICE_MOUSE_MODE_SERVER) {
             SpiceMouseInterface *sif;
-            sif = SPICE_CONTAINEROF(mouse->base.sif, SpiceMouseInterface, base);
+            sif = SPICE_UPCAST(SpiceMouseInterface, mouse->base.sif);
             sif->motion(mouse,
                         mouse_motion->dx, mouse_motion->dy, 0,
                         RED_MOUSE_STATE_TO_LOCAL(mouse_motion->buttons_state));
@@ -303,7 +337,7 @@ static bool inputs_channel_handle_message(RedChannelClient *rcc, uint16_t type,
         spice_assert((reds_config_get_agent_mouse(reds) && reds_has_vdagent(reds)) || tablet);
         if (!reds_config_get_agent_mouse(reds) || !reds_has_vdagent(reds)) {
             SpiceTabletInterface *sif;
-            sif = SPICE_CONTAINEROF(tablet->base.sif, SpiceTabletInterface, base);
+            sif = SPICE_UPCAST(SpiceTabletInterface, tablet->base.sif);
             sif->position(tablet, pos->x, pos->y, RED_MOUSE_STATE_TO_LOCAL(pos->buttons_state));
             break;
         }
@@ -377,27 +411,31 @@ static bool inputs_channel_handle_message(RedChannelClient *rcc, uint16_t type,
         if (!keyboard) {
             break;
         }
-        leds = kbd_get_leds(keyboard);
-        if ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK) !=
-            (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK)) {
+        leds = inputs_channel->modifiers;
+        if (!(inputs_channel->modifiers_pressed & SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK) &&
+            ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK) !=
+             (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK))) {
             kbd_push_scan(keyboard, SCROLL_LOCK_SCAN_CODE);
             kbd_push_scan(keyboard, SCROLL_LOCK_SCAN_CODE | SCAN_CODE_RELEASE);
+            inputs_channel->modifiers ^= SPICE_KEYBOARD_MODIFIER_FLAGS_SCROLL_LOCK;
         }
-        if ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK) !=
-            (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK)) {
+        if (!(inputs_channel->modifiers_pressed & SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK) &&
+            ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK) !=
+             (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK))) {
             kbd_push_scan(keyboard, NUM_LOCK_SCAN_CODE);
             kbd_push_scan(keyboard, NUM_LOCK_SCAN_CODE | SCAN_CODE_RELEASE);
+            inputs_channel->modifiers ^= SPICE_KEYBOARD_MODIFIER_FLAGS_NUM_LOCK;
         }
-        if ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK) !=
-            (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK)) {
+        if (!(inputs_channel->modifiers_pressed & SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK) &&
+            ((modifiers->modifiers & SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK) !=
+             (leds & SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK))) {
             kbd_push_scan(keyboard, CAPS_LOCK_SCAN_CODE);
             kbd_push_scan(keyboard, CAPS_LOCK_SCAN_CODE | SCAN_CODE_RELEASE);
+            inputs_channel->modifiers ^= SPICE_KEYBOARD_MODIFIER_FLAGS_CAPS_LOCK;
         }
-        activate_modifiers_watch(inputs_channel, reds);
+        activate_modifiers_watch(inputs_channel);
         break;
     }
-    case SPICE_MSGC_DISCONNECTING:
-        break;
     default:
         return red_channel_client_handle_message(rcc, type, size, message);
     }
@@ -435,7 +473,7 @@ void inputs_release_keys(InputsChannel *inputs)
 
 static void inputs_pipe_add_init(RedChannelClient *rcc)
 {
-    RedInputsInitPipeItem *item = spice_malloc(sizeof(RedInputsInitPipeItem));
+    RedInputsInitPipeItem *item = g_new(RedInputsInitPipeItem, 1);
     InputsChannel *inputs = INPUTS_CHANNEL(red_channel_client_get_channel(rcc));
 
     red_pipe_item_init(&item->base, RED_PIPE_ITEM_INPUTS_INIT);
@@ -444,17 +482,16 @@ static void inputs_pipe_add_init(RedChannelClient *rcc)
 }
 
 static void inputs_connect(RedChannel *channel, RedClient *client,
-                           RedsStream *stream, int migration,
+                           RedStream *stream, int migration,
                            RedChannelCapabilities *caps)
 {
     RedChannelClient *rcc;
 
-    if (!reds_stream_is_ssl(stream) && !red_client_during_migrate_at_target(client)) {
+    if (!red_stream_is_ssl(stream) && !red_client_during_migrate_at_target(client)) {
         main_channel_client_push_notify(red_client_get_main(client),
                                         "keyboard channel is insecure");
     }
 
-    spice_printerr("inputs channel client create");
     rcc = inputs_channel_client_create(channel, client, stream, caps);
     if (!rcc) {
         return;
@@ -479,15 +516,20 @@ static void inputs_channel_push_keyboard_modifiers(InputsChannel *inputs, uint8_
                           red_inputs_key_modifiers_item_new(modifiers));
 }
 
-void inputs_channel_on_keyboard_leds_change(InputsChannel *inputs, uint8_t leds)
+SPICE_GNUC_VISIBLE int spice_server_kbd_leds(SpiceKbdInstance *sin, int leds)
 {
-    inputs_channel_push_keyboard_modifiers(inputs, leds);
+    InputsChannel *inputs_channel = sin->st->inputs;
+    if (inputs_channel) {
+        inputs_channel->modifiers = leds;
+        inputs_channel_push_keyboard_modifiers(inputs_channel, leds);
+    }
+    return 0;
 }
 
 static void key_modifiers_sender(void *opaque)
 {
     InputsChannel *inputs = opaque;
-    inputs_channel_push_keyboard_modifiers(inputs, kbd_get_leds(inputs_channel_get_keyboard(inputs)));
+    inputs_channel_push_keyboard_modifiers(inputs, inputs->modifiers);
 }
 
 static bool inputs_channel_handle_migrate_flush_mark(RedChannelClient *rcc)
@@ -504,6 +546,11 @@ static bool inputs_channel_handle_migrate_data(RedChannelClient *rcc,
     InputsChannel *inputs = INPUTS_CHANNEL(red_channel_client_get_channel(rcc));
     SpiceMigrateDataHeader *header;
     SpiceMigrateDataInputs *mig_data;
+
+    if (size < sizeof(SpiceMigrateDataHeader) + sizeof(SpiceMigrateDataInputs)) {
+        spice_warning("bad message size %u", size);
+        return FALSE;
+    }
 
     header = (SpiceMigrateDataHeader *)message;
     mig_data = (SpiceMigrateDataInputs *)(header + 1);
@@ -536,20 +583,16 @@ InputsChannel* inputs_channel_new(RedsState *reds)
 static void
 inputs_channel_constructed(GObject *object)
 {
-    ClientCbs client_cbs = { NULL, };
     InputsChannel *self = INPUTS_CHANNEL(object);
     RedsState *reds = red_channel_get_server(RED_CHANNEL(self));
+    SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(RED_CHANNEL(self));
 
     G_OBJECT_CLASS(inputs_channel_parent_class)->constructed(object);
-
-    client_cbs.connect = inputs_connect;
-    client_cbs.migrate = inputs_migrate;
-    red_channel_register_client_cbs(RED_CHANNEL(self), &client_cbs, NULL);
 
     red_channel_set_cap(RED_CHANNEL(self), SPICE_INPUTS_CAP_KEY_SCANCODE);
     reds_register_channel(reds, RED_CHANNEL(self));
 
-    self->key_modifiers_timer = reds_core_timer_add(reds, key_modifiers_sender, self);
+    self->key_modifiers_timer = core->timer_add(core, key_modifiers_sender, self);
     if (!self->key_modifiers_timer) {
         spice_error("key modifiers timer create failed");
     }
@@ -559,9 +602,10 @@ static void
 inputs_channel_finalize(GObject *object)
 {
     InputsChannel *self = INPUTS_CHANNEL(object);
-    RedsState *reds = red_channel_get_server(RED_CHANNEL(self));
+    SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(RED_CHANNEL(self));
 
-    reds_core_timer_remove(reds, self->key_modifiers_timer);
+    inputs_channel_detach_tablet(self, self->tablet);
+    core->timer_remove(core, self->key_modifiers_timer);
 
     G_OBJECT_CLASS(inputs_channel_parent_class)->finalize(object);
 }
@@ -588,6 +632,10 @@ inputs_channel_class_init(InputsChannelClass *klass)
     channel_class->send_item = inputs_channel_send_item;
     channel_class->handle_migrate_data = inputs_channel_handle_migrate_data;
     channel_class->handle_migrate_flush_mark = inputs_channel_handle_migrate_flush_mark;
+
+    // client callbacks
+    channel_class->connect = inputs_connect;
+    channel_class->migrate = inputs_migrate;
 }
 
 static SpiceKbdInstance* inputs_channel_get_keyboard(InputsChannel *inputs)
@@ -598,11 +646,11 @@ static SpiceKbdInstance* inputs_channel_get_keyboard(InputsChannel *inputs)
 int inputs_channel_set_keyboard(InputsChannel *inputs, SpiceKbdInstance *keyboard)
 {
     if (inputs->keyboard) {
-        spice_printerr("already have keyboard");
+        red_channel_warning(RED_CHANNEL(inputs), "already have keyboard");
         return -1;
     }
     inputs->keyboard = keyboard;
-    inputs->keyboard->st = spice_kbd_state_new(red_channel_get_server(RED_CHANNEL(inputs)));
+    inputs->keyboard->st = spice_kbd_state_new(inputs);
     return 0;
 }
 
@@ -614,7 +662,7 @@ static SpiceMouseInstance* inputs_channel_get_mouse(InputsChannel *inputs)
 int inputs_channel_set_mouse(InputsChannel *inputs, SpiceMouseInstance *mouse)
 {
     if (inputs->mouse) {
-        spice_printerr("already have mouse");
+        red_channel_warning(RED_CHANNEL(inputs), "already have mouse");
         return -1;
     }
     inputs->mouse = mouse;
@@ -627,15 +675,14 @@ static SpiceTabletInstance* inputs_channel_get_tablet(InputsChannel *inputs)
     return inputs->tablet;
 }
 
-int inputs_channel_set_tablet(InputsChannel *inputs, SpiceTabletInstance *tablet, RedsState *reds)
+int inputs_channel_set_tablet(InputsChannel *inputs, SpiceTabletInstance *tablet)
 {
     if (inputs->tablet) {
-        spice_printerr("already have tablet");
+        red_channel_warning(RED_CHANNEL(inputs), "already have tablet");
         return -1;
     }
     inputs->tablet = tablet;
-    inputs->tablet->st = spice_tablet_state_new();
-    inputs->tablet->st->reds = reds;
+    inputs->tablet->st = spice_tablet_state_new(red_channel_get_server(RED_CHANNEL(inputs)));
     return 0;
 }
 
@@ -646,7 +693,10 @@ int inputs_channel_has_tablet(InputsChannel *inputs)
 
 void inputs_channel_detach_tablet(InputsChannel *inputs, SpiceTabletInstance *tablet)
 {
-    spice_printerr("");
+    if (tablet != NULL && tablet == inputs->tablet) {
+        spice_tablet_state_free(tablet->st);
+        tablet->st = NULL;
+    }
     inputs->tablet = NULL;
 }
 

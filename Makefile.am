@@ -1,7 +1,7 @@
 NULL =
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = spice-common server docs tools
+SUBDIRS = subprojects/spice-common server docs tools
 
 check-valgrind:
 	$(MAKE) -C server check-valgrind
@@ -10,14 +10,17 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = spice-server.pc
 
 DISTCHECK_CONFIGURE_FLAGS =			\
-	--enable-automated-tests		\
+	--disable-celt051			\
 	--enable-smartcard			\
 	--with-sasl				\
 	--enable-manual				\
 	$(NULL)
 
 EXTRA_DIST =					\
+	meson.build				\
+	meson_options.txt			\
 	build-aux/git-version-gen		\
+	build-aux/meson/check-spice-common	\
 	.version				\
 	$(NULL)
 

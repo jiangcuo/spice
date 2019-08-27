@@ -78,7 +78,7 @@ test_channel_send_item(RedChannelClient *rcc, RedPipeItem *item)
 }
 
 static void
-test_connect_client(RedChannel *channel, RedClient *client, RedsStream *stream,
+test_connect_client(RedChannel *channel, RedClient *client, RedStream *stream,
                     int migration, RedChannelCapabilities *caps)
 {
     RedChannelClient *rcc;
@@ -106,24 +106,13 @@ test_connect_client(RedChannel *channel, RedClient *client, RedsStream *stream,
 }
 
 static void
-red_test_channel_constructed(GObject *object)
-{
-    G_OBJECT_CLASS(red_test_channel_parent_class)->constructed(object);
-
-    ClientCbs client_cbs = { .connect = test_connect_client, };
-    red_channel_register_client_cbs(RED_CHANNEL(object), &client_cbs, NULL);
-}
-
-static void
 red_test_channel_class_init(RedTestChannelClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS(klass);
-    object_class->constructed = red_test_channel_constructed;
-
     RedChannelClass *channel_class = RED_CHANNEL_CLASS(klass);
     channel_class->parser = spice_get_client_channel_parser(SPICE_CHANNEL_PORT, NULL);
     channel_class->handle_message = red_channel_client_handle_message;
     channel_class->send_item = test_channel_send_item;
+    channel_class->connect = test_connect_client;
 }
 
 static uint8_t *
@@ -189,9 +178,9 @@ static void send_ack_sync(int socket, uint32_t generation)
         uint32_t generation;
     } msg;
     SPICE_VERIFY(sizeof(msg) == 12);
-    msg.type = SPICE_MSGC_ACK_SYNC;
-    msg.len = sizeof(generation);
-    msg.generation = generation;
+    msg.type = GUINT16_TO_LE(SPICE_MSGC_ACK_SYNC);
+    msg.len = GUINT32_TO_LE(sizeof(generation));
+    msg.generation = GUINT32_TO_LE(generation);
 
     g_assert_cmpint(write(socket, &msg.type, 10), ==, 10);
 }
@@ -244,7 +233,7 @@ static void timeout_watch_count(void *opaque)
     // TODO watch
 }
 
-static RedsStream *create_dummy_stream(SpiceServer *server, int *p_socket)
+static RedStream *create_dummy_stream(SpiceServer *server, int *p_socket)
 {
     int sv[2];
     g_assert_cmpint(socketpair(AF_LOCAL, SOCK_STREAM, 0, sv), ==, 0);
@@ -254,7 +243,7 @@ static RedsStream *create_dummy_stream(SpiceServer *server, int *p_socket)
     red_socket_set_non_blocking(sv[0], true);
     red_socket_set_non_blocking(sv[1], true);
 
-    RedsStream * stream = reds_stream_new(server, sv[0]);
+    RedStream * stream = red_stream_new(server, sv[0]);
     g_assert_nonnull(stream);
 
     return stream;

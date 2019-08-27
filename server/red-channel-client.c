@@ -22,12 +22,14 @@
 #include <glib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#ifndef _WIN32
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/ioctl.h>
+#endif
 #ifdef HAVE_LINUX_SOCKIOS_H
 #include <linux/sockios.h> /* SIOCOUTQ */
 #endif
@@ -101,8 +103,6 @@ typedef struct RedChannelClientConnectivityMonitor {
 } RedChannelClientConnectivityMonitor;
 
 typedef struct OutgoingMessageBuffer {
-    struct iovec vec[IOV_MAX];
-    int vec_size;
     int pos;
     int size;
 } OutgoingMessageBuffer;
@@ -119,7 +119,7 @@ struct RedChannelClientPrivate
 {
     RedChannel *channel;
     RedClient  *client;
-    RedsStream *stream;
+    RedStream *stream;
     gboolean monitor_latency;
 
     struct {
@@ -181,19 +181,14 @@ static bool red_channel_client_config_socket(RedChannelClient *rcc);
 #define spice_channel_client_error(rcc, format, ...)                                     \
     do {                                                                                 \
         RedChannel *_ch = red_channel_client_get_channel(rcc);                           \
-        uint32_t _type, _id;                                                             \
-        g_object_get(_ch, "channel-type", &_type, "id", &_id, NULL);                     \
-        spice_warning("rcc %p type %u id %u: " format, rcc,                              \
-                    type, id, ## __VA_ARGS__);                                           \
+        red_channel_warning(_ch, format, ## __VA_ARGS__);                                \
         red_channel_client_shutdown(rcc);                                                \
     } while (0)
 
 G_DEFINE_TYPE_WITH_CODE(RedChannelClient, red_channel_client, G_TYPE_OBJECT,
                         G_IMPLEMENT_INTERFACE(G_TYPE_INITABLE,
-                                              red_channel_client_initable_interface_init))
-
-#define CHANNEL_CLIENT_PRIVATE(o) \
-    (G_TYPE_INSTANCE_GET_PRIVATE((o), RED_TYPE_CHANNEL_CLIENT, RedChannelClientPrivate))
+                                              red_channel_client_initable_interface_init);
+                        G_ADD_PRIVATE(RedChannelClient));
 
 static gboolean red_channel_client_initable_init(GInitable *initable,
                                                  GCancellable *cancellable,
@@ -218,7 +213,7 @@ typedef struct RedEmptyMsgPipeItem {
 
 typedef struct MarkerPipeItem {
     RedPipeItem base;
-    gboolean *item_in_pipe;
+    bool item_sent;
 } MarkerPipeItem;
 
 static void red_channel_client_start_ping_timer(RedChannelClient *rcc, uint32_t timeout)
@@ -349,7 +344,7 @@ red_channel_client_finalize(GObject *object)
         self->priv->connectivity_monitor.timer = NULL;
     }
 
-    reds_stream_free(self->priv->stream);
+    red_stream_free(self->priv->stream);
     self->priv->stream = NULL;
 
     if (self->priv->send_data.main.marshaller) {
@@ -407,7 +402,6 @@ static void red_channel_client_class_init(RedChannelClientClass *klass)
     GParamSpec *spec;
 
     g_debug("%s", G_STRFUNC);
-    g_type_class_add_private(klass, sizeof(RedChannelClientPrivate));
 
     object_class->get_property = red_channel_client_get_property;
     object_class->set_property = red_channel_client_set_property;
@@ -457,7 +451,7 @@ static void red_channel_client_class_init(RedChannelClientClass *klass)
 static void
 red_channel_client_init(RedChannelClient *self)
 {
-    self->priv = CHANNEL_CLIENT_PRIVATE(self);
+    self->priv = red_channel_client_get_instance_private(self);
     // blocks send message (maybe use send_data.blocked + block flags)
     self->priv->ack_data.messages_window = ~0;
     self->priv->ack_data.client_generation = ~0;
@@ -571,11 +565,11 @@ static void red_channel_client_send_ping(RedChannelClient *rcc)
          * roundtrip measurement is less accurate (bigger).
          */
         rcc->priv->latency_monitor.tcp_nodelay = true;
-        delay_val = reds_stream_get_no_delay(rcc->priv->stream);
+        delay_val = red_stream_get_no_delay(rcc->priv->stream);
         if (delay_val != -1) {
             rcc->priv->latency_monitor.tcp_nodelay = delay_val;
             if (!delay_val) {
-                reds_stream_set_no_delay(rcc->priv->stream, TRUE);
+                red_stream_set_no_delay(rcc->priv->stream, TRUE);
             }
         }
     }
@@ -613,6 +607,7 @@ static void red_channel_client_send_item(RedChannelClient *rcc, RedPipeItem *ite
             red_channel_client_send_ping(rcc);
             break;
         case RED_PIPE_ITEM_TYPE_MARKER:
+            SPICE_UPCAST(MarkerPipeItem, item)->item_sent = true;
             break;
         default:
             red_channel_send_item(rcc->priv->channel, rcc, item);
@@ -632,7 +627,7 @@ static void red_channel_client_msg_sent(RedChannelClient *rcc)
     int fd;
 
     if (spice_marshaller_get_fd(rcc->priv->send_data.marshaller, &fd)) {
-        if (reds_stream_send_msgfd(rcc->priv->stream, fd) < 0) {
+        if (red_stream_send_msgfd(rcc->priv->stream, fd) < 0) {
             perror("sendfd");
             red_channel_client_disconnect(rcc);
             if (fd != -1)
@@ -700,7 +695,8 @@ static void red_channel_client_ping_timer(void *opaque)
 
         /* retrieving the occupied size of the socket's tcp snd buffer (unacked + unsent) */
         if (ioctl(rcc->priv->stream->socket, SIOCOUTQ, &so_unsent_size) == -1) {
-            spice_printerr("ioctl(SIOCOUTQ) failed, %s", strerror(errno));
+            red_channel_warning(red_channel_client_get_channel(rcc),
+                                "ioctl(SIOCOUTQ) failed, %s", strerror(errno));
         }
         if (so_unsent_size > 0) {
             /* tcp snd buffer is still occupied. rescheduling ping */
@@ -778,14 +774,10 @@ static void red_channel_client_connectivity_timer(void *opaque)
         core->timer_start(core, rcc->priv->connectivity_monitor.timer,
                           rcc->priv->connectivity_monitor.timeout);
     } else {
-        uint32_t type, id;
-        g_object_get(rcc->priv->channel,
-                     "channel-type", &type,
-                     "id", &id,
-                     NULL);
         monitor->state = CONNECTIVITY_STATE_DISCONNECTED;
-        spice_warning("rcc %p on channel %d:%d has been unresponsive for more than %u ms, disconnecting",
-                      rcc, type, id, monitor->timeout);
+        red_channel_warning(rcc->priv->channel,
+                            "rcc %p has been unresponsive for more than %u ms, disconnecting",
+                            rcc, monitor->timeout);
         red_channel_client_disconnect(rcc);
     }
 }
@@ -939,7 +931,7 @@ static gboolean red_channel_client_initable_init(GInitable *initable,
     }
 
     core = red_channel_get_core_interface(self->priv->channel);
-    reds_stream_set_core_interface(self->priv->stream, core);
+    red_stream_set_core_interface(self->priv->stream, core);
     self->priv->stream->watch =
         core->watch_add(core, self->priv->stream->socket,
                         SPICE_WATCH_EVENT_READ,
@@ -947,7 +939,7 @@ static gboolean red_channel_client_initable_init(GInitable *initable,
                         self);
 
     if (self->priv->monitor_latency
-        && reds_stream_get_family(self->priv->stream) != AF_UNIX) {
+        && red_stream_get_family(self->priv->stream) != AF_UNIX) {
         self->priv->latency_monitor.timer =
             core->timer_add(core, red_channel_client_ping_timer, self);
 
@@ -965,7 +957,9 @@ static gboolean red_channel_client_initable_init(GInitable *initable,
 
 cleanup:
     if (local_error) {
-        g_warning("Failed to create channel client: %s", local_error->message);
+        red_channel_warning(red_channel_client_get_channel(self),
+                            "Failed to create channel client: %s",
+                            local_error->message);
         g_propagate_error(error, local_error);
     }
     return local_error == NULL;
@@ -1071,7 +1065,7 @@ static void red_channel_client_release_msg_buf(RedChannelClient *rcc,
 
 static void red_channel_client_handle_outgoing(RedChannelClient *rcc)
 {
-    RedsStream *stream = rcc->priv->stream;
+    RedStream *stream = rcc->priv->stream;
     OutgoingMessageBuffer *buffer = &rcc->priv->outgoing;
     ssize_t n;
 
@@ -1087,10 +1081,11 @@ static void red_channel_client_handle_outgoing(RedChannelClient *rcc)
     }
 
     for (;;) {
-        buffer->vec_size =
-            red_channel_client_prepare_out_msg(rcc, buffer->vec, G_N_ELEMENTS(buffer->vec),
+        struct iovec vec[IOV_MAX];
+        int vec_size =
+            red_channel_client_prepare_out_msg(rcc, vec, G_N_ELEMENTS(vec),
                                                buffer->pos);
-        n = reds_stream_writev(stream, buffer->vec, buffer->vec_size);
+        n = red_stream_writev(stream, vec, vec_size);
         if (n == -1) {
             switch (errno) {
             case EAGAIN:
@@ -1102,7 +1097,7 @@ static void red_channel_client_handle_outgoing(RedChannelClient *rcc)
                 red_channel_client_disconnect(rcc);
                 return;
             default:
-                spice_printerr("%s", strerror(errno));
+                red_channel_warning(red_channel_client_get_channel(rcc), "%s", strerror(errno));
                 red_channel_client_disconnect(rcc);
                 return;
             }
@@ -1123,7 +1118,7 @@ static void red_channel_client_handle_outgoing(RedChannelClient *rcc)
 }
 
 /* return the number of bytes read. -1 in case of error */
-static int red_peer_receive(RedsStream *stream, uint8_t *buf, uint32_t size)
+static int red_peer_receive(RedStream *stream, uint8_t *buf, uint32_t size)
 {
     uint8_t *pos = buf;
     while (size) {
@@ -1135,7 +1130,7 @@ static int red_peer_receive(RedsStream *stream, uint8_t *buf, uint32_t size)
         if (!stream->watch) {
             return -1;
         }
-        now = reds_stream_read(stream, pos, size);
+        now = red_stream_read(stream, pos, size);
         if (now <= 0) {
             if (now == 0) {
                 return -1;
@@ -1148,7 +1143,7 @@ static int red_peer_receive(RedsStream *stream, uint8_t *buf, uint32_t size)
             } else if (errno == EPIPE) {
                 return -1;
             } else {
-                spice_printerr("%s", strerror(errno));
+                g_warning("%s", strerror(errno));
                 return -1;
             }
         } else {
@@ -1185,7 +1180,7 @@ static uint8_t *red_channel_client_parse(RedChannelClient *rcc, uint8_t *message
 // this is suboptimal potentially. Profile and consider fixing.
 static void red_channel_client_handle_incoming(RedChannelClient *rcc)
 {
-    RedsStream *stream = rcc->priv->stream;
+    RedStream *stream = rcc->priv->stream;
     IncomingMessageBuffer *buffer = &rcc->priv->incoming;
     int bytes_read;
     uint16_t msg_type;
@@ -1227,7 +1222,7 @@ static void red_channel_client_handle_incoming(RedChannelClient *rcc)
             if (!buffer->msg) {
                 buffer->msg = red_channel_client_alloc_msg_buf(rcc, msg_type, msg_size);
                 if (buffer->msg == NULL) {
-                    spice_printerr("ERROR: channel refused to allocate buffer.");
+                    red_channel_warning(channel, "ERROR: channel refused to allocate buffer.");
                     red_channel_client_disconnect(rcc);
                     return;
                 }
@@ -1255,7 +1250,7 @@ static void red_channel_client_handle_incoming(RedChannelClient *rcc)
                                           msg_type,
                                           &parsed_size, &parsed_free);
         if (parsed == NULL) {
-            spice_printerr("failed to parse message type %d", msg_type);
+            red_channel_warning(channel, "failed to parse message type %d", msg_type);
             red_channel_client_release_msg_buf(rcc,
                                                msg_type, msg_size,
                                                buffer->msg);
@@ -1309,11 +1304,11 @@ void red_channel_client_push(RedChannelClient *rcc)
 {
     RedPipeItem *pipe_item;
 
-    if (!rcc->priv->during_send) {
-        rcc->priv->during_send = TRUE;
-    } else {
+    if (rcc->priv->during_send) {
         return;
     }
+
+    rcc->priv->during_send = TRUE;
     g_object_ref(rcc);
     if (red_channel_client_is_blocked(rcc)) {
         red_channel_client_send(rcc);
@@ -1321,7 +1316,8 @@ void red_channel_client_push(RedChannelClient *rcc)
 
     if (!red_channel_client_no_item_being_sent(rcc) && !red_channel_client_is_blocked(rcc)) {
         red_channel_client_set_blocked(rcc);
-        spice_printerr("ERROR: an item waiting to be sent and not blocked");
+        red_channel_warning(red_channel_client_get_channel(rcc),
+                            "ERROR: an item waiting to be sent and not blocked");
     }
 
     while ((pipe_item = red_channel_client_pipe_item_get(rcc))) {
@@ -1334,6 +1330,11 @@ void red_channel_client_push(RedChannelClient *rcc)
     if ((red_channel_client_no_item_being_sent(rcc) && g_queue_is_empty(&rcc->priv->pipe)) ||
         red_channel_client_waiting_for_ack(rcc)) {
         red_channel_client_watch_update_mask(rcc, SPICE_WATCH_EVENT_READ);
+        /* channel has no pending data to send so now we can flush data in
+         * order to avoid data stall into buffers in case of manual
+         * flushing
+         */
+        red_stream_flush(rcc->priv->stream);
     }
     rcc->priv->during_send = FALSE;
     g_object_unref(rcc);
@@ -1377,7 +1378,7 @@ static void red_channel_client_handle_pong(RedChannelClient *rcc, SpiceMsgPing *
 
     /* set TCP_NODELAY=0, in case we reverted it for the test*/
     if (!rcc->priv->latency_monitor.tcp_nodelay) {
-        reds_stream_set_no_delay(rcc->priv->stream, FALSE);
+        red_stream_set_no_delay(rcc->priv->stream, FALSE);
     }
 
     /*
@@ -1419,11 +1420,9 @@ static void red_channel_client_handle_migrate_data(RedChannelClient *rcc,
 {
     RedChannel *channel = red_channel_client_get_channel(rcc);
     RedChannelClass *klass = RED_CHANNEL_GET_CLASS(channel);
-    uint32_t type, id;
 
-    g_object_get(channel, "channel-type", &type, "id", &id, NULL);
-    spice_debug("channel type %d id %d rcc %p size %u",
-                type, id, rcc, size);
+    red_channel_debug(channel, "rcc %p size %u", rcc, size);
+
     if (!klass->handle_migrate_data) {
         return;
     }
@@ -1449,7 +1448,7 @@ bool red_channel_client_handle_message(RedChannelClient *rcc, uint16_t type,
     switch (type) {
     case SPICE_MSGC_ACK_SYNC:
         if (size != sizeof(uint32_t)) {
-            spice_printerr("bad message size");
+            red_channel_warning(red_channel_client_get_channel(rcc), "bad message size");
             return FALSE;
         }
         rcc->priv->ack_data.client_generation = *(uint32_t *)(message);
@@ -1479,7 +1478,7 @@ bool red_channel_client_handle_message(RedChannelClient *rcc, uint16_t type,
         red_channel_client_handle_pong(rcc, message);
         break;
     default:
-        spice_printerr("invalid message type %u", type);
+        red_channel_warning(red_channel_client_get_channel(rcc), "invalid message type %u", type);
         return FALSE;
     }
     return TRUE;
@@ -1498,7 +1497,7 @@ void red_channel_client_begin_send_message(RedChannelClient *rcc)
 
     // TODO - better check: type in channel_allowed_types. Better: type in channel_allowed_types(channel_state)
     if (rcc->priv->send_data.header.get_msg_type(&rcc->priv->send_data.header) == 0) {
-        spice_printerr("BUG: header->type == 0");
+        red_channel_warning(red_channel_client_get_channel(rcc), "BUG: header->type == 0");
         return;
     }
 
@@ -1582,6 +1581,19 @@ void red_channel_client_pipe_add_after_pos(RedChannelClient *rcc,
     g_queue_insert_after(&rcc->priv->pipe, pipe_item_pos, item);
 }
 
+static void
+red_channel_client_pipe_add_before_pos(RedChannelClient *rcc,
+                                       RedPipeItem *item,
+                                       GList *pipe_item_pos)
+{
+    spice_assert(pipe_item_pos);
+    if (!prepare_pipe_add(rcc, item)) {
+        return;
+    }
+
+    g_queue_insert_before(&rcc->priv->pipe, pipe_item_pos, item);
+}
+
 void red_channel_client_pipe_add_after(RedChannelClient *rcc,
                                        RedPipeItem *item,
                                        RedPipeItem *pos)
@@ -1612,7 +1624,7 @@ void red_channel_client_pipe_add_tail(RedChannelClient *rcc,
 
 void red_channel_client_pipe_add_type(RedChannelClient *rcc, int pipe_item_type)
 {
-    RedPipeItem *item = spice_new(RedPipeItem, 1);
+    RedPipeItem *item = g_new(RedPipeItem, 1);
 
     red_pipe_item_init(item, pipe_item_type);
     red_channel_client_pipe_add(rcc, item);
@@ -1620,7 +1632,7 @@ void red_channel_client_pipe_add_type(RedChannelClient *rcc, int pipe_item_type)
 
 RedPipeItem *red_channel_client_new_empty_msg(int msg_type)
 {
-    RedEmptyMsgPipeItem *item = spice_new(RedEmptyMsgPipeItem, 1);
+    RedEmptyMsgPipeItem *item = g_new(RedEmptyMsgPipeItem, 1);
 
     red_pipe_item_init(&item->base, RED_PIPE_ITEM_TYPE_EMPTY_MSG);
     item->msg = msg_type;
@@ -1709,14 +1721,10 @@ void red_channel_client_disconnect(RedChannelClient *rcc)
 {
     RedChannel *channel = rcc->priv->channel;
     SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(channel);
-    uint32_t type, id;
 
     if (!red_channel_client_is_connected(rcc)) {
         return;
     }
-    g_object_get(channel, "channel-type", &type, "id", &id, NULL);
-    spice_printerr("rcc=%p (channel=%p type=%d id=%d)", rcc, channel,
-                   type, id);
     red_channel_client_pipe_clear(rcc);
     if (rcc->priv->stream->watch) {
         core->watch_remove(core, rcc->priv->stream->watch);
@@ -1749,7 +1757,7 @@ SpiceMarshaller *red_channel_client_get_marshaller(RedChannelClient *rcc)
     return rcc->priv->send_data.marshaller;
 }
 
-RedsStream *red_channel_client_get_stream(RedChannelClient *rcc)
+RedStream *red_channel_client_get_stream(RedChannelClient *rcc)
 {
     return rcc->priv->stream;
 }
@@ -1764,23 +1772,13 @@ void red_channel_client_set_header_sub_list(RedChannelClient *rcc, uint32_t sub_
     rcc->priv->send_data.header.set_msg_sub_list(&rcc->priv->send_data.header, sub_list);
 }
 
-static void marker_pipe_item_free(RedPipeItem *base)
-{
-    MarkerPipeItem *item = SPICE_UPCAST(MarkerPipeItem, base);
-
-    if (item->item_in_pipe) {
-        *item->item_in_pipe = FALSE;
-    }
-    free(item);
-}
-
 /* TODO: more evil sync stuff. anything with the word wait in it's name. */
 bool red_channel_client_wait_pipe_item_sent(RedChannelClient *rcc,
                                             GList *item_pos,
                                             int64_t timeout)
 {
     uint64_t end_time;
-    gboolean item_in_pipe;
+    bool item_sent;
 
     spice_debug("trace");
 
@@ -1790,37 +1788,32 @@ bool red_channel_client_wait_pipe_item_sent(RedChannelClient *rcc,
         end_time = UINT64_MAX;
     }
 
-    MarkerPipeItem *mark_item = spice_new0(MarkerPipeItem, 1);
+    MarkerPipeItem *mark_item = g_new0(MarkerPipeItem, 1);
 
-    red_pipe_item_init_full(&mark_item->base, RED_PIPE_ITEM_TYPE_MARKER,
-                            marker_pipe_item_free);
-    item_in_pipe = TRUE;
-    mark_item->item_in_pipe = &item_in_pipe;
-    red_channel_client_pipe_add_after_pos(rcc, &mark_item->base, item_pos);
+    red_pipe_item_init(&mark_item->base, RED_PIPE_ITEM_TYPE_MARKER);
+    mark_item->item_sent = false;
+    red_pipe_item_ref(&mark_item->base);
+    red_channel_client_pipe_add_before_pos(rcc, &mark_item->base, item_pos);
 
-    if (red_channel_client_is_blocked(rcc)) {
+    for (;;) {
         red_channel_client_receive(rcc);
-        red_channel_client_send(rcc);
-    }
-    red_channel_client_push(rcc);
-
-    while (item_in_pipe &&
-           (timeout == -1 || spice_get_monotonic_time_ns() < end_time)) {
-        usleep(CHANNEL_BLOCKED_SLEEP_DURATION);
-        red_channel_client_receive(rcc);
-        red_channel_client_send(rcc);
         red_channel_client_push(rcc);
+        if (mark_item->item_sent ||
+            (timeout != -1 && spice_get_monotonic_time_ns() >= end_time)) {
+            break;
+        }
+        usleep(CHANNEL_BLOCKED_SLEEP_DURATION);
     }
 
-    if (item_in_pipe) {
-        // still on the queue, make sure won't overwrite the stack variable
-        mark_item->item_in_pipe = NULL;
+    item_sent = mark_item->item_sent;
+    red_pipe_item_unref(&mark_item->base);
+
+    if (!item_sent) {
+        // still on the queue
         spice_warning("timeout");
         return FALSE;
-    } else {
-        return red_channel_client_wait_outgoing_item(rcc,
-                                                     timeout == -1 ? -1 : end_time - spice_get_monotonic_time_ns());
     }
+    return TRUE;
 }
 
 bool red_channel_client_wait_outgoing_item(RedChannelClient *rcc,
@@ -1881,19 +1874,17 @@ void red_channel_client_pipe_remove_and_release_pos(RedChannelClient *rcc,
 gboolean red_channel_client_set_migration_seamless(RedChannelClient *rcc)
 {
     gboolean ret = FALSE;
-    uint32_t type, id, flags;
+    uint32_t flags;
 
     g_object_get(rcc->priv->channel,
-                 "channel-type", &type,
-                 "id", &id,
                  "migration-flags", &flags,
                  NULL);
     if (flags & SPICE_MIGRATE_NEED_DATA_TRANSFER) {
         rcc->priv->wait_migrate_data = TRUE;
         ret = TRUE;
     }
-    spice_debug("channel type %d id %d rcc %p wait data %d", type, id, rcc,
-                rcc->priv->wait_migrate_data);
+    red_channel_debug(rcc->priv->channel, "rcc %p wait data %d", rcc,
+                      rcc->priv->wait_migrate_data);
 
     return ret;
 }

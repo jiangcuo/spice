@@ -22,8 +22,15 @@
 
 #include "display-channel-private.h"
 #include "glib-compat.h"
+#include "red-qxl.h"
 
 G_DEFINE_TYPE(DisplayChannel, display_channel, TYPE_COMMON_GRAPHICS_CHANNEL)
+
+static void display_channel_connect(RedChannel *channel, RedClient *client,
+                                    RedStream *stream, int migration,
+                                    RedChannelCapabilities *caps);
+static void display_channel_disconnect(RedChannelClient *rcc);
+static void display_channel_migrate(RedChannelClient *rcc);
 
 enum {
     PROP0,
@@ -67,7 +74,7 @@ display_channel_set_property(GObject *object,
     switch (property_id)
     {
         case PROP_N_SURFACES:
-            self->priv->n_surfaces = g_value_get_uint(value);
+            self->priv->n_surfaces = MIN(g_value_get_uint(value), NUM_SURFACES);
             break;
         case PROP_VIDEO_CODECS:
             display_channel_set_video_codecs(self, g_value_get_boxed(value));
@@ -88,10 +95,10 @@ display_channel_finalize(GObject *object)
     display_channel_destroy_surfaces(self);
     image_cache_reset(&self->priv->image_cache);
 
-    if (ENABLE_EXTRA_CHECKS) {
+    if (spice_extra_checks) {
         unsigned int count;
         _Drawable *drawable;
-        Stream *stream;
+        VideoStream *stream;
 
         count = 0;
         for (drawable = self->priv->free_drawables; drawable; drawable = drawable->u.next) {
@@ -170,7 +177,7 @@ void monitors_config_unref(MonitorsConfig *monitors_config)
     }
 
     spice_debug("freeing monitors config");
-    free(monitors_config);
+    g_free(monitors_config);
 }
 
 static void monitors_config_debug(MonitorsConfig *mc)
@@ -178,17 +185,18 @@ static void monitors_config_debug(MonitorsConfig *mc)
     int i;
 
     spice_debug("monitors config count:%d max:%d", mc->count, mc->max_allowed);
-    for (i = 0; i < mc->count; i++)
-        spice_debug("+%d+%d %dx%d",
+    for (i = 0; i < mc->count; i++) {
+        spice_debug("head #%d +%d+%d %dx%d", i,
                     mc->heads[i].x, mc->heads[i].y,
                     mc->heads[i].width, mc->heads[i].height);
+    }
 }
 
 static MonitorsConfig* monitors_config_new(QXLHead *heads, ssize_t nheads, ssize_t max)
 {
     MonitorsConfig *mc;
 
-    mc = spice_malloc(sizeof(MonitorsConfig) + nheads * sizeof(QXLHead));
+    mc = g_malloc(sizeof(MonitorsConfig) + nheads * sizeof(QXLHead));
     mc->refs = 1;
     mc->count = nheads;
     mc->max_allowed = max;
@@ -206,15 +214,15 @@ int display_channel_get_streams_timeout(DisplayChannel *display)
 
     red_time_t now = spice_get_monotonic_time_ns();
     while ((item = ring_next(ring, item))) {
-        Stream *stream;
+        VideoStream *stream;
 
-        stream = SPICE_CONTAINEROF(item, Stream, link);
+        stream = SPICE_CONTAINEROF(item, VideoStream, link);
         red_time_t delta = (stream->last_time + RED_STREAM_TIMEOUT) - now;
 
-        if (delta < 1000 * 1000) {
+        if (delta < NSEC_PER_MILLISEC) {
             return 0;
         }
-        timeout = MIN(timeout, (unsigned int)(delta / (1000 * 1000)));
+        timeout = MIN(timeout, (unsigned int)(delta / NSEC_PER_MILLISEC));
     }
     return timeout;
 }
@@ -269,10 +277,10 @@ static void stop_streams(DisplayChannel *display)
     RingItem *item = ring_get_head(ring);
 
     while (item) {
-        Stream *stream = SPICE_CONTAINEROF(item, Stream, link);
+        VideoStream *stream = SPICE_CONTAINEROF(item, VideoStream, link);
         item = ring_next(ring, item);
         if (!stream->current) {
-            stream_stop(display, stream);
+            video_stream_stop(display, stream);
         } else {
             spice_debug("attached stream");
         }
@@ -285,7 +293,6 @@ static void stop_streams(DisplayChannel *display)
 void display_channel_surface_unref(DisplayChannel *display, uint32_t surface_id)
 {
     RedSurface *surface = &display->priv->surfaces[surface_id];
-    QXLInstance *qxl = display->priv->qxl;
     DisplayChannelClient *dcc;
 
     if (--surface->refs != 0) {
@@ -299,11 +306,13 @@ void display_channel_surface_unref(DisplayChannel *display, uint32_t surface_id)
     spice_assert(surface->context.canvas);
 
     surface->context.canvas->ops->destroy(surface->context.canvas);
-    if (surface->create.info) {
-        red_qxl_release_resource(qxl, surface->create);
+    if (surface->create_cmd != NULL) {
+        red_surface_cmd_unref(surface->create_cmd);
+        surface->create_cmd = NULL;
     }
-    if (surface->destroy.info) {
-        red_qxl_release_resource(qxl, surface->destroy);
+    if (surface->destroy_cmd != NULL) {
+        red_surface_cmd_unref(surface->destroy_cmd);
+        surface->destroy_cmd = NULL;
     }
 
     region_destroy(&surface->draw_dirty_region);
@@ -340,8 +349,8 @@ static void streams_update_visible_region(DisplayChannel *display, Drawable *dra
     item = ring_get_head(ring);
 
     while (item) {
-        Stream *stream = SPICE_CONTAINEROF(item, Stream, link);
-        StreamAgent *agent;
+        VideoStream *stream = SPICE_CONTAINEROF(item, VideoStream, link);
+        VideoStreamAgent *agent;
 
         item = ring_next(ring, item);
 
@@ -350,12 +359,13 @@ static void streams_update_visible_region(DisplayChannel *display, Drawable *dra
         }
 
         FOREACH_DCC(display, dcc) {
-            agent = dcc_get_stream_agent(dcc, display_channel_get_stream_id(display, stream));
+            int stream_id = display_channel_get_video_stream_id(display, stream);
+            agent = dcc_get_video_stream_agent(dcc, stream_id);
 
             if (region_intersects(&agent->vis_region, &drawable->tree_item.base.rgn)) {
                 region_exclude(&agent->vis_region, &drawable->tree_item.base.rgn);
                 region_exclude(&agent->clip, &drawable->tree_item.base.rgn);
-                dcc_stream_agent_clip(dcc, agent);
+                dcc_video_stream_agent_clip(dcc, agent);
             }
         }
     }
@@ -383,7 +393,7 @@ static void pipes_add_drawable_after(DisplayChannel *display,
         dpi_pos_after = l->data;
 
         num_other_linked++;
-        dcc_add_drawable_after(dpi_pos_after->dcc, drawable, &dpi_pos_after->dpi_pipe_item);
+        dcc_add_drawable_after(dpi_pos_after->dcc, drawable, &dpi_pos_after->base);
     }
 
     if (num_other_linked == 0) {
@@ -428,7 +438,7 @@ static void current_add_drawable(DisplayChannel *display,
 static void current_remove_drawable(DisplayChannel *display, Drawable *item)
 {
     /* todo: move all to unref? */
-    stream_trace_add_drawable(display, item);
+    video_stream_trace_add_drawable(display, item);
     draw_item_remove_shadow(&item->tree_item);
     ring_remove(&item->tree_item.base.siblings_link);
     ring_remove(&item->list_link);
@@ -439,17 +449,12 @@ static void current_remove_drawable(DisplayChannel *display, Drawable *item)
 static void drawable_remove_from_pipes(Drawable *drawable)
 {
     RedDrawablePipeItem *dpi;
-    GList *l;
 
-    l = drawable->pipes;
-    while (l) {
-        GList *next = l->next;
+    GLIST_FOREACH(drawable->pipes, RedDrawablePipeItem, dpi) {
         RedChannelClient *rcc;
 
-        dpi = l->data;
         rcc = RED_CHANNEL_CLIENT(dpi->dcc);
-        red_channel_client_pipe_remove_and_release(rcc, &dpi->dpi_pipe_item);
-        l = next;
+        red_channel_client_pipe_remove_and_release(rcc, &dpi->base);
     }
 }
 
@@ -553,7 +558,7 @@ static bool current_add_equal(DisplayChannel *display, DrawItem *item, TreeItem 
          * end of the queue */
         int add_after = !!other_drawable->stream &&
                         is_drawable_independent_from_surfaces(drawable);
-        stream_maintenance(display, drawable, other_drawable);
+        video_stream_maintenance(display, drawable, other_drawable);
         current_add_drawable(display, drawable, &other->siblings_link);
         other_drawable->refs++;
         current_remove_drawable(display, other_drawable);
@@ -712,7 +717,7 @@ static void __exclude_region(DisplayChannel *display, Ring *ring, TreeItem *item
                 /* TODO: document the purpose of this code */
                 if (frame_candidate) {
                     Drawable *drawable = SPICE_CONTAINEROF(draw, Drawable, tree_item);
-                    stream_maintenance(display, frame_candidate, drawable);
+                    video_stream_maintenance(display, frame_candidate, drawable);
                 }
                 /* Remove the intersection from the DrawItem's region */
                 region_exclude(&draw->base.rgn, &and_rgn);
@@ -883,7 +888,7 @@ static bool current_add_with_shadow(DisplayChannel *display, Ring *ring, Drawabl
 
     // only primary surface streams are supported
     if (is_primary_surface(display, item->surface_id)) {
-        stream_detach_behind(display, &shadow->base.rgn, NULL);
+        video_stream_detach_behind(display, &shadow->base.rgn, NULL);
     }
 
     /* Prepend the shadow to the beginning of the current ring */
@@ -904,7 +909,7 @@ static bool current_add_with_shadow(DisplayChannel *display, Ring *ring, Drawabl
         streams_update_visible_region(display, item);
     } else {
         if (is_primary_surface(display, item->surface_id)) {
-            stream_detach_behind(display, &item->tree_item.base.rgn, item);
+            video_stream_detach_behind(display, &item->tree_item.base.rgn, item);
         }
     }
     stat_add(&display->priv->add_stat, start_time);
@@ -1083,7 +1088,7 @@ static bool current_add(DisplayChannel *display, Ring *ring, Drawable *drawable)
          * the tree.  Add the new item's region to that */
         region_or(&exclude_rgn, &item->base.rgn);
         exclude_region(display, ring, exclude_base, &exclude_rgn, NULL, drawable);
-        stream_trace_update(display, drawable);
+        video_stream_trace_update(display, drawable);
         streams_update_visible_region(display, drawable);
         /*
          * Performing the insertion after exclude_region for
@@ -1093,14 +1098,14 @@ static bool current_add(DisplayChannel *display, Ring *ring, Drawable *drawable)
         current_add_drawable(display, drawable, ring);
     } else {
         /*
-         * stream_detach_behind can affect the current tree since
+         * video_stream_detach_behind can affect the current tree since
          * it may trigger calls to display_channel_draw. Thus, the
          * drawable should be added to the tree before calling
-         * stream_detach_behind
+         * video_stream_detach_behind
          */
         current_add_drawable(display, drawable, ring);
         if (is_primary_surface(display, drawable->surface_id)) {
-            stream_detach_behind(display, &drawable->tree_item.base.rgn, drawable);
+            video_stream_detach_behind(display, &drawable->tree_item.base.rgn, drawable);
         }
     }
     region_destroy(&exclude_rgn);
@@ -1218,7 +1223,7 @@ static void handle_self_bitmap(DisplayChannel *display, Drawable *drawable)
     height = red_drawable->self_bitmap_area.bottom - red_drawable->self_bitmap_area.top;
     dest_stride = SPICE_ALIGN(width * bpp, 4);
 
-    image = spice_new0(SpiceImage, 1);
+    image = g_new0(SpiceImage, 1);
     image->descriptor.type = SPICE_IMAGE_TYPE_BITMAP;
     image->descriptor.flags = 0;
 
@@ -1284,7 +1289,7 @@ static bool handle_surface_deps(DisplayChannel *display, Drawable *drawable)
                 QRegion depend_region;
                 region_init(&depend_region);
                 region_add(&depend_region, &drawable->red_drawable->surfaces_rects[x]);
-                stream_detach_behind(display, &depend_region, NULL);
+                video_stream_detach_behind(display, &depend_region, NULL);
             }
         }
     }
@@ -1630,7 +1635,7 @@ static Drawable *display_channel_drawable_try_new(DisplayChannel *display,
             return NULL;
     }
 
-    bzero(drawable, sizeof(Drawable));
+    memset(drawable, 0, sizeof(Drawable));
     /* Pointer to the display from which the drawable is allocated.  This
      * pointer is safe to be retained as DisplayChannel lifespan is bigger than
      * all drawables.  */
@@ -1657,7 +1662,7 @@ static void depended_item_remove(DependItem *item)
     ring_remove(&item->ring_item);
 }
 
-static void drawable_remove_dependencies(DisplayChannel *display, Drawable *drawable)
+static void drawable_remove_dependencies(Drawable *drawable)
 {
     int x;
     int surface_id;
@@ -1695,11 +1700,11 @@ void drawable_unref(Drawable *drawable)
     spice_warn_if_fail(drawable->pipes == NULL);
 
     if (drawable->stream) {
-        stream_detach_drawable(drawable->stream);
+        video_stream_detach_drawable(drawable->stream);
     }
     region_destroy(&drawable->tree_item.base.rgn);
 
-    drawable_remove_dependencies(display, drawable);
+    drawable_remove_dependencies(drawable);
     drawable_unref_surface_deps(display, drawable);
     display_channel_surface_unref(display, drawable->surface_id);
 
@@ -1992,9 +1997,6 @@ void display_channel_draw(DisplayChannel *display, const SpiceRect *area, int su
     RedSurface *surface;
     Drawable *last;
 
-    spice_debug("surface %d: area ==>", surface_id);
-    rect_debug(area);
-
     spice_return_if_fail(surface_id >= 0 && surface_id < NUM_SURFACES);
     spice_return_if_fail(area);
     spice_return_if_fail(area->left >= 0 && area->top >= 0 &&
@@ -2167,8 +2169,8 @@ void display_channel_create_surface(DisplayChannel *display, uint32_t surface_id
         }
         memset(data, 0, height*abs(stride));
     }
-    surface->create.info = NULL;
-    surface->destroy.info = NULL;
+    g_warn_if_fail(surface->create_cmd == NULL);
+    g_warn_if_fail(surface->destroy_cmd == NULL);
     ring_init(&surface->current);
     ring_init(&surface->current_list);
     ring_init(&surface->depend_on_me);
@@ -2231,6 +2233,7 @@ static SpiceCanvas *image_surfaces_get(SpiceImageSurfaces *surfaces, uint32_t su
 DisplayChannel* display_channel_new(RedsState *reds,
                                     QXLInstance *qxl,
                                     const SpiceCoreInterfaceInternal *core,
+                                    Dispatcher *dispatcher,
                                     int migrate, int stream_video,
                                     GArray *video_codecs,
                                     uint32_t n_surfaces)
@@ -2250,6 +2253,7 @@ DisplayChannel* display_channel_new(RedsState *reds,
                            "n-surfaces", n_surfaces,
                            "video-codecs", video_codecs,
                            "handle-acks", TRUE,
+                           "dispatcher", dispatcher,
                            NULL);
     if (display) {
         display_channel_set_stream_video(display, stream_video);
@@ -2262,13 +2266,14 @@ static void drawables_init(DisplayChannel *display);
 static void
 display_channel_init(DisplayChannel *self)
 {
-    static SpiceImageSurfacesOps image_surfaces_ops = {
+    static const SpiceImageSurfacesOps image_surfaces_ops = {
         image_surfaces_get,
     };
 
     /* must be manually allocated here since g_type_class_add_private() only
      * supports structs smaller than 64k */
     self->priv = g_new0(DisplayChannelPrivate, 1);
+    self->priv->image_compression = SPICE_IMAGE_COMPRESSION_AUTO_GLZ;
     self->priv->pub = self;
 
     image_encoder_shared_init(&self->priv->encoder_shared_data);
@@ -2303,16 +2308,18 @@ display_channel_constructed(GObject *object)
                       "non_cache", TRUE);
     image_cache_init(&self->priv->image_cache);
     self->priv->stream_video = SPICE_STREAM_VIDEO_OFF;
-    display_channel_init_streams(self);
+    display_channel_init_video_streams(self);
 
     red_channel_set_cap(channel, SPICE_DISPLAY_CAP_MONITORS_CONFIG);
     red_channel_set_cap(channel, SPICE_DISPLAY_CAP_PREF_COMPRESSION);
     red_channel_set_cap(channel, SPICE_DISPLAY_CAP_PREF_VIDEO_CODEC_TYPE);
     red_channel_set_cap(channel, SPICE_DISPLAY_CAP_STREAM_REPORT);
+
+    reds_register_channel(reds, channel);
 }
 
 void display_channel_process_surface_cmd(DisplayChannel *display,
-                                         const RedSurfaceCmd *surface_cmd,
+                                         RedSurfaceCmd *surface_cmd,
                                          int loadvm)
 {
     uint32_t surface_id;
@@ -2348,7 +2355,7 @@ void display_channel_process_surface_cmd(DisplayChannel *display,
                                        reloaded_surface,
                                        // reloaded surfaces will be sent on demand
                                        !reloaded_surface);
-        surface->create = surface_cmd->release_info_ext;
+        surface->create_cmd = red_surface_cmd_ref(surface_cmd);
         break;
     }
     case QXL_SURFACE_CMD_DESTROY:
@@ -2356,7 +2363,7 @@ void display_channel_process_surface_cmd(DisplayChannel *display,
             spice_warning("avoiding destroying a surface twice");
             break;
         }
-        surface->destroy = surface_cmd->release_info_ext;
+        surface->destroy_cmd = red_surface_cmd_ref(surface_cmd);
         display_channel_destroy_surface(display, surface_id);
         break;
     default:
@@ -2410,12 +2417,12 @@ void display_channel_gl_draw_done(DisplayChannel *display)
     set_gl_draw_async_count(display, display->priv->gl_draw_async_count - 1);
 }
 
-int display_channel_get_stream_id(DisplayChannel *display, Stream *stream)
+int display_channel_get_video_stream_id(DisplayChannel *display, VideoStream *stream)
 {
     return (int)(stream - display->priv->streams_buf);
 }
 
-Stream *display_channel_get_nth_stream(DisplayChannel *display, gint i)
+VideoStream *display_channel_get_nth_video_stream(DisplayChannel *display, gint i)
 {
     return &display->priv->streams_buf[i];
 }
@@ -2427,7 +2434,7 @@ gboolean display_channel_validate_surface(DisplayChannel *display, uint32_t surf
         return FALSE;
     }
     if (!display->priv->surfaces[surface_id].context.canvas) {
-        spice_warning("canvas address is %p for %d (and is NULL)\n",
+        spice_warning("canvas address is %p for %d (and is NULL)",
                    &(display->priv->surfaces[surface_id].context.canvas), surface_id);
         spice_warning("failed on %d", surface_id);
         return FALSE;
@@ -2500,6 +2507,11 @@ display_channel_class_init(DisplayChannelClass *klass)
     channel_class->handle_migrate_data = handle_migrate_data;
     channel_class->handle_migrate_data_get_serial = handle_migrate_data_get_serial;
 
+    // client callbacks
+    channel_class->connect = display_channel_connect;
+    channel_class->disconnect = display_channel_disconnect;
+    channel_class->migrate = display_channel_migrate;
+
     g_object_class_install_property(object_class,
                                     PROP_N_SURFACES,
                                     g_param_spec_uint("n-surfaces",
@@ -2539,4 +2551,110 @@ void display_channel_debug_oom(DisplayChannel *display, const char *msg)
                 display->priv->encoder_shared_data.glz_drawable_count,
                 ring_get_length(&display->priv->current_list),
                 red_channel_sum_pipes_size(channel));
+}
+
+static void guest_set_client_capabilities(DisplayChannel *display)
+{
+    int i;
+    RedChannelClient *rcc;
+    uint8_t caps[SPICE_CAPABILITIES_SIZE] = { 0 };
+    int caps_available[] = {
+        SPICE_DISPLAY_CAP_SIZED_STREAM,
+        SPICE_DISPLAY_CAP_MONITORS_CONFIG,
+        SPICE_DISPLAY_CAP_COMPOSITE,
+        SPICE_DISPLAY_CAP_A8_SURFACE,
+    };
+    QXLInterface *qif = qxl_get_interface(display->priv->qxl);
+
+    if (!red_qxl_check_qxl_version(display->priv->qxl, 3, 2)) {
+        return;
+    }
+    if (!qif->set_client_capabilities) {
+        return;
+    }
+#define SET_CAP(a,c)                                                    \
+        ((a)[(c) / 8] |= (1 << ((c) % 8)))
+
+#define CLEAR_CAP(a,c)                                                  \
+        ((a)[(c) / 8] &= ~(1 << ((c) % 8)))
+
+    if ((red_channel_get_n_clients(RED_CHANNEL(display)) == 0)) {
+        red_qxl_set_client_capabilities(display->priv->qxl, FALSE, caps);
+    } else {
+        // Take least common denominator
+        for (i = 0 ; i < SPICE_N_ELEMENTS(caps_available); ++i) {
+            SET_CAP(caps, caps_available[i]);
+        }
+        FOREACH_CLIENT(display, rcc) {
+            for (i = 0 ; i < SPICE_N_ELEMENTS(caps_available); ++i) {
+                if (!red_channel_client_test_remote_cap(rcc, caps_available[i]))
+                    CLEAR_CAP(caps, caps_available[i]);
+            }
+        }
+        red_qxl_set_client_capabilities(display->priv->qxl, TRUE, caps);
+    }
+}
+
+void display_channel_update_qxl_running(DisplayChannel *display, bool running)
+{
+    if (running) {
+        guest_set_client_capabilities(display);
+    }
+}
+
+static void
+display_channel_connect(RedChannel *channel, RedClient *client,
+                        RedStream *stream, int migration,
+                        RedChannelCapabilities *caps)
+{
+    DisplayChannel *display = DISPLAY_CHANNEL(channel);
+    DisplayChannelClient *dcc;
+
+    spice_debug("connect new client");
+
+    SpiceServer *reds = red_channel_get_server(channel);
+    dcc = dcc_new(display, client, stream, migration, caps,
+                  display->priv->image_compression, reds_get_jpeg_state(reds),
+                  reds_get_zlib_glz_state(reds));
+    if (!dcc) {
+        return;
+    }
+    display_channel_update_compression(display, dcc);
+    guest_set_client_capabilities(display);
+    dcc_start(dcc);
+}
+
+static void display_channel_disconnect(RedChannelClient *rcc)
+{
+    DisplayChannel *display = DISPLAY_CHANNEL(red_channel_client_get_channel(rcc));
+
+    guest_set_client_capabilities(display);
+
+    red_channel_client_disconnect(rcc);
+}
+
+static void display_channel_migrate(RedChannelClient *rcc)
+{
+    DisplayChannel *display = DISPLAY_CHANNEL(red_channel_client_get_channel(rcc));
+
+    /* We need to stop the streams, and to send upgrade_items to the client.
+     * Otherwise, (1) the client might display lossy regions that we don't track
+     * (streams are not part of the migration data) (2) streams_timeout may occur
+     * after the MIGRATE message has been sent. This can result in messages
+     * being sent to the client after MSG_MIGRATE and before MSG_MIGRATE_DATA (e.g.,
+     * STREAM_CLIP, STREAM_DESTROY, DRAW_COPY)
+     * No message besides MSG_MIGRATE_DATA should be sent after MSG_MIGRATE.
+     * Notice that detach_and_stop_streams won't lead to any dev ram changes, since
+     * handle_dev_stop already took care of releasing all the dev ram resources.
+     */
+    video_stream_detach_and_stop(display);
+    if (red_channel_client_is_connected(rcc)) {
+        red_channel_client_default_migrate(rcc);
+    }
+}
+
+void display_channel_set_image_compression(DisplayChannel *display,
+                                           SpiceImageCompression image_compression)
+{
+    display->priv->image_compression = image_compression;
 }

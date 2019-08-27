@@ -544,6 +544,57 @@ which are described when running remote-viewer with `--help-spice`.
 To get USB redirection working on Windows clients, you need to install
 http://www.spice-space.org/download/windows/usbdk/[UsbDk]
 
+[[streamingagent]]
+Streaming Agent
+===============
+
+The SPICE streaming agent allows to send an encoded video stream of the guest
+desktop to the client.
+
+The streaming agent is a daemon/service running in the guest OS so it must be
+installed if it does not yet exist on the guest system.  It relies on a
+dedicated spiceport char device to achieve communication between the guest and
+the host.  This device must be added to the virtual machine as described below
+for the streaming agent to work in the guest.
+
+Configuration
+-------------
+
+.Using virt-manager
+
+The needed device can be added from the virtual machine
+details. Click on "Add hardware" and then add a "Channel" device with
+type "Spice port (spiceport)". The port should be named
+`org.spice-space.stream.0`, and the channel should also be
+`org.spice-space.stream.0`.
+
+.Using libvirt
+
+Two distinct devices must be added:
+
+* http://libvirt.org/formatdomain.html#elementsControllers[a virtio serial
+  device] if there is not one yet in the domain definition
+* http://libvirt.org/formatdomain.html#elementsCharSpiceport[a spiceport channel]
+
+[source,xml]
+<devices>
+    <controller type='virtio-serial' index='0'/>
+    <channel type='spiceport'>
+        <source channel='org.spice-space.stream.0'/>
+        <target type='virtio' name='org.spice-space.stream.0'/>
+    </channel>
+</devices>
+
+.Using QEMU
+
+Adding the following parameters to your QEMU command line will enable
+the needed devices for agent support in the guest OS:
+
+[source,sh]
+-device virtserialport,bus=virtio-serial0.0,nr=1,chardev=charchannel1,id=channel1,name=org.spice-space.stream.0 \
+-chardev spiceport,name=org.spice-space.stream.0,id=charchannel1
+
+
 CAC smartcard redirection
 =========================
 
@@ -1071,8 +1122,8 @@ required Spice components.
 Client requirements
 ~~~~~~~~~~~~~~~~~~~
 
-See the http://cgit.freedesktop.org/spice/spice-gtk/tree/README[README
-file in spice-gtk] for the list of dependencies.
+See the https://gitlab.freedesktop.org/spice/spice-gtk/raw/master/README
+[README file in spice-gtk] for the list of dependencies.
 
 Host requirements
 ~~~~~~~~~~~~~~~~~
@@ -1112,7 +1163,7 @@ export INST_ROOT="/opt/spice"; mkdir $INST_ROOT
 export PKG_CONFIG_PATH=$INST_ROOT/lib/pkgconfig:$PKG_CONFIG_PATH
 
 cd $BUILD_ROOT
-git clone git://cgit.freedesktop.org/spice/spice
+git clone https://gitlab.freedesktop.org/spice/spice.git
 cd $BUILD_ROOT/spice
 ./configure --prefix=$INST_ROOT
 make
@@ -1152,9 +1203,19 @@ Server side
 
 If the virtual machine was started using QEMU directly, SPICE server logs will be output to
 your console stdout.
+
 When using libvirt, logs are located in `/var/log/libvirt/qemu/` for the qemu
 system instance (`qemu:///system`), and in `~/.cache/libvirt/qemu/log` for the
 qemu session instance (`qemu:///session`).
+
+It's possible to get more verbose output by setting the `G_MESSAGES_DEBUG`
+environment variable to `Spice` or `all` before starting QEMU as described in
+https://developer.gnome.org/glib/stable/glib-running.html[GLib documentation].
+
+When using libvirt, the environment variable needs to be set from the XML
+domain definition as described in
+https://libvirt.org/drvqemu.html#qemucommand[libvirt documentation].
+
 
 Client side
 -----------

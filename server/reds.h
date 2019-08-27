@@ -19,7 +19,7 @@
 #define REDS_H_
 
 #include <stdint.h>
-#include <sys/uio.h>
+#include <inttypes.h>
 #include <spice/vd_agent.h>
 #include <common/marshaller.h>
 #include <common/messages.h>
@@ -32,12 +32,8 @@
 
 static inline QXLInterface * qxl_get_interface(QXLInstance *qxl)
 {
-    return SPICE_CONTAINEROF(qxl->base.sif, QXLInterface, base);
+    return SPICE_UPCAST(QXLInterface, qxl->base.sif);
 }
-
-struct SpiceMigrateState {
-    int dummy;
-};
 
 /* main thread only */
 void reds_handle_channel_event(RedsState *reds, int event, SpiceChannelEventInfo *info);
@@ -54,6 +50,7 @@ gboolean reds_config_get_agent_mouse(const RedsState *reds); // used by inputs_c
 int reds_has_vdagent(RedsState *reds); // used by inputs channel
 bool reds_config_get_playback_compression(RedsState *reds); // used by playback channel
 
+void reds_send_device_display_info(RedsState *reds);
 void reds_handle_agent_mouse_event(RedsState *reds, const VDAgentMouseState *mouse_state); // used by inputs_channel
 
 GArray* reds_get_renderers(RedsState *reds);
@@ -84,7 +81,7 @@ void reds_on_main_agent_data(RedsState *reds, MainChannelClient *mcc, const void
                              size_t size);
 void reds_on_main_migrate_connected(RedsState *reds, int seamless); //should be called when all the clients
                                                    // are connected to the target
-bool reds_handle_migrate_data(RedsState *recs, MainChannelClient *mcc,
+bool reds_handle_migrate_data(RedsState *reds, MainChannelClient *mcc,
                               SpiceMigrateDataMain *mig_data, uint32_t size);
 void reds_on_main_mouse_mode_request(RedsState *reds, void *message, size_t size);
 /* migration dest side: returns whether it can support seamless migration
@@ -102,6 +99,9 @@ spice_wan_compression_t reds_get_zlib_glz_state(const RedsState *reds);
 SpiceCoreInterfaceInternal* reds_get_core_interface(RedsState *reds);
 void reds_update_client_mouse_allowed(RedsState *reds);
 MainDispatcher* reds_get_main_dispatcher(RedsState *reds);
+
+/* Marshal VDAgentGraphicsDeviceInfo structure */
+void reds_marshall_device_display_info(RedsState *reds, SpiceMarshaller *m);
 
 /* Get the recording object stored in RedsState.
  * You should free with red_record_unref.

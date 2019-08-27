@@ -24,6 +24,7 @@
 
 #include "dcc-private.h"
 #include "display-channel-private.h"
+#include "red-qxl.h"
 
 typedef enum {
     FILL_BITS_TYPE_INVALID,
@@ -438,7 +439,7 @@ static FillBitsType fill_bits(DisplayChannelClient *dcc, SpiceMarshaller *m,
         /* Images must be added to the cache only after they are compressed
            in order to prevent starvation in the client between pixmap_cache and
            global dictionary (in cases of multiple monitors) */
-        if (reds_stream_get_family(red_channel_client_get_stream(rcc)) == AF_UNIX ||
+        if (red_stream_get_family(red_channel_client_get_stream(rcc)) == AF_UNIX ||
             !dcc_compress_image(dcc, &image, &simage->u.bitmap,
                                 drawable, can_lossy, &comp_send_data)) {
             SpicePalette *palette;
@@ -637,7 +638,7 @@ static bool pipe_rendered_drawables_intersect_with_areas(DisplayChannelClient *d
 
         if (pipe_item->type != RED_PIPE_ITEM_TYPE_DRAW)
             continue;
-        drawable = SPICE_CONTAINEROF(pipe_item, RedDrawablePipeItem, dpi_pipe_item)->drawable;
+        drawable = SPICE_UPCAST(RedDrawablePipeItem, pipe_item)->drawable;
 
         if (ring_item_is_linked(&drawable->list_link))
             continue; // item hasn't been rendered
@@ -730,7 +731,7 @@ static void red_pipe_replace_rendered_drawables_with_images(DisplayChannelClient
 
         if (pipe_item->type != RED_PIPE_ITEM_TYPE_DRAW)
             continue;
-        dpi = SPICE_CONTAINEROF(pipe_item, RedDrawablePipeItem, dpi_pipe_item);
+        dpi = SPICE_UPCAST(RedDrawablePipeItem, pipe_item);
         drawable = dpi->drawable;
         if (ring_item_is_linked(&drawable->list_link))
             continue; // item hasn't been rendered
@@ -1686,7 +1687,7 @@ static bool red_marshall_stream_data(RedChannelClient *rcc,
 {
     DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
     DisplayChannel *display = DCC_TO_DC(dcc);
-    Stream *stream = drawable->stream;
+    VideoStream *stream = drawable->stream;
     SpiceCopy *copy;
     uint32_t frame_mm_time;
     int is_sized;
@@ -1708,7 +1709,8 @@ static bool red_marshall_stream_data(RedChannelClient *rcc,
         return FALSE;
     }
 
-    StreamAgent *agent = &dcc->priv->stream_agents[display_channel_get_stream_id(display, stream)];
+    int stream_id = display_channel_get_video_stream_id(display, stream);
+    VideoStreamAgent *agent = &dcc->priv->stream_agents[stream_id];
     VideoBuffer *outbuf;
     /* workaround for vga streams */
     frame_mm_time =  drawable->red_drawable->mm_time ?
@@ -1741,7 +1743,7 @@ static bool red_marshall_stream_data(RedChannelClient *rcc,
 
         red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_DATA);
 
-        stream_data.base.id = display_channel_get_stream_id(display, stream);
+        stream_data.base.id = stream_id;
         stream_data.base.multi_media_time = frame_mm_time;
         stream_data.data_size = outbuf->size;
 
@@ -1751,7 +1753,7 @@ static bool red_marshall_stream_data(RedChannelClient *rcc,
 
         red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_DATA_SIZED);
 
-        stream_data.base.id = display_channel_get_stream_id(display, stream);
+        stream_data.base.id = stream_id;
         stream_data.base.multi_media_time = frame_mm_time;
         stream_data.data_size = outbuf->size;
         stream_data.width = copy->src_area.right - copy->src_area.left;
@@ -1790,12 +1792,13 @@ static void display_channel_marshall_migrate_data_surfaces(DisplayChannelClient 
                                                            SpiceMarshaller *m,
                                                            int lossy)
 {
-    SpiceMarshaller *m2 = spice_marshaller_get_ptr_submarshaller(m, 0);
-    uint32_t *num_surfaces_created;
+    SpiceMarshaller *m2 = spice_marshaller_get_ptr_submarshaller(m);
+    uint32_t num_surfaces_created;
+    uint8_t *num_surfaces_created_ptr;
     uint32_t i;
 
-    num_surfaces_created = (uint32_t *)spice_marshaller_reserve_space(m2, sizeof(uint32_t));
-    *num_surfaces_created = 0;
+    num_surfaces_created_ptr = spice_marshaller_reserve_space(m2, sizeof(uint32_t));
+    num_surfaces_created = 0;
     for (i = 0; i < NUM_SURFACES; i++) {
         SpiceRect lossy_rect;
 
@@ -1803,7 +1806,7 @@ static void display_channel_marshall_migrate_data_surfaces(DisplayChannelClient 
             continue;
         }
         spice_marshaller_add_uint32(m2, i);
-        (*num_surfaces_created)++;
+        num_surfaces_created++;
 
         if (!lossy) {
             continue;
@@ -1814,6 +1817,7 @@ static void display_channel_marshall_migrate_data_surfaces(DisplayChannelClient 
         spice_marshaller_add_int32(m2, lossy_rect.right);
         spice_marshaller_add_int32(m2, lossy_rect.bottom);
     }
+    spice_marshaller_set_uint32(m2, num_surfaces_created_ptr, num_surfaces_created);
 }
 
 static void display_channel_marshall_migrate_data(RedChannelClient *rcc,
@@ -1974,7 +1978,6 @@ static void red_marshall_image(RedChannelClient *rcc,
     copy.data.src_area.bottom = bitmap.y;
     copy.data.scale_mode = 0;
     copy.data.src_bitmap = 0;
-    copy.data.mask.flags = 0;
     copy.data.mask.flags = 0;
     copy.data.mask.pos.x = 0;
     copy.data.mask.pos.y = 0;
@@ -2150,10 +2153,11 @@ static void marshall_qxl_drawable(RedChannelClient *rcc,
 }
 
 static void marshall_stream_start(RedChannelClient *rcc,
-                                  SpiceMarshaller *base_marshaller, StreamAgent *agent)
+                                  SpiceMarshaller *base_marshaller,
+                                  VideoStreamAgent *agent)
 {
     DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
-    Stream *stream = agent->stream;
+    VideoStream *stream = agent->stream;
 
     spice_assert(stream);
     if (!agent->video_encoder) {
@@ -2165,7 +2169,7 @@ static void marshall_stream_start(RedChannelClient *rcc,
     SpiceClipRects clip_rects;
 
     stream_create.surface_id = 0;
-    stream_create.id = display_channel_get_stream_id(DCC_TO_DC(dcc), stream);
+    stream_create.id = display_channel_get_video_stream_id(DCC_TO_DC(dcc), stream);
     stream_create.flags = stream->top_down ? SPICE_STREAM_FLAGS_TOP_DOWN : 0;
     stream_create.codec_type = agent->video_encoder->codec_type;
 
@@ -2191,17 +2195,17 @@ static void marshall_stream_start(RedChannelClient *rcc,
 
 static void marshall_stream_clip(RedChannelClient *rcc,
                                  SpiceMarshaller *base_marshaller,
-                                 RedStreamClipItem *item)
+                                 VideoStreamClipItem *item)
 {
     DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
-    StreamAgent *agent = item->stream_agent;
+    VideoStreamAgent *agent = item->stream_agent;
 
     spice_return_if_fail(agent->stream);
 
     red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_CLIP);
     SpiceMsgDisplayStreamClip stream_clip;
 
-    stream_clip.id = display_channel_get_stream_id(DCC_TO_DC(dcc), agent->stream);
+    stream_clip.id = display_channel_get_video_stream_id(DCC_TO_DC(dcc), agent->stream);
     stream_clip.clip.type = item->clip_type;
     stream_clip.clip.rects = item->rects;
 
@@ -2209,14 +2213,15 @@ static void marshall_stream_clip(RedChannelClient *rcc,
 }
 
 static void marshall_stream_end(RedChannelClient *rcc,
-                                SpiceMarshaller *base_marshaller, StreamAgent* agent)
+                                SpiceMarshaller *base_marshaller,
+                                VideoStreamAgent* agent)
 {
     DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
     SpiceMsgDisplayStreamDestroy destroy;
 
     red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_DESTROY);
-    destroy.id = display_channel_get_stream_id(DCC_TO_DC(dcc), agent->stream);
-    stream_agent_stop(agent);
+    destroy.id = display_channel_get_video_stream_id(DCC_TO_DC(dcc), agent->stream);
+    video_stream_agent_stop(agent);
     spice_marshall_msg_display_stream_destroy(base_marshaller, &destroy);
 }
 
@@ -2288,7 +2293,7 @@ static void marshall_monitors_config(RedChannelClient *rcc, SpiceMarshaller *bas
         if (monitors_config->heads[i].width == 0 || monitors_config->heads[i].height == 0) {
             continue;
         }
-        msg->heads[count].id = monitors_config->heads[i].id;
+        msg->heads[count].monitor_id = monitors_config->heads[i].id;
         msg->heads[count].surface_id = monitors_config->heads[i].surface_id;
         msg->heads[count].width = monitors_config->heads[i].width;
         msg->heads[count].height = monitors_config->heads[i].height;
@@ -2304,15 +2309,13 @@ static void marshall_monitors_config(RedChannelClient *rcc, SpiceMarshaller *bas
 
 static void marshall_stream_activate_report(RedChannelClient *rcc,
                                             SpiceMarshaller *base_marshaller,
-                                            uint32_t stream_id)
+                                            RedStreamActivateReportItem *report_item)
 {
-    DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
-    StreamAgent *agent = &dcc->priv->stream_agents[stream_id];
     SpiceMsgDisplayStreamActivateReport msg;
 
     red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_STREAM_ACTIVATE_REPORT);
-    msg.stream_id = stream_id;
-    msg.unique_id = agent->report_id;
+    msg.stream_id = report_item->stream_id;
+    msg.unique_id = report_item->report_id;
     msg.max_window_size = RED_STREAM_CLIENT_REPORT_WINDOW;
     msg.timeout_ms = RED_STREAM_CLIENT_REPORT_TIMEOUT;
     spice_marshall_msg_display_stream_activate_report(base_marshaller, &msg);
@@ -2388,7 +2391,7 @@ void dcc_send_item(RedChannelClient *rcc, RedPipeItem *pipe_item)
     reset_send_data(dcc);
     switch (pipe_item->type) {
     case RED_PIPE_ITEM_TYPE_DRAW: {
-        RedDrawablePipeItem *dpi = SPICE_CONTAINEROF(pipe_item, RedDrawablePipeItem, dpi_pipe_item);
+        RedDrawablePipeItem *dpi = SPICE_UPCAST(RedDrawablePipeItem, pipe_item);
         marshall_qxl_drawable(rcc, m, dpi);
         break;
     }
@@ -2401,7 +2404,7 @@ void dcc_send_item(RedChannelClient *rcc, RedPipeItem *pipe_item)
         break;
     }
     case RED_PIPE_ITEM_TYPE_STREAM_CLIP:
-        marshall_stream_clip(rcc, m, SPICE_UPCAST(RedStreamClipItem, pipe_item));
+        marshall_stream_clip(rcc, m, SPICE_UPCAST(VideoStreamClipItem, pipe_item));
         break;
     case RED_PIPE_ITEM_TYPE_STREAM_DESTROY: {
         StreamCreateDestroyItem *item = SPICE_UPCAST(StreamCreateDestroyItem, pipe_item);
@@ -2428,29 +2431,24 @@ void dcc_send_item(RedChannelClient *rcc, RedPipeItem *pipe_item)
         red_channel_client_init_send_data(rcc, SPICE_MSG_DISPLAY_INVAL_ALL_PALETTES);
         break;
     case RED_PIPE_ITEM_TYPE_CREATE_SURFACE: {
-        RedSurfaceCreateItem *surface_create = SPICE_CONTAINEROF(pipe_item, RedSurfaceCreateItem,
-                                                                 pipe_item);
+        RedSurfaceCreateItem *surface_create = SPICE_UPCAST(RedSurfaceCreateItem, pipe_item);
         marshall_surface_create(rcc, m, &surface_create->surface_create);
         break;
     }
     case RED_PIPE_ITEM_TYPE_DESTROY_SURFACE: {
-        RedSurfaceDestroyItem *surface_destroy = SPICE_CONTAINEROF(pipe_item, RedSurfaceDestroyItem,
-                                                                   pipe_item);
+        RedSurfaceDestroyItem *surface_destroy = SPICE_UPCAST(RedSurfaceDestroyItem, pipe_item);
         marshall_surface_destroy(rcc, m, surface_destroy->surface_destroy.surface_id);
         break;
     }
     case RED_PIPE_ITEM_TYPE_MONITORS_CONFIG: {
-        RedMonitorsConfigItem *monconf_item = SPICE_CONTAINEROF(pipe_item,
-                                                                RedMonitorsConfigItem,
-                                                                pipe_item);
+        RedMonitorsConfigItem *monconf_item = SPICE_UPCAST(RedMonitorsConfigItem, pipe_item);
         marshall_monitors_config(rcc, m, monconf_item->monitors_config);
         break;
     }
     case RED_PIPE_ITEM_TYPE_STREAM_ACTIVATE_REPORT: {
-        RedStreamActivateReportItem *report_item = SPICE_CONTAINEROF(pipe_item,
-                                                                     RedStreamActivateReportItem,
-                                                                     pipe_item);
-        marshall_stream_activate_report(rcc, m, report_item->stream_id);
+        RedStreamActivateReportItem *report_item =
+            SPICE_UPCAST(RedStreamActivateReportItem, pipe_item);
+        marshall_stream_activate_report(rcc, m, report_item);
         break;
     }
     case RED_PIPE_ITEM_TYPE_GL_SCANOUT:

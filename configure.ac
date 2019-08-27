@@ -12,9 +12,9 @@ AC_PREREQ([2.57])
 #   then set age to 0.
 #
 dnl TODO see server/spice-char.h TODO comment for API breakage
-m4_define([SPICE_CURRENT], [13])
-m4_define([SPICE_REVISION], [4])
-m4_define([SPICE_AGE], [12])
+m4_define([SPICE_CURRENT], [14])
+m4_define([SPICE_REVISION], [0])
+m4_define([SPICE_AGE], [13])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
         [spice-devel@lists.freedesktop.org], spice)
@@ -30,7 +30,7 @@ SPICE_SERVER_VERSION=`printf "0x%02x%02x%02x" $major $minor $micro`
 AC_SUBST(SPICE_SERVER_VERSION)
 
 AC_CONFIG_MACRO_DIR([m4])
-m4_include([spice-common/m4/spice-deps.m4])
+m4_include([subprojects/spice-common/m4/spice-deps.m4])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR(.)
 
@@ -49,7 +49,7 @@ AM_PROG_CC_C_O
 AC_C_BIGENDIAN
 PKG_PROG_PKG_CONFIG
 
-AC_CHECK_HEADERS([sys/time.h execinfo.h linux/sockios.h])
+AC_CHECK_HEADERS([sys/time.h execinfo.h linux/sockios.h pthread_np.h])
 AC_CHECK_DECL([TCP_KEEPIDLE], [have_tcp_keepidle="yes"],,
               [#include <netinet/tcp.h>])
 AS_IF([test "x$have_tcp_keepidle" = "xyes"],
@@ -71,6 +71,7 @@ esac
 dnl =========================================================================
 dnl Check optional features
 SPICE_CHECK_SMARTCARD
+SPICE_EXTRA_CHECKS
 
 AC_ARG_ENABLE(gstreamer,
               AS_HELP_STRING([--enable-gstreamer=@<:@auto/0.10/1.0/yes/no@:>@],
@@ -133,14 +134,18 @@ AX_VALGRIND_CHECK
 
 SPICE_CHECK_LZ4
 SPICE_CHECK_SASL
+SPICE_CHECK_RECORDER
+AM_CONDITIONAL(HAVE_SASL, test "x$have_sasl" = "xyes")
 
 dnl =========================================================================
 dnl Check deps
-
-AC_CONFIG_SUBDIRS([spice-common])
-COMMON_CFLAGS='-I ${top_srcdir}/spice-common/ -I ${top_builddir}/spice-common/'
+AC_CONFIG_SUBDIRS([subprojects/spice-common])
+COMMON_CFLAGS='-I ${top_srcdir}/subprojects/spice-common/ -I ${top_builddir}/subprojects/spice-common/'
 COMMON_CFLAGS="$COMMON_CFLAGS -DG_LOG_DOMAIN=\\\"Spice\\\""
 AC_SUBST(COMMON_CFLAGS)
+
+SPICE_COMMON_DIR='${top_builddir}/subprojects/spice-common'
+AC_SUBST(SPICE_COMMON_DIR)
 
 AC_CHECK_LIBM
 AC_SUBST(LIBM)
@@ -153,15 +158,15 @@ AS_VAR_APPEND([SPICE_NONPKGCONFIG_LIBS], [" -pthread $LIBM $LIBRT"])
 SPICE_REQUIRES=""
 
 AS_IF([test x"$have_smartcard" = "xyes"], [
-    AS_VAR_APPEND([SPICE_REQUIRES], [" libcacard >= 0.1.2"])
+    AS_VAR_APPEND([SPICE_REQUIRES], [" libcacard >= 2.5.1"])
 ])
 
-SPICE_PROTOCOL_MIN_VER=0.12.13
+SPICE_PROTOCOL_MIN_VER=0.14.0
 PKG_CHECK_MODULES([SPICE_PROTOCOL], [spice-protocol >= $SPICE_PROTOCOL_MIN_VER])
 AC_SUBST([SPICE_PROTOCOL_MIN_VER])
 
-GLIB2_REQUIRED=2.28
-GLIB2_ENCODED_VERSION="GLIB_VERSION_2_28"
+GLIB2_REQUIRED=2.38
+GLIB2_ENCODED_VERSION="GLIB_VERSION_2_38"
 PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= $GLIB2_REQUIRED gio-2.0 >= $GLIB2_REQUIRED])
 GLIB2_CFLAGS="$GLIB2_CFLAGS -DGLIB_VERSION_MIN_REQUIRED=$GLIB2_ENCODED_VERSION \
   -DGLIB_VERSION_MAX_ALLOWED=$GLIB2_ENCODED_VERSION"
@@ -170,23 +175,18 @@ AS_VAR_APPEND([SPICE_REQUIRES], [" glib-2.0 >= $GLIB2_REQUIRED gio-2.0 >= $GLIB2
 PKG_CHECK_MODULES([GOBJECT2], [gobject-2.0 >= $GLIB2_REQUIRED])
 AS_VAR_APPEND([SPICE_REQUIRES], [" gobject-2.0 >= $GLIB2_REQUIRED"])
 
+#used only by tests
+PKG_CHECK_MODULES([GIO_UNIX], [gio-unix-2.0 >= $GLIB2_REQUIRED])
+
 PIXMAN_REQUIRED=0.17.7
 PKG_CHECK_MODULES(PIXMAN, pixman-1 >= $PIXMAN_REQUIRED)
 AC_SUBST(PIXMAN_CFLAGS)
 AC_SUBST(PIXMAN_LIBS)
 AS_VAR_APPEND([SPICE_REQUIRES], [" pixman-1 >= $PIXMAN_REQUIRED"])
 
-AC_ARG_ENABLE([celt051],
-              AS_HELP_STRING([--disable-celt051], [Disable celt051 audio codec (enabled by default)]),,
-              [enable_celt051="yes"])
+SPICE_CHECK_CELT051
 
-if test "x$enable_celt051" = "xyes"; then
-    CELT051_REQUIRED=0.5.1.1
-    PKG_CHECK_MODULES(CELT051, celt051 >= $CELT051_REQUIRED,
-                      AS_VAR_APPEND([SPICE_REQUIRES], [" celt051 >= $CELT051_REQUIRED"]))
-fi
-
-PKG_CHECK_MODULES(SSL, openssl)
+PKG_CHECK_MODULES(SSL, openssl >= 1.0.0)
 AC_SUBST(SSL_CFLAGS)
 AC_SUBST(SSL_LIBS)
 AS_VAR_APPEND([SPICE_REQUIRES], [" openssl"])
@@ -232,14 +232,6 @@ AC_ARG_ENABLE([statistics],
                               [Build SPICE with statistic code enabled @<:@default=no@:>@]))
 AS_IF([test "$enable_statistics" = "yes"],
       [AC_DEFINE([RED_STATISTICS], [1], [Enable SPICE statistics])])
-
-AC_ARG_ENABLE([extra-checks],
-               AS_HELP_STRING([--enable-extra-checks=@<:@yes/no@:>@],
-                              [Enable expensive checks @<:@default=no@:>@]))
-AM_CONDITIONAL(ENABLE_EXTRA_CHECKS, test "$enable_extra_checks" = "yes")
-AC_DEFINE_UNQUOTED([ENABLE_EXTRA_CHECKS],
-                   [$(test "x$enable_extra_checks" = xyes && echo 1 || echo 0)],
-                   [Define to 1 to enable extra checks on code otherwise define to 0])
 
 dnl ===========================================================================
 dnl check compiler flags

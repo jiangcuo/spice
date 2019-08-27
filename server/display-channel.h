@@ -22,25 +22,13 @@
 #include <setjmp.h>
 #include <common/rect.h>
 
-#include "reds-stream.h"
-#include "cache-item.h"
-#include "pixmap-cache.h"
-#include "stat.h"
 #include "reds.h"
-#include "memslot.h"
 #include "red-parse-qxl.h"
-#include "red-record-qxl.h"
-#include "demarshallers.h"
 #include "red-channel.h"
-#include "red-qxl.h"
-#include "dispatcher.h"
 #include "main-channel.h"
-#include "migration-protocol.h"
-#include "main-dispatcher.h"
 #include "spice-bitmap-utils.h"
-#include "utils.h"
 #include "tree.h"
-#include "stream.h"
+#include "video-stream.h"
 #include "dcc.h"
 #include "image-encoders.h"
 #include "common-graphics-channel.h"
@@ -96,7 +84,7 @@ struct Drawable {
     int frames_count;
     int gradual_frames_count;
     int last_gradual_frame;
-    Stream *stream;
+    VideoStream *stream;
     int streamable;
     BitmapGradualType copy_bitmap_graduality;
     DependItem depend_items[3];
@@ -111,6 +99,7 @@ struct Drawable {
 DisplayChannel*            display_channel_new                       (RedsState *reds,
                                                                       QXLInstance *qxl,
                                                                       const SpiceCoreInterfaceInternal *core,
+                                                                      Dispatcher *dispatcher,
                                                                       int migrate,
                                                                       int stream_video,
                                                                       GArray *video_codecs,
@@ -149,7 +138,7 @@ void                       display_channel_process_draw              (DisplayCha
                                                                       RedDrawable *red_drawable,
                                                                       uint32_t process_commands_generation);
 void                       display_channel_process_surface_cmd       (DisplayChannel *display,
-                                                                      const RedSurfaceCmd *surface_cmd,
+                                                                      RedSurfaceCmd *surface_cmd,
                                                                       int loadvm);
 void                       display_channel_update_compression        (DisplayChannel *display,
                                                                       DisplayChannelClient *dcc);
@@ -168,6 +157,10 @@ gboolean display_channel_surface_has_canvas(DisplayChannel *display, uint32_t su
 void display_channel_reset_image_cache(DisplayChannel *self);
 
 void display_channel_debug_oom(DisplayChannel *display, const char *msg);
+
+void display_channel_update_qxl_running(DisplayChannel *display, bool running);
+void display_channel_set_image_compression(DisplayChannel *display,
+                                           SpiceImageCompression image_compression);
 
 G_END_DECLS
 
