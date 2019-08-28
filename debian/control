@@ -43,12 +43,6 @@ Recommends:
  gstreamer1.0-plugins-good,
 Suggests:
  gstreamer1.0-plugins-ugly,
-Breaks:
- libspice-client-glib-2.0-1 (<= 0.12-2),
- libspice-client-gtk-2.0-1 (<= 0.12-2),
- libspice-client-gtk-3.0-1 (<= 0.12-2),
- python-spice-client-gtk (<= 0.12-2),
- spice-client-gtk (<= 0.12-2),
 Description: Implements the server side of the SPICE protocol
  The Simple Protocol for Independent Computing Environments (SPICE) is
  a remote display system built for virtual environments which allows
