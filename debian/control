@@ -41,6 +41,7 @@ Recommends:
  gstreamer1.0-libav,
  gstreamer1.0-plugins-base,
  gstreamer1.0-plugins-good,
+Suggests:
  gstreamer1.0-plugins-ugly,
 Breaks:
  libspice-client-glib-2.0-1 (<= 0.12-2),
