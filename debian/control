@@ -19,7 +19,7 @@ Build-Depends:
  libopus-dev (>= 0.9.14),
  libpixman-1-dev (>= 0.17.7),
  libsasl2-dev,
- libspice-protocol-dev (>= 0.12.13),
+ libspice-protocol-dev (>= 0.14.0~),
  libssl-dev,
  pkg-config,
  python,
