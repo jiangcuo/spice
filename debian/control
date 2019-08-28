@@ -1,7 +1,7 @@
 Source: spice
 Section: misc
 Priority: optional
-Maintainer: Liang Guo <guoliang@debian.org>
+Maintainer: Debian QEMU Team <pkg-qemu-devel@lists.alioth.debian.org>
 Uploaders: Michael Tokarev <mjt@tls.msk.ru>
 Build-Depends:
  debhelper (>= 10),
