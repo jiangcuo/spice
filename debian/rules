@@ -1,5 +1,10 @@
 #!/usr/bin/make -f
 
+# some "down-deps" pull too many libs as direct deps
+# (in particular links with unneded libgstbase,libgthread,libgstvideo)
+# XXX but this option is placed at the end of the command line so has no effect
+#export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+
 %:
 	dh $@ --parallel --with autoreconf
 
