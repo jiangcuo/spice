@@ -9,6 +9,10 @@
 	dh $@ --with autoreconf
 
 override_dh_auto_configure:
+# set GSTREAMER and GLIB2 _LIBS to smaller list
+# to avoid linking with useless libraries
+	GSTREAMER_1_0_LIBS="-lgstapp-1.0 -lgstreamer-1.0" \
+	GLIB2_LIBS="-lgio-2.0 -lgobject-2.0 -lglib-2.0" \
 	dh_auto_configure -- --disable-silent-rules \
 	 --enable-smartcard \
 	 --with-gstreamer=1.0 \
