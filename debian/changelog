@@ -1,3 +1,12 @@
+spice (0.14.2-2) unstable; urgency=medium
+
+  * set $XDG_RUNTIME_DIR instead of $HOME when running tests
+    to avoid dconf cache failure (fix FTBFS on almost all buildds)
+  * set GSTREAMER_1_0_LIBS and GLIB2_LIBS (trimmed) for configure
+    to avoid linking with useless libs
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Fri, 30 Aug 2019 15:58:47 +0300
+
 spice (0.14.2-1) unstable; urgency=medium
 
   * new upstream 0.14.2 release
