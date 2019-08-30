@@ -13,6 +13,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  SPICE_SERVER_0.12.6@SPICE_SERVER_0.12.6 0.12.6
  SPICE_SERVER_0.13.1@SPICE_SERVER_0.13.1 0.13.1
  SPICE_SERVER_0.13.2@SPICE_SERVER_0.13.2 0.13.2
+ SPICE_SERVER_0.14.2@SPICE_SERVER_0.14.2 0.14.2
  SPICE_SERVER_0.6.0@SPICE_SERVER_0.6.0 0.8.2
  SPICE_SERVER_0.6.1@SPICE_SERVER_0.6.1 0.8.2
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
@@ -41,6 +42,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_qxl_reset_cursor@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_reset_image_cache@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_reset_memslots@SPICE_SERVER_0.8.2 0.8.2
+ spice_qxl_set_device_info@SPICE_SERVER_0.14.2 0.14.2
  spice_qxl_set_max_monitors@SPICE_SERVER_0.12.6 0.12.6
  spice_qxl_start@SPICE_SERVER_0.8.2 0.8.2
  spice_qxl_stop@SPICE_SERVER_0.8.2 0.8.2
