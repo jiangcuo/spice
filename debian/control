@@ -28,8 +28,8 @@ Build-Depends:
  liborc-0.4-dev,
 Standards-Version: 4.1.1
 Homepage: http://www.spice-space.org
-Vcs-Git: https://anonscm.debian.org/git/collab-maint/spice.git
-Vcs-Browser: https://anonscm.debian.org/gitweb/?p=collab-maint/spice.git
+Vcs-Git: https://salsa.debian.org/debian/spice.git
+Vcs-Browser: https://salsa.debian.org/debian/spice
 
 Package: libspice-server1
 Section: libs
