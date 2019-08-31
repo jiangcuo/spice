@@ -1,0 +1,46 @@
+From c289a6eee31d5ae604ff1dd3dd64452b60257bc1 Mon Sep 17 00:00:00 2001
+From: Frediano Ziglio <fziglio@redhat.com>
+Date: Mon, 22 Jul 2019 18:46:38 +0100
+Subject: [PATCH] red-replay-qxl: Fix replay on 32 bit systems
+
+On 32 systems pointers are 32 bit while QXLPHYSICAL is always
+64 bit.
+Using pointer -> intptr_t -> QXLPHYSICAL conversion cause pointers
+to have higher 32 bit set to 1 if the address is >= 0x80000000.
+This is possible depending on address space.
+The QXLPHYSICAL is split in 3 sections:
+- slot ID;
+- generation;
+- virtual address.
+Current utility using record file (spice-server-replay) set slot ID
+and generation to 0 so if the higher bits become all 1 slot ID and
+generation won't be 0 causing the utility to fail.
+Use pointer -> uintptr_t -> QXLPHYSICAL conversion to avoid this
+issue.
+Note that for opposite conversion (QXLPHYSICAL_TO_PTR) the conversion
+does not change, type is changed just for consistency.
+
+Signed-off-by: Frediano Ziglio <fziglio@redhat.com>
+Acked-by: Snir Sheriber <ssheribe@redhat.com>
+---
+ server/red-replay-qxl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/server/red-replay-qxl.c b/server/red-replay-qxl.c
+index 7104c81c..4525c7d7 100644
+--- a/server/red-replay-qxl.c
++++ b/server/red-replay-qxl.c
+@@ -29,8 +29,8 @@
+ #include "memslot.h"
+ #include "red-parse-qxl.h"
+ 
+-#define QXLPHYSICAL_FROM_PTR(ptr) ((QXLPHYSICAL)(intptr_t)(ptr))
+-#define QXLPHYSICAL_TO_PTR(phy) ((void*)(intptr_t)(phy))
++#define QXLPHYSICAL_FROM_PTR(ptr) ((QXLPHYSICAL)(uintptr_t)(ptr))
++#define QXLPHYSICAL_TO_PTR(phy) ((void*)(uintptr_t)(phy))
+ 
+ typedef enum {
+     REPLAY_OK = 0,
+-- 
+2.20.1
+
