@@ -1,0 +1,45 @@
+From 19f9f454e0777d851f26d14df0c7984267c57015 Mon Sep 17 00:00:00 2001
+From: Christian Ehrhardt <christian.ehrhardt@canonical.com>
+Date: Wed, 5 Jun 2019 16:18:41 +0200
+Subject: [PATCH] test: fix test-qxl-parsing on ppc64el and armhf
+
+On ppc64el and armhf the handling of "1 << mem_info.memslot_id_shift"
+will end up beign a zero which breaks the test.
+
+Marking the implicit value 1 as a 64 bit value (to match the uint64_t
+target) fixes the issue.
+
+Fixes #31
+
+Signed-off-by: Christian Ehrhardt <christian.ehrhardt@canonical.com>
+Acked-by: Frediano Ziglio <fziglio@redhat.com>
+
+Origin: upstream, https://gitlab.freedesktop.org/spice/spice/commit/19f9f454e0777d851f26d14df0c7984267c57015
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1814146
+Last-Update: 2019-06-19
+
+---
+ AUTHORS                         | 1 +
+ server/tests/test-qxl-parsing.c | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+--- a/AUTHORS
++++ b/AUTHORS
+@@ -70,5 +70,6 @@ Patches also contributed by
+     谢 昆明 <kunming.xie@hotmail.com>
+     Benjamin Tissoires <benjamin.tissoires@redhat.com>
+     Olivier Fourdan <ofourdan@redhat.com>
++    Christian Ehrhardt <christian.ehrhardt@canonical.com>
+ 
+    ....send patches to get your name here...
+--- a/server/tests/test-qxl-parsing.c
++++ b/server/tests/test-qxl-parsing.c
+@@ -98,7 +98,7 @@ static void test_memslot_invalid_slot_id
+     RedMemSlotInfo mem_info;
+     init_meminfo(&mem_info);
+ 
+-    memslot_get_virt(&mem_info, 1 << mem_info.memslot_id_shift, 16, 0);
++    memslot_get_virt(&mem_info, UINT64_C(1) << mem_info.memslot_id_shift, 16, 0);
+ }
+ 
+ static void test_memslot_invalid_addresses(void)
