@@ -16,15 +16,3 @@ override_dh_auto_configure:
 
 # remove Requires.private and Libs.private defs from .pc file -- we're not building static libs
 	sed -E -i '/^(Libs|Requires)\.private:/D' spice-server.pc
-
-# at least one of the tests (listen) initializes dconf which,
-# for some reason, initializes its cache in ~/.cache/dconf.
-# On a buildd, writing to $HOME is forbidden. Work around this
-# by temporarily overriding $XDG_RUNTIME_DIR
-override_dh_auto_test:
-	mkdir -p .home
-	XDG_RUNTIME_DIR=${CURDIR}/.home dh_auto_test --no-parallel
-	rm -rf .home
-override_dh_auto_clean:
-	dh_auto_clean
-	rm -rf .home
