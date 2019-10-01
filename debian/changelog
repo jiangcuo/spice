@@ -1,3 +1,11 @@
+spice (0.14.2-4) unstable; urgency=medium
+
+  * disable failing test-listen (Closes: #941006)
+  * add fix-test-qxl-parsing-on-ppc64el-and-armhf.patch
+  * stop using dh_autoreconf as we do not patch autoconf/automake anymore
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Tue, 01 Oct 2019 08:52:16 +0300
+
 spice (0.14.2-3) unstable; urgency=medium
 
   * red-replay-qxl-fix-replay-on-32-bit-systems.patch
