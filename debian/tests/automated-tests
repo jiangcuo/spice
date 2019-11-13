@@ -1,13 +1,13 @@
 #! /bin/sh
 
-set -e
+set -ex
 
-dh_auto_configure -- --enable-automated-tests \
+dh_auto_configure -- \
     --disable-celt051 \
     --disable-silent-rules \
     --enable-smartcard
-make -C spice-common/common libspice-common.la libspice-common-server.la
+make -C subprojects/spice-common/common libspice-common.la libspice-common-server.la
 make -C server libspice-server.la
 make -C server/tests all
-./server/tests/test_display_streaming  --automated-tests
+./server/tests/test-display-streaming  --automated-tests
 
