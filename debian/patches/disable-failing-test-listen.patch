@@ -1,47 +1,33 @@
-Description: skip unreloable flaky test-listen
+Description: skip unreliable flaky test-listen
  This test is failing in automated build environment that strip user
- environments. After a few tries to export $HOME for the test nt picking it
+ environments. After a few tries to export $HOME for the test and picking it
  up we now disable the test "test-listen".
  Note: in a local sbuild chroot (which passes a user) it runs just fine.
- Note: We still build the test to ctach issues that would happen at that step.
+ Note: We still build the test to catch issues that would happen at that step.
 Forwarded: no
 Author: Christian Ehrhardt <christian.ehrhardt@canonical.com>
 Bug-Ubuntu: https://bugs.launchpad.net/bugs/1814146
 Bug-Debian: https://bugs.debian.org/941006
-Last-Update: 2019-05-28
+Last-Update: 2020-04-14 mjt
 
+diff --git a/server/tests/Makefile.am b/server/tests/Makefile.am
+index d749f888..964c0f75 100644
 --- a/server/tests/Makefile.am
 +++ b/server/tests/Makefile.am
-@@ -62,7 +62,6 @@ check_PROGRAMS =				\
- 	test-empty-success			\
- 	test-channel				\
- 	test-stream-device			\
+@@ -66 +65,0 @@ check_PROGRAMS =				\
 -	test-listen				\
- 	test-record				\
- 	$(NULL)
- 
+diff --git a/server/tests/Makefile.in b/server/tests/Makefile.in
+index 44dca967..8af8998e 100644
 --- a/server/tests/Makefile.in
 +++ b/server/tests/Makefile.in
-@@ -96,7 +96,7 @@ check_PROGRAMS = test-codecs-parsing$(EX
- 	test-leaks$(EXEEXT) test-vdagent$(EXEEXT) \
- 	test-fail-on-null-core-interface$(EXEEXT) \
- 	test-empty-success$(EXEEXT) test-channel$(EXEEXT) \
+@@ -98 +98 @@ check_PROGRAMS = test-codecs-parsing$(EXEEXT) test-options$(EXEEXT) \
 -	test-stream-device$(EXEEXT) test-listen$(EXEEXT) \
 +	test-stream-device$(EXEEXT) \
- 	test-record$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2)
- noinst_PROGRAMS = test-display-no-ssl$(EXEEXT) \
- 	test-display-streaming$(EXEEXT) test-playback$(EXEEXT) \
-@@ -1572,13 +1572,6 @@ test-stream-device.log: test-stream-devi
- 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
- 	--log-file $$b.log --trs-file $$b.trs \
- 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+@@ -1608,7 +1607,0 @@ test-stream-device.log: test-stream-device$(EXEEXT)
+-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 -	"$$tst" $(AM_TESTS_FD_REDIRECT)
 -test-listen.log: test-listen$(EXEEXT)
 -	@p='test-listen$(EXEEXT)'; \
 -	b='test-listen'; \
 -	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 -	--log-file $$b.log --trs-file $$b.trs \
--	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
- 	"$$tst" $(AM_TESTS_FD_REDIRECT)
- test-record.log: test-record$(EXEEXT)
- 	@p='test-record$(EXEEXT)'; \
