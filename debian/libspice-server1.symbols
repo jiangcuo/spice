@@ -14,6 +14,7 @@ libspice-server.so.1 libspice-server1 #MINVER#
  SPICE_SERVER_0.13.1@SPICE_SERVER_0.13.1 0.13.1
  SPICE_SERVER_0.13.2@SPICE_SERVER_0.13.2 0.13.2
  SPICE_SERVER_0.14.2@SPICE_SERVER_0.14.2 0.14.2
+ SPICE_SERVER_0.14.3@SPICE_SERVER_0.14.3 0.14.3
  SPICE_SERVER_0.6.0@SPICE_SERVER_0.6.0 0.8.2
  SPICE_SERVER_0.6.1@SPICE_SERVER_0.6.1 0.8.2
  SPICE_SERVER_0.8.0@SPICE_SERVER_0.8.0 0.8.2
@@ -60,12 +61,14 @@ libspice-server.so.1 libspice-server1 #MINVER#
  spice_server_char_device_recognized_subtypes@SPICE_SERVER_0.6.0 0.8.2
  spice_server_char_device_wakeup@SPICE_SERVER_0.6.0 0.8.2
  spice_server_destroy@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_free_video_codecs@SPICE_SERVER_0.14.3 0.14.3
  spice_server_get_best_playback_rate@SPICE_SERVER_0.12.5 0.12.5
  spice_server_get_best_record_rate@SPICE_SERVER_0.12.5 0.12.5
  spice_server_get_image_compression@SPICE_SERVER_0.6.0 0.8.2
  spice_server_get_num_clients@SPICE_SERVER_0.10.0 0.10.0
  spice_server_get_peer_info@SPICE_SERVER_0.6.0 0.8.2
  spice_server_get_sock_info@SPICE_SERVER_0.6.0 0.8.2
+ spice_server_get_video_codecs@SPICE_SERVER_0.14.3 0.14.3
  spice_server_init@SPICE_SERVER_0.6.0 0.8.2
  spice_server_is_server_mouse@SPICE_SERVER_0.10.3 0.11.0
  spice_server_kbd_leds@SPICE_SERVER_0.6.0 0.8.2
