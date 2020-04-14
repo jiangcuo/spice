@@ -1,3 +1,14 @@
+spice (0.14.3-1) unstable; urgency=medium
+
+  * new upstream version (Closes: #940057, #954629)
+  * remove NEWS from d/docs (removed upstream)
+  * remove patches included upstream
+  * refresh disable-failing-test-listen.patch
+  * set Multi-Arch: same for libspice-server-dev too
+  * update libspice-server1.symbols
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Tue, 14 Apr 2020 16:55:25 +0300
+
 spice (0.14.2-4) unstable; urgency=medium
 
   * disable failing test-listen (Closes: #941006)
