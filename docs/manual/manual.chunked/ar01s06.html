@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>6. Streaming Agent</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot" /><link rel="home" href="index.html" title="Spice User Manual" /><link rel="up" href="index.html" title="Spice User Manual" /><link rel="prev" href="ar01s05.html" title="5. USB redirection" /><link rel="next" href="ar01s07.html" title="7. CAC smartcard redirection" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ar01s05.html">Prev</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ar01s07.html">Next</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="streamingagent"></a>6. Streaming Agent</h2></div></div></div><p>The SPICE streaming agent allows to send an encoded video stream of the guest
-desktop to the client.</p><p>The streaming agent is a daemon/service running in the guest OS so it must be
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>6. Video Streaming</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot" /><link rel="home" href="index.html" title="Spice User Manual" /><link rel="up" href="index.html" title="Spice User Manual" /><link rel="prev" href="ar01s05.html" title="5. USB redirection" /><link rel="next" href="ar01s07.html" title="7. CAC smartcard redirection" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ar01s05.html">Prev</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ar01s07.html">Next</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="videostreaming"></a>6. Video Streaming</h2></div></div></div><p>SPICE streaming allows sending an encoded video stream of the guest
+desktop to the client. The encoding can be done from the host (inside
+SPICE server) or from the guest, with the help of the SPICE streaming
+agent.</p><p>The streaming agent is a daemon/service running in the guest OS so it must be
 installed if it does not yet exist on the guest system.  It relies on a
 dedicated spiceport char device to achieve communication between the guest and
 the host.  This device must be added to the virtual machine as described below
-for the streaming agent to work in the guest.</p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="_configuration_4"></a>6.1. Configuration</h3></div></div></div><p><strong>Using virt-manager. </strong>The needed device can be added from the virtual machine
+for the streaming agent to work in the guest.</p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="_guest_video_encoding_agent_configuration"></a>6.1. Guest Video Encoding: Agent Configuration</h3></div></div></div><p><strong>Using virt-manager. </strong>The needed device can be added from the virtual machine
 details. Click on "Add hardware" and then add a "Channel" device with
 type "Spice port (spiceport)". The port should be named
 <code class="literal">org.spice-space.stream.0</code>, and the channel should also be
@@ -21,4 +23,17 @@ type "Spice port (spiceport)". The port should be named
     &lt;/channel&gt;
 &lt;/devices&gt;</pre><p><strong>Using QEMU. </strong>Adding the following parameters to your QEMU command line will enable
 the needed devices for agent support in the guest OS:</p><pre class="programlisting">-device virtserialport,bus=virtio-serial0.0,nr=1,chardev=charchannel1,id=channel1,name=org.spice-space.stream.0 \
--chardev spiceport,name=org.spice-space.stream.0,id=charchannel1</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ar01s05.html">Prev</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="ar01s07.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+-chardev spiceport,name=org.spice-space.stream.0,id=charchannel1</pre></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="_host_video_encoding"></a>6.2. Host Video Encoding</h3></div></div></div><p>For host video encoding, SPICE natively supports MJPEG encoding. For
+using further codecs, SPICE server must be compiled with GStreamer
+support.</p><p><strong>Setting. </strong>SPICE video streaming parameter can take three values:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+<code class="literal">off</code>: no video detection is performed,
+</li><li class="listitem">
+<code class="literal">all</code>: any fast-refreshing window can be encoded into a video stream,
+</li><li class="listitem">
+<code class="literal">filter</code>: SPICE server adds additional filters to decide if video
+  streaming should be activated (at the moment, only small window
+  surfaces are skipped),
+</li></ul></div><p><strong>Using libvirt. </strong>The <code class="literal">streaming</code> tag must be added to Spice <code class="literal">graphics</code>:</p><pre class="programlisting">&lt;graphics type='spice' autoport='yes'&gt;
+    &lt;streaming mode='off|all|filter'/&gt;
+&lt;/graphics&gt;</pre><p><strong>Using QEMU. </strong>Adding the following parameters to your QEMU command line will enable
+SPICE server video encoding:</p><pre class="programlisting">-spice ...,streaming-video=off|all|filter,...</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ar01s05.html">Prev</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="ar01s07.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

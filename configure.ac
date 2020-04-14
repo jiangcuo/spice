@@ -12,9 +12,9 @@ AC_PREREQ([2.57])
 #   then set age to 0.
 #
 dnl TODO see server/spice-char.h TODO comment for API breakage
-m4_define([SPICE_CURRENT], [14])
+m4_define([SPICE_CURRENT], [15])
 m4_define([SPICE_REVISION], [0])
-m4_define([SPICE_AGE], [13])
+m4_define([SPICE_AGE], [14])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
         [spice-devel@lists.freedesktop.org], spice)
@@ -34,7 +34,7 @@ m4_include([subprojects/spice-common/m4/spice-deps.m4])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR(.)
 
-AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip subdir-objects])
+AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip subdir-objects foreign])
 AM_MAINTAINER_MODE
 
 AC_PROG_CC
@@ -67,6 +67,20 @@ case $host_cpu in
   *)
         SPICE_WARNING([spice-server on non-x86_64 architectures has not been extensively tested])
 esac
+
+AC_MSG_CHECKING([for native Win32])
+case "$host_os" in
+     *mingw*|*cygwin*)
+        os_win32=yes
+        dnl AI_ADDRCONFIG and possibly some other code require at least Vista
+        AC_DEFINE([_WIN32_WINNT], [0x600], [Minimal Win32 version])
+        ;;
+     *)
+        os_win32=no
+        ;;
+esac
+AC_MSG_RESULT([$os_win32])
+AM_CONDITIONAL([OS_WIN32],[test "$os_win32" = "yes"])
 
 dnl =========================================================================
 dnl Check optional features
@@ -134,7 +148,7 @@ AX_VALGRIND_CHECK
 
 SPICE_CHECK_LZ4
 SPICE_CHECK_SASL
-SPICE_CHECK_RECORDER
+SPICE_CHECK_INSTRUMENTATION
 AM_CONDITIONAL(HAVE_SASL, test "x$have_sasl" = "xyes")
 
 dnl =========================================================================
@@ -154,6 +168,9 @@ AC_CHECK_LIB(rt, clock_gettime, LIBRT="-lrt")
 AC_SUBST(LIBRT)
 
 AS_VAR_APPEND([SPICE_NONPKGCONFIG_LIBS], [" -pthread $LIBM $LIBRT"])
+AS_IF([test "x$os_win32" = "xyes"], [
+    AS_VAR_APPEND([SPICE_NONPKGCONFIG_LIBS], [" -lws2_32"])
+])
 
 SPICE_REQUIRES=""
 
@@ -176,7 +193,8 @@ PKG_CHECK_MODULES([GOBJECT2], [gobject-2.0 >= $GLIB2_REQUIRED])
 AS_VAR_APPEND([SPICE_REQUIRES], [" gobject-2.0 >= $GLIB2_REQUIRED"])
 
 #used only by tests
-PKG_CHECK_MODULES([GIO_UNIX], [gio-unix-2.0 >= $GLIB2_REQUIRED])
+AS_IF([test "x$os_win32" != "xyes"],
+      [PKG_CHECK_MODULES([GIO_UNIX], [gio-unix-2.0 >= $GLIB2_REQUIRED])])
 
 PIXMAN_REQUIRED=0.17.7
 PKG_CHECK_MODULES(PIXMAN, pixman-1 >= $PIXMAN_REQUIRED)
@@ -190,6 +208,15 @@ PKG_CHECK_MODULES(SSL, openssl >= 1.0.0)
 AC_SUBST(SSL_CFLAGS)
 AC_SUBST(SSL_LIBS)
 AS_VAR_APPEND([SPICE_REQUIRES], [" openssl"])
+
+save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS $SSL_CFLAGS"
+AC_CHECK_DECLS([SSL_CTX_set_ecdh_auto], [], [], [
+AC_INCLUDES_DEFAULT
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+])
+CFLAGS="$save_CFLAGS"
 
 AC_CHECK_LIB(jpeg, jpeg_destroy_decompress,
     AC_MSG_CHECKING([for jpeglib.h])
@@ -277,7 +304,7 @@ AC_SUBST(SPICE_REQUIRES)
 AC_SUBST(SPICE_NONPKGCONFIG_CFLAGS)
 AC_SUBST(SPICE_NONPKGCONFIG_LIBS)
 
-m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
+AM_SILENT_RULES([yes])
 
 AC_OUTPUT([
 Makefile

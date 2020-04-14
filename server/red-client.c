@@ -15,9 +15,7 @@
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif /* HAVE_CONFIG_H */
 
 #include "red-channel.h"
 #include "red-client.h"
@@ -108,6 +106,7 @@ red_client_finalize (GObject *object)
 {
     RedClient *self = RED_CLIENT(object);
 
+    g_clear_object(&self->mcc);
     spice_debug("release client=%p", self);
     pthread_mutex_destroy(&self->lock);
 
@@ -176,11 +175,11 @@ void red_client_migrate(RedClient *client)
     RedChannel *channel;
 
     if (!pthread_equal(pthread_self(), client->thread_id)) {
-        spice_warning("client->thread_id (0x%" G_GSIZE_MODIFIER "x) != "
-                      "pthread_self (0x%" G_GSIZE_MODIFIER "x)."
+        spice_warning("client->thread_id (%p) != "
+                      "pthread_self (%p)."
                       "If one of the threads is != io-thread && != vcpu-thread,"
                       " this might be a BUG",
-                      client->thread_id, pthread_self());
+                      (void*) client->thread_id, (void*) pthread_self());
     }
     FOREACH_CHANNEL_CLIENT(client, rcc) {
         if (red_channel_client_is_connected(rcc)) {
@@ -192,33 +191,54 @@ void red_client_migrate(RedClient *client)
 
 void red_client_destroy(RedClient *client)
 {
-    RedChannelClient *rcc;
-
     if (!pthread_equal(pthread_self(), client->thread_id)) {
-        spice_warning("client->thread_id (0x%" G_GSIZE_MODIFIER "x) != "
-                      "pthread_self (0x%" G_GSIZE_MODIFIER "x)."
+        spice_warning("client->thread_id (%p) != "
+                      "pthread_self (%p)."
                       "If one of the threads is != io-thread && != vcpu-thread,"
                       " this might be a BUG",
-                      client->thread_id,
-                      pthread_self());
+                      (void*) client->thread_id,
+                      (void*) pthread_self());
     }
-    red_client_set_disconnecting(client);
-    FOREACH_CHANNEL_CLIENT(client, rcc) {
+
+    pthread_mutex_lock(&client->lock);
+    spice_debug("destroy client %p with #channels=%d", client, g_list_length(client->channels));
+    // This makes sure that we won't try to add new RedChannelClient instances
+    // to the RedClient::channels list while iterating it
+    client->disconnecting = TRUE;
+    while (client->channels) {
         RedChannel *channel;
+        RedChannelClient *rcc = client->channels->data;
+
+        // Remove the RedChannelClient we are processing from the list
+        // Note that we own the object so it is safe to do some operations on it.
+        // This manual scan of the list is done to have a thread safe
+        // iteration of the list
+        client->channels = g_list_delete_link(client->channels, client->channels);
+
+        // prevent dead lock disconnecting rcc (which can happen
+        // in the same thread or synchronously on another one)
+        pthread_mutex_unlock(&client->lock);
+
         // some channels may be in other threads, so disconnection
         // is not synchronous.
         channel = red_channel_client_get_channel(rcc);
         red_channel_client_set_destroying(rcc);
+
         // some channels may be in other threads. However we currently
         // assume disconnect is synchronous (we changed the dispatcher
         // to wait for disconnection)
         // TODO: should we go back to async. For this we need to use
         // ref count for channel clients.
         red_channel_disconnect_client(channel, rcc);
+
         spice_assert(red_channel_client_pipe_is_empty(rcc));
         spice_assert(red_channel_client_no_item_being_sent(rcc));
+
         red_channel_client_destroy(rcc);
+        g_object_unref(rcc);
+        pthread_mutex_lock(&client->lock);
     }
+    pthread_mutex_unlock(&client->lock);
     g_object_unref(client);
 }
 
@@ -227,7 +247,6 @@ void red_client_destroy(RedClient *client)
 static RedChannelClient *red_client_get_channel(RedClient *client, int type, int id)
 {
     RedChannelClient *rcc;
-    RedChannelClient *ret = NULL;
 
     FOREACH_CHANNEL_CLIENT(client, rcc) {
         int channel_type, channel_id;
@@ -236,11 +255,10 @@ static RedChannelClient *red_client_get_channel(RedClient *client, int type, int
         channel = red_channel_client_get_channel(rcc);
         g_object_get(channel, "channel-type", &channel_type, "id", &channel_id, NULL);
         if (channel_type == type && channel_id == id) {
-            ret = rcc;
-            break;
+            return rcc;
         }
     }
-    return ret;
+    return NULL;
 }
 
 gboolean red_client_add_channel(RedClient *client, RedChannelClient *rcc, GError **error)
@@ -275,6 +293,11 @@ gboolean red_client_add_channel(RedClient *client, RedChannelClient *rcc, GError
         goto cleanup;
     }
 
+    // first must be the main one
+    if (!client->mcc) {
+        client->mcc = g_object_ref(rcc);
+        spice_assert(MAIN_CHANNEL_CLIENT(rcc) != NULL);
+    }
     client->channels = g_list_prepend(client->channels, rcc);
     if (client->during_target_migrate && client->seamless_migrate) {
         if (red_channel_client_set_migration_seamless(rcc)) {
@@ -290,11 +313,6 @@ cleanup:
 MainChannelClient *red_client_get_main(RedClient *client)
 {
     return client->mcc;
-}
-
-void red_client_set_main(RedClient *client, MainChannelClient *mcc)
-{
-    client->mcc = mcc;
 }
 
 void red_client_semi_seamless_migrate_complete(RedClient *client)
@@ -329,8 +347,14 @@ void red_client_remove_channel(RedChannelClient *rcc)
 {
     RedClient *client = red_channel_client_get_client(rcc);
     pthread_mutex_lock(&client->lock);
-    client->channels = g_list_remove(client->channels, rcc);
+    GList *link = g_list_find(client->channels, rcc);
+    if (link) {
+        client->channels = g_list_delete_link(client->channels, link);
+    }
     pthread_mutex_unlock(&client->lock);
+    if (link) {
+        g_object_unref(rcc);
+    }
 }
 
 /* returns TRUE If all channels are finished migrating, FALSE otherwise */

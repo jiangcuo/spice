@@ -14,9 +14,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include "video-stream.h"
 #include "display-channel-private.h"
@@ -468,6 +466,41 @@ static bool video_stream_add_frame(DisplayChannel *display,
         return TRUE;
     }
     return FALSE;
+}
+
+/* Returns an array with SPICE_VIDEO_CODEC_TYPE_ENUM_END elements,
+ * with the client preference order (index) as value */
+GArray *video_stream_parse_preferred_codecs(SpiceMsgcDisplayPreferredVideoCodecType *msg)
+{
+    int i, len;
+    int indexes[SPICE_VIDEO_CODEC_TYPE_ENUM_END];
+    GArray *client;
+
+    /* set default to a big and positive number */
+    memset(indexes, 0x7f, sizeof(indexes));
+
+    for (len = 0, i = 0; i < msg->num_of_codecs; i++) {
+        SpiceVideoCodecType video_codec = msg->codecs[i];
+
+        if (video_codec < SPICE_VIDEO_CODEC_TYPE_MJPEG ||
+            video_codec >= SPICE_VIDEO_CODEC_TYPE_ENUM_END) {
+            spice_debug("Client has sent unknown video-codec (value %d at index %d). "
+                        "Ignoring as server can't handle it",
+                         video_codec, i);
+            continue;
+        }
+
+        if (indexes[video_codec] < SPICE_VIDEO_CODEC_TYPE_ENUM_END) {
+            continue;
+        }
+
+        len++;
+        indexes[video_codec] = len;
+    }
+    client = g_array_sized_new(FALSE, FALSE, sizeof(int), SPICE_VIDEO_CODEC_TYPE_ENUM_END);
+    g_array_append_vals(client, indexes, SPICE_VIDEO_CODEC_TYPE_ENUM_END);
+
+    return client;
 }
 
 /* TODO: document the difference between the 2 functions below */
@@ -971,4 +1004,27 @@ void video_stream_trace_add_drawable(DisplayChannel *display,
     trace->width = src_area->right - src_area->left;
     trace->height = src_area->bottom - src_area->top;
     trace->dest_area = item->red_drawable->bbox;
+}
+
+/*
+ * video_codecs: an array of RedVideoCodec
+ * sep: a string for separating the list elements
+ *
+ * returns a string of "enc:codec<sep>"* that must be released
+ *         with g_free.
+ */
+char *video_codecs_to_string(GArray *video_codecs, const char *sep)
+{
+    int i;
+    GString *msg = g_string_new("");
+
+    for (i = 0; i < video_codecs->len; i++) {
+        RedVideoCodec codec = g_array_index(video_codecs, RedVideoCodec, i);
+        char *codec_name = reds_get_video_codec_fullname(&codec);
+
+        g_string_append_printf(msg, "%s%s", i ? sep : "", codec_name);
+        g_free(codec_name);
+    }
+
+    return g_string_free(msg, FALSE);
 }

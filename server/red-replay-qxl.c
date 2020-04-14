@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <inttypes.h>
 #include <zlib.h>
@@ -31,8 +29,8 @@
 #include "memslot.h"
 #include "red-parse-qxl.h"
 
-#define QXLPHYSICAL_FROM_PTR(ptr) ((QXLPHYSICAL)(intptr_t)(ptr))
-#define QXLPHYSICAL_TO_PTR(phy) ((void*)(intptr_t)(phy))
+#define QXLPHYSICAL_FROM_PTR(ptr) ((QXLPHYSICAL)(uintptr_t)(ptr))
+#define QXLPHYSICAL_TO_PTR(phy) ((void*)(uintptr_t)(phy))
 
 typedef enum {
     REPLAY_OK = 0,
@@ -267,7 +265,7 @@ static replay_t read_binary(SpiceReplay *replay, const char *prefix, size_t *siz
         }
         if ((ret = inflate(&strm, Z_NO_FLUSH)) != Z_STREAM_END) {
             spice_error("inflate error %d (disc: %" G_GSSIZE_FORMAT ")",
-                        ret, *size - strm.total_out);
+                        ret, (size_t) (*size - strm.total_out));
             if (ret == Z_DATA_ERROR) {
                 /* last operation may be wrong. since we do the recording
                  * in red_worker, when there is a shutdown from the vcpu/io thread
@@ -313,10 +311,12 @@ static ssize_t red_replay_data_chunks(SpiceReplay *replay, const char *prefix,
     data_size = cur->data_size;
     cur->next_chunk = cur->prev_chunk = 0;
     while (count_chunks-- > 0) {
-        if (read_binary(replay, prefix, &next_data_size, (uint8_t**)&cur->next_chunk,
-            sizeof(QXLDataChunk)) == REPLAY_ERROR) {
+        uint8_t *data = NULL;
+        if (read_binary(replay, prefix, &next_data_size, &data,
+                        sizeof(QXLDataChunk)) == REPLAY_ERROR) {
             return -1;
         }
+        cur->next_chunk = QXLPHYSICAL_FROM_PTR(data);
         data_size += next_data_size;
         next = QXLPHYSICAL_TO_PTR(cur->next_chunk);
         next->prev_chunk = QXLPHYSICAL_FROM_PTR(cur);
@@ -416,7 +416,7 @@ static uint8_t *red_replay_image_data_flat(SpiceReplay *replay, size_t *size)
 
 static QXLImage *red_replay_image(SpiceReplay *replay, uint32_t flags)
 {
-    QXLImage* qxl = NULL;
+    QXLImage* qxl = NULL, *data;
     size_t bitmap_size;
     ssize_t size;
     uint8_t qxl_flags;
@@ -474,7 +474,9 @@ static QXLImage *red_replay_image(SpiceReplay *replay, uint32_t flags)
         if (qxl_flags & QXL_BITMAP_DIRECT) {
             qxl->bitmap.data = QXLPHYSICAL_FROM_PTR(red_replay_image_data_flat(replay, &bitmap_size));
         } else {
-            size = red_replay_data_chunks(replay, "bitmap.data", (uint8_t**)&qxl->bitmap.data, 0);
+            uint8_t *data = NULL;
+            size = red_replay_data_chunks(replay, "bitmap.data", &data, 0);
+            qxl->bitmap.data = QXLPHYSICAL_FROM_PTR(data);
             if (size != bitmap_size) {
                 g_warning("bad image, %" G_GSIZE_FORMAT " != %" G_GSIZE_FORMAT, size, bitmap_size);
                 return NULL;
@@ -495,10 +497,15 @@ static QXLImage *red_replay_image(SpiceReplay *replay, uint32_t flags)
         if (replay->error) {
             return NULL;
         }
-        qxl = replay_realloc(replay, qxl, sizeof(QXLImageDescriptor) + sizeof(QXLQUICData) +
-                             qxl->quic.data_size);
-        size = red_replay_data_chunks(replay, "quic.data", (uint8_t**)&qxl->quic.data, 0);
+        data = NULL;
+        size = red_replay_data_chunks(replay, "quic.data", (uint8_t**)&data,
+                                      sizeof(QXLImageDescriptor) + sizeof(QXLQUICData) +
+                                      sizeof(QXLDataChunk));
         spice_assert(size == qxl->quic.data_size);
+        data->descriptor = qxl->descriptor;
+        data->quic.data_size = qxl->quic.data_size;
+        replay_free(replay, qxl);
+        qxl = data;
         break;
     default:
         spice_warn_if_reached();
@@ -524,7 +531,9 @@ static void red_replay_image_free(SpiceReplay *replay, QXLPHYSICAL p, uint32_t f
     case SPICE_IMAGE_TYPE_SURFACE:
         break;
     case SPICE_IMAGE_TYPE_QUIC:
-        red_replay_data_chunks_free(replay, qxl, 0);
+        red_replay_data_chunks_free(replay, qxl,
+                                    sizeof(QXLImageDescriptor) + sizeof(QXLQUICData) +
+                                    sizeof(QXLDataChunk));
         qxl = NULL;
         break;
     default:
@@ -712,7 +721,9 @@ static void red_replay_stroke_ptr(SpiceReplay *replay, QXLStroke *qxl, uint32_t 
         size_t size;
 
         replay_fscanf(replay, "attr.style_nseg %d\n", &temp); qxl->attr.style_nseg = temp;
-        read_binary(replay, "style", &size, (uint8_t**)&qxl->attr.style, 0);
+        uint8_t *data = NULL;
+        read_binary(replay, "style", &size, &data, 0);
+        qxl->attr.style = QXLPHYSICAL_FROM_PTR(data);
     }
     red_replay_brush_ptr(replay, &qxl->brush, flags);
     replay_fscanf(replay, "fore_mode %d\n", &temp); qxl->fore_mode = temp;
@@ -1136,7 +1147,9 @@ static QXLSurfaceCmd *red_replay_surface_cmd(SpiceReplay *replay)
         }
         size = qxl->u.surface_create.height * abs(qxl->u.surface_create.stride);
         if ((qxl->flags & QXL_SURF_FLAG_KEEP_DATA) != 0) {
-            read_binary(replay, "data", &read_size, (uint8_t**)&qxl->u.surface_create.data, 0);
+            uint8_t *data = NULL;
+            read_binary(replay, "data", &read_size, &data, 0);
+            qxl->u.surface_create.data = QXLPHYSICAL_FROM_PTR(data);
             if (read_size != size) {
                 g_warning("mismatch %" G_GSIZE_FORMAT " != %" G_GSIZE_FORMAT, size, read_size);
             }

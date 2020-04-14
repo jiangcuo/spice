@@ -16,10 +16,18 @@
 */
 /* This file include recorder library headers or if disabled provide
  * replacement declarations */
-#ifndef ENABLE_RECORDER
+
+#ifdef ENABLE_RECORDER
+#include <common/recorder/recorder.h>
+
+#elif defined(ENABLE_AGENT_INTERFACE)
+#include <common/agent_interface.h>
+
+#else
 
 #include <stdio.h>
 #include <stdint.h>
+#include <spice/macros.h>
 
 /* Replacement declarations.
  * There declarations should generate no code (beside when no optimization are
@@ -45,7 +53,7 @@ typedef struct SpiceDummyTweak {
 #define RECORDER(rec, num_rings, comment) \
     RECORDER_DEFINE(rec, num_rings, comment)
 #define RECORDER_DEFINE(rec, num_rings, comment) \
-    const SpiceEmptyStruct spice_recorder_ ## rec = {}
+    const SpiceEmptyStruct SPICE_GNUC_UNUSED spice_recorder_ ## rec = {}
 #define RECORDER_TRACE(rec) \
     (sizeof(spice_recorder_ ## rec) != sizeof(SpiceEmptyStruct))
 #define RECORDER_TWEAK_DECLARE(rec) \
@@ -68,7 +76,31 @@ static inline void
 recorder_dump_on_common_signals(unsigned add, unsigned remove)
 {
 }
+#endif
 
-#else
-#include <common/recorder/recorder.h>
+#if !defined(ENABLE_AGENT_INTERFACE)
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+/* Stubs for Agent-Interface specific definitions */
+static inline void
+agent_interface_start(unsigned int port)
+{
+}
+
+typedef void (*forward_quality_cb_t)(void *, const char *);
+static inline void
+agent_interface_set_forward_quality_cb(forward_quality_cb_t cb, void *data)
+{
+}
+
+typedef int (*on_connect_cb_t)(void *);
+static inline void
+agent_interface_set_on_connect_cb(on_connect_cb_t cb, void *data)
+{
+}
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 #endif

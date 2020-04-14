@@ -2,7 +2,7 @@
 # project definition
 #
 project('spice', 'c',
-        version : run_command('build-aux/git-version-gen', '${MESON_SOURCE_ROOT}/.tarball-version', check : true).stdout().strip(),
+        version : run_command('build-aux/git-version-gen', meson.source_root() + '/.tarball-version', check : true).stdout().strip(),
         license : 'LGPLv2.1',
         meson_version : '>= 0.48')
 
@@ -27,9 +27,9 @@ run_command('build-aux/meson/check-spice-common', check : true)
 #   then set age to 0.
 #
 #
-spice_server_current = 14
+spice_server_current = 15
 spice_server_revision = 0
-spice_server_age = 13
+spice_server_age = 14
 spice_server_so_version = '@0@.@1@.@2@'.format(spice_server_current - spice_server_age,
                                                spice_server_age,
                                                spice_server_revision)
@@ -38,7 +38,6 @@ message('libspice.so version: ' + spice_server_so_version)
 # some global vars
 spice_server_global_cflags = ['-DSPICE_SERVER_INTERNAL',
                               '-DG_LOG_DOMAIN="Spice"',
-                              '-DHAVE_CONFIG_H',
                               #'-Werror',
                               '-Wall',
                               '-Wextra',
@@ -103,9 +102,13 @@ foreach dep : ['libjpeg', 'zlib']
   spice_server_deps += dependency(dep)
 endforeach
 
-foreach dep : ['librt', 'libm']
-  spice_server_deps += compiler.find_library(dep)
-endforeach
+if host_machine.system() != 'windows'
+  foreach dep : ['librt', 'libm']
+    spice_server_deps += compiler.find_library(dep)
+  endforeach
+else
+  spice_server_deps += compiler.find_library('ws2_32')
+endif
 
 #
 # Non-mandatory/optional dependencies
@@ -202,8 +205,12 @@ if get_option('statistics')
   spice_server_config_data.set('RED_STATISTICS', '1')
 endif
 
+# Minimal Win32 version
+if host_machine.system() == 'windows'
+  spice_server_config_data.set('_WIN32_WINNT', '0x600')
+endif
+
 configure_file(output : 'config.h',
-               install : false,
                configuration : spice_server_config_data)
 
 #

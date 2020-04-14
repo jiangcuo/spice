@@ -1,7 +1,7 @@
 NULL =
 
 @VALGRIND_CHECK_RULES@
-VALGRIND_SUPPRESSIONS_FILES = $(srcdir)/valgrind/glib.supp
+VALGRIND_SUPPRESSIONS_FILES = $(srcdir)/valgrind/glib.supp $(srcdir)/valgrind/spice.supp
 EXTRA_DIST =				\
 	$(VALGRIND_SUPPRESSIONS_FILES)	\
 	meson.build			\
@@ -33,8 +33,11 @@ libtest_a_SOURCES =				\
 	basic-event-loop.h			\
 	test-display-base.c			\
 	test-display-base.h			\
-	test-glib-compat.c			\
 	test-glib-compat.h			\
+	win-alarm.c				\
+	win-alarm.h				\
+	vmc-emu.c				\
+	vmc-emu.h				\
 	$(NULL)
 
 LDADD =								\
@@ -51,11 +54,9 @@ check_PROGRAMS =				\
 	test-codecs-parsing			\
 	test-options				\
 	test-stat				\
-	test-stream				\
 	test-agent-msg-filter			\
 	test-loop				\
 	test-qxl-parsing			\
-	test-stat-file				\
 	test-leaks				\
 	test-vdagent				\
 	test-fail-on-null-core-interface	\
@@ -66,6 +67,17 @@ check_PROGRAMS =				\
 	test-record				\
 	$(NULL)
 
+if HAVE_SMARTCARD
+check_PROGRAMS += test-smartcard
+endif
+
+if !OS_WIN32
+check_PROGRAMS +=				\
+	test-stream				\
+	test-stat-file				\
+	$(NULL)
+endif
+
 noinst_PROGRAMS =				\
 	test-display-no-ssl			\
 	test-display-streaming			\
@@ -75,6 +87,12 @@ noinst_PROGRAMS =				\
 	test-display-width-stride		\
 	$(check_PROGRAMS)			\
 	$(NULL)
+
+if !OS_WIN32
+noinst_PROGRAMS += \
+	test-websocket \
+	$(NULL)
+endif
 
 TESTS = $(check_PROGRAMS)			\
 	$(NULL)
@@ -126,13 +144,13 @@ libtest_stat3_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORK
 libtest_stat4_a_SOURCES = stat-test.c
 libtest_stat4_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORKER_STAT=1 -DTEST_NAME=stat_test4
 
-## test-gst (helper) and video-encoders (test)
+## test-gst (helper) and test-video-encoders (test)
 
 if HAVE_GSTREAMER
 noinst_PROGRAMS += test-gst
 
 if ENABLE_EXTRA_CHECKS
-TESTS += video-encoders
+TESTS += test-video-encoders
 endif
 
 test_gst_SOURCES = test-gst.c \
@@ -144,7 +162,7 @@ test_gst_CPPFLAGS = \
 	$(NULL)
 endif
 
-EXTRA_DIST += video-encoders
+EXTRA_DIST += test-video-encoders
 
 if HAVE_SASL
 check_PROGRAMS += test-sasl

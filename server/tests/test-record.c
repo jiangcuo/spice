@@ -35,9 +35,9 @@ test_record(bool compress)
     RedRecord *rec;
     const char *fn = OUTPUT_FILENAME;
 
-    unsetenv("SPICE_WORKER_RECORD_FILTER");
+    g_unsetenv("SPICE_WORKER_RECORD_FILTER");
     if (compress) {
-        setenv("SPICE_WORKER_RECORD_FILTER", "gzip", 1);
+        g_setenv("SPICE_WORKER_RECORD_FILTER", "gzip", 1);
     }
 
     // delete possible stale test output
@@ -62,7 +62,7 @@ test_record(bool compress)
     // check content of the output file
     FILE *f;
     if (!compress) {
-        f = fopen(fn, "r");
+        f = fopen(fn, "rb");
     } else {
         f = popen("gzip -dc < " OUTPUT_FILENAME, "r");
     }
@@ -95,6 +95,9 @@ int
 main(void)
 {
     test_record(false);
+    // TODO implement on Windows
+#ifndef _WIN32
     test_record(true);
+#endif
     return 0;
 }

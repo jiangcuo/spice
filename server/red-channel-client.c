@@ -15,9 +15,7 @@
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <glib.h>
 #include <stdio.h>
@@ -37,7 +35,6 @@
 
 #include "red-channel-client.h"
 #include "red-client.h"
-#include "glib-compat.h"
 
 #define CLIENT_ACK_WINDOW 20
 
@@ -80,6 +77,7 @@ typedef struct RedChannelClientLatencyMonitor {
     QosPingState state;
     uint64_t last_pong_time;
     SpiceTimer *timer;
+    uint32_t timeout;
     uint32_t id;
     bool tcp_nodelay;
     bool warmup_was_sent;
@@ -147,6 +145,7 @@ struct RedChannelClientPrivate
         } urgent;
     } send_data;
 
+    bool block_read;
     bool during_send;
     GQueue pipe;
 
@@ -180,8 +179,7 @@ static bool red_channel_client_config_socket(RedChannelClient *rcc);
  */
 #define spice_channel_client_error(rcc, format, ...)                                     \
     do {                                                                                 \
-        RedChannel *_ch = red_channel_client_get_channel(rcc);                           \
-        red_channel_warning(_ch, format, ## __VA_ARGS__);                                \
+        red_channel_warning(rcc->priv->channel, format, ## __VA_ARGS__);                 \
         red_channel_client_shutdown(rcc);                                                \
     } while (0)
 
@@ -204,6 +202,7 @@ enum {
 };
 
 #define PING_TEST_TIMEOUT_MS (MSEC_PER_SEC * 15)
+#define PING_TEST_LONG_TIMEOUT_MS (MSEC_PER_SEC * 60 * 5)
 #define PING_TEST_IDLE_NET_TIMEOUT_MS (MSEC_PER_SEC / 10)
 
 typedef struct RedEmptyMsgPipeItem {
@@ -218,8 +217,6 @@ typedef struct MarkerPipeItem {
 
 static void red_channel_client_start_ping_timer(RedChannelClient *rcc, uint32_t timeout)
 {
-    SpiceCoreInterfaceInternal *core;
-
     if (!rcc->priv->latency_monitor.timer) {
         return;
     }
@@ -228,14 +225,11 @@ static void red_channel_client_start_ping_timer(RedChannelClient *rcc, uint32_t 
     }
     rcc->priv->latency_monitor.state = PING_STATE_TIMER;
 
-    core = red_channel_get_core_interface(rcc->priv->channel);
-    core->timer_start(core, rcc->priv->latency_monitor.timer, timeout);
+    red_timer_start(rcc->priv->latency_monitor.timer, timeout);
 }
 
 static void red_channel_client_cancel_ping_timer(RedChannelClient *rcc)
 {
-    SpiceCoreInterfaceInternal *core;
-
     if (!rcc->priv->latency_monitor.timer) {
         return;
     }
@@ -243,8 +237,7 @@ static void red_channel_client_cancel_ping_timer(RedChannelClient *rcc)
         return;
     }
 
-    core = red_channel_get_core_interface(rcc->priv->channel);
-    core->timer_cancel(core, rcc->priv->latency_monitor.timer);
+    red_timer_cancel(rcc->priv->latency_monitor.timer);
     rcc->priv->latency_monitor.state = PING_STATE_NONE;
 }
 
@@ -257,8 +250,8 @@ static void red_channel_client_restart_ping_timer(RedChannelClient *rcc)
     }
     passed = (spice_get_monotonic_time_ns() - rcc->priv->latency_monitor.last_pong_time) / NSEC_PER_MILLISEC;
     timeout = PING_TEST_IDLE_NET_TIMEOUT_MS;
-    if (passed  < PING_TEST_TIMEOUT_MS) {
-        timeout += PING_TEST_TIMEOUT_MS - passed;
+    if (passed  < rcc->priv->latency_monitor.timeout) {
+        timeout += rcc->priv->latency_monitor.timeout - passed;
     }
 
     red_channel_client_start_ping_timer(rcc, timeout);
@@ -334,15 +327,11 @@ red_channel_client_finalize(GObject *object)
 {
     RedChannelClient *self = RED_CHANNEL_CLIENT(object);
 
-    SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(self->priv->channel);
-    if (self->priv->latency_monitor.timer) {
-        core->timer_remove(core, self->priv->latency_monitor.timer);
-        self->priv->latency_monitor.timer = NULL;
-    }
-    if (self->priv->connectivity_monitor.timer) {
-        core->timer_remove(core, self->priv->connectivity_monitor.timer);
-        self->priv->connectivity_monitor.timer = NULL;
-    }
+    red_timer_remove(self->priv->latency_monitor.timer);
+    self->priv->latency_monitor.timer = NULL;
+
+    red_timer_remove(self->priv->connectivity_monitor.timer);
+    self->priv->connectivity_monitor.timer = NULL;
 
     red_stream_free(self->priv->stream);
     self->priv->stream = NULL;
@@ -624,6 +613,7 @@ static void red_channel_client_restore_main_sender(RedChannelClient *rcc)
 
 static void red_channel_client_msg_sent(RedChannelClient *rcc)
 {
+#ifndef _WIN32
     int fd;
 
     if (spice_marshaller_get_fd(rcc->priv->send_data.marshaller, &fd)) {
@@ -637,6 +627,7 @@ static void red_channel_client_msg_sent(RedChannelClient *rcc)
         if (fd != -1)
             close(fd);
     }
+#endif
 
     red_channel_client_clear_sent_item(rcc);
 
@@ -686,29 +677,29 @@ static void red_channel_client_ping_timer(void *opaque)
 {
     RedChannelClient *rcc = opaque;
 
+    g_object_ref(rcc);
+
     spice_assert(rcc->priv->latency_monitor.state == PING_STATE_TIMER);
     red_channel_client_cancel_ping_timer(rcc);
 
 #ifdef HAVE_LINUX_SOCKIOS_H /* SIOCOUTQ is a Linux only ioctl on sockets. */
-    {
-        int so_unsent_size = 0;
+    int so_unsent_size = 0;
 
-        /* retrieving the occupied size of the socket's tcp snd buffer (unacked + unsent) */
-        if (ioctl(rcc->priv->stream->socket, SIOCOUTQ, &so_unsent_size) == -1) {
-            red_channel_warning(red_channel_client_get_channel(rcc),
-                                "ioctl(SIOCOUTQ) failed, %s", strerror(errno));
-        }
-        if (so_unsent_size > 0) {
-            /* tcp snd buffer is still occupied. rescheduling ping */
-            red_channel_client_start_ping_timer(rcc, PING_TEST_IDLE_NET_TIMEOUT_MS);
-        } else {
-            red_channel_client_push_ping(rcc);
-        }
+    /* retrieving the occupied size of the socket's tcp send buffer (unacked + unsent) */
+    if (ioctl(rcc->priv->stream->socket, SIOCOUTQ, &so_unsent_size) == -1) {
+        red_channel_warning(red_channel_client_get_channel(rcc),
+                            "ioctl(SIOCOUTQ) failed, %s", strerror(errno));
     }
-#else /* ifdef HAVE_LINUX_SOCKIOS_H */
+    if (so_unsent_size > 0) {
+        /* tcp send buffer is still occupied. rescheduling ping */
+        red_channel_client_start_ping_timer(rcc, PING_TEST_IDLE_NET_TIMEOUT_MS);
+        g_object_unref(rcc);
+        return;
+    }
+#endif /* ifdef HAVE_LINUX_SOCKIOS_H */
     /* More portable alternative code path (less accurate but avoids bogus ioctls)*/
     red_channel_client_push_ping(rcc);
-#endif /* ifdef HAVE_LINUX_SOCKIOS_H */
+    g_object_unref(rcc);
 }
 
 static inline int red_channel_client_waiting_for_ack(RedChannelClient *rcc)
@@ -740,6 +731,8 @@ static void red_channel_client_connectivity_timer(void *opaque)
     RedChannelClientConnectivityMonitor *monitor = &rcc->priv->connectivity_monitor;
     int is_alive = TRUE;
 
+    g_object_ref(rcc);
+
     if (monitor->state == CONNECTIVITY_STATE_BLOCKED) {
         if (!monitor->received_bytes && !monitor->sent_bytes) {
             if (!red_channel_client_is_blocked(rcc) && !red_channel_client_waiting_for_ack(rcc)) {
@@ -760,7 +753,6 @@ static void red_channel_client_connectivity_timer(void *opaque)
     }
 
     if (is_alive) {
-        SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(rcc->priv->channel);
         monitor->received_bytes = false;
         monitor->sent_bytes = false;
         if (red_channel_client_is_blocked(rcc) || red_channel_client_waiting_for_ack(rcc)) {
@@ -769,10 +761,9 @@ static void red_channel_client_connectivity_timer(void *opaque)
                    rcc->priv->latency_monitor.state == PING_STATE_LATENCY) {
             monitor->state = CONNECTIVITY_STATE_WAIT_PONG;
         } else {
-             monitor->state = CONNECTIVITY_STATE_CONNECTED;
+            monitor->state = CONNECTIVITY_STATE_CONNECTED;
         }
-        core->timer_start(core, rcc->priv->connectivity_monitor.timer,
-                          rcc->priv->connectivity_monitor.timeout);
+        red_timer_start(monitor->timer, monitor->timeout);
     } else {
         monitor->state = CONNECTIVITY_STATE_DISCONNECTED;
         red_channel_warning(rcc->priv->channel,
@@ -780,6 +771,7 @@ static void red_channel_client_connectivity_timer(void *opaque)
                             rcc, monitor->timeout);
         red_channel_client_disconnect(rcc);
     }
+    g_object_unref(rcc);
 }
 
 void red_channel_client_start_connectivity_monitoring(RedChannelClient *rcc, uint32_t timeout_ms)
@@ -799,10 +791,13 @@ void red_channel_client_start_connectivity_monitoring(RedChannelClient *rcc, uin
     if (rcc->priv->latency_monitor.timer == NULL) {
         rcc->priv->latency_monitor.timer = core->timer_add(
             core, red_channel_client_ping_timer, rcc);
-        if (!red_client_during_migrate_at_target(rcc->priv->client)) {
-            red_channel_client_start_ping_timer(rcc, PING_TEST_IDLE_NET_TIMEOUT_MS);
-        }
         rcc->priv->latency_monitor.roundtrip = -1;
+    } else {
+        red_channel_client_cancel_ping_timer(rcc);
+    }
+    rcc->priv->latency_monitor.timeout = PING_TEST_TIMEOUT_MS;
+    if (!red_client_during_migrate_at_target(rcc->priv->client)) {
+        red_channel_client_start_ping_timer(rcc, PING_TEST_IDLE_NET_TIMEOUT_MS);
     }
     if (rcc->priv->connectivity_monitor.timer == NULL) {
         rcc->priv->connectivity_monitor.state = CONNECTIVITY_STATE_CONNECTED;
@@ -810,7 +805,7 @@ void red_channel_client_start_connectivity_monitoring(RedChannelClient *rcc, uin
             core, red_channel_client_connectivity_timer, rcc);
         rcc->priv->connectivity_monitor.timeout = timeout_ms;
         if (!red_client_during_migrate_at_target(rcc->priv->client)) {
-            core->timer_start(core, rcc->priv->connectivity_monitor.timer,
+            red_timer_start(rcc->priv->connectivity_monitor.timer,
                               rcc->priv->connectivity_monitor.timeout);
         }
     }
@@ -938,8 +933,7 @@ static gboolean red_channel_client_initable_init(GInitable *initable,
                         red_channel_client_event,
                         self);
 
-    if (self->priv->monitor_latency
-        && red_stream_get_family(self->priv->stream) != AF_UNIX) {
+    if (red_stream_get_family(self->priv->stream) != AF_UNIX) {
         self->priv->latency_monitor.timer =
             core->timer_add(core, red_channel_client_ping_timer, self);
 
@@ -948,6 +942,8 @@ static gboolean red_channel_client_initable_init(GInitable *initable,
                                                 PING_TEST_IDLE_NET_TIMEOUT_MS);
         }
         self->priv->latency_monitor.roundtrip = -1;
+        self->priv->latency_monitor.timeout =
+            self->priv->monitor_latency ? PING_TEST_TIMEOUT_MS : PING_TEST_LONG_TIMEOUT_MS;
     }
 
     red_channel_add_client(self->priv->channel, self);
@@ -968,14 +964,33 @@ cleanup:
 static void
 red_channel_client_watch_update_mask(RedChannelClient *rcc, int event_mask)
 {
-    SpiceCoreInterfaceInternal *core;
-
     if (!rcc->priv->stream->watch) {
         return;
     }
 
-    core = red_channel_get_core_interface(rcc->priv->channel);
-    core->watch_update_mask(core, rcc->priv->stream->watch, event_mask);
+    if (rcc->priv->block_read) {
+        event_mask &= ~SPICE_WATCH_EVENT_READ;
+    }
+
+    red_watch_update_mask(rcc->priv->stream->watch, event_mask);
+}
+
+void red_channel_client_block_read(RedChannelClient *rcc)
+{
+    if (rcc->priv->block_read) {
+        return;
+    }
+    rcc->priv->block_read = true;
+    red_channel_client_watch_update_mask(rcc, SPICE_WATCH_EVENT_WRITE);
+}
+
+void red_channel_client_unblock_read(RedChannelClient *rcc)
+{
+    if (!rcc->priv->block_read) {
+        return;
+    }
+    rcc->priv->block_read = false;
+    red_channel_client_watch_update_mask(rcc, SPICE_WATCH_EVENT_READ|SPICE_WATCH_EVENT_WRITE);
 }
 
 static void red_channel_client_seamless_migration_done(RedChannelClient *rcc)
@@ -985,8 +1000,7 @@ static void red_channel_client_seamless_migration_done(RedChannelClient *rcc)
     if (red_client_seamless_migration_done_for_channel(rcc->priv->client)) {
         red_channel_client_start_ping_timer(rcc, PING_TEST_IDLE_NET_TIMEOUT_MS);
         if (rcc->priv->connectivity_monitor.timer) {
-            SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(rcc->priv->channel);
-            core->timer_start(core, rcc->priv->connectivity_monitor.timer,
+            red_timer_start(rcc->priv->connectivity_monitor.timer,
                               rcc->priv->connectivity_monitor.timeout);
         }
     }
@@ -1004,16 +1018,13 @@ bool red_channel_client_is_waiting_for_migrate_data(RedChannelClient *rcc)
 
 void red_channel_client_default_migrate(RedChannelClient *rcc)
 {
-    SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(rcc->priv->channel);
-    if (rcc->priv->latency_monitor.timer) {
-        red_channel_client_cancel_ping_timer(rcc);
-        core->timer_remove(core, rcc->priv->latency_monitor.timer);
-        rcc->priv->latency_monitor.timer = NULL;
-    }
-    if (rcc->priv->connectivity_monitor.timer) {
-        core->timer_remove(core, rcc->priv->connectivity_monitor.timer);
-        rcc->priv->connectivity_monitor.timer = NULL;
-    }
+    red_channel_client_cancel_ping_timer(rcc);
+    red_timer_remove(rcc->priv->latency_monitor.timer);
+    rcc->priv->latency_monitor.timer = NULL;
+
+    red_timer_remove(rcc->priv->connectivity_monitor.timer);
+    rcc->priv->connectivity_monitor.timer = NULL;
+
     red_channel_client_pipe_add_type(rcc, RED_PIPE_ITEM_TYPE_MIGRATE);
 }
 
@@ -1021,15 +1032,12 @@ void red_channel_client_destroy(RedChannelClient *rcc)
 {
     rcc->priv->destroying = TRUE;
     red_channel_client_disconnect(rcc);
-    red_client_remove_channel(rcc);
-    g_object_unref(rcc);
 }
 
 void red_channel_client_shutdown(RedChannelClient *rcc)
 {
     if (rcc->priv->stream && rcc->priv->stream->watch) {
-        SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(rcc->priv->channel);
-        core->watch_remove(core, rcc->priv->stream->watch);
+        red_watch_remove(rcc->priv->stream->watch);
         rcc->priv->stream->watch = NULL;
         shutdown(rcc->priv->stream->socket, SHUT_RDWR);
     }
@@ -1090,29 +1098,29 @@ static void red_channel_client_handle_outgoing(RedChannelClient *rcc)
             switch (errno) {
             case EAGAIN:
                 red_channel_client_set_blocked(rcc);
-                return;
+                break;
             case EINTR:
                 continue;
             case EPIPE:
                 red_channel_client_disconnect(rcc);
-                return;
+                break;
             default:
                 red_channel_warning(red_channel_client_get_channel(rcc), "%s", strerror(errno));
                 red_channel_client_disconnect(rcc);
-                return;
+                break;
             }
-        } else {
-            buffer->pos += n;
-            red_channel_client_data_sent(rcc, n);
-            if (buffer->pos == buffer->size) { // finished writing data
-                /* reset buffer before calling on_msg_done, since it
-                 * can trigger another call to red_channel_client_handle_outgoing (when
-                 * switching from the urgent marshaller to the main one */
-                buffer->pos = 0;
-                buffer->size = 0;
-                red_channel_client_msg_sent(rcc);
-                return;
-            }
+            return;
+        }
+        buffer->pos += n;
+        red_channel_client_data_sent(rcc, n);
+        if (buffer->pos == buffer->size) { // finished writing data
+            /* reset buffer before calling on_msg_done, since it
+             * can trigger another call to red_channel_client_handle_outgoing (when
+             * switching from the urgent marshaller to the main one */
+            buffer->pos = 0;
+            buffer->size = 0;
+            red_channel_client_msg_sent(rcc);
+            return;
         }
     }
 }
@@ -1140,16 +1148,13 @@ static int red_peer_receive(RedStream *stream, uint8_t *buf, uint32_t size)
                 break;
             } else if (errno == EINTR) {
                 continue;
-            } else if (errno == EPIPE) {
-                return -1;
-            } else {
+            } else if (errno != EPIPE) {
                 g_warning("%s", strerror(errno));
-                return -1;
             }
-        } else {
-            size -= now;
-            pos += now;
+            return -1;
         }
+        size -= now;
+        pos += now;
     }
     return pos - buf;
 }
@@ -1160,18 +1165,9 @@ static uint8_t *red_channel_client_parse(RedChannelClient *rcc, uint8_t *message
 {
     RedChannel *channel = red_channel_client_get_channel(rcc);
     RedChannelClass *klass = RED_CHANNEL_GET_CLASS(channel);
-    uint8_t *parsed_message;
 
-    if (klass->parser) {
-        parsed_message = klass->parser(message, message + message_size, message_type,
-                                       SPICE_VERSION_MINOR, size_out, free_message);
-    } else {
-        parsed_message = message;
-        *size_out = message_size;
-        *free_message = NULL;
-    }
-
-    return parsed_message;
+    return klass->parser(message, message + message_size, message_type,
+                         SPICE_VERSION_MINOR, size_out, free_message);
 }
 
 // TODO: this implementation, as opposed to the old implementation in red_worker,
@@ -1221,6 +1217,11 @@ static void red_channel_client_handle_incoming(RedChannelClient *rcc)
         if (buffer->msg_pos < msg_size) {
             if (!buffer->msg) {
                 buffer->msg = red_channel_client_alloc_msg_buf(rcc, msg_type, msg_size);
+                if (buffer->msg == NULL && rcc->priv->block_read) {
+                    // if we are blocked by flow control just return, message will be read
+                    // when data will be available
+                    return;
+                }
                 if (buffer->msg == NULL) {
                     red_channel_warning(channel, "ERROR: channel refused to allocate buffer.");
                     red_channel_client_disconnect(rcc);
@@ -1326,6 +1327,9 @@ void red_channel_client_push(RedChannelClient *rcc)
     /* prepare_pipe_add() will reenable WRITE events when the rcc->priv->pipe is empty
      * red_channel_client_ack_zero_messages_window() will reenable WRITE events
      * if we were waiting for acks to be received
+     * If we don't remove WRITE if we are waiting for ack we will be keep
+     * notified that we can write and we then exit (see pipe_item_get) as we
+     * are waiting for the ack consuming CPU in a tight loop
      */
     if ((red_channel_client_no_item_being_sent(rcc) && g_queue_is_empty(&rcc->priv->pipe)) ||
         red_channel_client_waiting_for_ack(rcc)) {
@@ -1333,6 +1337,9 @@ void red_channel_client_push(RedChannelClient *rcc)
         /* channel has no pending data to send so now we can flush data in
          * order to avoid data stall into buffers in case of manual
          * flushing
+         * We need to flush also in case of ack as it is possible
+         * that for a long train of small messages the message that would
+         * cause the client to send the ack is still in the queue
          */
         red_stream_flush(rcc->priv->stream);
     }
@@ -1395,7 +1402,7 @@ static void red_channel_client_handle_pong(RedChannelClient *rcc, SpiceMsgPing *
 
     rcc->priv->latency_monitor.last_pong_time = now;
     rcc->priv->latency_monitor.state = PING_STATE_NONE;
-    red_channel_client_start_ping_timer(rcc, PING_TEST_TIMEOUT_MS);
+    red_channel_client_start_ping_timer(rcc, rcc->priv->latency_monitor.timeout);
 }
 
 static void red_channel_client_handle_migrate_flush_mark(RedChannelClient *rcc)
@@ -1447,11 +1454,7 @@ bool red_channel_client_handle_message(RedChannelClient *rcc, uint16_t type,
 {
     switch (type) {
     case SPICE_MSGC_ACK_SYNC:
-        if (size != sizeof(uint32_t)) {
-            red_channel_warning(red_channel_client_get_channel(rcc), "bad message size");
-            return FALSE;
-        }
-        rcc->priv->ack_data.client_generation = *(uint32_t *)(message);
+        rcc->priv->ack_data.client_generation = ((SpiceMsgcAckSync *) message)->generation;
         break;
     case SPICE_MSGC_ACK:
         if (rcc->priv->ack_data.client_generation == rcc->priv->ack_data.generation) {
@@ -1720,26 +1723,26 @@ static void red_channel_client_on_disconnect(RedChannelClient *rcc)
 void red_channel_client_disconnect(RedChannelClient *rcc)
 {
     RedChannel *channel = rcc->priv->channel;
-    SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(channel);
 
     if (!red_channel_client_is_connected(rcc)) {
         return;
     }
     red_channel_client_pipe_clear(rcc);
-    if (rcc->priv->stream->watch) {
-        core->watch_remove(core, rcc->priv->stream->watch);
-        rcc->priv->stream->watch = NULL;
-    }
-    if (rcc->priv->latency_monitor.timer) {
-        core->timer_remove(core, rcc->priv->latency_monitor.timer);
-        rcc->priv->latency_monitor.timer = NULL;
-    }
-    if (rcc->priv->connectivity_monitor.timer) {
-        core->timer_remove(core, rcc->priv->connectivity_monitor.timer);
-        rcc->priv->connectivity_monitor.timer = NULL;
-    }
+
+    red_channel_client_shutdown(rcc);
+
+    red_timer_remove(rcc->priv->latency_monitor.timer);
+    rcc->priv->latency_monitor.timer = NULL;
+
+    red_timer_remove(rcc->priv->connectivity_monitor.timer);
+    rcc->priv->connectivity_monitor.timer = NULL;
+
     red_channel_remove_client(channel, rcc);
     red_channel_client_on_disconnect(rcc);
+    // remove client from RedClient
+    // NOTE this may trigger the free of the object, if we are in a watch/timer
+    // we should make sure we keep a reference
+    red_client_remove_channel(rcc);
 }
 
 gboolean red_channel_client_is_blocked(RedChannelClient *rcc)

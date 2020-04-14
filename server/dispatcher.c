@@ -14,9 +14,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <unistd.h>
 #include <errno.h>
@@ -115,8 +113,8 @@ dispatcher_finalize(GObject *object)
 {
     Dispatcher *self = DISPATCHER(object);
     g_free(self->priv->messages);
-    close(self->priv->send_fd);
-    close(self->priv->recv_fd);
+    socket_close(self->priv->send_fd);
+    socket_close(self->priv->recv_fd);
     pthread_mutex_destroy(&self->priv->lock);
     g_free(self->priv->payload);
     G_OBJECT_CLASS(dispatcher_parent_class)->finalize(object);
@@ -201,6 +199,7 @@ static int read_safe(int fd, uint8_t *buf, size_t size, int block)
     }
 
     if (!block) {
+#ifndef _WIN32
         struct pollfd pollfd = {.fd = fd, .events = POLLIN, .revents = 0};
         while ((ret = poll(&pollfd, 1, 0)) == -1) {
             if (errno == EINTR) {
@@ -213,14 +212,33 @@ static int read_safe(int fd, uint8_t *buf, size_t size, int block)
         if (!(pollfd.revents & POLLIN)) {
             return 0;
         }
+#else
+        struct timeval tv = { 0, 0 };
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+        if (select(1, &fds, NULL, NULL, &tv) < 1) {
+            return 0;
+        }
+#endif
     }
     while (read_size < size) {
-        ret = read(fd, buf + read_size, size - read_size);
+        ret = socket_read(fd, buf + read_size, size - read_size);
         if (ret == -1) {
             if (errno == EINTR) {
                 spice_debug("EINTR in read");
                 continue;
             }
+#ifdef _WIN32
+            // Windows turns this socket not-blocking
+            if (errno == EAGAIN) {
+                fd_set fds;
+                FD_ZERO(&fds);
+                FD_SET(fd, &fds);
+                select(1, &fds, NULL, NULL, NULL);
+                continue;
+            }
+#endif
             return -1;
         }
         if (ret == 0) {
@@ -242,7 +260,7 @@ static int write_safe(int fd, uint8_t *buf, size_t size)
     int ret;
 
     while (written_size < size) {
-        ret = write(fd, buf + written_size, size - written_size);
+        ret = socket_write(fd, buf + written_size, size - written_size);
         if (ret == -1) {
             if (errno != EINTR) {
                 return -1;
@@ -299,11 +317,13 @@ static int dispatcher_handle_single_read(Dispatcher *dispatcher)
 }
 
 /*
- * dispatcher_handle_recv_read
+ * dispatcher_handle_event
  * doesn't handle being in the middle of a message. all reads are blocking.
  */
-void dispatcher_handle_recv_read(Dispatcher *dispatcher)
+static void dispatcher_handle_event(int fd, int event, void *opaque)
 {
+    Dispatcher *dispatcher = opaque;
+
     while (dispatcher_handle_single_read(dispatcher)) {
     }
 }
@@ -412,14 +432,15 @@ static void setup_dummy_signal_handler(void)
 }
 #endif
 
+SpiceWatch *dispatcher_create_watch(Dispatcher *dispatcher, SpiceCoreInterfaceInternal *core)
+{
+    return core->watch_add(core, dispatcher->priv->recv_fd,
+                           SPICE_WATCH_EVENT_READ, dispatcher_handle_event, dispatcher);
+}
+
 void dispatcher_set_opaque(Dispatcher *self, void *opaque)
 {
     self->priv->opaque = opaque;
-}
-
-int dispatcher_get_recv_fd(Dispatcher *dispatcher)
-{
-    return dispatcher->priv->recv_fd;
 }
 
 pthread_t dispatcher_get_thread_id(Dispatcher *self)

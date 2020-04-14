@@ -14,9 +14,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <glib.h>
 #include <pthread.h>
@@ -170,18 +168,18 @@ void glz_encoder_destroy(GlzEncoderContext *opaque_encoder)
 
 typedef uint8_t BYTE;
 
-typedef struct __attribute__ ((__packed__)) one_byte_pixel_t {
+typedef struct one_byte_pixel_t {
     BYTE a;
 } one_byte_pixel_t;
 
-typedef struct __attribute__ ((__packed__)) rgb32_pixel_t {
+typedef struct rgb32_pixel_t {
     BYTE b;
     BYTE g;
     BYTE r;
     BYTE pad;
 } rgb32_pixel_t;
 
-typedef struct __attribute__ ((__packed__)) rgb24_pixel_t {
+typedef struct rgb24_pixel_t {
     BYTE b;
     BYTE g;
     BYTE r;

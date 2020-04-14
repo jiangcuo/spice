@@ -370,10 +370,29 @@ NULL =
 ASCIIDOC_FLAGS = -a icons -a toc
 EXTRA_DIST = \
 	meson.build				\
+	spice_for_newbies.html			\
+	spice_for_newbies.txt			\
+	spice_protocol.html			\
+	spice_protocol.txt			\
 	spice_style.html			\
 	spice_style.txt				\
 	spice_threading_model.html		\
 	spice_threading_model.txt		\
+	vd_interfaces.html			\
+	vd_interfaces.txt			\
+	images/newbies/g_cmd_flow.png		\
+	images/newbies/g_sub.png		\
+	images/newbies/cli_bsc_stc.png		\
+	images/newbies/srv_stc.png		\
+	images/newbies/a_cmd_flow.png		\
+	$(NULL)
+
+HTML_FILES = \
+	spice_for_newbies.html \
+	spice_protocol.html \
+	spice_style.html \
+	spice_threading_model.html \
+	vd_interfaces.html \
 	$(NULL)
 
 @BUILD_MANUAL_TRUE@SUBDIRS = manual
@@ -389,9 +408,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu docs/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign docs/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu docs/Makefile
+	  $(AUTOMAKE) --foreign docs/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -694,13 +713,13 @@ uninstall-am:
 .PRECIOUS: Makefile
 
 
-@BUILD_MANUAL_TRUE@all-local: spice_style.html spice_threading_model.html
+@BUILD_MANUAL_TRUE@all-local: $(HTML_FILES)
 
 @BUILD_MANUAL_TRUE@%.html: %.txt
 @BUILD_MANUAL_TRUE@	$(AM_V_GEN) $(ASCIIDOC) -n $(ASCIIDOC_FLAGS) -o $@ $<
 
 clean-local:
-	rm -f spice_style.html spice_threading_model.html
+	rm -f $(HTML_FILES)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

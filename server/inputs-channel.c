@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <stddef.h> // NULL
 #include <spice/macros.h>
@@ -164,8 +162,7 @@ const VDAgentMouseState *inputs_channel_get_mouse_state(InputsChannel *inputs)
 
 static void activate_modifiers_watch(InputsChannel *inputs)
 {
-    SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(RED_CHANNEL(inputs));
-    core->timer_start(core, inputs->key_modifiers_timer, KEY_MODIFIERS_TTL);
+    red_timer_start(inputs->key_modifiers_timer, KEY_MODIFIERS_TTL);
 }
 
 static void kbd_push_scan(SpiceKbdInstance *sin, uint8_t scan)
@@ -602,10 +599,9 @@ static void
 inputs_channel_finalize(GObject *object)
 {
     InputsChannel *self = INPUTS_CHANNEL(object);
-    SpiceCoreInterfaceInternal *core = red_channel_get_core_interface(RED_CHANNEL(self));
 
     inputs_channel_detach_tablet(self, self->tablet);
-    core->timer_remove(core, self->key_modifiers_timer);
+    red_timer_remove(self->key_modifiers_timer);
 
     G_OBJECT_CLASS(inputs_channel_parent_class)->finalize(object);
 }

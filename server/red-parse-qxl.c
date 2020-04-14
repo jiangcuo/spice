@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <inttypes.h>
 #include <glib.h>
@@ -628,9 +626,15 @@ static void red_put_brush(SpiceBrush *red)
 static void red_get_qmask_ptr(RedMemSlotInfo *slots, int group_id,
                               SpiceQMask *red, QXLQMask *qxl, uint32_t flags)
 {
-    red->flags  = qxl->flags;
-    red_get_point_ptr(&red->pos, &qxl->pos);
     red->bitmap = red_get_image(slots, group_id, qxl->bitmap, flags, true);
+    if (red->bitmap) {
+        red->flags  = qxl->flags;
+        red_get_point_ptr(&red->pos, &qxl->pos);
+    } else {
+        red->flags  = 0;
+        red->pos.x = 0;
+        red->pos.y = 0;
+    }
 }
 
 static void red_put_qmask(SpiceQMask *red)
@@ -943,9 +947,9 @@ static SpiceString *red_get_string(RedMemSlotInfo *slots, int group_id,
         spice_assert(glyph_size <= (char*) end - (char*) &start->data[0]);
         memcpy(glyph->data, start->data, glyph_size);
         start = (QXLRasterGlyph*)(&start->data[glyph_size]);
-        glyph = (SpiceRasterGlyph*)
+        glyph = SPICE_ALIGNED_CAST(SpiceRasterGlyph*,
             (((uint8_t *)glyph) +
-             SPICE_ALIGN(sizeof(SpiceRasterGlyph) + glyph_size, 4));
+             SPICE_ALIGN(sizeof(SpiceRasterGlyph) + glyph_size, 4)));
     }
 
     if (free_data) {
@@ -1331,7 +1335,7 @@ static bool red_get_message(QXLInstance *qxl_instance, RedMemSlotInfo *slots, in
 {
     QXLMessage *qxl;
     int memslot_id;
-    unsigned long len;
+    uintptr_t len;
     uint8_t *end;
 
     /*

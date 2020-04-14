@@ -15,14 +15,14 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <arpa/inet.h>
 #ifdef USE_SMARTCARD
 #include <libcacard.h>
 #endif
+
+#define RedCharDeviceClientOpaque RedChannelClient
 
 #include "reds.h"
 #include "char-device.h"
@@ -130,19 +130,29 @@ static RedPipeItem *smartcard_read_msg_from_device(RedCharDevice *self,
     RedCharDeviceSmartcard *dev = RED_CHAR_DEVICE_SMARTCARD(self);
     SpiceCharDeviceInterface *sif = spice_char_device_get_interface(sin);
     VSCMsgHeader *vheader = (VSCMsgHeader*)dev->priv->buf;
-    int n;
     int remaining;
     int actual_length;
 
-    while ((n = sif->read(sin, dev->priv->buf_pos, dev->priv->buf_size - dev->priv->buf_used)) > 0) {
+    while (true) {
         RedMsgItem *msg_to_client;
 
-        dev->priv->buf_pos += n;
-        dev->priv->buf_used += n;
-        if (dev->priv->buf_used < sizeof(VSCMsgHeader)) {
-            continue;
+        // it's possible we already got a full message from a previous partial
+        // read. In this case we don't need to read any byte
+        if (dev->priv->buf_used < sizeof(VSCMsgHeader) ||
+            dev->priv->buf_used - sizeof(VSCMsgHeader) < ntohl(vheader->length)) {
+            int n = sif->read(sin, dev->priv->buf_pos, dev->priv->buf_size - dev->priv->buf_used);
+            if (n <= 0) {
+                break;
+            }
+            dev->priv->buf_pos += n;
+            dev->priv->buf_used += n;
+
+            if (dev->priv->buf_used < sizeof(VSCMsgHeader)) {
+                continue;
+            }
+            smartcard_read_buf_prepare(dev, vheader);
+            vheader = (VSCMsgHeader*)dev->priv->buf;
         }
-        smartcard_read_buf_prepare(dev, vheader);
         actual_length = ntohl(vheader->length);
         if (dev->priv->buf_used - sizeof(VSCMsgHeader) < actual_length) {
             continue;
@@ -150,9 +160,9 @@ static RedPipeItem *smartcard_read_msg_from_device(RedCharDevice *self,
         msg_to_client = smartcard_char_device_on_message_from_device(dev, vheader);
         remaining = dev->priv->buf_used - sizeof(VSCMsgHeader) - actual_length;
         if (remaining > 0) {
-            memcpy(dev->priv->buf, dev->priv->buf_pos, remaining);
+            memmove(dev->priv->buf, dev->priv->buf_pos - remaining, remaining);
         }
-        dev->priv->buf_pos = dev->priv->buf;
+        dev->priv->buf_pos = dev->priv->buf + remaining;
         dev->priv->buf_used = remaining;
         if (msg_to_client) {
             return &msg_to_client->base;
@@ -166,24 +176,22 @@ static RedPipeItem *smartcard_read_msg_from_device(RedCharDevice *self,
  * so no mutex is required. */
 static void smartcard_send_msg_to_client(RedCharDevice *self,
                                          RedPipeItem *msg,
-                                         RedClient *client)
+                                         RedChannelClient *client)
 {
     RedCharDeviceSmartcard *dev = RED_CHAR_DEVICE_SMARTCARD(self);
     RedChannelClient *rcc = RED_CHANNEL_CLIENT(dev->priv->scc);
 
-    spice_assert(dev->priv->scc &&
-                 red_channel_client_get_client(rcc) == client);
+    spice_assert(dev->priv->scc && rcc == client);
     red_pipe_item_ref(msg);
     red_channel_client_pipe_add_push(rcc, msg);
 }
 
-static void smartcard_remove_client(RedCharDevice *self, RedClient *client)
+static void smartcard_remove_client(RedCharDevice *self, RedChannelClient *client)
 {
     RedCharDeviceSmartcard *dev = RED_CHAR_DEVICE_SMARTCARD(self);
     RedChannelClient *rcc = RED_CHANNEL_CLIENT(dev->priv->scc);
 
-    spice_assert(dev->priv->scc &&
-                 red_channel_client_get_client(rcc) == client);
+    spice_assert(dev->priv->scc && rcc == client);
     red_channel_client_shutdown(rcc);
 }
 
@@ -224,7 +232,9 @@ static int smartcard_char_device_add_to_readers(RedsState *reds, SpiceCharDevice
 
 SpiceCharDeviceInstance *smartcard_readers_get(uint32_t reader_id)
 {
-    spice_assert(reader_id < g_smartcard_readers.num);
+    if (reader_id >= g_smartcard_readers.num) {
+        return NULL;
+    }
     return g_smartcard_readers.sin[reader_id];
 }
 
@@ -307,7 +317,7 @@ void smartcard_char_device_attach_client(SpiceCharDeviceInstance *char_device,
     dev->priv->scc = scc;
     smartcard_channel_client_set_char_device(scc, dev);
     client_added = red_char_device_client_add(RED_CHAR_DEVICE(dev),
-                                              red_channel_client_get_client(RED_CHANNEL_CLIENT(scc)),
+                                              RED_CHANNEL_CLIENT(scc),
                                               FALSE, /* no flow control yet */
                                               0, /* send queue size */
                                               ~0,
@@ -359,12 +369,12 @@ void smartcard_char_device_detach_client(RedCharDeviceSmartcard *smartcard,
     SpiceCharDeviceInterface *sif;
     SpiceCharDeviceInstance *sin;
 
-    g_object_get(smartcard, "sin", &sin, NULL);
+    sin = red_char_device_get_device_instance(RED_CHAR_DEVICE(smartcard));
     sif = spice_char_device_get_interface(sin);
 
     spice_assert(smartcard->priv->scc == scc);
     red_char_device_client_remove(RED_CHAR_DEVICE(smartcard),
-                                  red_channel_client_get_client(RED_CHANNEL_CLIENT(scc)));
+                                  RED_CHANNEL_CLIENT(scc));
     smartcard_channel_client_set_char_device(scc, NULL);
     smartcard->priv->scc = NULL;
 
@@ -549,7 +559,8 @@ red_smartcard_channel_class_init(RedSmartcardChannelClass *klass)
 
     object_class->constructed = red_smartcard_channel_constructed;
 
-    channel_class->handle_message = smartcard_channel_client_handle_message,
+    channel_class->parser = spice_get_client_channel_parser(SPICE_CHANNEL_SMARTCARD, NULL);
+    channel_class->handle_message = smartcard_channel_client_handle_message;
 
     channel_class->send_item = smartcard_channel_send_item;
     channel_class->handle_migrate_flush_mark = smartcard_channel_client_handle_migrate_flush_mark;

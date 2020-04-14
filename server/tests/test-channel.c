@@ -28,6 +28,7 @@
 #include "red-client.h"
 #include "cursor-channel.h"
 #include "net-utils.h"
+#include "win-alarm.h"
 
 /*
  * Declare a RedTestChannel to be used for the test
@@ -182,7 +183,7 @@ static void send_ack_sync(int socket, uint32_t generation)
     msg.len = GUINT32_TO_LE(sizeof(generation));
     msg.generation = GUINT32_TO_LE(generation);
 
-    g_assert_cmpint(write(socket, &msg.type, 10), ==, 10);
+    g_assert_cmpint(socket_write(socket, &msg.type, 10), ==, 10);
 }
 
 static SpiceTimer *waked_up_timer;
@@ -197,7 +198,7 @@ static void timer_wakeup(void *opaque)
     ssize_t len;
     alarm(1);
     char buffer[256];
-    while ((len=recv(client_socket, buffer, sizeof(buffer), 0)) > 0)
+    while ((len=socket_read(client_socket, buffer, sizeof(buffer))) > 0)
         got_data += len;
     alarm(0);
 
@@ -217,7 +218,7 @@ static void timeout_watch_count(void *opaque)
     // get all pending data
     alarm(1);
     char buffer[256];
-    while (recv(client_socket, buffer, sizeof(buffer), 0) > 0)
+    while (socket_read(client_socket, buffer, sizeof(buffer)) > 0)
         continue;
     alarm(0);
 
@@ -225,7 +226,7 @@ static void timeout_watch_count(void *opaque)
     watch_called_countdown = 20;
 
     // send ack reply, this should unblock data from RedChannelClient
-    g_assert_cmpint(write(client_socket, "\2\0\0\0\0\0", 6), ==, 6);
+    g_assert_cmpint(socket_write(client_socket, "\2\0\0\0\0\0", 6), ==, 6);
 
     // expect data soon
     waked_up_timer = core->timer_add(timer_wakeup, core);
@@ -288,7 +289,6 @@ static void channel_loop(void)
     mcc = main_channel_link(main_channel, client, create_dummy_stream(server, NULL),
                             0, FALSE, &caps);
     g_assert_nonnull(mcc);
-    red_client_set_main(client, mcc);
 
     // inject a trace into the core interface to count the events
     SpiceCoreInterfaceInternal *server_core = reds_get_core_interface(server);

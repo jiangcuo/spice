@@ -315,6 +315,8 @@ def write_validate_pointer_item(writer, container, item, scope, parent_scope, st
 def write_validate_array_item(writer, container, item, scope, parent_scope, start,
                               want_nw_size, want_mem_size, want_extra_size):
     array = item.type
+    if item.member:
+        array.check_valid(item.member)
     is_byte_size = False
     element_type = array.element_type
     if array.is_bytes_length():
@@ -804,7 +806,10 @@ def write_array_parser(writer, member, nelements, array, dest, scope):
     element_type = array.element_type
     if member:
         array_start = dest.get_ref(member.name)
-        at_end = member.has_attr("end")
+        at_end = member.has_end_attr()
+        # the field is supposed to be a [0] array, check it
+        if at_end:
+            writer.statement('verify(sizeof(%s) == 0)' % array_start)
     else:
         array_start = "end"
         at_end = True

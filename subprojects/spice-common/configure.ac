@@ -33,6 +33,13 @@ AC_SEARCH_LIBS(regcomp, [regex rx])
 SPICE_CHECK_SYSDEPS
 SPICE_EXTRA_CHECKS
 
+AC_ARG_ENABLE([tests],
+  AS_HELP_STRING([--enable-tests],
+                 [Enable tests @<:@default=yes@:>@]),
+  [],
+  enable_tests="yes")
+AM_CONDITIONAL(ENABLE_TESTS, test "x$enable_tests" = "xyes")
+
 AC_ARG_ENABLE([alignment-checks],
   AS_HELP_STRING([--enable-alignment-checks],
                  [Enable runtime checks for cast alignment @<:@default=no@:>@]),
@@ -41,7 +48,7 @@ AC_ARG_ENABLE([alignment-checks],
 AS_IF([test "x$enable_alignment_checks" = "xyes"],
       [AC_DEFINE([SPICE_DEBUG_ALIGNMENT], 1, [Enable runtime checks for cast alignment])])
 
-SPICE_CHECK_RECORDER
+SPICE_CHECK_INSTRUMENTATION
 
 # Checks for libraries
 PKG_CHECK_MODULES([PROTOCOL], [spice-protocol >= 0.12.12])

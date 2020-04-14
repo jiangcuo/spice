@@ -14,9 +14,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <inttypes.h>
 #include <common/generated_server_marshallers.h>
@@ -568,7 +566,7 @@ void main_channel_client_handle_migrate_end(MainChannelClient *mcc)
         red_channel_warning(red_channel_client_get_channel(RED_CHANNEL_CLIENT(mcc)),
                             "unexpected SPICE_MSGC_MIGRATE_END, "
                             "client does not support semi-seamless migration");
-            return;
+        return;
     }
     red_client_semi_seamless_migrate_complete(client);
 }

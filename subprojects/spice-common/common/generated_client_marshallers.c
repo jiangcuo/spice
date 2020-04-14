@@ -16,10 +16,8 @@
   License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
-#include "client_marshallers.h"
+#include "common/client_marshallers.h"
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -285,6 +283,7 @@ static void spice_marshall_msgc_smartcard_header(SPICE_GNUC_UNUSED SpiceMarshall
     spice_marshaller_add_uint32(m, src->type);
     spice_marshaller_add_uint32(m, src->reader_id);
     spice_marshaller_add_uint32(m, src->length);
+    /* Don't marshall @nomarshal data */
 }
 
 #endif /* USE_SMARTCARD */

@@ -673,8 +673,12 @@ PROTOCOL_CFLAGS
 PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
+ENABLE_AGENT_INTERFACE_FALSE
+ENABLE_AGENT_INTERFACE_TRUE
 ENABLE_RECORDER_FALSE
 ENABLE_RECORDER_TRUE
+ENABLE_TESTS_FALSE
+ENABLE_TESTS_TRUE
 ENABLE_EXTRA_CHECKS_FALSE
 ENABLE_EXTRA_CHECKS_TRUE
 LIBOBJS
@@ -819,8 +823,9 @@ with_sysroot
 enable_libtool_lock
 enable_manual
 enable_extra_checks
+enable_tests
 enable_alignment_checks
-enable_recorder
+enable_instrumentation
 enable_python_checks
 enable_smartcard
 enable_celt051
@@ -1492,16 +1497,18 @@ Optional Features:
                           Build SPICE manual
   --enable-extra-checks=[yes/no]
                           Enable expensive checks [default=no]
+  --enable-tests          Enable tests [default=yes]
   --enable-alignment-checks
                           Enable runtime checks for cast alignment
                           [default=no]
-  --enable-recorder       Enable recorder instrumentation [default=no]
+  --enable-instrumentation=[recorder/agent/no]
+                          Enable instrumentation [default=no]
   --enable-python-checks=[yes/no]
                           Enable checks for Python modules needed to build
                           from git [default=no]
   --enable-smartcard=[yes/no/auto]
                           Enable smartcard support [default=auto]
-  --enable-celt051        Enable celt051 audio codec [default=auto]
+  --enable-celt051        Enable celt051 audio codec [default=no]
   --disable-opus       Disable Opus audio codec (enabled by default)
 
 Optional Packages:
@@ -14539,6 +14546,22 @@ $as_echo "#define ENABLE_EXTRA_CHECKS 1" >>confdefs.h
 fi
 
 
+# Check whether --enable-tests was given.
+if test "${enable_tests+set}" = set; then :
+  enableval=$enable_tests;
+else
+  enable_tests="yes"
+fi
+
+ if test "x$enable_tests" = "xyes"; then
+  ENABLE_TESTS_TRUE=
+  ENABLE_TESTS_FALSE='#'
+else
+  ENABLE_TESTS_TRUE='#'
+  ENABLE_TESTS_FALSE=
+fi
+
+
 # Check whether --enable-alignment-checks was given.
 if test "${enable_alignment_checks+set}" = set; then :
   enableval=$enable_alignment_checks;
@@ -14553,24 +14576,37 @@ $as_echo "#define SPICE_DEBUG_ALIGNMENT 1" >>confdefs.h
 fi
 
 
-    # Check whether --enable-recorder was given.
-if test "${enable_recorder+set}" = set; then :
-  enableval=$enable_recorder;
+    # Check whether --enable-instrumentation was given.
+if test "${enable_instrumentation+set}" = set; then :
+  enableval=$enable_instrumentation;
 else
-  enable_recorder="no"
+  enable_instrumentation="no"
 fi
 
-    if test "$enable_recorder" = "yes"; then :
+    if test "$enable_instrumentation" = "recorder"; then :
 
 $as_echo "#define ENABLE_RECORDER 1" >>confdefs.h
 
 fi
-     if test "$enable_recorder" = "yes"; then
+    if test "$enable_instrumentation" = "agent"; then :
+
+$as_echo "#define ENABLE_AGENT_INTERFACE 1" >>confdefs.h
+
+fi
+     if test "$enable_instrumentation" = "recorder"; then
   ENABLE_RECORDER_TRUE=
   ENABLE_RECORDER_FALSE='#'
 else
   ENABLE_RECORDER_TRUE='#'
   ENABLE_RECORDER_FALSE=
+fi
+
+     if test "$enable_instrumentation" = "agent"; then
+  ENABLE_AGENT_INTERFACE_TRUE=
+  ENABLE_AGENT_INTERFACE_FALSE='#'
+else
+  ENABLE_AGENT_INTERFACE_TRUE='#'
+  ENABLE_AGENT_INTERFACE_FALSE=
 fi
 
 
@@ -16100,7 +16136,7 @@ fi
 if test "${enable_celt051+set}" = set; then :
   enableval=$enable_celt051;
 else
-  enable_celt051="auto"
+  enable_celt051="no"
 fi
 
 
@@ -16176,12 +16212,6 @@ else
 $as_echo "yes" >&6; }
 	have_celt051=yes
 fi
-        if test "x$enable_celt051" = "xauto"; then
-            if test "x$have_celt051" = "xyes"; then
-                as_fn_error $? "CELT 0.5.1.x has been detected, but CELT support is no longer automatically enabled by default. Please explicitly use --enable-celt051 or --disable-celt051" "$LINENO" 5
-            fi
-            # have_celt051 is "no" here, so celt is disabled by default
-        fi
         if test "x$enable_celt051" = "xyes" && test "x$have_celt051" != "xyes"; then
             as_fn_error $? "\"--enable-celt051 has been specified, but CELT 0.5.1 is missing\"" "$LINENO" 5
         fi
@@ -16743,8 +16773,16 @@ if test -z "${ENABLE_EXTRA_CHECKS_TRUE}" && test -z "${ENABLE_EXTRA_CHECKS_FALSE
   as_fn_error $? "conditional \"ENABLE_EXTRA_CHECKS\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
+if test -z "${ENABLE_TESTS_TRUE}" && test -z "${ENABLE_TESTS_FALSE}"; then
+  as_fn_error $? "conditional \"ENABLE_TESTS\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
 if test -z "${ENABLE_RECORDER_TRUE}" && test -z "${ENABLE_RECORDER_FALSE}"; then
   as_fn_error $? "conditional \"ENABLE_RECORDER\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${ENABLE_AGENT_INTERFACE_TRUE}" && test -z "${ENABLE_AGENT_INTERFACE_FALSE}"; then
+  as_fn_error $? "conditional \"ENABLE_AGENT_INTERFACE\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_SMARTCARD_TRUE}" && test -z "${HAVE_SMARTCARD_FALSE}"; then

@@ -7,7 +7,7 @@ version_info = meson.project_version().split('.')
 major = '@0@'.format(version_info[0])
 minor = '@0@'.format(version_info[1])
 micro = version_info[2].to_int()
-if not version_info[3].contains('git')
+if not version_info.contains('git')
   micro += 1
 endif
 micro = '@0@'.format(micro)
@@ -26,7 +26,6 @@ spice_server_headers = [
   'spice-audio.h',
   'spice-char.h',
   'spice-core.h',
-  'spice-experimental.h',
   'spice-input.h',
   'spice-migration.h',
   'spice-qxl.h',
@@ -68,7 +67,6 @@ spice_server_sources = [
   'display-channel-private.h',
   'display-limits.h',
   'event-loop.c',
-  'glib-compat.h',
   'glz-encoder.c',
   'glz-encoder-dict.c',
   'glz-encoder-dict.h',
@@ -133,6 +131,8 @@ spice_server_sources = [
   'stat.h',
   'stream-channel.c',
   'stream-channel.h',
+  'sys-socket.c',
+  'sys-socket.h',
   'red-stream-device.c',
   'red-stream-device.h',
   'sw-canvas.c',
@@ -143,6 +143,8 @@ spice_server_sources = [
   'video-encoder.h',
   'video-stream.c',
   'video-stream.h',
+  'websocket.c',
+  'websocket.h',
   'zlib-encoder.c',
   'zlib-encoder.h',
 ]

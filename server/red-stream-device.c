@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <common/recorder.h>
 
@@ -122,7 +120,7 @@ stream_device_partial_read(StreamDevice *dev, SpiceCharDeviceInstance *sin)
         if (!dev->close_timer) {
             dev->close_timer = reds_core_timer_add(reds, close_timer_func, dev);
         }
-        reds_core_timer_start(reds, dev->close_timer, 0);
+        red_timer_start(dev->close_timer, 0);
         return false;
     }
 
@@ -569,11 +567,6 @@ handle_msg_cursor_move(StreamDevice *dev, SpiceCharDeviceInstance *sin)
 }
 
 static void
-stream_device_send_msg_to_client(RedCharDevice *self, RedPipeItem *msg, RedClient *client)
-{
-}
-
-static void
 stream_device_remove_client(RedCharDevice *self, RedClient *client)
 {
 }
@@ -651,8 +644,7 @@ stream_device_dispose(GObject *object)
 {
     StreamDevice *dev = STREAM_DEVICE(object);
 
-    RedsState *reds = red_char_device_get_server(RED_CHAR_DEVICE(dev));
-    reds_core_timer_remove(reds, dev->close_timer);
+    red_timer_remove(dev->close_timer);
 
     if (dev->stream_channel) {
         // close all current connections and drop the reference
@@ -715,8 +707,8 @@ reset_channels(StreamDevice *dev)
 static void
 char_device_set_state(RedCharDevice *char_dev, int state)
 {
-    SpiceCharDeviceInstance *sin = NULL;
-    g_object_get(char_dev, "sin", &sin, NULL);
+    SpiceCharDeviceInstance *sin;
+    sin = red_char_device_get_device_instance(char_dev);
     spice_assert(sin != NULL);
 
     SpiceCharDeviceInterface *sif = spice_char_device_get_interface(sin);
@@ -782,7 +774,6 @@ stream_device_class_init(StreamDeviceClass *klass)
     object_class->finalize = stream_device_finalize;
 
     char_dev_class->read_one_msg_from_device = stream_device_read_msg_from_dev;
-    char_dev_class->send_msg_to_client = stream_device_send_msg_to_client;
     char_dev_class->remove_client = stream_device_remove_client;
     char_dev_class->port_event = stream_device_port_event;
 }

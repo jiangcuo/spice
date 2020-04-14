@@ -90,24 +90,34 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 check_PROGRAMS = test-codecs-parsing$(EXEEXT) test-options$(EXEEXT) \
-	test-stat$(EXEEXT) test-stream$(EXEEXT) \
-	test-agent-msg-filter$(EXEEXT) test-loop$(EXEEXT) \
-	test-qxl-parsing$(EXEEXT) test-stat-file$(EXEEXT) \
+	test-stat$(EXEEXT) test-agent-msg-filter$(EXEEXT) \
+	test-loop$(EXEEXT) test-qxl-parsing$(EXEEXT) \
 	test-leaks$(EXEEXT) test-vdagent$(EXEEXT) \
 	test-fail-on-null-core-interface$(EXEEXT) \
 	test-empty-success$(EXEEXT) test-channel$(EXEEXT) \
 	test-stream-device$(EXEEXT) test-listen$(EXEEXT) \
-	test-record$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2)
+	test-record$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2) \
+	$(am__EXEEXT_3) $(am__EXEEXT_4)
+@HAVE_SMARTCARD_TRUE@am__append_1 = test-smartcard
+@OS_WIN32_FALSE@am__append_2 = \
+@OS_WIN32_FALSE@	test-stream				\
+@OS_WIN32_FALSE@	test-stat-file				\
+@OS_WIN32_FALSE@	$(NULL)
+
 noinst_PROGRAMS = test-display-no-ssl$(EXEEXT) \
 	test-display-streaming$(EXEEXT) test-playback$(EXEEXT) \
 	test-display-resolution-changes$(EXEEXT) \
 	test-two-servers$(EXEEXT) test-display-width-stride$(EXEEXT) \
-	$(check_PROGRAMS) $(am__EXEEXT_1) spice-server-replay$(EXEEXT) \
-	$(am__EXEEXT_3)
-TESTS = $(check_PROGRAMS) $(am__EXEEXT_1) $(am__append_2)
-@HAVE_GSTREAMER_TRUE@am__append_1 = test-gst
-@ENABLE_EXTRA_CHECKS_TRUE@@HAVE_GSTREAMER_TRUE@am__append_2 = video-encoders
-@HAVE_SASL_TRUE@am__append_3 = test-sasl
+	$(check_PROGRAMS) $(am__EXEEXT_1) $(am__EXEEXT_5) \
+	spice-server-replay$(EXEEXT) $(am__EXEEXT_6)
+@OS_WIN32_FALSE@am__append_3 = \
+@OS_WIN32_FALSE@	test-websocket \
+@OS_WIN32_FALSE@	$(NULL)
+
+TESTS = $(check_PROGRAMS) $(am__EXEEXT_1) $(am__append_5)
+@HAVE_GSTREAMER_TRUE@am__append_4 = test-gst
+@ENABLE_EXTRA_CHECKS_TRUE@@HAVE_GSTREAMER_TRUE@am__append_5 = test-video-encoders
+@HAVE_SASL_TRUE@am__append_6 = test-sasl
 subdir = server/tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_valgrind_check.m4 \
@@ -129,8 +139,12 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__EXEEXT_1 =
-@HAVE_SASL_TRUE@am__EXEEXT_2 = test-sasl$(EXEEXT)
-@HAVE_GSTREAMER_TRUE@am__EXEEXT_3 = test-gst$(EXEEXT)
+@HAVE_SMARTCARD_TRUE@am__EXEEXT_2 = test-smartcard$(EXEEXT)
+@OS_WIN32_FALSE@am__EXEEXT_3 = test-stream$(EXEEXT) \
+@OS_WIN32_FALSE@	test-stat-file$(EXEEXT) $(am__EXEEXT_1)
+@HAVE_SASL_TRUE@am__EXEEXT_4 = test-sasl$(EXEEXT)
+@OS_WIN32_FALSE@am__EXEEXT_5 = test-websocket$(EXEEXT) $(am__EXEEXT_1)
+@HAVE_GSTREAMER_TRUE@am__EXEEXT_6 = test-gst$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 LIBRARIES = $(noinst_LIBRARIES)
 ARFLAGS = cru
@@ -158,8 +172,8 @@ libtest_a_AR = $(AR) $(ARFLAGS)
 libtest_a_LIBADD =
 am__objects_1 =
 am_libtest_a_OBJECTS = basic-event-loop.$(OBJEXT) \
-	test-display-base.$(OBJEXT) test-glib-compat.$(OBJEXT) \
-	$(am__objects_1)
+	test-display-base.$(OBJEXT) win-alarm.$(OBJEXT) \
+	vmc-emu.$(OBJEXT) $(am__objects_1)
 libtest_a_OBJECTS = $(am_libtest_a_OBJECTS)
 am__dirstamp = $(am__leading_dot)dirstamp
 am_spice_server_replay_OBJECTS = replay.$(OBJEXT) \
@@ -327,6 +341,14 @@ test_sasl_DEPENDENCIES = libtest.a \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+test_smartcard_SOURCES = test-smartcard.c
+test_smartcard_OBJECTS = test-smartcard.$(OBJEXT)
+test_smartcard_LDADD = $(LDADD)
+test_smartcard_DEPENDENCIES = libtest.a \
+	$(SPICE_COMMON_DIR)/common/libspice-common.la \
+	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_test_stat_OBJECTS = test-stat.$(OBJEXT)
 test_stat_OBJECTS = $(am_test_stat_OBJECTS)
 am__DEPENDENCIES_2 = libtest.a \
@@ -377,6 +399,14 @@ test_vdagent_DEPENDENCIES = libtest.a \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+test_websocket_SOURCES = test-websocket.c
+test_websocket_OBJECTS = test-websocket.$(OBJEXT)
+test_websocket_LDADD = $(LDADD)
+test_websocket_DEPENDENCIES = libtest.a \
+	$(SPICE_COMMON_DIR)/common/libspice-common.la \
+	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -407,14 +437,16 @@ am__depfiles_remade = ../$(DEPDIR)/event-loop.Po \
 	./$(DEPDIR)/test-display-width-stride.Po \
 	./$(DEPDIR)/test-empty-success.Po \
 	./$(DEPDIR)/test-fail-on-null-core-interface.Po \
-	./$(DEPDIR)/test-glib-compat.Po ./$(DEPDIR)/test-leaks.Po \
-	./$(DEPDIR)/test-listen.Po ./$(DEPDIR)/test-loop.Po \
-	./$(DEPDIR)/test-options.Po ./$(DEPDIR)/test-playback.Po \
-	./$(DEPDIR)/test-qxl-parsing.Po ./$(DEPDIR)/test-record.Po \
-	./$(DEPDIR)/test-sasl.Po ./$(DEPDIR)/test-stat-file.Po \
+	./$(DEPDIR)/test-leaks.Po ./$(DEPDIR)/test-listen.Po \
+	./$(DEPDIR)/test-loop.Po ./$(DEPDIR)/test-options.Po \
+	./$(DEPDIR)/test-playback.Po ./$(DEPDIR)/test-qxl-parsing.Po \
+	./$(DEPDIR)/test-record.Po ./$(DEPDIR)/test-sasl.Po \
+	./$(DEPDIR)/test-smartcard.Po ./$(DEPDIR)/test-stat-file.Po \
 	./$(DEPDIR)/test-stat.Po ./$(DEPDIR)/test-stream-device.Po \
 	./$(DEPDIR)/test-stream.Po ./$(DEPDIR)/test-two-servers.Po \
-	./$(DEPDIR)/test-vdagent.Po ./$(DEPDIR)/test_gst-test-gst.Po
+	./$(DEPDIR)/test-vdagent.Po ./$(DEPDIR)/test-websocket.Po \
+	./$(DEPDIR)/test_gst-test-gst.Po ./$(DEPDIR)/vmc-emu.Po \
+	./$(DEPDIR)/win-alarm.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -443,9 +475,10 @@ SOURCES = $(libtest_stat1_a_SOURCES) $(libtest_stat2_a_SOURCES) \
 	test-empty-success.c test-fail-on-null-core-interface.c \
 	$(test_gst_SOURCES) test-leaks.c test-listen.c test-loop.c \
 	test-options.c test-playback.c test-qxl-parsing.c \
-	test-record.c test-sasl.c $(test_stat_SOURCES) \
-	test-stat-file.c test-stream.c test-stream-device.c \
-	test-two-servers.c test-vdagent.c
+	test-record.c test-sasl.c test-smartcard.c \
+	$(test_stat_SOURCES) test-stat-file.c test-stream.c \
+	test-stream-device.c test-two-servers.c test-vdagent.c \
+	test-websocket.c
 DIST_SOURCES = $(libtest_stat1_a_SOURCES) $(libtest_stat2_a_SOURCES) \
 	$(libtest_stat3_a_SOURCES) $(libtest_stat4_a_SOURCES) \
 	$(libtest_a_SOURCES) $(spice_server_replay_SOURCES) \
@@ -455,9 +488,10 @@ DIST_SOURCES = $(libtest_stat1_a_SOURCES) $(libtest_stat2_a_SOURCES) \
 	test-empty-success.c test-fail-on-null-core-interface.c \
 	$(am__test_gst_SOURCES_DIST) test-leaks.c test-listen.c \
 	test-loop.c test-options.c test-playback.c test-qxl-parsing.c \
-	test-record.c test-sasl.c $(test_stat_SOURCES) \
-	test-stat-file.c test-stream.c test-stream-device.c \
-	test-two-servers.c test-vdagent.c
+	test-record.c test-sasl.c test-smartcard.c \
+	$(test_stat_SOURCES) test-stat-file.c test-stream.c \
+	test-stream-device.c test-two-servers.c test-vdagent.c \
+	test-websocket.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -867,10 +901,10 @@ top_srcdir = @top_srcdir@
 valgrind_enabled_tools = @valgrind_enabled_tools@
 valgrind_tools = @valgrind_tools@
 NULL = 
-VALGRIND_SUPPRESSIONS_FILES = $(srcdir)/valgrind/glib.supp
+VALGRIND_SUPPRESSIONS_FILES = $(srcdir)/valgrind/glib.supp $(srcdir)/valgrind/spice.supp
 EXTRA_DIST = $(VALGRIND_SUPPRESSIONS_FILES) meson.build \
 	pki/ca-cert.pem pki/server-cert.pem pki/server-key.pem $(NULL) \
-	video-encoders
+	test-video-encoders
 AM_CPPFLAGS = \
 	-DSPICE_TOP_SRCDIR=\"$(abs_top_srcdir)\"\
 	-I$(top_srcdir)				\
@@ -894,8 +928,11 @@ libtest_a_SOURCES = \
 	basic-event-loop.h			\
 	test-display-base.c			\
 	test-display-base.h			\
-	test-glib-compat.c			\
 	test-glib-compat.h			\
+	win-alarm.c				\
+	win-alarm.h				\
+	vmc-emu.c				\
+	vmc-emu.h				\
 	$(NULL)
 
 LDADD = \
@@ -960,9 +997,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu server/tests/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign server/tests/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu server/tests/Makefile
+	  $(AUTOMAKE) --foreign server/tests/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -1111,6 +1148,10 @@ test-sasl$(EXEEXT): $(test_sasl_OBJECTS) $(test_sasl_DEPENDENCIES) $(EXTRA_test_
 	@rm -f test-sasl$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_sasl_OBJECTS) $(test_sasl_LDADD) $(LIBS)
 
+test-smartcard$(EXEEXT): $(test_smartcard_OBJECTS) $(test_smartcard_DEPENDENCIES) $(EXTRA_test_smartcard_DEPENDENCIES) 
+	@rm -f test-smartcard$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_smartcard_OBJECTS) $(test_smartcard_LDADD) $(LIBS)
+
 test-stat$(EXEEXT): $(test_stat_OBJECTS) $(test_stat_DEPENDENCIES) $(EXTRA_test_stat_DEPENDENCIES) 
 	@rm -f test-stat$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_stat_OBJECTS) $(test_stat_LDADD) $(LIBS)
@@ -1134,6 +1175,10 @@ test-two-servers$(EXEEXT): $(test_two_servers_OBJECTS) $(test_two_servers_DEPEND
 test-vdagent$(EXEEXT): $(test_vdagent_OBJECTS) $(test_vdagent_DEPENDENCIES) $(EXTRA_test_vdagent_DEPENDENCIES) 
 	@rm -f test-vdagent$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_vdagent_OBJECTS) $(test_vdagent_LDADD) $(LIBS)
+
+test-websocket$(EXEEXT): $(test_websocket_OBJECTS) $(test_websocket_DEPENDENCIES) $(EXTRA_test_websocket_DEPENDENCIES) 
+	@rm -f test-websocket$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_websocket_OBJECTS) $(test_websocket_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -1159,7 +1204,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-display-width-stride.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-empty-success.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-fail-on-null-core-interface.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-glib-compat.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-leaks.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-listen.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-loop.Po@am__quote@ # am--include-marker
@@ -1168,13 +1212,17 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-qxl-parsing.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-record.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-sasl.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-smartcard.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stat-file.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stat.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stream-device.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stream.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-two-servers.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-vdagent.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-websocket.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_gst-test-gst.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vmc-emu.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/win-alarm.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -1496,13 +1544,6 @@ test-stat.log: test-stat$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-test-stream.log: test-stream$(EXEEXT)
-	@p='test-stream$(EXEEXT)'; \
-	b='test-stream'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
 test-agent-msg-filter.log: test-agent-msg-filter$(EXEEXT)
 	@p='test-agent-msg-filter$(EXEEXT)'; \
 	b='test-agent-msg-filter'; \
@@ -1520,13 +1561,6 @@ test-loop.log: test-loop$(EXEEXT)
 test-qxl-parsing.log: test-qxl-parsing$(EXEEXT)
 	@p='test-qxl-parsing$(EXEEXT)'; \
 	b='test-qxl-parsing'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-test-stat-file.log: test-stat-file$(EXEEXT)
-	@p='test-stat-file$(EXEEXT)'; \
-	b='test-stat-file'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1587,6 +1621,27 @@ test-record.log: test-record$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test-smartcard.log: test-smartcard$(EXEEXT)
+	@p='test-smartcard$(EXEEXT)'; \
+	b='test-smartcard'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test-stream.log: test-stream$(EXEEXT)
+	@p='test-stream$(EXEEXT)'; \
+	b='test-stream'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test-stat-file.log: test-stat-file$(EXEEXT)
+	@p='test-stat-file$(EXEEXT)'; \
+	b='test-stat-file'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 test-sasl.log: test-sasl$(EXEEXT)
 	@p='test-sasl$(EXEEXT)'; \
 	b='test-sasl'; \
@@ -1594,9 +1649,9 @@ test-sasl.log: test-sasl$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-video-encoders.log: video-encoders
-	@p='video-encoders'; \
-	b='video-encoders'; \
+test-video-encoders.log: test-video-encoders
+	@p='test-video-encoders'; \
+	b='test-video-encoders'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1713,7 +1768,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/test-display-width-stride.Po
 	-rm -f ./$(DEPDIR)/test-empty-success.Po
 	-rm -f ./$(DEPDIR)/test-fail-on-null-core-interface.Po
-	-rm -f ./$(DEPDIR)/test-glib-compat.Po
 	-rm -f ./$(DEPDIR)/test-leaks.Po
 	-rm -f ./$(DEPDIR)/test-listen.Po
 	-rm -f ./$(DEPDIR)/test-loop.Po
@@ -1722,13 +1776,17 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/test-qxl-parsing.Po
 	-rm -f ./$(DEPDIR)/test-record.Po
 	-rm -f ./$(DEPDIR)/test-sasl.Po
+	-rm -f ./$(DEPDIR)/test-smartcard.Po
 	-rm -f ./$(DEPDIR)/test-stat-file.Po
 	-rm -f ./$(DEPDIR)/test-stat.Po
 	-rm -f ./$(DEPDIR)/test-stream-device.Po
 	-rm -f ./$(DEPDIR)/test-stream.Po
 	-rm -f ./$(DEPDIR)/test-two-servers.Po
 	-rm -f ./$(DEPDIR)/test-vdagent.Po
+	-rm -f ./$(DEPDIR)/test-websocket.Po
 	-rm -f ./$(DEPDIR)/test_gst-test-gst.Po
+	-rm -f ./$(DEPDIR)/vmc-emu.Po
+	-rm -f ./$(DEPDIR)/win-alarm.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -1791,7 +1849,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/test-display-width-stride.Po
 	-rm -f ./$(DEPDIR)/test-empty-success.Po
 	-rm -f ./$(DEPDIR)/test-fail-on-null-core-interface.Po
-	-rm -f ./$(DEPDIR)/test-glib-compat.Po
 	-rm -f ./$(DEPDIR)/test-leaks.Po
 	-rm -f ./$(DEPDIR)/test-listen.Po
 	-rm -f ./$(DEPDIR)/test-loop.Po
@@ -1800,13 +1857,17 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/test-qxl-parsing.Po
 	-rm -f ./$(DEPDIR)/test-record.Po
 	-rm -f ./$(DEPDIR)/test-sasl.Po
+	-rm -f ./$(DEPDIR)/test-smartcard.Po
 	-rm -f ./$(DEPDIR)/test-stat-file.Po
 	-rm -f ./$(DEPDIR)/test-stat.Po
 	-rm -f ./$(DEPDIR)/test-stream-device.Po
 	-rm -f ./$(DEPDIR)/test-stream.Po
 	-rm -f ./$(DEPDIR)/test-two-servers.Po
 	-rm -f ./$(DEPDIR)/test-vdagent.Po
+	-rm -f ./$(DEPDIR)/test-websocket.Po
 	-rm -f ./$(DEPDIR)/test_gst-test-gst.Po
+	-rm -f ./$(DEPDIR)/vmc-emu.Po
+	-rm -f ./$(DEPDIR)/win-alarm.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

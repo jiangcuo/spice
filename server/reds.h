@@ -27,6 +27,7 @@
 #include "char-device.h"
 #include "spice.h"
 #include "red-channel.h"
+#include "video-encoder.h"
 #include "main-dispatcher.h"
 #include "migration-protocol.h"
 
@@ -54,6 +55,7 @@ void reds_send_device_display_info(RedsState *reds);
 void reds_handle_agent_mouse_event(RedsState *reds, const VDAgentMouseState *mouse_state); // used by inputs_channel
 
 GArray* reds_get_renderers(RedsState *reds);
+char *reds_get_video_codec_fullname(RedVideoCodec *codec);
 
 enum {
     RED_RENDERER_INVALID,
@@ -113,20 +115,8 @@ SpiceWatch *reds_core_watch_add(RedsState *reds,
                                 int fd, int event_mask,
                                 SpiceWatchFunc func,
                                 void *opaque);
-void reds_core_watch_update_mask(RedsState *reds,
-                                 SpiceWatch *watch,
-                                 int event_mask);
-void reds_core_watch_remove(RedsState *reds, SpiceWatch *watch);
-
 SpiceTimer *reds_core_timer_add(RedsState *reds,
                                 SpiceTimerFunc func,
                                 void *opaque);
-void reds_core_timer_start(RedsState *reds,
-                           SpiceTimer *timer,
-                           uint32_t ms);
-void reds_core_timer_cancel(RedsState *reds,
-                            SpiceTimer *timer);
-void reds_core_timer_remove(RedsState *reds,
-                            SpiceTimer *timer);
 
 #endif /* REDS_H_ */

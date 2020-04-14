@@ -16,9 +16,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <inttypes.h>
 #include <pthread.h>
@@ -335,13 +333,13 @@ static inline double get_mbps(uint64_t bit_rate)
 /* Returns the source frame rate which may change at any time so don't store
  * the result.
  */
-static uint32_t get_source_fps(SpiceGstEncoder *encoder)
+static uint32_t get_source_fps(const SpiceGstEncoder *encoder)
 {
     return encoder->cbs.get_source_fps ?
         encoder->cbs.get_source_fps(encoder->cbs.opaque) : SPICE_GST_DEFAULT_FPS;
 }
 
-static uint32_t get_network_latency(SpiceGstEncoder *encoder)
+static uint32_t get_network_latency(const SpiceGstEncoder *encoder)
 {
     /* Assume that the network latency is symmetric */
     return encoder->cbs.get_roundtrip_ms ?
@@ -372,7 +370,7 @@ static void free_pipeline(SpiceGstEncoder *encoder)
 
 /* ---------- Encoded frame statistics ---------- */
 
-static inline uint32_t get_last_frame_mm_time(SpiceGstEncoder *encoder)
+static inline uint32_t get_last_frame_mm_time(const SpiceGstEncoder *encoder)
 {
     return encoder->history[encoder->history_last].mm_time;
 }
@@ -380,7 +378,7 @@ static inline uint32_t get_last_frame_mm_time(SpiceGstEncoder *encoder)
 /* Returns the current bit rate based on the last
  * SPICE_GST_FRAME_STATISTICS_COUNT frames.
  */
-static uint64_t get_effective_bit_rate(SpiceGstEncoder *encoder)
+static uint64_t get_effective_bit_rate(const SpiceGstEncoder *encoder)
 {
     uint32_t next_mm_time = encoder->next_frame_mm_time ?
                             encoder->next_frame_mm_time :
@@ -390,7 +388,7 @@ static uint64_t get_effective_bit_rate(SpiceGstEncoder *encoder)
     return elapsed ? encoder->stat_size_sum * 8 * MSEC_PER_SEC / elapsed : 0;
 }
 
-static uint64_t get_average_encoding_time(SpiceGstEncoder *encoder)
+static uint64_t get_average_encoding_time(const SpiceGstEncoder *encoder)
 {
     uint32_t count = encoder->history_last +
         (encoder->history_last < encoder->stat_first ? SPICE_GST_HISTORY_SIZE : 0) -
@@ -398,7 +396,7 @@ static uint64_t get_average_encoding_time(SpiceGstEncoder *encoder)
     return encoder->stat_duration_sum / count;
 }
 
-static uint64_t get_average_frame_size(SpiceGstEncoder *encoder)
+static uint32_t get_average_frame_size(const SpiceGstEncoder *encoder)
 {
     uint32_t count = encoder->history_last +
         (encoder->history_last < encoder->stat_first ? SPICE_GST_HISTORY_SIZE : 0) -
@@ -406,6 +404,13 @@ static uint64_t get_average_frame_size(SpiceGstEncoder *encoder)
     return encoder->stat_size_sum / count;
 }
 
+/* Look for the largest frame and store it in stat_size_max to reduce how
+ * often we have to scan the history for the largest frame.
+ * Then all we need to keep things consistent is to:
+ * - Update stat_size_max when adding a larger frame to the history.
+ * - Reset stat_size_max to zero when the largest frame falls out of
+ *   the history.
+ */
 static uint32_t get_maximum_frame_size(SpiceGstEncoder *encoder)
 {
     if (encoder->stat_size_max == 0) {
@@ -425,8 +430,8 @@ static uint32_t get_maximum_frame_size(SpiceGstEncoder *encoder)
 /* Returns the bit rate of the specified period. from and to must be the
  * mm time of the first and last frame to consider.
  */
-static uint64_t get_period_bit_rate(SpiceGstEncoder *encoder, uint32_t from,
-                                    uint32_t to)
+static uint64_t get_period_bit_rate(const SpiceGstEncoder *encoder,
+                                    uint32_t from, uint32_t to)
 {
     uint32_t sum = 0;
     uint32_t last_mm_time = 0;
@@ -510,7 +515,8 @@ static void set_video_bit_rate(SpiceGstEncoder *encoder, uint64_t bit_rate)
         encoder->video_bit_rate = bit_rate;
         set_gstenc_bitrate(encoder);
 
-    } else  if (abs(bit_rate - encoder->video_bit_rate) > encoder->video_bit_rate * SPICE_GST_VIDEO_BITRATE_MARGIN) {
+    } else if (i64abs((int64_t)(bit_rate - encoder->video_bit_rate)) >
+               encoder->video_bit_rate * SPICE_GST_VIDEO_BITRATE_MARGIN) {
         encoder->video_bit_rate = bit_rate;
         set_pipeline_changes(encoder, SPICE_GST_VIDEO_PIPELINE_BITRATE);
     }
@@ -522,19 +528,19 @@ static uint32_t get_min_playback_delay(SpiceGstEncoder *encoder)
      * an I frame) and an average frame. This also takes into account the
      * frames dropped by the encoder bit rate control.
      */
-    uint64_t size = get_maximum_frame_size(encoder) + get_average_frame_size(encoder);
-    uint32_t send_time = MSEC_PER_SEC * size * 8 / encoder->bit_rate;
+    uint32_t size = get_maximum_frame_size(encoder) + get_average_frame_size(encoder);
+    uint32_t send_time = ((uint64_t)MSEC_PER_SEC * 8) * size / encoder->bit_rate;
 
     /* Also factor in the network latency with a margin for jitter. */
     uint32_t net_latency = get_network_latency(encoder) * (1.0 + SPICE_GST_LATENCY_MARGIN);
 
-    return send_time + net_latency;
+    return send_time + net_latency + get_average_encoding_time(encoder) / NSEC_PER_MILLISEC;
 }
 
 static void update_client_playback_delay(SpiceGstEncoder *encoder)
 {
     if (encoder->cbs.update_client_playback_delay) {
-        uint32_t min_delay = get_min_playback_delay(encoder) + get_average_encoding_time(encoder) / NSEC_PER_MILLISEC;
+        uint32_t min_delay = get_min_playback_delay(encoder);
         encoder->cbs.update_client_playback_delay(encoder->cbs.opaque, min_delay);
     }
 }
@@ -544,7 +550,8 @@ static void update_next_frame_mm_time(SpiceGstEncoder *encoder)
     uint64_t period_ns = NSEC_PER_SEC / get_source_fps(encoder);
     uint64_t min_delay_ns = get_average_encoding_time(encoder);
     if (min_delay_ns > period_ns) {
-        spice_warning("your system seems to be too slow to encode this %dx%d video in real time", encoder->width, encoder->height);
+        spice_warning("your system seems to be too slow to encode this %dx%d@%d video in real time",
+                      encoder->width, encoder->height, get_source_fps(encoder));
     }
 
     min_delay_ns = MIN(min_delay_ns, SPICE_GST_MAX_PERIOD);
@@ -589,7 +596,7 @@ static void update_next_frame_mm_time(SpiceGstEncoder *encoder)
  * This is based on a 10x compression ratio which should be more than enough
  * for even MJPEG to provide good quality.
  */
-static uint64_t get_bit_rate_cap(SpiceGstEncoder *encoder)
+static uint64_t get_bit_rate_cap(const SpiceGstEncoder *encoder)
 {
     uint32_t raw_frame_bits = encoder->width * encoder->height * encoder->format->bpp;
     return raw_frame_bits * get_source_fps(encoder) / 10;
@@ -660,7 +667,7 @@ static void set_bit_rate(SpiceGstEncoder *encoder, uint64_t bit_rate)
     encoder->vbuffer_size = new_size;
     update_next_frame_mm_time(encoder);
 
-    /* Frames preceeding the bit rate change are not relevant to the current
+    /* Frames preceding the bit rate change are not relevant to the current
      * situation anymore.
      */
     encoder->stat_first = encoder->history_last;
@@ -877,7 +884,7 @@ static GstFlowReturn new_sample(GstAppSink *gstappsink, gpointer video_encoder)
     return GST_FLOW_OK;
 }
 
-static const gchar* get_gst_codec_name(SpiceGstEncoder *encoder)
+static const gchar* get_gst_codec_name(const SpiceGstEncoder *encoder)
 {
     switch (encoder->base.codec_type)
     {
@@ -915,12 +922,7 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
     switch (encoder->base.codec_type)
     {
     case SPICE_VIDEO_CODEC_TYPE_MJPEG:
-#ifdef HAVE_GSTREAMER_0_10
         gstenc_opts = g_strdup("");
-#else
-        /* Set max-threads to ensure zero-frame latency */
-        gstenc_opts = g_strdup("max-threads=1");
-#endif
         break;
     case SPICE_VIDEO_CODEC_TYPE_VP9:
     case SPICE_VIDEO_CODEC_TYPE_VP8: {

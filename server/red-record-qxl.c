@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <inttypes.h>
 #include <pthread.h>
@@ -817,6 +815,7 @@ void red_record_qxl_command(RedRecord *record, RedMemSlotInfo *slots,
     pthread_mutex_unlock(&record->lock);
 }
 
+#ifndef _WIN32
 /**
  * Redirects child output to the file specified
  */
@@ -829,6 +828,7 @@ static void child_output_setup(gpointer user_data)
     }
     close(fd);
 }
+#endif
 
 RedRecord *red_record_new(const char *filename)
 {
@@ -838,13 +838,14 @@ RedRecord *red_record_new(const char *filename)
     FILE *f;
     RedRecord *record;
 
-    f = fopen(filename, "w+");
+    f = fopen(filename, "wb+");
     if (!f) {
         spice_error("failed to open recording file %s", filename);
     }
 
     filter = getenv("SPICE_WORKER_RECORD_FILTER");
     if (filter) {
+#ifndef _WIN32
         gint argc;
         gchar **argv = NULL;
         GError *error = NULL;
@@ -870,6 +871,10 @@ RedRecord *red_record_new(const char *filename)
         }
         close(fd_in);
         g_spawn_close_pid(child_pid);
+#else
+        // TODO
+        spice_warning("recorder filter not supported under Windows");
+#endif
     }
 
     if (fwrite(header, sizeof(header)-1, 1, f) != 1) {

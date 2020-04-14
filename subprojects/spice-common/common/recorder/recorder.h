@@ -16,22 +16,22 @@
 //
 //
 // *****************************************************************************
-// This software is licensed under the GNU General Public License v3
+// This software is licensed under the GNU Lesser General Public License v2+
 // (C) 2017-2019, Christophe de Dinechin <christophe@dinechin.org>
 // *****************************************************************************
 // This file is part of Recorder
 //
-// Recorder is free software: you can r redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
+// Recorder is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 2 of the License, or
 // (at your option) any later version.
 //
 // Recorder is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
+// GNU Lesser General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
+// You should have received a copy of the GNU Lesser General Public License
 // along with Recorder, in a file named COPYING.
 // If not, see <https://www.gnu.org/licenses/>.
 // *****************************************************************************
@@ -52,12 +52,13 @@ extern "C" {
 //
 // ============================================================================
 
-#define RECORDER_CURRENT_VERSION                RECORDER_VERSION(1,0,5)
+#define RECORDER_CURRENT_VERSION                RECORDER_VERSION(1,0,8)
 #define RECORDER_VERSION(majr,minr,ptch)        ((majr)<<16|((minr)<<8|(ptch)))
 #define RECORDER_VERSION_MAJOR(version)         (((version) >> 16) & 0xFF)
 #define RECORDER_VERSION_MINOR(version)         (((version) >>  8)& 0xFF)
 #define RECORDER_VERSION_PATCH(version)         (((version) >>  0)& 0xFF)
 #define RECORDER_64BIT                          (INTPTR_MAX > 0x7fffffff)
+
 
 
 // ============================================================================
@@ -830,7 +831,7 @@ typedef struct recorder_chan  *recorder_chan_p;
 
 // Magic number in export channel is different for 32-bit and 64-bit values
 #define RECORDER_CHAN_MAGIC           (0xC0DABABE ^ RECORDER_64BIT)
-#define RECORDER_CHAN_VERSION         RECORDER_VERSION(1,0,5)
+#define RECORDER_CHAN_VERSION         RECORDER_VERSION(1,0,8)
 #define RECORDER_EXPORT_SIZE          2048
 
 extern const char *recorder_export_file(void);
@@ -944,9 +945,20 @@ extern uintptr_t recorder_tick(void);
 //   i.e. float are converted to double on 64-bit platforms, and conversely.
 
 #ifdef __cplusplus
+#include <string>
+
 // In C++, we don't use _Generic but actual overloading
 template <class inttype>
-static inline uintptr_t         _recorder_arg(inttype i)  { return (uintptr_t) i; }
+static inline uintptr_t         _recorder_arg(inttype i)
+{
+    return (uintptr_t) i;
+}
+
+
+static inline uintptr_t         _recorder_arg(const std::string &arg)
+{
+    return (uintptr_t) arg.c_str();
+}
 #define _recorder_float         _recorder_arg
 #define _recorder_double        _recorder_arg
 

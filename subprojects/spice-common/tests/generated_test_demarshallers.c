@@ -16,9 +16,7 @@
   License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 #include "test-marshallers.h"
 #include <string.h>
 #include <assert.h>
@@ -289,7 +287,7 @@ static uint8_t * parse_msg_main_ArrayMessage(uint8_t *message_start, uint8_t *me
     uint64_t nw_size;
     uint64_t mem_size;
     uint8_t *in, *end;
-    uint64_t name__nw_size;
+    uint64_t name__nw_size, name__mem_size;
     uint64_t name__nelements;
     SpiceMsgMainArrayMessage *out;
 
@@ -300,10 +298,11 @@ static uint8_t * parse_msg_main_ArrayMessage(uint8_t *message_start, uint8_t *me
         name__nelements = message_end - (start + 0);
 
         name__nw_size = name__nelements;
+        name__mem_size = sizeof(int8_t) * name__nelements;
     }
 
     nw_size = 0 + name__nw_size;
-    mem_size = sizeof(SpiceMsgMainArrayMessage);
+    mem_size = sizeof(SpiceMsgMainArrayMessage) + name__mem_size;
 
     /* Check if message fits in reported side */
     if (nw_size > (uintptr_t) (message_end - start)) {
@@ -320,8 +319,10 @@ static uint8_t * parse_msg_main_ArrayMessage(uint8_t *message_start, uint8_t *me
 
     out = (SpiceMsgMainArrayMessage *)data;
 
+    verify(sizeof(out->name) == 0);
     memcpy(out->name, in, name__nelements);
     in += name__nelements;
+    end += name__nelements;
 
     assert(in <= message_end);
     assert(end <= data + mem_size);
@@ -424,6 +425,7 @@ static uint8_t * parse_msg_main_channels_list(uint8_t *message_start, uint8_t *m
     out = (SpiceMsgChannels *)data;
 
     out->num_of_channels = consume_uint32(&in);
+    verify(sizeof(out->channels) == 0);
     for (i = 0; i < channels__nelements; i++) {
         out->channels[i] = consume_uint16(&in);
         end += sizeof(uint16_t);
@@ -487,6 +489,7 @@ static uint8_t * parse_msg_main_LenMessage(uint8_t *message_start, uint8_t *mess
     for (i = 0; i < dummy__nelements; i++) {
         out->dummy[i] = consume_uint32(&in);
     }
+    verify(sizeof(out->data) == 0);
     memcpy(out->data, in, data__nelements);
     in += data__nelements;
     end += data__nelements;

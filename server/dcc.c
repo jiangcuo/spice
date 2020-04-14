@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <common/utils.h>
 #include "dcc-private.h"
@@ -26,7 +24,6 @@
 #include "red-client.h"
 #include "main-channel-client.h"
 #include <spice-server-enums.h>
-#include "glib-compat.h"
 
 G_DEFINE_TYPE(DisplayChannelClient, display_channel_client, TYPE_COMMON_GRAPHICS_CHANNEL_CLIENT)
 
@@ -577,6 +574,7 @@ void dcc_start(DisplayChannelClient *dcc)
     if (!display_channel_client_wait_for_init(dcc))
         return;
 
+    g_object_ref(dcc);
     red_channel_client_ack_zero_messages_window(rcc);
     if (display->priv->surfaces[0].context.canvas) {
         display_channel_current_flush(display, 0);
@@ -593,6 +591,7 @@ void dcc_start(DisplayChannelClient *dcc)
         red_channel_client_pipe_add(rcc, dcc_gl_scanout_item_new(rcc, NULL, 0));
         dcc_push_monitors_config(dcc);
     }
+    g_object_unref(dcc);
 }
 
 static void dcc_destroy_stream_agents(DisplayChannelClient *dcc)
@@ -970,8 +969,8 @@ bool dcc_pixmap_cache_unlocked_add(DisplayChannelClient *dcc, uint64_t id,
         NewCacheItem **now;
 
         SPICE_VERIFY(SPICE_OFFSETOF(NewCacheItem, lru_link) == 0);
-        if (!(tail = (NewCacheItem *)ring_get_tail(&cache->lru)) ||
-                                                   tail->sync[dcc->priv->id] == serial) {
+        if (!(tail = SPICE_CONTAINEROF(ring_get_tail(&cache->lru), NewCacheItem, lru_link)) ||
+                                                     tail->sync[dcc->priv->id] == serial) {
             cache->available += size;
             g_free(item);
             return FALSE;
@@ -1122,9 +1121,8 @@ static gint sort_video_codecs_by_client_preference(gconstpointer a_pointer,
 
 static void dcc_update_preferred_video_codecs(DisplayChannelClient *dcc)
 {
-    guint i;
     GArray *video_codecs, *server_codecs;
-    GString *msg;
+    char *codecs_str;
 
     server_codecs = display_channel_get_video_codecs(DCC_TO_DC(dcc));
     spice_return_if_fail(server_codecs != NULL);
@@ -1139,13 +1137,9 @@ static void dcc_update_preferred_video_codecs(DisplayChannelClient *dcc)
     g_clear_pointer(&dcc->priv->preferred_video_codecs, g_array_unref);
     dcc->priv->preferred_video_codecs = video_codecs;
 
-    msg = g_string_new("Preferred video-codecs:");
-    for (i = 0; i < video_codecs->len; i++) {
-        RedVideoCodec codec = g_array_index(video_codecs, RedVideoCodec, i);
-        g_string_append_printf(msg, " %d", codec.type);
-    }
-    spice_debug("%s", msg->str);
-    g_string_free(msg, TRUE);
+    codecs_str = video_codecs_to_string(video_codecs, " ");
+    spice_debug("Preferred video-codecs: %s", codecs_str);
+    g_free(codecs_str);
 }
 
 static void on_display_video_codecs_update(GObject *gobject, GParamSpec *pspec, gpointer user_data)
@@ -1165,41 +1159,15 @@ static void on_display_video_codecs_update(GObject *gobject, GParamSpec *pspec, 
 static int dcc_handle_preferred_video_codec_type(DisplayChannelClient *dcc,
                                                  SpiceMsgcDisplayPreferredVideoCodecType *msg)
 {
-    gint i, len;
-    gint indexes[SPICE_VIDEO_CODEC_TYPE_ENUM_END];
-    GArray *client;
-
     g_return_val_if_fail(msg->num_of_codecs > 0, TRUE);
 
-    /* set default to a big and positive number */
-    memset(indexes, 0x7f, sizeof(indexes));
-
-    for (len = 0, i = 0; i < msg->num_of_codecs; i++) {
-        gint video_codec = msg->codecs[i];
-
-        if (video_codec < SPICE_VIDEO_CODEC_TYPE_MJPEG ||
-            video_codec >= SPICE_VIDEO_CODEC_TYPE_ENUM_END) {
-            spice_debug("Client has sent unknow video-codec (value %d at index %d). "
-                        "Ignoring as server can't handle it",
-                         video_codec, i);
-            continue;
-        }
-
-        if (indexes[video_codec] < SPICE_VIDEO_CODEC_TYPE_ENUM_END) {
-            continue;
-        }
-
-        len++;
-        indexes[video_codec] = len;
-    }
-    client = g_array_sized_new(FALSE, FALSE, sizeof(gint), SPICE_VIDEO_CODEC_TYPE_ENUM_END);
-    g_array_append_vals(client, indexes, SPICE_VIDEO_CODEC_TYPE_ENUM_END);
-
     g_clear_pointer(&dcc->priv->client_preferred_video_codecs, g_array_unref);
-    dcc->priv->client_preferred_video_codecs = client;
+    dcc->priv->client_preferred_video_codecs = video_stream_parse_preferred_codecs(msg);
 
     /* New client preference */
     dcc_update_preferred_video_codecs(dcc);
+    video_stream_detach_and_stop(DCC_TO_DC(dcc));
+
     return TRUE;
 }
 
@@ -1252,10 +1220,11 @@ bool dcc_handle_message(RedChannelClient *rcc, uint16_t type, uint32_t size, voi
 static int dcc_handle_migrate_glz_dictionary(DisplayChannelClient *dcc,
                                              SpiceMigrateDataDisplay *migrate)
 {
+    GlzEncDictRestoreData glz_dict_data = migrate->glz_dict_data;
     return image_encoders_restore_glz_dictionary(&dcc->priv->encoders,
                                                  red_channel_client_get_client(RED_CHANNEL_CLIENT(dcc)),
                                                  migrate->glz_dict_id,
-                                                 &migrate->glz_dict_data);
+                                                 &glz_dict_data);
 }
 
 static bool restore_surface(DisplayChannelClient *dcc, uint32_t surface_id)

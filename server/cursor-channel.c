@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <glib.h>
 #include <common/generated_server_marshallers.h>
@@ -350,7 +348,9 @@ cursor_channel_connect(CursorChannel *cursor, RedClient *client, RedStream *stre
     ccc = cursor_channel_client_new(cursor, client, stream,
                                     migrate,
                                     caps);
-    spice_return_if_fail(ccc != NULL);
+    if (ccc == NULL) {
+        return;
+    }
 
     RedChannelClient *rcc = RED_CHANNEL_CLIENT(ccc);
     red_channel_client_ack_zero_messages_window(rcc);

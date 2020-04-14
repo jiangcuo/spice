@@ -11,10 +11,13 @@
 /* Define to 1 if using `alloca.c'. */
 #undef C_ALLOCA
 
+/* Define if the agent-interface instrumentation is enabled */
+#undef ENABLE_AGENT_INTERFACE
+
 /* Enable extra checks on code */
 #undef ENABLE_EXTRA_CHECKS
 
-/* Define if recorder instrumentation is enabled */
+/* Define if the recorder instrumentation is enabled */
 #undef ENABLE_RECORDER
 
 /* Define to 1 if you have `alloca', as a function or macro. */

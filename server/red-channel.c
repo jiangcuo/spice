@@ -18,9 +18,7 @@
     Author:
         yhalperi@redhat.com
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <common/ring.h>
 
@@ -204,12 +202,13 @@ red_channel_constructed(GObject *object)
 {
     RedChannel *self = RED_CHANNEL(object);
 
-    red_channel_debug(self, "thread_id 0x%" G_GSIZE_MODIFIER "x", self->priv->thread_id);
+    red_channel_debug(self, "thread_id %p", (void*) self->priv->thread_id);
 
     RedChannelClass *klass = RED_CHANNEL_GET_CLASS(self);
 
     G_OBJECT_CLASS(red_channel_parent_class)->constructed(object);
 
+    spice_assert(klass->parser != NULL);
     spice_assert(klass->handle_migrate_data ||
                  !(self->priv->migration_flags & SPICE_MIGRATE_NEED_DATA_TRANSFER));
 }
@@ -475,11 +474,11 @@ void red_channel_remove_client(RedChannel *channel, RedChannelClient *rcc)
 
     if (!pthread_equal(pthread_self(), channel->priv->thread_id)) {
         red_channel_warning(channel,
-                            "channel->thread_id (0x%" G_GSIZE_MODIFIER "x) != "
-                            "pthread_self (0x%" G_GSIZE_MODIFIER "x)."
+                            "channel->thread_id (%p) != "
+                            "pthread_self (%p)."
                             "If one of the threads is != io-thread && != vcpu-thread, "
                             "this might be a BUG",
-                            channel->priv->thread_id, pthread_self());
+                            (void*) channel->priv->thread_id, (void*) pthread_self());
     }
     spice_return_if_fail(channel);
     link = g_list_find(channel->priv->clients, rcc);
@@ -600,44 +599,32 @@ static bool red_channel_no_item_being_sent(RedChannel *channel)
  * TODO - inline? macro? right now this is the simplest from code amount
  */
 
-typedef void (*rcc_item_t)(RedChannelClient *rcc, RedPipeItem *item);
-
 /**
- * red_channel_pipes_create_batch:
+ * red_channel_pipes_new_add:
  * @channel: a channel
  * @creator: a callback to create pipe item (not null)
  * @data: the data to pass to the creator
- * @pipe_add: a callback to add non-null pipe items (not null)
  *
  * Returns: the number of added items
  **/
-static int red_channel_pipes_create_batch(RedChannel *channel,
-                                new_pipe_item_t creator, void *data,
-                                rcc_item_t pipe_add)
+int red_channel_pipes_new_add(RedChannel *channel,
+                              new_pipe_item_t creator, void *data)
 {
     RedChannelClient *rcc;
     RedPipeItem *item;
     int num = 0, n = 0;
 
     spice_assert(creator != NULL);
-    spice_assert(pipe_add != NULL);
 
     FOREACH_CLIENT(channel, rcc) {
         item = (*creator)(rcc, data, num++);
         if (item) {
-            (*pipe_add)(rcc, item);
+            red_channel_client_pipe_add(rcc, item);
             n++;
         }
     }
 
     return n;
-}
-
-int red_channel_pipes_new_add(RedChannel *channel,
-                              new_pipe_item_t creator, void *data)
-{
-    return red_channel_pipes_create_batch(channel, creator, data,
-                                          red_channel_client_pipe_add);
 }
 
 uint32_t red_channel_max_pipe_size(RedChannel *channel)

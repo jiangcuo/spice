@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <common/marshaller.h>
 #include <common/generated_server_marshallers.h>
@@ -713,7 +711,7 @@ static void red_pipe_replace_rendered_drawables_with_images(DisplayChannelClient
     int resent_surface_ids[MAX_PIPE_SIZE];
     SpiceRect resent_areas[MAX_PIPE_SIZE]; // not pointers since drawables may be released
     int num_resent;
-    GList *l;
+    GList *l, *prev;
     GQueue *pipe;
 
     resent_surface_ids[0] = first_surface_id;
@@ -723,12 +721,12 @@ static void red_pipe_replace_rendered_drawables_with_images(DisplayChannelClient
     pipe = red_channel_client_get_pipe(RED_CHANNEL_CLIENT(dcc));
 
     // going from the oldest to the newest
-    for (l = pipe->tail; l != NULL; l = l->prev) {
+    for (l = pipe->tail; l != NULL; l = prev) {
         RedPipeItem *pipe_item = l->data;
         Drawable *drawable;
         RedDrawablePipeItem *dpi;
-        RedImageItem *image;
 
+        prev = l->prev;
         if (pipe_item->type != RED_PIPE_ITEM_TYPE_DRAW)
             continue;
         dpi = SPICE_UPCAST(RedDrawablePipeItem, pipe_item);
@@ -747,15 +745,13 @@ static void red_pipe_replace_rendered_drawables_with_images(DisplayChannelClient
             continue;
         }
 
-        image = dcc_add_surface_area_image(dcc, drawable->red_drawable->surface_id,
-                                           &drawable->red_drawable->bbox, l, TRUE);
+        dcc_add_surface_area_image(dcc, drawable->red_drawable->surface_id,
+                                   &drawable->red_drawable->bbox, l, TRUE);
         resent_surface_ids[num_resent] = drawable->red_drawable->surface_id;
         resent_areas[num_resent] = drawable->red_drawable->bbox;
         num_resent++;
 
-        spice_assert(image);
         red_channel_client_pipe_remove_and_release_pos(RED_CHANNEL_CLIENT(dcc), l);
-        pipe_item = &image->base;
     }
 }
 
@@ -1827,6 +1823,7 @@ static void display_channel_marshall_migrate_data(RedChannelClient *rcc,
     DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
     ImageEncoders *encoders = dcc_get_encoders(dcc);
     SpiceMigrateDataDisplay display_data = {0,};
+    GlzEncDictRestoreData glz_dict_data;
 
     display_channel = DISPLAY_CHANNEL(red_channel_client_get_channel(rcc));
 
@@ -1835,7 +1832,7 @@ static void display_channel_marshall_migrate_data(RedChannelClient *rcc,
     spice_marshaller_add_uint32(base_marshaller, SPICE_MIGRATE_DATA_DISPLAY_VERSION);
 
     spice_assert(dcc->priv->pixmap_cache);
-    spice_assert(MIGRATE_DATA_DISPLAY_MAX_CACHE_CLIENTS == 4 &&
+    SPICE_VERIFY(MIGRATE_DATA_DISPLAY_MAX_CACHE_CLIENTS == 4 &&
                  MIGRATE_DATA_DISPLAY_MAX_CACHE_CLIENTS == MAX_CACHE_CLIENTS);
 
     display_data.message_serial = red_channel_client_get_message_serial(rcc);
@@ -1848,7 +1845,8 @@ static void display_channel_marshall_migrate_data(RedChannelClient *rcc,
            sizeof(display_data.pixmap_cache_clients));
 
     image_encoders_glz_get_restore_data(encoders, &display_data.glz_dict_id,
-                                        &display_data.glz_dict_data);
+                                        &glz_dict_data);
+    display_data.glz_dict_data = glz_dict_data;
 
     /* all data besided the surfaces ref */
     spice_marshaller_add(base_marshaller,

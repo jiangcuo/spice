@@ -19,9 +19,7 @@
 /* Replay a previously recorded file (via SPICE_WORKER_RECORD_FILENAME)
  */
 
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <string.h>
 #include <stdlib.h>
@@ -118,7 +116,7 @@ static gboolean fill_queue_idle(gpointer user_data)
         if (!cmd) {
             g_async_queue_push(display_queue, GINT_TO_POINTER(-1));
             g_async_queue_push(cursor_queue, GINT_TO_POINTER(-1));
-            goto end;
+            break;
         }
 
         ++ncommands;
@@ -135,7 +133,6 @@ static gboolean fill_queue_idle(gpointer user_data)
         }
     }
 
-end:
     if (!keep) {
         pthread_mutex_lock(&mutex);
         if (fill_source) {
@@ -155,17 +152,12 @@ static void fill_queue(void)
 {
     pthread_mutex_lock(&mutex);
 
-    if (!started)
-        goto end;
+    if (started && fill_source == NULL) {
+        fill_source = g_idle_source_new();
+        g_source_set_callback(fill_source, fill_queue_idle, NULL, NULL);
+        g_source_attach(fill_source, basic_event_loop_get_context());
+    }
 
-    if (fill_source)
-        goto end;
-
-    fill_source = g_idle_source_new();
-    g_source_set_callback(fill_source, fill_queue_idle, NULL, NULL);
-    g_source_attach(fill_source, basic_event_loop_get_context());
-
-end:
     pthread_mutex_unlock(&mutex);
 }
 
@@ -411,10 +403,12 @@ int main(int argc, char **argv)
     }
     g_strfreev(file);
     file = NULL;
+#ifndef _WIN32
     if (fcntl(fileno(fd), FD_CLOEXEC) < 0) {
         perror("fcntl failed");
         exit(1);
     }
+#endif
     fseek(fd, 0L, SEEK_END);
     total_size = ftell(fd);
     fseek(fd, 0L, SEEK_SET);
@@ -487,9 +481,8 @@ int main(int argc, char **argv)
     free_queue(cursor_queue);
     end_replay();
 
-    /* FIXME: there should be a way to join server threads before:
-     * g_main_loop_unref(loop);
-     */
+    g_main_loop_unref(loop);
+    basic_event_loop_destroy();
 
     return 0;
 }

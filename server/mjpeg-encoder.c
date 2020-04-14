@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <stdio.h>
 #include <inttypes.h>
@@ -40,7 +38,6 @@ static const int mjpeg_quality_samples[MJPEG_QUALITY_SAMPLE_NUM] = {20, 30, 40, 
 #define MJPEG_AVERAGE_SIZE_WINDOW 3
 
 #define MJPEG_BIT_RATE_EVAL_MIN_NUM_FRAMES 3
-#define MJPEG_LOW_FPS_RATE_TH 3
 
 #define MJPEG_SERVER_STATUS_EVAL_FPS_INTERVAL 1
 #define MJPEG_SERVER_STATUS_DOWNGRADE_DROP_FACTOR_TH 0.1
@@ -72,6 +69,16 @@ static const int mjpeg_quality_samples[MJPEG_QUALITY_SAMPLE_NUM] = {20, 30, 40, 
 
 /* The compressed buffer initial size. */
 #define MJPEG_INITIAL_BUFFER_SIZE (32 * 1024)
+
+#ifdef JCS_EXTENSIONS
+#  ifndef WORDS_BIGENDIAN
+#    define JCS_EXT_LE_BGRX JCS_EXT_BGRX
+#    define JCS_EXT_LE_BGR JCS_EXT_BGR
+#  else
+#    define JCS_EXT_LE_BGRX JCS_EXT_XRGB
+#    define JCS_EXT_LE_BGR JCS_EXT_RGB
+#  endif
+#endif
 
 enum {
     MJPEG_QUALITY_EVAL_TYPE_SET,
@@ -184,9 +191,8 @@ typedef struct MJpegEncoder {
 } MJpegEncoder;
 
 static void mjpeg_encoder_process_server_drops(MJpegEncoder *encoder);
-static uint32_t get_min_required_playback_delay(uint64_t frame_enc_size,
-                                                uint64_t byte_rate,
-                                                uint32_t latency);
+static uint32_t get_min_required_playback_delay(const MJpegEncoder *encoder,
+                                                uint64_t frame_enc_size);
 
 static void mjpeg_video_buffer_free(VideoBuffer *video_buffer)
 {
@@ -210,7 +216,7 @@ static MJpegVideoBuffer* create_mjpeg_video_buffer(void)
 
 static void mjpeg_encoder_destroy(VideoEncoder *video_encoder)
 {
-    MJpegEncoder *encoder = (MJpegEncoder*)video_encoder;
+    MJpegEncoder *encoder = SPICE_CONTAINEROF(video_encoder, MJpegEncoder, base);
     g_free(encoder->cinfo.dest);
     jpeg_destroy_compress(&encoder->cinfo);
     g_free(encoder->row);
@@ -236,6 +242,7 @@ static void pixel_rgb24bpp_to_24(void *src_ptr, uint8_t *dest)
 static void pixel_rgb32bpp_to_24(void *src, uint8_t *dest)
 {
     uint32_t pixel = *(uint32_t *)src;
+    pixel = GUINT32_FROM_LE(pixel);
     *dest++ = (pixel >> 16) & 0xff;
     *dest++ = (pixel >>  8) & 0xff;
     *dest++ = (pixel >>  0) & 0xff;
@@ -245,6 +252,7 @@ static void pixel_rgb32bpp_to_24(void *src, uint8_t *dest)
 static void pixel_rgb16bpp_to_24(void *src, uint8_t *dest)
 {
     uint16_t pixel = *(uint16_t *)src;
+    pixel = GUINT16_FROM_LE(pixel);
     *dest++ = ((pixel >> 7) & 0xf8) | ((pixel >> 12) & 0x7);
     *dest++ = ((pixel >> 2) & 0xf8) | ((pixel >> 7) & 0x7);
     *dest++ = ((pixel << 3) & 0xf8) | ((pixel >> 2) & 0x7);
@@ -338,13 +346,13 @@ spice_jpeg_mem_dest(j_compress_ptr cinfo,
 }
 /* end of code from libjpeg */
 
-static inline uint32_t mjpeg_encoder_get_source_fps(MJpegEncoder *encoder)
+static inline uint32_t mjpeg_encoder_get_source_fps(const MJpegEncoder *encoder)
 {
     return encoder->cbs.get_source_fps ?
         encoder->cbs.get_source_fps(encoder->cbs.opaque) : MJPEG_MAX_FPS;
 }
 
-static inline uint32_t mjpeg_encoder_get_latency(MJpegEncoder *encoder)
+static inline uint32_t mjpeg_encoder_get_latency(const MJpegEncoder *encoder)
 {
     return encoder->cbs.get_roundtrip_ms ?
         encoder->cbs.get_roundtrip_ms(encoder->cbs.opaque) / 2 : 0;
@@ -537,10 +545,7 @@ complete_sample:
     spice_debug("MJpeg quality sample end %p: quality %d fps %d",
                 encoder, mjpeg_quality_samples[rate_control->quality_id], rate_control->fps);
     if (encoder->cbs.update_client_playback_delay) {
-        uint32_t latency = mjpeg_encoder_get_latency(encoder);
-        uint32_t min_delay = get_min_required_playback_delay(final_quality_enc_size,
-                                                             rate_control->byte_rate,
-                                                             latency);
+        uint32_t min_delay = get_min_required_playback_delay(encoder, final_quality_enc_size);
 
         encoder->cbs.update_client_playback_delay(encoder->cbs.opaque, min_delay);
     }
@@ -760,7 +765,7 @@ static int mjpeg_encoder_start_frame(MJpegEncoder *encoder,
     case SPICE_BITMAP_FMT_RGBA:
         encoder->bytes_per_pixel = 4;
 #ifdef JCS_EXTENSIONS
-        encoder->cinfo.in_color_space   = JCS_EXT_BGRX;
+        encoder->cinfo.in_color_space   = JCS_EXT_LE_BGRX;
         encoder->cinfo.input_components = 4;
 #else
         encoder->pixel_converter = pixel_rgb32bpp_to_24;
@@ -773,7 +778,7 @@ static int mjpeg_encoder_start_frame(MJpegEncoder *encoder,
     case SPICE_BITMAP_FMT_24BIT:
         encoder->bytes_per_pixel = 3;
 #ifdef JCS_EXTENSIONS
-        encoder->cinfo.in_color_space = JCS_EXT_BGR;
+        encoder->cinfo.in_color_space = JCS_EXT_LE_BGR;
 #else
         encoder->pixel_converter = pixel_rgb24bpp_to_24;
 #endif
@@ -938,7 +943,7 @@ static int mjpeg_encoder_encode_frame(VideoEncoder *video_encoder,
                                       gpointer bitmap_opaque,
                                       VideoBuffer **outbuf)
 {
-    MJpegEncoder *encoder = (MJpegEncoder*)video_encoder;
+    MJpegEncoder *encoder = SPICE_CONTAINEROF(video_encoder, MJpegEncoder, base);
     MJpegVideoBuffer *buffer = create_mjpeg_video_buffer();
     if (!buffer) {
         return VIDEO_ENCODER_FRAME_UNSUPPORTED;
@@ -1169,10 +1174,11 @@ static void mjpeg_encoder_handle_positive_client_stream_report(MJpegEncoder *enc
  * the video playback jitter buffer should be at least (send_time*2 + net_latency) for
  * preventing underflow
  */
-static uint32_t get_min_required_playback_delay(uint64_t frame_enc_size,
-                                                uint64_t byte_rate,
-                                                uint32_t latency)
+static uint32_t get_min_required_playback_delay(const MJpegEncoder *encoder,
+                                                uint64_t frame_enc_size)
 {
+    uint64_t byte_rate = encoder->rate_control.byte_rate;
+    uint32_t latency = mjpeg_encoder_get_latency(encoder);
     uint32_t one_frame_time;
     uint32_t min_delay;
 
@@ -1197,7 +1203,7 @@ static void mjpeg_encoder_client_stream_report(VideoEncoder *video_encoder,
                                                int32_t end_frame_delay,
                                                uint32_t audio_delay)
 {
-    MJpegEncoder *encoder = (MJpegEncoder*)video_encoder;
+    MJpegEncoder *encoder = SPICE_CONTAINEROF(video_encoder, MJpegEncoder, base);
     MJpegEncoderRateControl *rate_control = &encoder->rate_control;
     MJpegEncoderClientState *client_state = &rate_control->client_state;
     uint64_t avg_enc_size = 0;
@@ -1222,8 +1228,7 @@ static void mjpeg_encoder_client_stream_report(VideoEncoder *video_encoder,
                        rate_control->num_recent_enc_frames;
     }
     spice_debug("recent size avg %.2f (KB)", avg_enc_size / 1024.0);
-    min_playback_delay = get_min_required_playback_delay(avg_enc_size, rate_control->byte_rate,
-                                                         mjpeg_encoder_get_latency(encoder));
+    min_playback_delay = get_min_required_playback_delay(encoder, avg_enc_size);
     spice_debug("min-delay %u client-delay %d", min_playback_delay, end_frame_delay);
 
     if (min_playback_delay > end_frame_delay) {
@@ -1296,7 +1301,7 @@ static void mjpeg_encoder_client_stream_report(VideoEncoder *video_encoder,
 
 static void mjpeg_encoder_notify_server_frame_drop(VideoEncoder *video_encoder)
 {
-    MJpegEncoder *encoder = (MJpegEncoder*)video_encoder;
+    MJpegEncoder *encoder = SPICE_CONTAINEROF(video_encoder, MJpegEncoder, base);
     encoder->rate_control.server_state.num_frames_dropped++;
     mjpeg_encoder_process_server_drops(encoder);
 }
@@ -1335,14 +1340,14 @@ static void mjpeg_encoder_process_server_drops(MJpegEncoder *encoder)
 
 static uint64_t mjpeg_encoder_get_bit_rate(VideoEncoder *video_encoder)
 {
-    MJpegEncoder *encoder = (MJpegEncoder*)video_encoder;
+    MJpegEncoder *encoder = SPICE_CONTAINEROF(video_encoder, MJpegEncoder, base);
     return encoder->rate_control.byte_rate * 8;
 }
 
 static void mjpeg_encoder_get_stats(VideoEncoder *video_encoder,
                                     VideoEncoderStats *stats)
 {
-    MJpegEncoder *encoder = (MJpegEncoder*)video_encoder;
+    MJpegEncoder *encoder = SPICE_CONTAINEROF(video_encoder, MJpegEncoder, base);
     spice_assert(encoder != NULL && stats != NULL);
     stats->starting_bit_rate = encoder->starting_bit_rate;
     stats->cur_bit_rate = mjpeg_encoder_get_bit_rate(video_encoder);

@@ -14,23 +14,23 @@
 //
 //
 // *****************************************************************************
-// This software is licensed under the GNU General Public License v3
+// This software is licensed under the GNU Lesser General Public License v2+
 // (C) 2017-2019, Christophe de Dinechin <christophe@dinechin.org>
 // (C) 2018-2019, Frediano Ziglio <fziglio@redhat.com>
 // *****************************************************************************
 // This file is part of Recorder
 //
-// Recorder is free software: you can r redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
+// Recorder is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 2 of the License, or
 // (at your option) any later version.
 //
 // Recorder is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
+// GNU Lesser General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
+// You should have received a copy of the GNU Lesser General Public License
 // along with Recorder, in a file named COPYING.
 // If not, see <https://www.gnu.org/licenses/>.
 // *****************************************************************************
@@ -62,16 +62,9 @@
 
 // ============================================================================
 //
-//   Available recorders exposed by recorder library
+//    File-specific constants
 //
 // ============================================================================
-
-RECORDER(recorder,              32, "Recorder operations and configuration");
-RECORDER(recorder_warning,       8, "Recorder warnings");
-RECORDER(recorder_error,         8, "Recorder errors");
-RECORDER(recorder_signals,      32, "Recorder signal handling");
-RECORDER(recorder_traces,       64, "Recorder traces");
-
 
 enum
 {
@@ -117,9 +110,51 @@ enum
 #endif // SIGPWR
 };
 
+
+
+// ============================================================================
+//
+//   Available recorders exposed by recorder library
+//
+// ============================================================================
+
+RECORDER(recorder,              32, "Recorder operations and configuration");
+RECORDER(recorder_warning,       8, "Recorder warnings");
+RECORDER(recorder_error,         8, "Recorder errors");
+RECORDER(recorder_signals,      32, "Recorder signal handling");
+RECORDER(recorder_traces,       64, "Recorder traces");
+
+
 RECORDER_TWEAK_DEFINE(recorder_signals_mask,
                       RECORDER_SIGNALS_MASK,
                       "Recorder default mask for signals to catch");
+RECORDER_TWEAK_DEFINE(recorder_dump_sleep, 100,
+                      "Sleep time between background dumps (ms)");
+RECORDER_TWEAK_DEFINE(recorder_export_size, 2048,
+                      "Number of samples stored when exporting records");
+RECORDER_TWEAK_DEFINE(recorder_configuration_sleep, 100,
+                      "Sleep time between configuration checks (ms)");
+RECORDER_TWEAK_DEFINE(recorder_time_precision,
+                        RECORDER_HZ > 100000 ?  6
+                      : RECORDER_HZ >  10000 ?  5
+                      : RECORDER_HZ >   1000 ?  4
+                      : RECORDER_HZ >    100 ?  3
+                      : RECORDER_HZ >     10 ?  2
+                      : RECORDER_HZ >      1 ?  1
+                      :                         0,
+                      "Precision for displaying time");
+
+// Display tweaks
+RECORDER_TWEAK_DEFINE(recorder_location, 0,
+                      "Set to show location in recorder dumps");
+RECORDER_TWEAK_DEFINE(recorder_function, 0,
+                      "Set to show function in recorder dumps");
+RECORDER_TWEAK_DEFINE(recorder_order, 1,
+                      "Set to show order number in recorder dumps");
+RECORDER_TWEAK_DEFINE(recorder_abstime, 0,
+                      "Set to show absolute time in recorder dumps");
+RECORDER_TWEAK_DEFINE(recorder_reltime, 1,
+                      "Set to show relative time in recorder dumps");
 
 
 
@@ -178,6 +213,8 @@ static inline void pattern_free(pattern_t *re)
 
 #define array_size(a)   (sizeof(a) / sizeof(a[0]))
 
+
+
 // ============================================================================
 //
 //    Local prototypes (in case -Wmissing-prototypes is enabled)
@@ -191,9 +228,10 @@ ringidx_t recorder_chan_reader(recorder_chan_p chan);
 size_t    recorder_chan_item_size(recorder_chan_p chan);
 
 
+
 // ============================================================================
 //
-//    User-configurable parameters
+//    User-configurable parameters and other static variables
 //
 // ============================================================================
 
@@ -210,6 +248,8 @@ static void * recorder_output = NULL;
 static recorder_show_fn recorder_show = recorder_print;
 static recorder_format_fn recorder_format = recorder_format_entry;
 static recorder_type_fn recorder_types[256];
+
+static uintptr_t recorder_time_at_start = 0;
 
 
 
@@ -779,11 +819,6 @@ recorder_show_fn  recorder_configure_show(recorder_show_fn show)
 #  define snprintf  _snprintf
 #endif
 
-RECORDER_TWEAK_DEFINE(recorder_location, 0,
-                      "Set to show location in recorder dumps");
-RECORDER_TWEAK_DEFINE(recorder_function, 0,
-                      "Set to show function in recorder dumps");
-
 static void recorder_format_entry(recorder_show_fn show,
                                   void *output,
                                   const char *label,
@@ -799,6 +834,9 @@ static void recorder_format_entry(recorder_show_fn show,
     char *dst = buffer;
     char *dst_end = buffer + sizeof buffer;
 
+#define rsnprintf(...)                                                  \
+    snprintf(dst, dst_end >= dst ? dst_end - dst : 0,  __VA_ARGS__)
+
     // Look for file:line: in the input message
     const char *end_of_fileline = message;
     for (int colon = 0; colon < 2; colon++)
@@ -812,13 +850,9 @@ static void recorder_format_entry(recorder_show_fn show,
     {
         int fileline_size = (int) (end_of_fileline - message);
         if (size != 1)
-            dst += snprintf(dst, dst_end - dst,
-                            "%*.*s", size, fileline_size, message);
+            dst += rsnprintf("%*.*s", size, fileline_size, message);
         else
-            dst += snprintf(dst, dst_end - dst,
-                            "%.*s", fileline_size, message);
-        if (dst > dst_end)
-            dst = dst_end;
+            dst += rsnprintf("%.*s", fileline_size, message);
     }
     message = end_of_fileline;
 
@@ -826,36 +860,53 @@ static void recorder_format_entry(recorder_show_fn show,
     if (size)
     {
         if (size != 1)
-            dst += snprintf(dst, dst_end - dst, "%*s:", size, function_name);
+            dst += rsnprintf("%*s:", size, function_name);
         else
-            dst += snprintf(dst, dst_end - dst, "%s:", function_name);
-        if (dst > dst_end)
-            dst = dst_end;
+            dst += rsnprintf("%s:", function_name);
     }
 
-    if (RECORDER_64BIT) // Static if to detect how to display time
+    char spacing = '[';
+
+    if (RECORDER_TWEAK(recorder_order))
     {
-        // Time stamp in us, show in seconds
-        dst += snprintf(dst, dst_end - dst,
-                        "[%lu %.6f] %s: %s",
-                        (unsigned long) order,
-                        (double) timestamp / RECORDER_HZ,
-                        label, message);
+        dst += rsnprintf("%c%"PRIdPTR, spacing, order);
+        spacing = ' ';
     }
-    else
+
+    if (RECORDER_TWEAK(recorder_abstime))
     {
-        // Time stamp  in ms, show in seconds
-        dst += snprintf(dst, dst_end - dst,
-                        "[%lu %.3f] %s: %s",
-                        (unsigned long) order,
-                        (double) timestamp / RECORDER_HZ,
-                        label, message);
+        uintptr_t abstime = timestamp + recorder_time_at_start;
+        const uintptr_t minute = (uintptr_t) 60 * RECORDER_HZ;
+        uintptr_t minutes = abstime / minute;
+        uintptr_t seconds = abstime % minute;
+        int precision = (int) RECORDER_TWEAK(recorder_time_precision);
+
+        dst += rsnprintf("%c%02"PRIdPTR":%02"PRIdPTR":%0*.*f",
+                         spacing,
+                         minutes / 60,
+                         minutes % 60,
+                         precision + 3, precision,
+                         seconds * (1.0 / RECORDER_HZ));
+        spacing = ' ';
     }
+
+    if (RECORDER_TWEAK(recorder_reltime))
+    {
+        dst += rsnprintf("%c%.*f",
+                         spacing,
+                         (int) RECORDER_TWEAK(recorder_time_precision),
+                         (double) timestamp / RECORDER_HZ);
+        spacing = ' ';
+    }
+
+    if (spacing != '[')
+        dst += rsnprintf("] ");
+
+    dst += rsnprintf("%s %s", label, message);
+
     // In case snprintf overflowed
-    if (dst > dst_end)
-        dst = dst_end;
-
-    show(buffer, dst - buffer, output);
+    show(buffer, (dst > dst_end ? dst_end : dst) - buffer, output);
+#undef rsnprintf
 }
 
 
@@ -1767,9 +1818,6 @@ static recorder_type recorder_type_from_format(const char *format,
 //
 // ============================================================================
 
-RECORDER_TWEAK_DEFINE(recorder_dump_sleep, 100,
-                      "Sleep time between background dumps (ms)");
-
 static bool background_dump_running = false;
 
 
@@ -1959,13 +2007,13 @@ uintptr_t recorder_tick(void)
     static uintptr_t initialTick = 0;
     struct timeval t;
     gettimeofday(&t, NULL);
-#if RECORDER_64BIT
-    uintptr_t tick = t.tv_sec * 1000000ULL + t.tv_usec;
-#else
-    uintptr_t tick = t.tv_sec * 1000ULL + t.tv_usec / 1000;
-#endif
+    uintptr_t tick = t.tv_sec * RECORDER_HZ + t.tv_usec / (1000000/RECORDER_HZ);
     if (!initialTick)
+    {
         initialTick = tick;
+        recorder_time_at_start = tick % ((uintptr_t) 86400 * RECORDER_HZ);
+    }
+
     return tick - initialTick;
 }
 #endif // recorder_tick
@@ -2019,8 +2067,6 @@ void recorder_tweak_activate (recorder_tweak *tweak)
 //
 // ============================================================================
 
-RECORDER_TWEAK_DEFINE(recorder_export_size, 2048,
-                      "Number of samples stored when exporting records");
 static recorder_chans_p chans = NULL;
 
 static const char *recorder_type_name[] =
@@ -2103,8 +2149,6 @@ static void recorder_atexit_cleanup(void)
 }
 
 
-RECORDER_TWEAK_DEFINE(recorder_configuration_sleep, 100,
-                      "Sleep time between configuration checks (ms)");
 static void *background_configuration_check(void *ignored)
 // ----------------------------------------------------------------------------
 //    Check if there is a configuration command and apply it

@@ -101,21 +101,11 @@ AC_DEFUN([SPICE_CHECK_SMARTCARD], [
 AC_DEFUN([SPICE_CHECK_CELT051], [
     AC_ARG_ENABLE([celt051],
         AS_HELP_STRING([--enable-celt051],
-                       [Enable celt051 audio codec @<:@default=auto@:>@]),,
-        [enable_celt051="auto"])
+                       [Enable celt051 audio codec @<:@default=no@:>@]),,
+        [enable_celt051="no"])
 
     if test "x$enable_celt051" != "xno"; then
         PKG_CHECK_MODULES([CELT051], [celt051 >= 0.5.1.1], [have_celt051=yes], [have_celt051=no])
-        if test "x$enable_celt051" = "xauto"; then
-            if test "x$have_celt051" = "xyes"; then
-                AC_MSG_ERROR(m4_normalize([
-                                CELT 0.5.1.x has been detected, \
-                                but CELT support is no longer automatically enabled by default. \
-                                Please explicitly use --enable-celt051 or --disable-celt051
-                             ]))
-            fi
-            # have_celt051 is "no" here, so celt is disabled by default
-        fi
         if test "x$enable_celt051" = "xyes" && test "x$have_celt051" != "xyes"; then
             AC_MSG_ERROR(["--enable-celt051 has been specified, but CELT 0.5.1 is missing"])
         fi
@@ -351,17 +341,20 @@ AC_DEFUN([SPICE_CHECK_OPENSSL], [
     PKG_CHECK_MODULES(OPENSSL, openssl)
 ])
 
-# SPICE_CHECK_RECORDER
+# SPICE_CHECK_INSTRUMENTATION
 # -----------------
-# Check for the availability of recorder library.
+# Check for the availability of an instrumentation library.
 #------------------
-AC_DEFUN([SPICE_CHECK_RECORDER], [
-    AC_ARG_ENABLE([recorder],
-      AS_HELP_STRING([--enable-recorder],
-                     [Enable recorder instrumentation @<:@default=no@:>@]),
+AC_DEFUN([SPICE_CHECK_INSTRUMENTATION], [
+    AC_ARG_ENABLE([instrumentation],
+      AS_HELP_STRING([--enable-instrumentation=@<:@recorder/agent/no@:>@],
+                     [Enable instrumentation @<:@default=no@:>@]),
       [],
-      enable_recorder="no")
-    AS_IF([test "$enable_recorder" = "yes"],
-           AC_DEFINE([ENABLE_RECORDER], [1], [Define if recorder instrumentation is enabled]))
-    AM_CONDITIONAL([ENABLE_RECORDER],[test "$enable_recorder" = "yes"])
+      enable_instrumentation="no")
+    AS_IF([test "$enable_instrumentation" = "recorder"],
+           AC_DEFINE([ENABLE_RECORDER], [1], [Define if the recorder instrumentation is enabled]))
+    AS_IF([test "$enable_instrumentation" = "agent"],
+           AC_DEFINE([ENABLE_AGENT_INTERFACE], [1], [Define if the agent-interface instrumentation is enabled]))
+    AM_CONDITIONAL([ENABLE_RECORDER],[test "$enable_instrumentation" = "recorder"])
+    AM_CONDITIONAL([ENABLE_AGENT_INTERFACE],[test "$enable_instrumentation" = "agent"])
 ])

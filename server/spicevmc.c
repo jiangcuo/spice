@@ -18,9 +18,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <assert.h>
 #include <string.h>
@@ -36,13 +34,13 @@
 #include "reds.h"
 #include "migration-protocol.h"
 
-/* todo: add flow control. i.e.,
- * (a) limit the tokens available for the client
- * (b) limit the tokens available for the server
- */
 /* 64K should be enough for all but the largest writes + 32 bytes hdr */
 #define BUF_SIZE (64 * 1024 + 32)
 #define COMPRESS_THRESHOLD 1000
+
+// limit of the queued data, at this limit we stop reading from device to
+// avoid DoS
+#define QUEUED_DATA_LIMIT (1024*1024)
 
 SPICE_DECLARE_TYPE(RedCharDeviceSpiceVmc, red_char_device_spicevmc, CHAR_DEVICE_SPICEVMC);
 #define RED_TYPE_CHAR_DEVICE_SPICEVMC red_char_device_spicevmc_get_type()
@@ -85,6 +83,7 @@ struct RedCharDeviceSpiceVmcClass
 static RedCharDevice *red_char_device_spicevmc_new(SpiceCharDeviceInstance *sin,
                                                    RedsState *reds,
                                                    RedVmcChannel *channel);
+static void spicevmc_red_channel_queue_data(RedVmcChannel *channel, RedVmcPipeItem *item);
 
 G_DEFINE_TYPE(RedCharDeviceSpiceVmc, red_char_device_spicevmc, RED_TYPE_CHAR_DEVICE)
 
@@ -98,6 +97,7 @@ struct RedVmcChannel
     RedVmcPipeItem *pipe_item;
     RedCharDeviceWriteBuffer *recv_from_client_buf;
     uint8_t port_opened;
+    uint32_t queued_data;
     RedStatCounter in_data;
     RedStatCounter in_compressed;
     RedStatCounter in_decompressed;
@@ -339,7 +339,7 @@ static RedPipeItem *spicevmc_chardev_read_msg_from_dev(RedCharDevice *self,
 
     sif = spice_char_device_get_interface(sin);
 
-    if (!channel->rcc) {
+    if (!channel->rcc || channel->queued_data >= QUEUED_DATA_LIMIT) {
         return NULL;
     }
 
@@ -362,29 +362,18 @@ static RedPipeItem *spicevmc_chardev_read_msg_from_dev(RedCharDevice *self,
 
         msg_item_compressed = try_compress_lz4(channel, n, msg_item);
         if (msg_item_compressed != NULL) {
-            return &msg_item_compressed->base;
+            spicevmc_red_channel_queue_data(channel, msg_item_compressed);
+            return NULL;
         }
 #endif
         stat_inc_counter(channel->out_data, n);
         msg_item->uncompressed_data_size = n;
         msg_item->buf_used = n;
-        return &msg_item->base;
-    } else {
-        channel->pipe_item = msg_item;
+        spicevmc_red_channel_queue_data(channel, msg_item);
         return NULL;
     }
-}
-
-static void spicevmc_chardev_send_msg_to_client(RedCharDevice *self,
-                                                RedPipeItem *msg,
-                                                RedClient *client)
-{
-    RedCharDeviceSpiceVmc *vmc = RED_CHAR_DEVICE_SPICEVMC(self);
-    RedVmcChannel *channel = RED_VMC_CHANNEL(vmc->channel);
-
-    spice_assert(red_channel_client_get_client(channel->rcc) == client);
-    red_pipe_item_ref(msg);
-    red_channel_client_pipe_add_push(channel->rcc, msg);
+    channel->pipe_item = msg_item;
+    return NULL;
 }
 
 static void red_port_init_item_free(struct RedPipeItem *base)
@@ -496,9 +485,9 @@ static bool handle_compressed_msg(RedVmcChannel *channel, RedChannelClient *rcc,
     int decompressed_size;
     RedCharDeviceWriteBuffer *write_buf;
 
-    write_buf = red_char_device_write_buffer_get_client(channel->chardev,
-                                                        red_channel_client_get_client(rcc),
-                                                        compressed_data_msg->uncompressed_size);
+    write_buf = red_char_device_write_buffer_get_server(channel->chardev,
+                                                        compressed_data_msg->uncompressed_size,
+                                                        false);
     if (!write_buf) {
         return FALSE;
     }
@@ -570,6 +559,15 @@ static bool spicevmc_red_channel_client_handle_message(RedChannelClient *rcc,
     return TRUE;
 }
 
+/* if device manage to send some data attempt to unblock the channel */
+static void spicevmc_on_free_self_token(RedCharDevice *self)
+{
+    RedCharDeviceSpiceVmc *vmc = RED_CHAR_DEVICE_SPICEVMC(self);
+    RedVmcChannel *channel = RED_VMC_CHANNEL(vmc->channel);
+
+    red_channel_client_unblock_read(channel->rcc);
+}
+
 static uint8_t *spicevmc_red_channel_alloc_msg_rcv_buf(RedChannelClient *rcc,
                                                        uint16_t type,
                                                        uint32_t size)
@@ -577,16 +575,14 @@ static uint8_t *spicevmc_red_channel_alloc_msg_rcv_buf(RedChannelClient *rcc,
 
     switch (type) {
     case SPICE_MSGC_SPICEVMC_DATA: {
-        RedClient *client = red_channel_client_get_client(rcc);
         RedVmcChannel *channel = RED_VMC_CHANNEL(red_channel_client_get_channel(rcc));
 
         assert(!channel->recv_from_client_buf);
 
-        channel->recv_from_client_buf = red_char_device_write_buffer_get_client(channel->chardev,
-                                                                                client,
-                                                                                size);
+        channel->recv_from_client_buf = red_char_device_write_buffer_get_server(channel->chardev,
+                                                                                size, true);
         if (!channel->recv_from_client_buf) {
-            spice_error("failed to allocate write buffer");
+            red_channel_client_block_read(rcc);
             return NULL;
         }
         return channel->recv_from_client_buf->buf;
@@ -616,11 +612,19 @@ static void spicevmc_red_channel_release_msg_rcv_buf(RedChannelClient *rcc,
     }
 }
 
+static void
+spicevmc_red_channel_queue_data(RedVmcChannel *channel, RedVmcPipeItem *item)
+{
+    channel->queued_data += item->buf_used;
+    red_channel_client_pipe_add_push(channel->rcc, &item->base);
+}
+
 static void spicevmc_red_channel_send_data(RedChannelClient *rcc,
                                            SpiceMarshaller *m,
                                            RedPipeItem *item)
 {
     RedVmcPipeItem *i = SPICE_UPCAST(RedVmcPipeItem, item);
+    RedVmcChannel *channel = RED_VMC_CHANNEL(red_channel_client_get_channel(rcc));
 
     /* for compatibility send using not compressed data message */
     if (i->type == SPICE_DATA_COMPRESSION_TYPE_NONE) {
@@ -637,6 +641,14 @@ static void spicevmc_red_channel_send_data(RedChannelClient *rcc,
     red_pipe_item_ref(item);
     spice_marshaller_add_by_ref_full(m, i->buf, i->buf_used,
                                      marshaller_unref_pipe_item, item);
+
+    // account for sent data and wake up device if was blocked
+    uint32_t old_queued_data = channel->queued_data;
+    channel->queued_data -= i->buf_used;
+    if (channel->chardev &&
+        old_queued_data >= QUEUED_DATA_LIMIT && channel->queued_data < QUEUED_DATA_LIMIT) {
+        red_char_device_wakeup(channel->chardev);
+    }
 }
 
 static void spicevmc_red_channel_send_migrate_data(RedChannelClient *rcc,
@@ -775,6 +787,7 @@ static void spicevmc_connect(RedChannel *channel, RedClient *client,
         return;
     }
     vmc_channel->rcc = rcc;
+    vmc_channel->queued_data = 0;
     red_channel_client_ack_zero_messages_window(rcc);
 
     if (strcmp(sin->subtype, "port") == 0) {
@@ -788,7 +801,7 @@ static void spicevmc_connect(RedChannel *channel, RedClient *client,
         return;
     }
 
-    sif = spice_char_device_get_interface(vmc_channel->chardev_sin);
+    sif = spice_char_device_get_interface(sin);
     if (sif->state) {
         sif->state(sin, 1);
     }
@@ -814,7 +827,7 @@ RedCharDevice *spicevmc_device_connect(RedsState *reds,
 }
 
 /* Must be called from RedClient handling thread. */
-void spicevmc_device_disconnect(RedsState *reds, SpiceCharDeviceInstance *sin)
+void spicevmc_device_disconnect(SpiceCharDeviceInstance *sin)
 {
     g_object_unref(RED_CHAR_DEVICE(sin->st));
     sin->st = NULL;
@@ -893,9 +906,9 @@ red_char_device_spicevmc_class_init(RedCharDeviceSpiceVmcClass *klass)
     object_class->dispose = red_char_device_spicevmc_dispose;
 
     char_dev_class->read_one_msg_from_device = spicevmc_chardev_read_msg_from_dev;
-    char_dev_class->send_msg_to_client = spicevmc_chardev_send_msg_to_client;
     char_dev_class->remove_client = spicevmc_char_dev_remove_client;
     char_dev_class->port_event = spicevmc_port_event;
+    char_dev_class->on_free_self_token = spicevmc_on_free_self_token;
 
     g_object_class_install_property(object_class,
                                     PROP_CHANNEL,
@@ -922,7 +935,7 @@ red_char_device_spicevmc_new(SpiceCharDeviceInstance *sin,
                         "sin", sin,
                         "spice-server", reds,
                         "client-tokens-interval", 0ULL,
-                        "self-tokens", ~0ULL,
+                        "self-tokens", UINT64_C(128), // limit number of messages sent to device
                         "channel", channel,
                         NULL);
 }

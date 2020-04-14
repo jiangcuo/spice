@@ -5,7 +5,7 @@
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
 <meta name="generator" content="AsciiDoc 8.6.10" />
-<title></title>
+<title>How does SPICE handle threading</title>
 <style type="text/css">
 /* Shared CSS for AsciiDoc xhtml11 and html5 backends */
 
@@ -734,14 +734,14 @@ asciidoc.install(2);
 </head>
 <body class="article">
 <div id="header">
+<h1>How does SPICE handle threading</h1>
 <div id="toc">
   <div id="toctitle">Table of Contents</div>
   <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
 </div>
 </div>
 <div id="content">
-<div class="sect1">
-<h2 id="_how_does_spice_handle_threading">1. How does SPICE handle threading</h2>
+<div id="preamble">
 <div class="sectionbody">
 <div class="paragraph"><p>Lots of code runs in a single thread.</p></div>
 <div class="paragraph"><p>Qemu usually calls SPICE from its main thread except on callbacks to code
@@ -767,17 +767,23 @@ Dispatchers are used to send messages/request from one thread to another.
 The main dispatcher is used to send requests to the main thread.
 The Qxl uses a dispatcher to send requests to the RedWorker which will forward
 to DisplayChannel/CursorChannel.</p></div>
-<div class="paragraph"><p>RedClient may call some RedChannelClient functions using some callbacks
-registered inside ClientCbs. Usually these callbacks are functions that do the
-job directly if the RedChannel is running in the main thread or they use a
-dispatcher to do the job in the right thread. Currently there are 3 callbacks:
-connect, disconnect and migrate. Connect and migrate are asynchronous (the job
-is done while the current thread is doing something else) while disconnect is
-synchronous (the main thread will wait for termination).</p></div>
+<div class="paragraph"><p>One aspect to take into consideration is the event scheduling. SPICE uses some
+<code>SpiceCoreInterface</code> to handle events. As the events will be handled from a
+thread based on the core interface you have to use the correct core. Each
+channel has an associated core interface which can be retrieved using
+<code>red_channel_get_core_interface</code>. There&#8217;s also a main core interface you can get
+using <code>reds_get_core_interface</code>. <code>reds_core_timer_*</code> and <code>reds_core_watch_*</code>
+functions use the main core interface.
+Even though multiple channel types run in the main thread and so could use
+directly the main code interface, for coherence, rule simplicity and to allows
+the code to be moved in a separate thread easily if needed, it&#8217;s advisable to
+use the channel core interface (that will be the main core interface in this
+case).
+Currently character devices and not channel code runs in the main thread.</p></div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_reference_counting_and_ownership">2. Reference counting and ownership</h2>
+<h2 id="_reference_counting_and_ownership">1. Reference counting and ownership</h2>
 <div class="sectionbody">
 <div class="paragraph"><p>&#8594;  pointer</p></div>
 <div class="paragraph"><p>&#8658;  pointer with owning (mostly GObject ref counting)</p></div>
@@ -808,7 +814,7 @@ clients, currently before RedClient which will have a dangling pointer.</p></div
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2019-04-30 09:51:04 BST
+ 2020-02-27 11:26:12 GMT
 </div>
 </div>
 </body>

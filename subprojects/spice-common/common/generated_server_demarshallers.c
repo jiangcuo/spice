@@ -16,9 +16,7 @@
   License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 #include "common/messages.h"
 #include <string.h>
 #include <assert.h>
@@ -838,6 +836,7 @@ static uint8_t * parse_msgc_display_preferred_video_codec_type(uint8_t *message_
     out = (SpiceMsgcDisplayPreferredVideoCodecType *)data;
 
     out->num_of_codecs = consume_uint8(&in);
+    verify(sizeof(out->codecs) == 0);
     for (i = 0; i < codecs__nelements; i++) {
         out->codecs[i] = consume_uint8(&in);
         end += sizeof(uint8_t);
@@ -1452,10 +1451,25 @@ static uint8_t * parse_msgc_smartcard_header(uint8_t *message_start, uint8_t *me
     uint64_t nw_size;
     uint64_t mem_size;
     uint8_t *in, *end;
+    uint64_t data__nw_size, data__mem_size;
+    uint64_t data__nelements;
     VSCMsgHeader *out;
 
-    nw_size = 12;
-    mem_size = sizeof(VSCMsgHeader);
+    { /* data */
+        uint32_t length__value;
+        pos = start + 8;
+        if (SPICE_UNLIKELY(pos + 4 > message_end)) {
+            goto error;
+        }
+        length__value = read_uint32(pos);
+        data__nelements = length__value;
+
+        data__nw_size = data__nelements;
+        data__mem_size = sizeof(uint8_t) * data__nelements;
+    }
+
+    nw_size = 12 + data__nw_size;
+    mem_size = sizeof(VSCMsgHeader) + data__mem_size;
 
     /* Check if message fits in reported side */
     if (nw_size > (uintptr_t) (message_end - start)) {
@@ -1475,6 +1489,10 @@ static uint8_t * parse_msgc_smartcard_header(uint8_t *message_start, uint8_t *me
     out->type = consume_uint32(&in);
     out->reader_id = consume_uint32(&in);
     out->length = consume_uint32(&in);
+    verify(sizeof(out->data) == 0);
+    memcpy(out->data, in, data__nelements);
+    in += data__nelements;
+    end += data__nelements;
 
     assert(in <= message_end);
     assert(end <= data + mem_size);

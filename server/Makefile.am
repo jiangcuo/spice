@@ -12,7 +12,6 @@ AM_CPPFLAGS =					\
 	$(LZ4_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
 	$(SASL_CFLAGS)				\
-	$(SLIRP_CFLAGS)				\
 	$(SMARTCARD_CFLAGS)			\
 	$(GSTREAMER_0_10_CFLAGS)		\
 	$(GSTREAMER_1_0_CFLAGS)			\
@@ -42,7 +41,6 @@ endif
 libserver_la_LIBADD =							\
 	$(SPICE_COMMON_DIR)/common/libspice-common.la			\
 	$(SPICE_COMMON_DIR)/common/libspice-common-server.la		\
-	$(GL_LIBS)							\
 	$(GLIB2_LIBS)							\
 	$(GOBJECT2_LIBS)						\
 	$(JPEG_LIBS)							\
@@ -50,7 +48,6 @@ libserver_la_LIBADD =							\
 	$(LIBRT)							\
 	$(PIXMAN_LIBS)							\
 	$(SASL_LIBS)							\
-	$(SLIRP_LIBS)							\
 	$(GSTREAMER_0_10_LIBS)						\
 	$(GSTREAMER_1_0_LIBS)						\
 	$(SSL_LIBS)							\
@@ -64,7 +61,6 @@ libspice_serverinclude_HEADERS =		\
 	spice-audio.h				\
 	spice-char.h				\
 	spice-core.h				\
-	spice-experimental.h			\
 	spice-input.h				\
 	spice-migration.h			\
 	spice-qxl.h				\
@@ -101,7 +97,6 @@ libserver_la_SOURCES =				\
 	display-channel-private.h		\
 	display-limits.h			\
 	event-loop.c				\
-	glib-compat.h				\
 	glz-encoder.c				\
 	glz-encoder-dict.c			\
 	glz-encoder-dict.h			\
@@ -166,6 +161,8 @@ libserver_la_SOURCES =				\
 	stat.h					\
 	stream-channel.c			\
 	stream-channel.h			\
+	sys-socket.h				\
+	sys-socket.c				\
 	red-stream-device.c			\
 	red-stream-device.h			\
 	sw-canvas.c				\
@@ -176,6 +173,8 @@ libserver_la_SOURCES =				\
 	video-encoder.h				\
 	video-stream.c				\
 	video-stream.h				\
+	websocket.c				\
+	websocket.h				\
 	zlib-encoder.c				\
 	zlib-encoder.h				\
 	$(NULL)

@@ -681,6 +681,7 @@ test_dummy_recorder_SOURCES = \
 
 test_dummy_recorder_CFLAGS = \
 	-I$(top_srcdir)			\
+	$(PROTOCOL_CFLAGS)		\
 	$(NULL)
 
 test_dummy_recorder_LDADD = \

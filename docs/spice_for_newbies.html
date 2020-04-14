@@ -1,0 +1,1473 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
+<meta name="generator" content="AsciiDoc 8.6.10" />
+<title>Spice for Newbies</title>
+<style type="text/css">
+/* Shared CSS for AsciiDoc xhtml11 and html5 backends */
+
+/* Default font. */
+body {
+  font-family: Georgia,serif;
+}
+
+/* Title font. */
+h1, h2, h3, h4, h5, h6,
+div.title, caption.title,
+thead, p.table.header,
+#toctitle,
+#author, #revnumber, #revdate, #revremark,
+#footer {
+  font-family: Arial,Helvetica,sans-serif;
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+  color: navy;
+}
+
+strong {
+  font-weight: bold;
+  color: #083194;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+h5 {
+  font-size: 1.0em;
+}
+
+div.sectionbody {
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
+}
+ul > li     { color: #aaa; }
+ul > li > * { color: black; }
+
+.monospaced, code, pre {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
+  padding: 0;
+  margin: 0;
+}
+pre {
+  white-space: pre-wrap;
+}
+
+#author {
+  color: #527bbd;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+#email {
+}
+#revnumber, #revdate, #revremark {
+}
+
+#footer {
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+#preamble {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.0em;
+  margin-bottom: 2.0em;
+  margin-right: 10%;
+  color: #606060;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  color: #527bbd;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid #dddddd;
+  border-left: 4px solid #f0f0f0;
+  padding: 0.5em;
+}
+
+div.listingblock > div.content {
+  border: 1px solid #dddddd;
+  border-left: 5px solid #f0f0f0;
+  background: #f8f8f8;
+  padding: 0.5em;
+}
+
+div.quoteblock, div.verseblock {
+  padding-left: 1.0em;
+  margin-left: 1.0em;
+  margin-right: 10%;
+  border-left: 5px solid #f0f0f0;
+  color: #888;
+}
+
+div.quoteblock > div.attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock > pre.content {
+  font-family: inherit;
+  font-size: inherit;
+}
+div.verseblock > div.attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+/* DEPRECATED: Pre version 8.2.7 verse style literal block. */
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 3px solid #dddddd;
+}
+
+div.exampleblock > div.content {
+  border-left: 3px solid #dddddd;
+  padding-left: 0.5em;
+}
+
+div.imageblock div.content { padding-left: 0; }
+span.image img { border-style: none; vertical-align: text-bottom; }
+a.image:visited { color: white; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: normal;
+  color: navy;
+}
+dd > *:first-child {
+  margin-top: 0.1em;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+ol.arabic {
+  list-style-type: decimal;
+}
+ol.loweralpha {
+  list-style-type: lower-alpha;
+}
+ol.upperalpha {
+  list-style-type: upper-alpha;
+}
+ol.lowerroman {
+  list-style-type: lower-roman;
+}
+ol.upperroman {
+  list-style-type: upper-roman;
+}
+
+div.compact ul, div.compact ol,
+div.compact p, div.compact p,
+div.compact div, div.compact div {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+
+tfoot {
+  font-weight: bold;
+}
+td > div.verse {
+  white-space: pre;
+}
+
+div.hdlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hdlist tr {
+  padding-bottom: 15px;
+}
+dt.hdlist1.strong, td.hdlist1.strong {
+  font-weight: bold;
+}
+td.hdlist1 {
+  vertical-align: top;
+  font-style: normal;
+  padding-right: 0.8em;
+  color: navy;
+}
+td.hdlist2 {
+  vertical-align: top;
+}
+div.hdlist.compact tr {
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.comment {
+  background: yellow;
+}
+
+.footnote, .footnoteref {
+  font-size: 0.8em;
+}
+
+span.footnote, span.footnoteref {
+  vertical-align: super;
+}
+
+#footnotes {
+  margin: 20px 0 20px 0;
+  padding: 7px 0 0 0;
+}
+
+#footnotes div.footnote {
+  margin: 0 0 5px 0;
+}
+
+#footnotes hr {
+  border: none;
+  border-top: 1px solid silver;
+  height: 1px;
+  text-align: left;
+  margin-left: 0;
+  width: 20%;
+  min-width: 100px;
+}
+
+div.colist td {
+  padding-right: 0.5em;
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+div.colist td img {
+  margin-top: 0.3em;
+}
+
+@media print {
+  #footer-badges { display: none; }
+}
+
+#toc {
+  margin-bottom: 2.5em;
+}
+
+#toctitle {
+  color: #527bbd;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel0, div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+
+span.aqua { color: aqua; }
+span.black { color: black; }
+span.blue { color: blue; }
+span.fuchsia { color: fuchsia; }
+span.gray { color: gray; }
+span.green { color: green; }
+span.lime { color: lime; }
+span.maroon { color: maroon; }
+span.navy { color: navy; }
+span.olive { color: olive; }
+span.purple { color: purple; }
+span.red { color: red; }
+span.silver { color: silver; }
+span.teal { color: teal; }
+span.white { color: white; }
+span.yellow { color: yellow; }
+
+span.aqua-background { background: aqua; }
+span.black-background { background: black; }
+span.blue-background { background: blue; }
+span.fuchsia-background { background: fuchsia; }
+span.gray-background { background: gray; }
+span.green-background { background: green; }
+span.lime-background { background: lime; }
+span.maroon-background { background: maroon; }
+span.navy-background { background: navy; }
+span.olive-background { background: olive; }
+span.purple-background { background: purple; }
+span.red-background { background: red; }
+span.silver-background { background: silver; }
+span.teal-background { background: teal; }
+span.white-background { background: white; }
+span.yellow-background { background: yellow; }
+
+span.big { font-size: 2em; }
+span.small { font-size: 0.6em; }
+
+span.underline { text-decoration: underline; }
+span.overline { text-decoration: overline; }
+span.line-through { text-decoration: line-through; }
+
+div.unbreakable { page-break-inside: avoid; }
+
+
+/*
+ * xhtml11 specific
+ *
+ * */
+
+div.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead, p.table.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.table {
+  margin-top: 0;
+}
+/* Because the table frame attribute is overriden by CSS in most browsers. */
+div.tableblock > table[frame="void"] {
+  border-style: none;
+}
+div.tableblock > table[frame="hsides"] {
+  border-left-style: none;
+  border-right-style: none;
+}
+div.tableblock > table[frame="vsides"] {
+  border-top-style: none;
+  border-bottom-style: none;
+}
+
+
+/*
+ * html5 specific
+ *
+ * */
+
+table.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+thead, p.tableblock.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.tableblock {
+  margin-top: 0;
+}
+table.tableblock {
+  border-width: 3px;
+  border-spacing: 0px;
+  border-style: solid;
+  border-color: #527bbd;
+  border-collapse: collapse;
+}
+th.tableblock, td.tableblock {
+  border-width: 1px;
+  padding: 4px;
+  border-style: solid;
+  border-color: #527bbd;
+}
+
+table.tableblock.frame-topbot {
+  border-left-style: hidden;
+  border-right-style: hidden;
+}
+table.tableblock.frame-sides {
+  border-top-style: hidden;
+  border-bottom-style: hidden;
+}
+table.tableblock.frame-none {
+  border-style: hidden;
+}
+
+th.tableblock.halign-left, td.tableblock.halign-left {
+  text-align: left;
+}
+th.tableblock.halign-center, td.tableblock.halign-center {
+  text-align: center;
+}
+th.tableblock.halign-right, td.tableblock.halign-right {
+  text-align: right;
+}
+
+th.tableblock.valign-top, td.tableblock.valign-top {
+  vertical-align: top;
+}
+th.tableblock.valign-middle, td.tableblock.valign-middle {
+  vertical-align: middle;
+}
+th.tableblock.valign-bottom, td.tableblock.valign-bottom {
+  vertical-align: bottom;
+}
+
+
+/*
+ * manpage specific
+ *
+ * */
+
+body.manpage h1 {
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  border-top: 2px solid silver;
+  border-bottom: 2px solid silver;
+}
+body.manpage h2 {
+  border-style: none;
+}
+body.manpage div.sectionbody {
+  margin-left: 3em;
+}
+
+@media print {
+  body.manpage div#toc { display: none; }
+}
+
+
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+var asciidoc = {  // Namespace.
+
+/////////////////////////////////////////////////////////////////////
+// Table Of Contents generator
+/////////////////////////////////////////////////////////////////////
+
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, 2006, 2009. License: GPL */
+
+// toclevels = 1..4.
+toc: function (toclevels) {
+
+  function getText(el) {
+    var text = "";
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+        text += i.data;
+      else if (i.firstChild != null)
+        text += getText(i);
+    }
+    return text;
+  }
+
+  function TocEntry(el, text, toclevel) {
+    this.element = el;
+    this.text = text;
+    this.toclevel = toclevel;
+  }
+
+  function tocEntries(el, toclevels) {
+    var result = new Array;
+    var re = new RegExp('[hH]([1-'+(toclevels+1)+'])');
+    // Function that scans the DOM tree for header elements (the DOM2
+    // nodeIterator API would be a better technique but not supported by all
+    // browsers).
+    var iterate = function (el) {
+      for (var i = el.firstChild; i != null; i = i.nextSibling) {
+        if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+          var mo = re.exec(i.tagName);
+          if (mo && (i.getAttribute("class") || i.getAttribute("className")) != "float") {
+            result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+          }
+          iterate(i);
+        }
+      }
+    }
+    iterate(el);
+    return result;
+  }
+
+  var toc = document.getElementById("toc");
+  if (!toc) {
+    return;
+  }
+
+  // Delete existing TOC entries in case we're reloading the TOC.
+  var tocEntriesToRemove = [];
+  var i;
+  for (i = 0; i < toc.childNodes.length; i++) {
+    var entry = toc.childNodes[i];
+    if (entry.nodeName.toLowerCase() == 'div'
+     && entry.getAttribute("class")
+     && entry.getAttribute("class").match(/^toclevel/))
+      tocEntriesToRemove.push(entry);
+  }
+  for (i = 0; i < tocEntriesToRemove.length; i++) {
+    toc.removeChild(tocEntriesToRemove[i]);
+  }
+
+  // Rebuild TOC entries.
+  var entries = tocEntries(document.getElementById("content"), toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "_toc_" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+  if (entries.length == 0)
+    toc.parentNode.removeChild(toc);
+},
+
+
+/////////////////////////////////////////////////////////////////////
+// Footnotes generator
+/////////////////////////////////////////////////////////////////////
+
+/* Based on footnote generation code from:
+ * http://www.brandspankingnew.net/archive/2005/07/format_footnote.html
+ */
+
+footnotes: function () {
+  // Delete existing footnote entries in case we're reloading the footnodes.
+  var i;
+  var noteholder = document.getElementById("footnotes");
+  if (!noteholder) {
+    return;
+  }
+  var entriesToRemove = [];
+  for (i = 0; i < noteholder.childNodes.length; i++) {
+    var entry = noteholder.childNodes[i];
+    if (entry.nodeName.toLowerCase() == 'div' && entry.getAttribute("class") == "footnote")
+      entriesToRemove.push(entry);
+  }
+  for (i = 0; i < entriesToRemove.length; i++) {
+    noteholder.removeChild(entriesToRemove[i]);
+  }
+
+  // Rebuild footnote entries.
+  var cont = document.getElementById("content");
+  var spans = cont.getElementsByTagName("span");
+  var refs = {};
+  var n = 0;
+  for (i=0; i<spans.length; i++) {
+    if (spans[i].className == "footnote") {
+      n++;
+      var note = spans[i].getAttribute("data-note");
+      if (!note) {
+        // Use [\s\S] in place of . so multi-line matches work.
+        // Because JavaScript has no s (dotall) regex flag.
+        note = spans[i].innerHTML.match(/\s*\[([\s\S]*)]\s*/)[1];
+        spans[i].innerHTML =
+          "[<a id='_footnoteref_" + n + "' href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+        spans[i].setAttribute("data-note", note);
+      }
+      noteholder.innerHTML +=
+        "<div class='footnote' id='_footnote_" + n + "'>" +
+        "<a href='#_footnoteref_" + n + "' title='Return to text'>" +
+        n + "</a>. " + note + "</div>";
+      var id =spans[i].getAttribute("id");
+      if (id != null) refs["#"+id] = n;
+    }
+  }
+  if (n == 0)
+    noteholder.parentNode.removeChild(noteholder);
+  else {
+    // Process footnoterefs.
+    for (i=0; i<spans.length; i++) {
+      if (spans[i].className == "footnoteref") {
+        var href = spans[i].getElementsByTagName("a")[0].getAttribute("href");
+        href = href.match(/#.*/)[0];  // Because IE return full URL.
+        n = refs[href];
+        spans[i].innerHTML =
+          "[<a href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+      }
+    }
+  }
+},
+
+install: function(toclevels) {
+  var timerId;
+
+  function reinstall() {
+    asciidoc.footnotes();
+    if (toclevels) {
+      asciidoc.toc(toclevels);
+    }
+  }
+
+  function reinstallAndRemoveTimer() {
+    clearInterval(timerId);
+    reinstall();
+  }
+
+  timerId = setInterval(reinstall, 500);
+  if (document.addEventListener)
+    document.addEventListener("DOMContentLoaded", reinstallAndRemoveTimer, false);
+  else
+    window.onload = reinstallAndRemoveTimer;
+}
+
+}
+asciidoc.install(2);
+/*]]>*/
+</script>
+</head>
+<body class="article">
+<div id="header">
+<h1>Spice for Newbies</h1>
+<span id="revnumber">version v1.0,</span>
+<span id="revdate">01.01.2009</span>
+<br /><span id="revremark">Draft 1</span>
+<div id="toc">
+  <div id="toctitle">Table of Contents</div>
+  <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
+</div>
+</div>
+<div id="content">
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph"><p>Copyright &#169; 2009 Red Hat, Inc.<br />
+Licensed under a Creative Commons Attribution-Share Alike 3.0<br />
+United States License (see <a href="http://creativecommons.org/licenses/by-sa/3.0/us/legalcode">http://creativecommons.org/licenses/by-sa/3.0/us/legalcode</a>).<br /></p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_introduction">1. Introduction</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Spice is an open remote computing solution, providing client access to remote
+machine display and devices (e.g., keyboard, mouse, audio, usb). Spice achieves
+a user experience similar to an interaction with a local machine, while trying
+to offload most of the intensive CPU and GPU tasks to the client.  Spice is
+suitable for both LAN and WAN usage, without compromising on the user
+experience.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_basic_architecture">2. Basic Architecture</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Spice basic building blocks are the Spice protocol, Spice server and Spice
+client. Spice-related components include the QXL device and guest QXL driver.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+Graphic Commands Flow
+</p>
+<div class="imageblock" style="text-align:center;">
+<div class="content">
+<img src="./images/newbies/g_cmd_flow.png" alt="g_cmd_flow.png" />
+</div>
+<div class="title">Figure 1. Graphic Commands Flow</div>
+</div>
+<div class="paragraph"><p>The above figure shows the basic Spice architecture and guest-to-client data
+flow of graphic commands, when using libspice with QEMU. libspice can be used by
+any other VDI<span class="footnote"><br />[Spice VD Interfaces documentation]<br /></span> compatible
+host application as well. Graphic commands data flow starts by a user
+application requesting the OS graphic engine (X or GDI) to perform a rendering
+operation. The graphic engine passes the commands to the QXL driver, which
+translates the OS commands to QXL commands and pushes them into a command ring.
+The command ring resides in the device memory. libspice pulls the commands from
+the ring and adds them to graphic commands tree. The graphic commands tree
+contains the set of commands, whose execution will reproduce the display
+content. The tree is used by libspice to optimize commands transmission to the
+client by dropping commands hidden by other commands. The commands tree is also
+used for video stream detection. libspice also maintains a queue of commands to
+be sent to the client, for  updating its display. When a command is pulled from
+the queue for transmission to the client, it is translated into Spice protocol
+messages. Commands removed from the tree, are removed from the send queue as
+well. When a command is no longer required by libspice, it is pushed into the
+device release ring. The driver uses this ring for releasing commands resources.
+When a client receives a graphic command it uses the command to update the
+display.</p></div>
+</li>
+<li>
+<p>
+Agent Commands Flow
+</p>
+<div class="imageblock" style="text-align:center;">
+<div class="content">
+<img src="./images/newbies/a_cmd_flow.png" alt="a_cmd_flow.png" />
+</div>
+<div class="title">Figure 2. Agent Commands Flow</div>
+</div>
+<div class="paragraph"><p>Spice agent is a software module executed in the guest. Spice server and client
+use the agent for tasks that need to be performed in the guest context, such as
+configuring the guest display settings. The figure above shows the Spice client
+and server communication with the agent using VDIPort device and guest driver.
+Messages can be generated by the client (e.g., configuration of the guest
+display settings), the server (e.g., mouse motion), and the agent (e.g.,
+configuration ack). The driver communicates with the device using its input and
+output rings. Client and server generated messages are written to the same write
+queue in the server and are later written to the device output ring. Messages
+are read from the device input ring to the server read buffer. The message port
+determines whether the message  should be handled by the server or forwarded to
+the client.</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_spice_client">3. Spice Client</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Spice cross-platform (Linux &amp; Windows) client is the interface for the end user.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+Client Basic Structure
+</p>
+<div class="imageblock" style="text-align:center;">
+<div class="content">
+<img src="./images/newbies/cli_bsc_stc.png" alt="cli_bsc_stc.png" />
+</div>
+<div class="title">Figure 3. Client Basic Structure</div>
+</div>
+</li>
+<li>
+<p>
+Client Classes
+</p>
+<div class="paragraph"><p>Following is an introduction to the key classes of the Spice client. For having
+a clean cross-platform structure, Spice defines generic interfaces, keeping
+their platform-specific implementation in parallel directories. One such generic
+interface is the Platform class, defining many low-level services such as timer
+and cursor operations.</p></div>
+<div class="paragraph"><p><strong>Application</strong> is the main class, which contains and controls the client,
+monitors and screens. It handles general application functionality such as
+parsing command line arguments, running the main message loop,  handling events
+(connection, disconnection, error, etc.),  redirection of mouse events to input
+handler, toggling full screen mode, etc.</p></div>
+<div class="olist loweralpha"><ol class="loweralpha">
+<li>
+<p>
+Channels
+</p>
+<div class="paragraph"><p>The client and server communicate via channels. Each channel type is dedicated
+to a specific type of data. Each channel uses a dedicated TCP socket, and it can
+be secured (using SSL) or unsecured. On the client side each channel has a
+dedicated thread, so different QoS can be given to each one by differentiating
+their thread priority.</p></div>
+<div class="paragraph"><p><strong>RedClient</strong> serves as the main channel. It owns all the other instantiated channels and controls
+them (creating channels using their factory, connecting, disconnecting, etc.), and handles control,
+configuration and migration (using the Migrate class).</p></div>
+<div class="paragraph"><p>The ancestors of all the channels are:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+RedPeer - socket wrapper for secured and unsecured communication, providing infrastructures such
+  as connect, disconnect, close, send, receive, and socket swapping for migration. It defines
+generic message classes: InMessages, CompoundInMessage and OutMessage. All messages include type,
+size and data.
+</p>
+</li>
+<li>
+<p>
+RedChannelBase - inherits RedPeer, provides the basic functionality for establishing channel
+  connectivity with the server and support for channel capability exchange with the server.
+</p>
+</li>
+<li>
+<p>
+RedChannel - inherits RedChannelBase. This class is the parent of all instantiated channels.
+  Handles sending outgoing messages and dispatching incoming messages. RedChannel thread runs an
+event loop with various event sources (e.g., send and abort triggers). The channel socket is added
+as an event source for triggering Spice messages sending and receiving.
+</p>
+<div class="paragraph"><p>The available channels are:</p></div>
+</li>
+<li>
+<p>
+Main - implemented by RedClient (see above).
+</p>
+</li>
+<li>
+<p>
+DisplayChannel - handles graphic commands, images and video streams.
+</p>
+</li>
+<li>
+<p>
+InputsChannel - keyboard and mouse inputs.
+</p>
+</li>
+<li>
+<p>
+CursorChannel - pointer device position, visibility and cursor shape.
+</p>
+</li>
+<li>
+<p>
+PlaybackChannel - audio received from the server to be played by the client .
+</p>
+</li>
+<li>
+<p>
+RecordChannel - audio captured on the client side.
+</p>
+<div class="paragraph"><p>ChannelFactory is the base class for all channel factories. Each channel registers its specific
+factory for enabling RedClient to create channels by channel type.</p></div>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+Screens and Windows
+</p>
+<div class="ulist"><ul>
+<li>
+<p>
+ScreenLayer - screen layer is attached to specific screen, providing operations on rectangle areas
+  (set, clear, update, invalidate, etc.). Layers are z-ordered (e.g., cursor is above display).
+</p>
+</li>
+<li>
+<p>
+RedScreen - implements the screen logic and controls the window, using the screen layers (e.g.,
+  display, cursor) for displaying its content
+</p>
+</li>
+<li>
+<p>
+RedDrawable - platform-specific implementation of basic pixmap. It supports basic rendering
+  operations (e.g., copy, blend, combine).
+</p>
+</li>
+<li>
+<p>
+RedWindow_p - platform-specific window data and methods.
+</p>
+</li>
+<li>
+<p>
+RedWindow - inherits RedDrawable and RedWindow_p. Cross-platform implementation of basic window
+  state and functionality (e.g., show, hide, move, minimize, set title, set cursor etc.).
+</p>
+</li>
+</ul></div>
+</li>
+</ol></div>
+</li>
+<li>
+<p>
+Spice Server
+</p>
+<div class="paragraph"><p>Spice server is implemented in libspice, a Virtual Device Interface (VDI) pluggable library. VDI
+provides a standard way to publish interfaces of virtual devices by a software component. This
+enables other software components to interact with these devices. For more information, refer to
+. From one side, the server communicates with a remote client using the Spice
+protocol. From the other side, it interacts with the VDI host application (e.g., QEMU).
+For display remoting purposes the server maintains a commands queue and a tree for managing the
+current objects dependencies and hidings. QXL commands are processed and translated to Spice
+protocol commands sent to the client.
+Spice always attempts to pass the rendering tasks to the client, thus leveraging its hardware
+acceleration abilities. Rendering on the host side, by software or GPU, is done as a last result.
+The Spice server keeps guest graphic commands that compose the current image. It releases a command
+only when it is completely covered by other commands and there are no dependencies on it, or when we
+need to render the command to the frame buffer. The two main reasons that trigger drawing to the
+frame buffer are (1) Running out of resources; (2) The guest needs to read from the frame buffer.</p></div>
+<div class="olist loweralpha"><ol class="loweralpha">
+<li>
+<p>
+Server Structure
+</p>
+<div class="imageblock" style="text-align:center;">
+<div class="content">
+<img src="./images/newbies/srv_stc.png" alt="srv_stc.png" />
+</div>
+<div class="title">Figure 4. Sever Structure</div>
+</div>
+<div class="paragraph"><p>The server communicates with the client via channels. Each channel type is dedicated to a specific
+type of data. Each channel uses a dedicated TCP socket, and it can be secured (using SSL) or
+unsecured. The server channels are analogous of the client channels: Main, Inputs, Display, Cursor,
+Playback, and Record (for more information see Channels 2.3.2.1)</p></div>
+<div class="paragraph"><p>The main and input channels are controlled by handler functions (implemented in reds.c). The display
+and cursor channels are handled by a red worker thread per display.  The audio playback and record
+channels have their own handlers (snd_worker.c). Libspice and the VDI host application (e.g. QEMU)
+communicate via interfaces defined for each functionality (e.g., QXL, agent, keyboard, mouse,
+tablet, playback, record), as detailed in .</p></div>
+<div class="paragraph"><p>As shown in the above figures, spice server consists of the following major components:</p></div>
+<div class="olist lowerroman"><ol class="lowerroman">
+<li>
+<p>
+Red Server (reds.c)
+</p>
+<div class="paragraph"><p>The server itself, which listens for client connections, accepts them and communicates with them.
+Reds is responsible for:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Channels
+</p>
+<div class="ulist"><ul>
+<li>
+<p>
+Owns and manages the channels (register, unregister, shutdown)
+</p>
+</li>
+<li>
+<p>
+Informs the client about active channels, so that client can create them
+</p>
+</li>
+<li>
+<p>
+Main and input channel handling
+</p>
+</li>
+<li>
+<p>
+Links establishment (both main and the others)
+</p>
+</li>
+<li>
+<p>
+Socket operations and connections management
+</p>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+Handles SSL and ticketing
+</p>
+</li>
+<li>
+<p>
+VDI interfaces (e.g., core, migration, keyboard, mouse, tablet, agent) addition and removal
+</p>
+</li>
+<li>
+<p>
+Migration process coordination
+</p>
+</li>
+<li>
+<p>
+Handling of user commands (e.g., from Qemu monitor)
+</p>
+</li>
+<li>
+<p>
+Communication with guest agent
+</p>
+</li>
+<li>
+<p>
+Statistics
+</p>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+Graphics subsystem
+</p>
+<div class="imageblock" style="text-align:center;">
+<div class="content">
+<img src="./images/newbies/g_sub.png" alt="g_sub.png" />
+</div>
+<div class="title">Figure 5. Graphics subsystem</div>
+</div>
+<div class="paragraph"><p>Unlike other subsystems in Spice server, the graphics subsystem runs in parallel to the server
+execution, on a dedicated thread (i.e, red worker).This structure enables independency between  QEMU
+flow and the processing and rendering of incoming graphic commands, which can consume a lot of CPU
+resources. The figure above shows Spice server graphics subsystem structure. Red server initiates a
+dispatcher on a new QXL interface (i.e., VDI). The dispatcher creates red worker for that interface.
+The commands processed by the worker can originate from three sources: (1) Synchronized QXL device
+commands, (2) red server commands, both (1 and 2) delivered by the dispatcher using a socket (i.e.,
+socket pair), (3) asynchronous QXL device commands, pulled by the worker from the QXL device rings
+using the interface.</p></div>
+<div class="paragraph"><p><strong><em>Red Worker (red_worker.c)</em></strong></p></div>
+<div class="paragraph"><p>Spice server holds a different  instance of the red worker  thread for each QXL device instance. The
+responsibilities of the red_worker are:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Processing QXL device commands (e.g. draw, update, cursor)
+</p>
+</li>
+<li>
+<p>
+Handling messages received from the dispatcher
+</p>
+</li>
+<li>
+<p>
+Channel pipes and pipe items
+</p>
+</li>
+<li>
+<p>
+Display and cursor channels
+</p>
+</li>
+<li>
+<p>
+Image compression (using quic, lz, glzencoding and jpeg)
+</p>
+</li>
+<li>
+<p>
+Video streaming - identification, encoding and stream creation
+</p>
+</li>
+<li>
+<p>
+Cache - client shared pixmap cache, cursor cache, palette cache
+</p>
+</li>
+<li>
+<p>
+Graphic items removal optimization - using item tree, containers, shadows, excluded regions,
+  opaque items
+</p>
+</li>
+<li>
+<p>
+Cairo and OpenGL (pbuf and pixmap) renderers - canvas, surfaces etc.
+</p>
+</li>
+<li>
+<p>
+Ring operations
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p><strong><em>Red Dispatcher (red_dispatcher.c)</em></strong></p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Dispatcher, one per QXL device instance
+</p>
+</li>
+<li>
+<p>
+Encapsulates the worker internals from the QXL device and reds
+</p>
+</li>
+<li>
+<p>
+Initiates a worker for a QXL device instance and creates a worker thread
+</p>
+</li>
+<li>
+<p>
+Dispatches the worker using a socketpair channel
+</p>
+</li>
+<li>
+<p>
+QXL devices use the QXLWorker interface, implemented and attached by the red dispatcher, which
+  translates the device calls to messages transmitted through the red worker pipe.  This way keeps
+the two separated and logically independent.
+</p>
+</li>
+<li>
+<p>
+Reds uses the interface defined in red_dispatcher.h for dispatcher functions such as dispatcher
+  initialization, image compression change, video streaming state change, mouse mode setting and
+renderer addition.
+</p>
+</li>
+</ul></div>
+</li>
+</ol></div>
+</li>
+</ol></div>
+</li>
+<li>
+<p>
+Spice Protocol
+</p>
+<div class="paragraph"><p>Spice protocol is used for client-server communication, i.e., for transferring graphical objects,
+keyboard and mouse events, cursor information, audio playback and record chunks, and control
+commands. Detailed documentation of the Spice protocol can be found in
+<span class="footnote"><br />[Spice remote computing protocol definition]<br /></span>.</p></div>
+</li>
+<li>
+<p>
+QXL Device
+</p>
+<div class="paragraph"><p>Spice server supports QXL VDI interface. When libspice is used with QEMU, a specific QEMU  QXL PCI
+device can be used for improving the remote display performance and enhancing the graphic
+capabilities of the guest graphic system. QXL device requires guest QXL drivers for full
+functionality. However, standard VGA is supported when no driver exists. This mode also enables
+active display from the virtual machine (VM) boot stage. The device interacts with the driver using
+command and cursor rings, interrupts for display and cursor events, and I/O ports. Other
+responsibilities of the device include:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Initializing and map the device ROM, RAM and VRAM to physical memory
+</p>
+</li>
+<li>
+<p>
+Mapping the I/O ports and handle reads and writes for managing: area updates, command and cursor
+  notifications, IRQ updates, mode set, device reset, logging, etc.
+</p>
+</li>
+<li>
+<p>
+Rings - initialize and maintain command and cursor rings, get commands and cursor commands from
+  rings and wait for notifications. Maintain resources ring.
+</p>
+</li>
+<li>
+<p>
+Communicating with the corresponding red worker using the QXLWorker interface, implemented and
+  attached by red dispatcher, which translates the device calls to messages written to and read from
+the red worker pipe.
+</p>
+</li>
+<li>
+<p>
+Registering the QXLInterface for enabling the worker to communicate with the device. The interface
+  includes PCI information and functions for attaching a worker, getting display and cursor commands
+from rings, display and cursor notifications, mode change notification, etc.
+</p>
+</li>
+<li>
+<p>
+Defining supported qxl modes and enabling  modification of the current mode, including vga mode,
+  where all monitors mirror a single device (vga clients)
+</p>
+</li>
+<li>
+<p>
+Handle display initialization, update, resize andrefresh in VGA mode
+</p>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+QXL Guest Drivers
+</p>
+<div class="paragraph"><p>Platform-specific guest drivers are used to enable and communicate with the QXL device(s). The
+Windows drivers consist of a display driver that works with the graphics device interface (GDI)
+calls and structures, and a miniport driver that handles memory mapping, ports, and interrupts.</p></div>
+</li>
+<li>
+<p>
+Spice Agent
+</p>
+<div class="paragraph"><p>Spice agent is an optional component for enhancing user experience and performing guest-oriented
+tasks. For example, the agent injects mouse position and state to the guest when using client mouse
+mode. It also enabled copy/paste of text and images between the guest and the client. In addition,
+it is used for configuration of the guest display settings. The agent consists of a system service
+and a user process. There is a windows and a linux implementation.</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_features">4. Features</h2>
+<div class="sectionbody">
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+Graphic Commands
+</p>
+<div class="paragraph"><p>Spice supports transmission and handling of 2D graphic commands (3D support is soon to come),  as
+opposed to frame buffer updates, which are used in many other remote desktop solutions. The QXL
+device commands are generic and platform-independent, so both Windows and X drivers use them
+natively.</p></div>
+</li>
+<li>
+<p>
+Hardware Acceleration
+</p>
+<div class="paragraph"><p>The basic Spice client rendering is performed using Cairo, which is a cross-platform,
+device-independent library. Cairo provides vector graphics primitives for 2-dimensional drawing.
+Hardware acceleration is an additional rendering mode in which the rendering is performed on
+hardware by the client GPU and not by software, using the client CPU. Hardware acceleration is
+implemented using OpenGL (experimental) in Linux, and GDI in Windows. . Hardware acceleration
+advantages are:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+High performance rendering - using OpenGL the Spice client is able to render much faster than
+  before. Heavy software operations such as stretching (used by video streaming) are much faster
+when preformed by hardware than by software. Therefore, Spice achieves a much smoother user
+experience.
+</p>
+</li>
+<li>
+<p>
+Reducing client CPU usage  - the client enjoys more CPU time, which can be used for other tasks
+  like audio.
+</p>
+<div class="paragraph"><p>Unlike Cairo, which is an independent software library, OpenGL is a hardware library that depends on
+the driver and hardware implementation. As a result, Spice might suffer  from incorrect rendering,
+heavy CPU usage, or  client or host crash in the worst case. In addition, although OpenGL is a
+global standard, the implementation of hardware and drivers changes dramatically between vendors.
+Thus, on different GPUs, Spice might display different rendering output, and different performance
+might be detected.  In addition, there are devices which do not support OpenGL at all.</p></div>
+<div class="paragraph"><p>The server also uses OpenGL for hardware acceleration, sharing the same code as the Linux client.</p></div>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+Image Compression
+</p>
+<div class="paragraph"><p>Spice offers several image compression algorithms, which can be chosen on server initiation, and
+dynamically at run-time. Quic is Spice proprietary image compression utility which is based on the
+SFALIC algorithm <span class="footnote"><br />[Starosolski&#44; R.:
+<a href="http://sun.aei.polsl.pl/~rstaros/papers/s2006-spe-sfalic.pdf">Simple Fast and Adaptive Lossless Image
+Compression Algorithm</a>, Software-Practice and Experience, 2007, 37(1):65-91, DOI 10.1002/spe.746.]<br /></span>.
+The LZ (LZSS) <span class="footnote"><br />[Lempel-Ziv-Storer-Szymanski: &ldquo;Data compression via textual
+substitution&rdquo; published in Journal of the ACM (pp. 928-951)]<br /></span> algorithm, adjusted to images, is
+another option. Both Quic and LZ are local algorithms, i.e., they encode each image independently.
+Global LZ (GLZ) is another Spice proprietary, that uses LZ with an history-based global dictionary.
+GLZ takes advantage of repeating patterns among images for shrinking the traffic and save bandwidth,
+which is critical in a WAN environment. Spice also offers an automatic mode for compression
+selection per-image, where the choice between LZ/GLZ and Quic is heuristically based on the image
+properties. Conceptually, artificial images are compressed better by LZ/GLZ, and real images are
+compressed better by Quic.</p></div>
+</li>
+<li>
+<p>
+Video Compression
+</p>
+<div class="paragraph"><p>Spice uses lossless compression for images sent to the client, and not lossy compression, in order
+to avoid disruption of  important display objects .  However, since (1) video streams can be major
+consumers of bandwith, as each video frame is an independent image, and (2) their content is mostly
+uncritical, Spice employs lossy video compression for such streams:  Spice server heuristically
+identifies video areas by identifying regions that are updated with high rate. These areas updates
+are sent to the client as video streams coded using the loss-prone Motion JPEG algorithm (M-JPEG).
+This mechanism saves a lot of traffic, improving Spice performance, especially in WAN. Nevertheless,
+in some circumstances the heuristic behavior might cause low quality images (e.g., when identifying
+updated text area as a video stream). Video streaming can be chosen on server initiation and can be
+changed dynamically on run-time..</p></div>
+</li>
+<li>
+<p>
+Caching
+</p>
+<div class="paragraph"><p>Spice implements client image caching in order to avoid redundant transmissions to the client.
+Caching applies to any kind of image data sent to the client, including pixmaps, palettes and
+cursors. Each image arrives from the driver with a unique id and a cache hint. Non-identical images
+have different ids, while identical images share the same id.  The cache hint recommends the server
+to cache the image. Pixmap cache is shared among all the displays. Cache is defined per connection
+and synchronized between the server and the client,  i.e.,  in each moment the server knows exactly
+which images are in the client cache. Moreover, the server is the one to decide whether an item
+should be added or removed from the cache. The client cache size is set by the client and
+transferred to the server through the display channel initialization message.  The server monitors
+the current cache capacity and when it lacks space  it removes the least recently used cache items
+until there is enough available cache space. The server sends an invalidate command with these items
+and the client removes them.</p></div>
+</li>
+<li>
+<p>
+Mouse Modes
+</p>
+<div class="paragraph"><p>Spice supports two mouse modes, server and client. The mode can change dynamically and is negotiated
+between the client and the server.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Server mouse - use the QEMU ps/2 mouse emulation for enabling mouse in the guest. Upon user click
+  inside the Spice client window, client mouse is captured and set invisible. The client sends mouse
+moves as delta coordinates to the server. Therefore, client mouse is returned to the window center
+after each move. In this mode,  the server controls mouse position on display, so it is always
+synchronized between the client and the guest. However, it might be problematic on WAN or a loaded
+server, where mouse cursor might have some latency or non-responsiveness.
+</p>
+</li>
+<li>
+<p>
+Client mouse - client mouse is used as the effective pointing device. It is not captured and guest
+  cursor is set invisible. The client sends mouse moves as absolute coordinates to the server. Guest
+agent scales the coordinates for the guest virtual desktop and injects the appropriate cursor
+position.  For a single monitor, client mouse can be used even without an agent if VDI host
+application registers an absolute pointing device (e.g., USB tablet in QEMU). In this case. the
+Spice server scales the coordinates. Client mode is appropriate for WAN or loaded server, since
+cursor has smooth motion and responsiveness. However, the cursor might loss sync (position and
+shape) for a while. The client mouse cursor is updated according to the guest mouse cursor.
+</p>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+Multiple Monitors
+</p>
+<div class="paragraph"><p>Spice supports any number of monitors, constrained only by the guest, client, and server
+limitations. The number of monitors and their RAM size is set when launching the VM. Spice supports
+automatic configuration of the guest monitors resolution and display settings, according to the
+client machine settings. This is implemented by a client command to the guest agent.</p></div>
+</li>
+<li>
+<p>
+2-way Audio and Lip-sync
+</p>
+<div class="paragraph"><p>Spice supports audio playback and recording. Playback is compressed using the CELT
+<span class="footnote"><br />[<a href="http://www.celt-codec.org/">The CELT ultra-low delay audio codec</a>]<br /></span> algorithm.
+Lip-sync between video and audio is achieved by time-stamping the video frames in the QXL device and
+injecting them in the client side, synchronized with the audio, which is independent.</p></div>
+</li>
+<li>
+<p>
+Hardware Cursor
+</p>
+<div class="paragraph"><p>The QXL device supports cursor hardware acceleration. Separating the cursor from the display enables
+prioritizing the cursor for better responsiveness. In addition, it reduces the network traffic.</p></div>
+</li>
+<li>
+<p>
+Live Migration
+</p>
+<div class="paragraph"><p>VM migration between servers is seamless to a connected client. The complete connection state,
+including the open channels and cursor, is saved on the source and restored on the destination.</p></div>
+</li>
+<li>
+<p>
+WAN optimizations
+</p>
+<div class="paragraph"><p>The server sends an initial ping message to determine latency and bandwidth. If they are worst then
+a threshold, the server tells the guest to reduce guest side features, currently implemented only in
+windows guests, reducing bit depth and disabling animations and wallpaper, and additionally images
+are compressed using lossless jpeg and zlib-glz. If an image is required for another operation such
+as or it is resent in lossless encoding.</p></div>
+</li>
+<li>
+<p>
+Copy and Paste
+</p>
+<div class="paragraph"><p>When a guest agent is running there is support for copying and pasting text and images in both
+directions between the client and the guest.</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+</div>
+<div id="footnotes"><hr /></div>
+<div id="footer">
+<div id="footer-text">
+Version v1.0<br />
+Last updated
+ 2020-02-27 11:26:12 GMT
+</div>
+</div>
+</body>
+</html>

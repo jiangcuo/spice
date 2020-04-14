@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <errno.h>
 #include <unistd.h>
@@ -26,6 +24,8 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
+#else
+#include <ws2tcpip.h>
 #endif
 
 #include <glib.h>
@@ -39,9 +39,10 @@
 #include "red-common.h"
 #include "red-stream.h"
 #include "reds.h"
+#include "websocket.h"
 
 // compatibility for *BSD systems
-#ifndef TCP_CORK
+#if !defined(TCP_CORK) && !defined(_WIN32)
 #define TCP_CORK TCP_NOPUSH
 #endif
 
@@ -86,6 +87,8 @@ struct RedStreamPrivate {
 
     AsyncRead async_read;
 
+    RedsWebSocket *ws;
+
     /* life time of info:
      * allocated when creating RedStream.
      * deallocated when main_dispatcher handles the SPICE_CHANNEL_EVENT_DISCONNECTED
@@ -102,6 +105,7 @@ struct RedStreamPrivate {
     SpiceCoreInterfaceInternal *core;
 };
 
+#ifndef _WIN32
 /**
  * Set TCP_CORK on socket
  */
@@ -111,10 +115,16 @@ static int socket_set_cork(int socket, int enabled)
     SPICE_VERIFY(sizeof(enabled) == sizeof(int));
     return setsockopt(socket, IPPROTO_TCP, TCP_CORK, &enabled, sizeof(enabled));
 }
+#else
+static inline int socket_set_cork(int socket, int enabled)
+{
+    return -1;
+}
+#endif
 
 static ssize_t stream_write_cb(RedStream *s, const void *buf, size_t size)
 {
-    return write(s->socket, buf, size);
+    return socket_write(s->socket, buf, size);
 }
 
 static ssize_t stream_writev_cb(RedStream *s, const struct iovec *iov, int iovcnt)
@@ -132,7 +142,7 @@ static ssize_t stream_writev_cb(RedStream *s, const struct iovec *iov, int iovcn
         for (i = 0; i < tosend; i++) {
             expected += iov[i].iov_len;
         }
-        n = writev(s->socket, iov, tosend);
+        n = socket_writev(s->socket, iov, tosend);
         if (n <= expected) {
             if (n > 0)
                 ret += n;
@@ -148,18 +158,40 @@ static ssize_t stream_writev_cb(RedStream *s, const struct iovec *iov, int iovcn
 
 static ssize_t stream_read_cb(RedStream *s, void *buf, size_t size)
 {
-    return read(s->socket, buf, size);
+    return socket_read(s->socket, buf, size);
+}
+
+static ssize_t stream_ssl_error(RedStream *s, int return_code)
+{
+    SPICE_GNUC_UNUSED int ssl_error;
+
+    ssl_error = SSL_get_error(s->priv->ssl, return_code);
+
+    // OpenSSL can to return SSL_ERROR_WANT_READ if we attempt to read
+    // data and the socket did not receive all SSL packet.
+    // Under Windows errno is not set so potentially caller can detect
+    // the wrong error so we need to set errno.
+#ifdef _WIN32
+    if (ssl_error == SSL_ERROR_WANT_READ || ssl_error == SSL_ERROR_WANT_WRITE) {
+        errno = EAGAIN;
+    } else {
+        errno = EPIPE;
+    }
+#endif
+
+    // red_peer_receive is expected to receive -1 on errors while
+    // OpenSSL documentation just state a <0 value
+    return -1;
 }
 
 static ssize_t stream_ssl_write_cb(RedStream *s, const void *buf, size_t size)
 {
     int return_code;
-    SPICE_GNUC_UNUSED int ssl_error;
 
     return_code = SSL_write(s->priv->ssl, buf, size);
 
     if (return_code < 0) {
-        ssl_error = SSL_get_error(s->priv->ssl, return_code);
+        return stream_ssl_error(s, return_code);
     }
 
     return return_code;
@@ -168,12 +200,11 @@ static ssize_t stream_ssl_write_cb(RedStream *s, const void *buf, size_t size)
 static ssize_t stream_ssl_read_cb(RedStream *s, void *buf, size_t size)
 {
     int return_code;
-    SPICE_GNUC_UNUSED int ssl_error;
 
     return_code = SSL_read(s->priv->ssl, buf, size);
 
     if (return_code < 0) {
-        ssl_error = SSL_get_error(s->priv->ssl, return_code);
+        return stream_ssl_error(s, return_code);
     }
 
     return return_code;
@@ -181,10 +212,8 @@ static ssize_t stream_ssl_read_cb(RedStream *s, void *buf, size_t size)
 
 void red_stream_remove_watch(RedStream* s)
 {
-    if (s->watch) {
-        s->priv->core->watch_remove(s->priv->core, s->watch);
-        s->watch = NULL;
-    }
+    red_watch_remove(s->watch);
+    s->watch = NULL;
 }
 
 #if HAVE_SASL
@@ -318,6 +347,7 @@ int red_stream_get_no_delay(RedStream *stream)
     return red_socket_get_no_delay(stream->socket);
 }
 
+#ifndef _WIN32
 int red_stream_send_msgfd(RedStream *stream, int fd)
 {
     struct msghdr msgh = { 0, };
@@ -360,6 +390,7 @@ int red_stream_send_msgfd(RedStream *stream, int fd)
 
     return r;
 }
+#endif
 
 ssize_t red_stream_writev(RedStream *s, const struct iovec *iov, int iovcnt)
 {
@@ -403,8 +434,10 @@ void red_stream_free(RedStream *s)
         SSL_free(s->priv->ssl);
     }
 
+    websocket_free(s->priv->ws);
+
     red_stream_remove_watch(s);
-    close(s->socket);
+    socket_close(s->socket);
 
     g_free(s);
 }
@@ -1125,3 +1158,54 @@ error:
     return false;
 }
 #endif
+
+static ssize_t stream_websocket_read(RedStream *s, void *buf, size_t size)
+{
+    unsigned flags;
+    int len;
+
+    do {
+        len = websocket_read(s->priv->ws, buf, size, &flags);
+    } while (len == 0 && flags != 0);
+    return len;
+}
+
+static ssize_t stream_websocket_write(RedStream *s, const void *buf, size_t size)
+{
+    return websocket_write(s->priv->ws, buf, size, WEBSOCKET_BINARY_FINAL);
+}
+
+static ssize_t stream_websocket_writev(RedStream *s, const struct iovec *iov, int iovcnt)
+{
+    return websocket_writev(s->priv->ws, (struct iovec *) iov, iovcnt, WEBSOCKET_BINARY_FINAL);
+}
+
+/*
+    If we detect that a newly opened stream appears to be using
+    the WebSocket protocol, we will put in place cover functions
+    that will speak WebSocket to the client, but allow the server
+    to continue to use normal stream read/write/writev semantics.
+*/
+bool red_stream_is_websocket(RedStream *stream, const void *buf, size_t len)
+{
+    if (stream->priv->ws) {
+        return false;
+    }
+
+    stream->priv->ws = websocket_new(buf, len, stream,
+                                     (websocket_read_cb_t) stream->priv->read,
+                                     (websocket_write_cb_t) stream->priv->write,
+                                     (websocket_writev_cb_t) stream->priv->writev);
+    if (stream->priv->ws) {
+        stream->priv->read = stream_websocket_read;
+        stream->priv->write = stream_websocket_write;
+
+        if (stream->priv->writev) {
+            stream->priv->writev = stream_websocket_writev;
+        }
+
+        return true;
+    }
+
+    return false;
+}

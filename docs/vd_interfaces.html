@@ -1,0 +1,1545 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
+<meta name="generator" content="AsciiDoc 8.6.10" />
+<title>VD Interfaces</title>
+<style type="text/css">
+/* Shared CSS for AsciiDoc xhtml11 and html5 backends */
+
+/* Default font. */
+body {
+  font-family: Georgia,serif;
+}
+
+/* Title font. */
+h1, h2, h3, h4, h5, h6,
+div.title, caption.title,
+thead, p.table.header,
+#toctitle,
+#author, #revnumber, #revdate, #revremark,
+#footer {
+  font-family: Arial,Helvetica,sans-serif;
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+  color: navy;
+}
+
+strong {
+  font-weight: bold;
+  color: #083194;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+h5 {
+  font-size: 1.0em;
+}
+
+div.sectionbody {
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
+}
+ul > li     { color: #aaa; }
+ul > li > * { color: black; }
+
+.monospaced, code, pre {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
+  padding: 0;
+  margin: 0;
+}
+pre {
+  white-space: pre-wrap;
+}
+
+#author {
+  color: #527bbd;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+#email {
+}
+#revnumber, #revdate, #revremark {
+}
+
+#footer {
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+#preamble {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.0em;
+  margin-bottom: 2.0em;
+  margin-right: 10%;
+  color: #606060;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  color: #527bbd;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid #dddddd;
+  border-left: 4px solid #f0f0f0;
+  padding: 0.5em;
+}
+
+div.listingblock > div.content {
+  border: 1px solid #dddddd;
+  border-left: 5px solid #f0f0f0;
+  background: #f8f8f8;
+  padding: 0.5em;
+}
+
+div.quoteblock, div.verseblock {
+  padding-left: 1.0em;
+  margin-left: 1.0em;
+  margin-right: 10%;
+  border-left: 5px solid #f0f0f0;
+  color: #888;
+}
+
+div.quoteblock > div.attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock > pre.content {
+  font-family: inherit;
+  font-size: inherit;
+}
+div.verseblock > div.attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+/* DEPRECATED: Pre version 8.2.7 verse style literal block. */
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 3px solid #dddddd;
+}
+
+div.exampleblock > div.content {
+  border-left: 3px solid #dddddd;
+  padding-left: 0.5em;
+}
+
+div.imageblock div.content { padding-left: 0; }
+span.image img { border-style: none; vertical-align: text-bottom; }
+a.image:visited { color: white; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: normal;
+  color: navy;
+}
+dd > *:first-child {
+  margin-top: 0.1em;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+ol.arabic {
+  list-style-type: decimal;
+}
+ol.loweralpha {
+  list-style-type: lower-alpha;
+}
+ol.upperalpha {
+  list-style-type: upper-alpha;
+}
+ol.lowerroman {
+  list-style-type: lower-roman;
+}
+ol.upperroman {
+  list-style-type: upper-roman;
+}
+
+div.compact ul, div.compact ol,
+div.compact p, div.compact p,
+div.compact div, div.compact div {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+
+tfoot {
+  font-weight: bold;
+}
+td > div.verse {
+  white-space: pre;
+}
+
+div.hdlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hdlist tr {
+  padding-bottom: 15px;
+}
+dt.hdlist1.strong, td.hdlist1.strong {
+  font-weight: bold;
+}
+td.hdlist1 {
+  vertical-align: top;
+  font-style: normal;
+  padding-right: 0.8em;
+  color: navy;
+}
+td.hdlist2 {
+  vertical-align: top;
+}
+div.hdlist.compact tr {
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.comment {
+  background: yellow;
+}
+
+.footnote, .footnoteref {
+  font-size: 0.8em;
+}
+
+span.footnote, span.footnoteref {
+  vertical-align: super;
+}
+
+#footnotes {
+  margin: 20px 0 20px 0;
+  padding: 7px 0 0 0;
+}
+
+#footnotes div.footnote {
+  margin: 0 0 5px 0;
+}
+
+#footnotes hr {
+  border: none;
+  border-top: 1px solid silver;
+  height: 1px;
+  text-align: left;
+  margin-left: 0;
+  width: 20%;
+  min-width: 100px;
+}
+
+div.colist td {
+  padding-right: 0.5em;
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+div.colist td img {
+  margin-top: 0.3em;
+}
+
+@media print {
+  #footer-badges { display: none; }
+}
+
+#toc {
+  margin-bottom: 2.5em;
+}
+
+#toctitle {
+  color: #527bbd;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel0, div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+
+span.aqua { color: aqua; }
+span.black { color: black; }
+span.blue { color: blue; }
+span.fuchsia { color: fuchsia; }
+span.gray { color: gray; }
+span.green { color: green; }
+span.lime { color: lime; }
+span.maroon { color: maroon; }
+span.navy { color: navy; }
+span.olive { color: olive; }
+span.purple { color: purple; }
+span.red { color: red; }
+span.silver { color: silver; }
+span.teal { color: teal; }
+span.white { color: white; }
+span.yellow { color: yellow; }
+
+span.aqua-background { background: aqua; }
+span.black-background { background: black; }
+span.blue-background { background: blue; }
+span.fuchsia-background { background: fuchsia; }
+span.gray-background { background: gray; }
+span.green-background { background: green; }
+span.lime-background { background: lime; }
+span.maroon-background { background: maroon; }
+span.navy-background { background: navy; }
+span.olive-background { background: olive; }
+span.purple-background { background: purple; }
+span.red-background { background: red; }
+span.silver-background { background: silver; }
+span.teal-background { background: teal; }
+span.white-background { background: white; }
+span.yellow-background { background: yellow; }
+
+span.big { font-size: 2em; }
+span.small { font-size: 0.6em; }
+
+span.underline { text-decoration: underline; }
+span.overline { text-decoration: overline; }
+span.line-through { text-decoration: line-through; }
+
+div.unbreakable { page-break-inside: avoid; }
+
+
+/*
+ * xhtml11 specific
+ *
+ * */
+
+div.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead, p.table.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.table {
+  margin-top: 0;
+}
+/* Because the table frame attribute is overriden by CSS in most browsers. */
+div.tableblock > table[frame="void"] {
+  border-style: none;
+}
+div.tableblock > table[frame="hsides"] {
+  border-left-style: none;
+  border-right-style: none;
+}
+div.tableblock > table[frame="vsides"] {
+  border-top-style: none;
+  border-bottom-style: none;
+}
+
+
+/*
+ * html5 specific
+ *
+ * */
+
+table.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+thead, p.tableblock.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.tableblock {
+  margin-top: 0;
+}
+table.tableblock {
+  border-width: 3px;
+  border-spacing: 0px;
+  border-style: solid;
+  border-color: #527bbd;
+  border-collapse: collapse;
+}
+th.tableblock, td.tableblock {
+  border-width: 1px;
+  padding: 4px;
+  border-style: solid;
+  border-color: #527bbd;
+}
+
+table.tableblock.frame-topbot {
+  border-left-style: hidden;
+  border-right-style: hidden;
+}
+table.tableblock.frame-sides {
+  border-top-style: hidden;
+  border-bottom-style: hidden;
+}
+table.tableblock.frame-none {
+  border-style: hidden;
+}
+
+th.tableblock.halign-left, td.tableblock.halign-left {
+  text-align: left;
+}
+th.tableblock.halign-center, td.tableblock.halign-center {
+  text-align: center;
+}
+th.tableblock.halign-right, td.tableblock.halign-right {
+  text-align: right;
+}
+
+th.tableblock.valign-top, td.tableblock.valign-top {
+  vertical-align: top;
+}
+th.tableblock.valign-middle, td.tableblock.valign-middle {
+  vertical-align: middle;
+}
+th.tableblock.valign-bottom, td.tableblock.valign-bottom {
+  vertical-align: bottom;
+}
+
+
+/*
+ * manpage specific
+ *
+ * */
+
+body.manpage h1 {
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  border-top: 2px solid silver;
+  border-bottom: 2px solid silver;
+}
+body.manpage h2 {
+  border-style: none;
+}
+body.manpage div.sectionbody {
+  margin-left: 3em;
+}
+
+@media print {
+  body.manpage div#toc { display: none; }
+}
+
+
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+var asciidoc = {  // Namespace.
+
+/////////////////////////////////////////////////////////////////////
+// Table Of Contents generator
+/////////////////////////////////////////////////////////////////////
+
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, 2006, 2009. License: GPL */
+
+// toclevels = 1..4.
+toc: function (toclevels) {
+
+  function getText(el) {
+    var text = "";
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+        text += i.data;
+      else if (i.firstChild != null)
+        text += getText(i);
+    }
+    return text;
+  }
+
+  function TocEntry(el, text, toclevel) {
+    this.element = el;
+    this.text = text;
+    this.toclevel = toclevel;
+  }
+
+  function tocEntries(el, toclevels) {
+    var result = new Array;
+    var re = new RegExp('[hH]([1-'+(toclevels+1)+'])');
+    // Function that scans the DOM tree for header elements (the DOM2
+    // nodeIterator API would be a better technique but not supported by all
+    // browsers).
+    var iterate = function (el) {
+      for (var i = el.firstChild; i != null; i = i.nextSibling) {
+        if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+          var mo = re.exec(i.tagName);
+          if (mo && (i.getAttribute("class") || i.getAttribute("className")) != "float") {
+            result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+          }
+          iterate(i);
+        }
+      }
+    }
+    iterate(el);
+    return result;
+  }
+
+  var toc = document.getElementById("toc");
+  if (!toc) {
+    return;
+  }
+
+  // Delete existing TOC entries in case we're reloading the TOC.
+  var tocEntriesToRemove = [];
+  var i;
+  for (i = 0; i < toc.childNodes.length; i++) {
+    var entry = toc.childNodes[i];
+    if (entry.nodeName.toLowerCase() == 'div'
+     && entry.getAttribute("class")
+     && entry.getAttribute("class").match(/^toclevel/))
+      tocEntriesToRemove.push(entry);
+  }
+  for (i = 0; i < tocEntriesToRemove.length; i++) {
+    toc.removeChild(tocEntriesToRemove[i]);
+  }
+
+  // Rebuild TOC entries.
+  var entries = tocEntries(document.getElementById("content"), toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "_toc_" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+  if (entries.length == 0)
+    toc.parentNode.removeChild(toc);
+},
+
+
+/////////////////////////////////////////////////////////////////////
+// Footnotes generator
+/////////////////////////////////////////////////////////////////////
+
+/* Based on footnote generation code from:
+ * http://www.brandspankingnew.net/archive/2005/07/format_footnote.html
+ */
+
+footnotes: function () {
+  // Delete existing footnote entries in case we're reloading the footnodes.
+  var i;
+  var noteholder = document.getElementById("footnotes");
+  if (!noteholder) {
+    return;
+  }
+  var entriesToRemove = [];
+  for (i = 0; i < noteholder.childNodes.length; i++) {
+    var entry = noteholder.childNodes[i];
+    if (entry.nodeName.toLowerCase() == 'div' && entry.getAttribute("class") == "footnote")
+      entriesToRemove.push(entry);
+  }
+  for (i = 0; i < entriesToRemove.length; i++) {
+    noteholder.removeChild(entriesToRemove[i]);
+  }
+
+  // Rebuild footnote entries.
+  var cont = document.getElementById("content");
+  var spans = cont.getElementsByTagName("span");
+  var refs = {};
+  var n = 0;
+  for (i=0; i<spans.length; i++) {
+    if (spans[i].className == "footnote") {
+      n++;
+      var note = spans[i].getAttribute("data-note");
+      if (!note) {
+        // Use [\s\S] in place of . so multi-line matches work.
+        // Because JavaScript has no s (dotall) regex flag.
+        note = spans[i].innerHTML.match(/\s*\[([\s\S]*)]\s*/)[1];
+        spans[i].innerHTML =
+          "[<a id='_footnoteref_" + n + "' href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+        spans[i].setAttribute("data-note", note);
+      }
+      noteholder.innerHTML +=
+        "<div class='footnote' id='_footnote_" + n + "'>" +
+        "<a href='#_footnoteref_" + n + "' title='Return to text'>" +
+        n + "</a>. " + note + "</div>";
+      var id =spans[i].getAttribute("id");
+      if (id != null) refs["#"+id] = n;
+    }
+  }
+  if (n == 0)
+    noteholder.parentNode.removeChild(noteholder);
+  else {
+    // Process footnoterefs.
+    for (i=0; i<spans.length; i++) {
+      if (spans[i].className == "footnoteref") {
+        var href = spans[i].getElementsByTagName("a")[0].getAttribute("href");
+        href = href.match(/#.*/)[0];  // Because IE return full URL.
+        n = refs[href];
+        spans[i].innerHTML =
+          "[<a href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+      }
+    }
+  }
+},
+
+install: function(toclevels) {
+  var timerId;
+
+  function reinstall() {
+    asciidoc.footnotes();
+    if (toclevels) {
+      asciidoc.toc(toclevels);
+    }
+  }
+
+  function reinstallAndRemoveTimer() {
+    clearInterval(timerId);
+    reinstall();
+  }
+
+  timerId = setInterval(reinstall, 500);
+  if (document.addEventListener)
+    document.addEventListener("DOMContentLoaded", reinstallAndRemoveTimer, false);
+  else
+    window.onload = reinstallAndRemoveTimer;
+}
+
+}
+asciidoc.install(2);
+/*]]>*/
+</script>
+</head>
+<body class="article">
+<div id="header">
+<h1>VD Interfaces</h1>
+<span id="revnumber">version v1.0,</span>
+<span id="revdate">01.01.2009</span>
+<br /><span id="revremark">Draft 1</span>
+<div id="toc">
+  <div id="toctitle">Table of Contents</div>
+  <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
+</div>
+</div>
+<div id="content">
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph"><p>Copyright &#169; 2009 Red Hat, Inc.<br />
+Licensed under a Creative Commons Attribution-Share Alike 3.0<br />
+United States License (see
+<a href="http://creativecommons.org/licenses/by-sa/3.0/us/legalcode">http://creativecommons.org/licenses/by-sa/3.0/us/legalcode</a>).<br /></p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_introduction">1. Introduction</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Virtual Device Interfaces (VDI) provide a standard way to publish interfaces of
+virtual devices by a software component. This enables other software components
+to interact with these devices. This also enables other software components to
+interact with these devices. Going forward, the first component will be called
+the back-end and the second component will be called the front-end. An example
+for using Virtual Device Interfaces is as part of a virtual machine system,
+where the back-end will be the hardware emulation layer. The back-end will
+expose interfaces like display port, mouse input etc. The front-end will plug
+into the display output and will render its output according to it&#8217;s specific
+implementation. The front-end will also plug into the mouse input and send
+mouse events to be processed by the back-end. In addition many other interface
+types can be exposed by the back-end. Another example of back-end is a remote
+display system in a physical machine environment. Here, the back-and is
+implemented using known techniques for interacting with the native OS for the
+purpose of receiving display updates and pushing inputs. The back-end exposes
+interfaces like display output, mouse input etc. The front-end can be exactly
+the same as in the previous example.</p></div>
+<div class="paragraph"><p>By using VDI one back-end can use many types of front-ends without any special
+code modification. It is also possible for the back-end to dynamically switch
+front-ends, and improve back-end usability and flexibility. The use of
+front-ends by many back-ends allows for a better sharing of development,
+maintenance, and overall product quality.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_basic_operation">2. Basic operation</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Back-end to front-end interaction is initiated by back-end. Back-end uses
+VDI_init symbol to pass its Core interface to the front-end. In addition to
+core interface, back-end also passes options argument to the front-end. Options
+argument is a string holding initialization argument specific to front-end
+implementation. Core interface, like every other interface in VDI, is
+represented as a data structure containing data members and member functions.
+Every interface starts with a common base structure “VDInterface”. The common
+structure contains information for identifying the type of the interface and
+the instance within the type group (i.e. The actual unique is {type, id}). Core
+interface provides basic functionality for attaching with other interfaces that
+the back-end implements. Core interface provides methods for receiving
+interface change events (i.e. interface added event and removing interface
+event) and for enumerating registers. Using these services, the front-end can
+find and interact with other interfaces that back-end publishes. The front-end
+uses VDI type for knowing what functionality the interface provides and the
+means to interact with the interface (i.e interface specific logic function and
+data members).</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_front_end_public_symbols">3. Front-end public symbols</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>VDI defines a minimal set of external symbols for enabling back-end to initiate
+with the front-end. The back-end can load front-end and retrieve front-end
+external symbols dynamically at run-time using native platform services.
+Alternatively, the front-end static or shared library can be linked to the
+back-end during back-end build process.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">int</span> <span style="font-weight: bold"><span style="color: #000000">VDI_init</span></span><span style="color: #990000">(</span><span style="font-weight: bold"><span style="color: #0000FF">const</span></span> <span style="color: #009900">char</span> <span style="color: #990000">*</span>args<span style="color: #990000">,</span> <span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Front-and initialization function. The first parameter is options argument, the
+content of  which depends on the specific front-end. The second parameter is
+core interface that provides the basic communication channel between front-end
+and back-end, core interface will be explained later on. VDI_init return value
+is VDI_ERROR_?</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #0000FF">const</span></span> <span style="color: #009900">char</span> <span style="color: #990000">**</span><span style="font-weight: bold"><span style="color: #000000">VDI_get_usage</span></span><span style="color: #990000">()</span></tt></pre></div></div>
+<div class="paragraph"><p>This function return array of strings in human readable form for displaying the
+available options argument that can be pass in args parameter of VDI_init call.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_front_end_termination">4. Front-end termination</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>No explicit symbol is defined for front-end termination. Removing core
+interface by back-end implicitly instructs front end to terminate itself.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_common_definition">5. Common Definition</h2>
+<div class="sectionbody">
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>VDI_ERROR_OK <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+VDI_ERROR_ERROR <span style="color: #990000">=</span> <span style="color: #990000">-</span><span style="color: #993399">1</span>
+VM_INTERFACE_VERSION <span style="color: #990000">=</span> <span style="color: #993399">2</span> <span style="font-style: italic"><span style="color: #9A1900">/*Current VDI version, front-end an back-end must have</span></span>
+<span style="font-style: italic"><span style="color: #9A1900">the same VDI version for proper operation. */</span></span></tt></pre></div></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>VDIObjectRef – opaque object reference that passes between back-end and
+front-end</code></pre>
+</div></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>VDI_INVALID_OBJECT_REF <span style="color: #990000">=</span> <span style="color: #993399">0</span></tt></pre></div></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_base_structure_of_vd_interface">6. Base structure of VD interface.</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The following is definition of VD Interface, all VDI interfaces are derived
+from VD Interface.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #008080">UINT32</span> version<span style="color: #990000">;</span> <span style="font-style: italic"><span style="color: #9A1900">/* VDI version must be VM_INTERFACE_VERSION */</span></span>
+<span style="color: #008080">CONST</span>  <span style="color: #008080">CHAR</span> <span style="color: #990000">*</span>type<span style="color: #990000">;</span> <span style="font-style: italic"><span style="color: #9A1900">/* type of the interface */</span></span>
+UNSIGNED <span style="color: #008080">INT</span> id<span style="color: #990000">;</span> <span style="font-style: italic"><span style="color: #9A1900">/* unique id of the interface */</span></span>
+<span style="color: #008080">CONST</span>  <span style="color: #008080">CHAR</span> <span style="color: #990000">*</span>description<span style="color: #990000">;</span> <span style="font-style: italic"><span style="color: #9A1900">/* interface human readable interface description*</span></span>
+<span style="font-style: italic"><span style="color: #9A1900">UINT32 major_version; /* interface major version. Front-end and back-end</span></span>
+<span style="font-style: italic"><span style="color: #9A1900">interfaces having different  major_version are not compatible. */</span></span>
+<span style="color: #008080">UINT32</span> minor_version<span style="color: #990000">;</span> <span style="font-style: italic"><span style="color: #9A1900">/* interface minor version. Minor version increments on</span></span>
+<span style="font-style: italic"><span style="color: #9A1900">changes that add functionality but do not break compatible and will be reset on</span></span>
+<span style="font-style: italic"><span style="color: #9A1900">major version  increment. */</span></span></tt></pre></div></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_core_interface">7. Core Interface</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Core interface is the main interface for front-end to back-end communication.
+It is not allowed to have more the one interface with this type. Removal of
+Core interface by the back-end is explicit front-end termination.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+VDInterface members value
+</p>
+<div class="listingblock">
+<div class="content">
+<pre><code>type = “core”
+major_version = 1
+minor_version = 0
+id = 0</code></pre>
+</div></div>
+</li>
+<li>
+<p>
+Types
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>VDI_CHANGE_NEW <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+VDI_CHANGE_REMOVING <span style="color: #990000">=</span> <span style="color: #993399">1</span></tt></pre></div></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>vdi_interface_change_notifier_t<span style="color: #990000">)(</span><span style="color: #009900">void</span> <span style="color: #990000">*</span>opaque<span style="color: #990000">,</span> <span style="color: #008080">VDInterface</span> <span style="color: #990000">*</span>interface<span style="color: #990000">,</span>
+<span style="color: #008080">VDInterfaceChangeType</span> change<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Callback for receiving notification event on adding and removing VDI
+interfaces.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+opaque – back-end passes front-end&#8217;s opaque value that was passed during
+notifier  registration.
+</p>
+</li>
+<li>
+<p>
+interface - the relevant interface
+</p>
+</li>
+<li>
+<p>
+change – type of change VDI_CHANGE_NEW or VDI_CHANGE_REMOVING
+</p>
+</li>
+</ul></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>timer_callback_t<span style="color: #990000">)(</span><span style="color: #009900">void</span> <span style="color: #990000">*</span>opaque<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Callback for receiving timer event.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+opaque – back-end passes front-end&#8217;s opaque value that was passed during
+timer registration.
+</p>
+</li>
+</ul></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>VDI_LOG_LEVEL_ERROR = 1
+VDI_LOG_LEVEL_WARN = 2
+VDI_LOG_LEVEL_INFO = 3</code></pre>
+</div></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>VDInterface specific extension
+VDInterface <span style="color: #990000">*(*</span> next<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #008080">VDInterface</span> <span style="color: #990000">*</span>prev<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Get next interface – return interface following prev. If prev is NULL  return
+first interface. If next return NULL then prev is the last interface. The
+function is used for interfaces discovery.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #000000">VDIObjectRef</span></span> <span style="color: #990000">(*</span>register_change_notifier<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #009900">void</span> <span style="color: #990000">*</span>opaque<span style="color: #990000">,</span>
+<span style="color: #008080">vdi_interface_change_notifier_t</span> in_notifier<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Register in_notifier to be called on interface change events. opaque will be
+pushed back by back-end in notify call. On success the function return notifier
+object ref otherwise VDI_INVALID_OBJECT_REF is returned.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>unregister_change_notifiers<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #008080">VDObjectRef</span> notifier<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Unregister interface change notifier hat was registered using
+register_change_notifiers.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #000000">VDIObjectRef</span></span> <span style="color: #990000">(*</span>create_timer<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #008080">timer_callback_t</span> callback<span style="color: #990000">,</span>
+<span style="color: #009900">void</span><span style="color: #990000">*</span> opaque<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Create timer object. The timer handler will call callback on time expiration.
+opaque will be pushed back by back-end in callback call. On success the
+function return timer object ref otherwise VDI_INVALID_OBJECT_REF is returned</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>arm_timer<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #008080">VDIObjectRef</span> timer<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> ms<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Schedule timer object to fire it&#8217;s callback after ms. Timer is VDI ref object
+returned by create_timer and ms is time in millisecond.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>disarm_timer<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #008080">VDIObjectRef</span> timer<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Cancel previous arm_timer scheduling. Timer is VDI ref object returned by
+create_timer</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>destroy_timer<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #008080">VDIObjectRef</span> timer<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Destroy timer object. Timer is vdi ref object returned by create_timer.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">int</span> <span style="color: #990000">(*</span>set_file_handlers<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #009900">int</span> fd<span style="color: #990000">,</span> <span style="color: #009900">void</span> <span style="color: #990000">(*</span>on_read<span style="color: #990000">)(</span><span style="color: #009900">void</span> <span style="color: #990000">*),</span>
+<span style="color: #009900">void</span> <span style="color: #990000">(*</span>on_write<span style="color: #990000">)(</span><span style="color: #009900">void</span> <span style="color: #990000">*),</span> <span style="color: #009900">void</span> <span style="color: #990000">*</span>opaque<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Request notification on file descriptor for non blocking operation. Fd is the
+target file descriptor. Back-end will call on_read, if not NULL, on read events
+passing  opaque as first argument. Back-end will call on_write, if not NULL, on
+write events passing  opaque as first argument. On success VDI_ERROR_OK is
+return.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>term_printf<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="font-weight: bold"><span style="color: #0000FF">const</span></span> <span style="color: #009900">char</span><span style="color: #990000">*</span> format<span style="color: #990000">,</span> <span style="color: #990000">...)</span></tt></pre></div></div>
+<div class="paragraph"><p>Send message to back-end interactive terminal if exist. format is printf
+format,  following format are variable arguments list that are format
+arguments.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>log<span style="color: #990000">)(</span><span style="color: #008080">CoreInterface</span> <span style="color: #990000">*</span>core<span style="color: #990000">,</span> <span style="color: #008080">LogLevel</span> level<span style="color: #990000">,</span> <span style="font-weight: bold"><span style="color: #0000FF">const</span></span> <span style="color: #009900">char</span><span style="color: #990000">*</span> component<span style="color: #990000">,</span> <span style="font-weight: bold"><span style="color: #0000FF">const</span></span>
+<span style="color: #009900">char</span><span style="color: #990000">*</span> format<span style="color: #990000">,</span> <span style="color: #990000">...)</span></tt></pre></div></div>
+<div class="paragraph"><p>Send message to be logged using back-end logging service. Level is one of
+VDI_LOG_LEVEL_?.  Component is component name that will be attached as prefix
+to the message. Format is printf format, following format are variable
+arguments list that are format arguments.
+Callback</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_other_interfaces">8. Other interfaces</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Core interface is the only interface that is an integral part of VDI
+specifications. Any other interface can be defined independently of this
+specification. It&#8217;s required that both the back-and the front-end know specific
+interface definitions for proper operation. The only restriction for defining
+new interface is to ensure the uniqueness of VD Interface type. The following
+interfaces are known VD interfaces that discussed here as a reference for
+better understanding of the specification.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_keyboard_interface">9. Keyboard  interface</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Keyboard interface exposes standard keyboard functionally. It enables pushing
+scan-code set 1 codes and getting keyboard LED information by query or change
+notifications mechanism.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+VDInterface members value
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>type <span style="color: #990000">=</span> “keyboard”
+major_version <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+minor_version <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+id <span style="color: #990000">=</span> keyboard instance id</tt></pre></div></div>
+</li>
+<li>
+<p>
+Types
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>VDI_KEYBOARD_LED_SCROLL_LOCK <span style="color: #993399">0</span>
+VDI_KEYBOARD_LED_NUM_LOCK <span style="color: #993399">1</span>
+VDI_KEYBOARD_LED_CAPS_LOCK <span style="color: #993399">2</span></tt></pre></div></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>keyboard_leads_notifier_t<span style="color: #990000">)(</span><span style="color: #009900">void</span> <span style="color: #990000">*</span>opaque<span style="color: #990000">,</span> <span style="color: #008080">uint8_t</span> leds<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Callback for receiving notification event on keyboard LED changes.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+opaque – back-end passed front-end&#8217;s opaque value that was passed during
+notifier  registration.
+</p>
+</li>
+<li>
+<p>
+leds – current LED state mask. LED X is on if bit VDI_KEYBOARD_LED_X is set.
+</p>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+VDInterface specific extension
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>push_scan_freg<span style="color: #990000">)(</span><span style="color: #008080">KeyboardInterface</span> <span style="color: #990000">*</span>keyboard<span style="color: #990000">,</span> <span style="color: #008080">uint8_t</span> frag<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Push  scan-code code fragment to the keyboard.  Frag is part of scan code.
+For example calling:</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #000000">push_scan_freg</span></span><span style="color: #990000">(</span><span style="color: #993399">0xe0</span><span style="color: #990000">);</span>
+<span style="font-weight: bold"><span style="color: #000000">push_scan_freg</span></span><span style="color: #990000">(</span><span style="color: #993399">0x1d</span><span style="color: #990000">);</span></tt></pre></div></div>
+<div class="paragraph"><p>will result with Right CTRL.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #000000">uint8_t</span></span> <span style="color: #990000">(*</span>get_leds<span style="color: #990000">)(</span><span style="color: #008080">KeyboardInterface</span> <span style="color: #990000">*</span>keyboard<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Get current keyboard lads mask. Return lads mask</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #000000">VDIObjectRef</span></span> <span style="color: #990000">(*</span>register_leds_notifier<span style="color: #990000">)(</span><span style="color: #008080">KeyboardInterface</span> <span style="color: #990000">*</span>keyboard<span style="color: #990000">,</span>
+<span style="color: #008080">keyboard_leads_notifier_t</span> notifier<span style="color: #990000">,</span> <span style="color: #009900">void</span> <span style="color: #990000">*</span>opaque<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Register for LED notification. Back-end will call notifier on every keyboard
+LED change. Opaque will be pushed back as notifier argument. On success, the
+function return notifier object ref otherwise VDI_INVALID_OBJECT_REF is
+returned.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>unregister_leds_notifier<span style="color: #990000">)(</span><span style="color: #008080">KeyboardInterface</span> <span style="color: #990000">*</span>keyboard<span style="color: #990000">,</span> VDObjectRef
+notifier<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Unregister  LED change notifier that was registered using
+register_leds_notifier.</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_mouse_interface">10. Mouse  interface</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Mouse interface for pushing mouse  motion and mouse buttons state events.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+VDInterface members value
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>type <span style="color: #990000">=</span> “mouse”
+major_version <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+minor_version <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+id <span style="color: #990000">=</span> mouse instance id</tt></pre></div></div>
+</li>
+<li>
+<p>
+Types
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>VDI_MOUSE_BUTTON_LEFT <span style="color: #993399">0</span>
+VDI_MOUSE_BUTTON_RIGHT <span style="color: #993399">1</span>
+VDI_MOUSE_BUTTON_MIDEL <span style="color: #993399">2</span></tt></pre></div></div>
+</li>
+<li>
+<p>
+VDInterface specific extension
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>motion<span style="color: #990000">)(</span>MouseInterface<span style="color: #990000">*</span> mouse<span style="color: #990000">,</span> <span style="color: #009900">int</span> dx<span style="color: #990000">,</span> <span style="color: #009900">int</span> dy<span style="color: #990000">,</span> <span style="color: #009900">int</span> dz<span style="color: #990000">,</span> uint32_t
+buttons_state<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Push mouse motion and buttons state. dx and dy are mouse motion in pixels in x
+and y axis, positive dx is rightward motion and positive dy is downward motion.
+dz is scroll wheel ticks, positive value is scroll down. buttons_state is
+buttons state mask. Button X is press if bit VDI_MOUSE_BUTTON_X is set.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>buttons<span style="color: #990000">)(</span>MouseInterface<span style="color: #990000">*</span> mouse<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> buttons_state<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Push mouse buttons state. buttons_state is the same as in the motion call</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_tablet_interface">11. Tablet  interface</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Tablet interface for supporting absolute mouse pointing.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+Interface members value
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>type <span style="color: #990000">=</span> “tablet”
+major_version <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+minor_version <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+id <span style="color: #990000">=</span> tablet instance id</tt></pre></div></div>
+</li>
+<li>
+<p>
+Types
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>VDI_TABLET_BUTTON_LEFT <span style="color: #993399">0</span>
+VDI_TABLET_BUTTON_RIGHT <span style="color: #993399">1</span>
+VDI_TABLET_BUTTON_MIDEL <span style="color: #993399">2</span></tt></pre></div></div>
+</li>
+<li>
+<p>
+VDInterface specific extension
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>set_logical_size<span style="color: #990000">)(</span>TabletInterface<span style="color: #990000">*</span> tablet<span style="color: #990000">,</span> <span style="color: #009900">int</span> width<span style="color: #990000">,</span> <span style="color: #009900">int</span> height<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Set logical dimension of the tablet. The logical dimension will be used by the
+tablet device for mapping position to local coordinate system.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>position<span style="color: #990000">)(</span>TabletInterface<span style="color: #990000">*</span> tablet<span style="color: #990000">,</span> <span style="color: #009900">int</span> x<span style="color: #990000">,</span> <span style="color: #009900">int</span> y<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> buttons_state<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Push mouse position and mouse button state.  {x, y} position is relative to the
+upper left corner. Positive value on x axis advances rightward and positive
+value on y axis advances downward. buttons_state is buttons state mask. Button
+X is press if bit VDI_TABLET_BUTTON_X is set.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>wheel<span style="color: #990000">)(</span>TabletInterface<span style="color: #990000">*</span> tablet<span style="color: #990000">,</span> <span style="color: #009900">int</span> wheel_motion<span style="color: #990000">,</span> uint32_t
+buttons_state<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Push scroll wheel motion and buttons state. wheel_motion is scroll sicks.
+positive wheel_motion is for scroll down. buttons_state is as in “position”</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>buttons<span style="color: #990000">)(</span>TabletInterface<span style="color: #990000">*</span> tablet<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> buttons_state<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Push buttons state. buttons_state is as in “position”</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_playback_interface">12. Playback  interface</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Playback interface for receiving audio stream for playback. Playback use fix
+audio configuration,  channels = 2,  frequency = 44100 and channel sample
+format signed 16bit.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+VDInterface members value
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>type <span style="color: #990000">=</span> “playback”
+major_version <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+minor_version <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+id <span style="color: #990000">=</span> playback instance id</tt></pre></div></div>
+</li>
+<li>
+<p>
+PlaybackPlug
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #008080">uint32_t</span> major_version</tt></pre></div></div>
+<div class="paragraph"><p>plug major version. Changing  major version breaks compatibility.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #008080">uint32_t</span> minor_version</tt></pre></div></div>
+<div class="paragraph"><p>interface minor version. Minor version increments on changes that add
+functionality but do not break compatible and will be reset on major version
+increment.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>start<span style="color: #990000">)(</span><span style="color: #008080">PlaybackPlug</span> <span style="color: #990000">*</span>plug<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>back-end will call this callback while staring audio playback</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>stop<span style="color: #990000">)(</span><span style="color: #008080">PlaybackPlug</span> <span style="color: #990000">*</span>plug<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>back-end will call this callback while stopping audio playback</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>get_frame<span style="color: #990000">)(</span><span style="color: #008080">PlaybackPlug</span> <span style="color: #990000">*</span>plug<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> <span style="color: #990000">**</span>frame<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> <span style="color: #990000">*</span>samples<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>back-end will call this callback for getting audio frame. On return *frame will
+point to audio frame capable of holding *samples samples (i.e frame size is
+samples * 4). The frame will be pushed back filled with audio samples by the
+back-end. If no frame is available *frame will be NULL.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>put_frame<span style="color: #990000">)(</span><span style="color: #008080">PlaybackPlug</span> <span style="color: #990000">*</span>plug<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> <span style="color: #990000">*</span>frame<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>back-end will call this callback to deliver audio frame for playback. Frame is
+one that was returns by get_frame. This call also moves frame ownership back to
+the front-end.</p></div>
+</li>
+<li>
+<p>
+VDInterface specific extension
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #000000">VDIObjectRef</span></span> <span style="color: #990000">(*</span>plug<span style="color: #990000">)(</span><span style="color: #008080">PlaybackInterface</span> <span style="color: #990000">*</span>playback<span style="color: #990000">,</span> PlaybackPlug<span style="color: #990000">*</span> plug<span style="color: #990000">,</span>  <span style="color: #009900">int</span>
+<span style="color: #990000">*</span>active<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Attach playback plug to playback interface instance. Plug is the plug to
+attach. On return, active will be 0 if playback is stopped and 1 if playback is
+running. On success, the function return object ref otherwise
+VDI_INVALID_OBJECT_REF is returned.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>unplug<span style="color: #990000">)(</span><span style="color: #008080">PlaybackInterface</span> <span style="color: #990000">*</span>playback<span style="color: #990000">,</span> VDIObjectRef<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Unplug  playback that was plugged using plug.</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_record_interface">13. Record  interface</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Record interface for pushing audio capture to back-end. Record use fix audio
+configuration, channels = 2,  frequency = 44100 and channel sample format
+signed 16bit.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+VDInterface members value
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>type <span style="color: #990000">=</span>  “record”
+major_version <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+minor_version <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+id <span style="color: #990000">=</span> record instance id</tt></pre></div></div>
+</li>
+<li>
+<p>
+RecordPlug
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #008080">uint32_t</span> minor_version</tt></pre></div></div>
+<div class="paragraph"><p>plug major version. Changing  major version breaks compatibility.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #008080">uint32_t</span> major_version</tt></pre></div></div>
+<div class="paragraph"><p>interface minor version. Minor version increments on changes that add
+functionality but do not break compatible and will be reset on major version
+increment.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>start<span style="color: #990000">)(</span><span style="color: #008080">RecordPlug</span> <span style="color: #990000">*</span>plug<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>back-end will call this callback for staring audio capture</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>stop<span style="color: #990000">)(</span><span style="color: #008080">RecordPlug</span> <span style="color: #990000">*</span>plug<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>back-end will call this callback to stop audio capture</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #000000">uint32_t</span></span> <span style="color: #990000">(*</span>read<span style="color: #990000">)(</span><span style="color: #008080">RecordPlug</span> <span style="color: #990000">*</span>plug<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> num_samples<span style="color: #990000">,</span> <span style="color: #008080">uint32_t</span> <span style="color: #990000">*</span>samples<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>back-end will call this callback to receive audio capture samples.  num_samples
+is the requested number samples. Samples is buffer for receiving samples (i.e
+samples size is num_samples * 4). Read return number of samples returned.</p></div>
+</li>
+<li>
+<p>
+VDInterface specific extension
+</p>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #000000">VDIObjectRef</span></span> <span style="color: #990000">(*</span>plug<span style="color: #990000">)(</span><span style="color: #008080">RecordInterface</span> <span style="color: #990000">*</span>recorder<span style="color: #990000">,</span> RecordPlug<span style="color: #990000">*</span> plug<span style="color: #990000">,</span> <span style="color: #009900">int</span> <span style="color: #990000">*</span>active<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Attach record plug to interface instance. Plug is the plug to attach. On
+return, active will be 0 if record is stopped and 1 if record is running. On
+success, the function return object ref otherwise VDI_INVALID_OBJECT_REF is
+returned.</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="color: #009900">void</span> <span style="color: #990000">(*</span>unplug<span style="color: #990000">)(</span><span style="color: #008080">RecordInterface</span> <span style="color: #990000">*</span>recorder<span style="color: #990000">,</span> VDIObjectRef<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p>Unplug  record plug that was plugged using plug.</p></div>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_additional_registered_interfaces">14. Additional registered interfaces</h2>
+<div class="sectionbody">
+<div class="ulist"><ul>
+<li>
+<p>
+QXL interface "qxl" – QXL interface enable front-end to plug into QXL display
+device in order to receive QXL and to render it&#8217;s output locally or remotely.
+</p>
+</li>
+<li>
+<p>
+VDI port interface "vdi_port" – interface for plugging, reading and writing
+to vdi_port. vdi_port is used for communication with an agent residing on gust
+machine.
+</p>
+</li>
+<li>
+<p>
+Migration  interface "migration" -  interface for integrating with back-end
+migration process. This interface enable registering for pre and post migration
+hooks.
+</p>
+</li>
+<li>
+<p>
+Qemu terminal  interface "qemu_terminal" – interface for integrating with
+QEMU style terminal.
+</p>
+</li>
+</ul></div>
+</div>
+</div>
+</div>
+<div id="footnotes"><hr /></div>
+<div id="footer">
+<div id="footer-text">
+Version v1.0<br />
+Last updated
+ 2020-02-27 11:26:12 GMT
+</div>
+</div>
+</body>
+</html>

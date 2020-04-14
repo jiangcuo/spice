@@ -15,11 +15,11 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -980,13 +980,6 @@ static void register_callbacks(Dispatcher *dispatcher)
 
 
 
-static void handle_dev_input(int fd, int event, void *opaque)
-{
-    Dispatcher *dispatcher = opaque;
-
-    dispatcher_handle_recv_read(dispatcher);
-}
-
 typedef struct RedWorkerSource {
     GSource source;
     RedWorker *worker;
@@ -1086,8 +1079,7 @@ RedWorker* red_worker_new(QXLInstance *qxl)
     stat_init_counter(&worker->total_loop_counter, reds, &worker->stat, "total_loops", TRUE);
 
     worker->dispatch_watch =
-        worker->core.watch_add(&worker->core, dispatcher_get_recv_fd(dispatcher),
-                               SPICE_WATCH_EVENT_READ, handle_dev_input, dispatcher);
+        dispatcher_create_watch(dispatcher, &worker->core);
     spice_assert(worker->dispatch_watch != NULL);
 
     GSource *source = g_source_new(&worker_source_funcs, sizeof(RedWorkerSource));
@@ -1145,22 +1137,28 @@ static void *red_worker_main(void *arg)
 
 bool red_worker_run(RedWorker *worker)
 {
+#ifndef _WIN32
     sigset_t thread_sig_mask;
     sigset_t curr_sig_mask;
+#endif
     int r;
 
     spice_return_val_if_fail(worker, FALSE);
     spice_return_val_if_fail(!worker->thread, FALSE);
 
+#ifndef _WIN32
     sigfillset(&thread_sig_mask);
     sigdelset(&thread_sig_mask, SIGILL);
     sigdelset(&thread_sig_mask, SIGFPE);
     sigdelset(&thread_sig_mask, SIGSEGV);
     pthread_sigmask(SIG_SETMASK, &thread_sig_mask, &curr_sig_mask);
+#endif
     if ((r = pthread_create(&worker->thread, NULL, red_worker_main, worker))) {
         spice_error("create thread failed %d", r);
     }
+#ifndef _WIN32
     pthread_sigmask(SIG_SETMASK, &curr_sig_mask, NULL);
+#endif
     pthread_setname_np(worker->thread, "SPICE Worker");
 
     return r == 0;
@@ -1187,7 +1185,7 @@ void red_worker_free(RedWorker *worker)
     worker->display_channel = NULL;
 
     if (worker->dispatch_watch) {
-        worker->core.watch_remove(&worker->core, worker->dispatch_watch);
+        red_watch_remove(worker->dispatch_watch);
     }
 
     g_main_context_unref(worker->core.main_context);

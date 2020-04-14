@@ -67,7 +67,9 @@ int red_stream_get_family(const RedStream *stream);
 bool red_stream_is_plain_unix(const RedStream *stream);
 bool red_stream_set_no_delay(RedStream *stream, bool no_delay);
 int red_stream_get_no_delay(RedStream *stream);
+#ifndef _WIN32
 int red_stream_send_msgfd(RedStream *stream, int fd);
+#endif
 
 /**
  * Set auto flush flag.
@@ -88,6 +90,8 @@ bool red_stream_set_auto_flush(RedStream *stream, bool auto_flush);
  * no result.
  */
 void red_stream_flush(RedStream *stream);
+
+bool red_stream_is_websocket(RedStream *stream, const void *buf, size_t len);
 
 typedef enum {
     RED_SASL_ERROR_OK,

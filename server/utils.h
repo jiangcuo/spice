@@ -52,9 +52,9 @@ static inline int test_bit(int index, uint32_t val)
 
 typedef int64_t red_time_t;
 
-#define NSEC_PER_SEC      1000000000LL
-#define NSEC_PER_MILLISEC 1000000LL
-#define NSEC_PER_MICROSEC 1000
+#define NSEC_PER_SEC      INT64_C(1000000000)
+#define NSEC_PER_MILLISEC INT64_C(1000000)
+#define NSEC_PER_MICROSEC INT64_C(1000)
 
 /* g_get_monotonic_time() does not have enough precision */
 static inline red_time_t spice_get_monotonic_time_ns(void)
@@ -74,5 +74,10 @@ const char *red_channel_type_to_str(int type);
 int red_channel_name_to_type(const char *name);
 
 void red_dump_openssl_errors(void);
+
+static inline int64_t i64abs(int64_t value)
+{
+    return (value >= 0) ? value : -value;
+}
 
 #endif /* UTILS_H_ */

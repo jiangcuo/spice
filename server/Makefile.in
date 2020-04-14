@@ -171,40 +171,40 @@ libserver_la_DEPENDENCIES =  \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__libserver_la_SOURCES_DIST = spice-audio.h spice-char.h \
-	spice-core.h spice-experimental.h spice-input.h \
-	spice-migration.h spice-qxl.h spice-server.h spice-version.h \
-	spice-replay.h spice.h spice-server-enums.h \
-	spice-server-enums.c agent-msg-filter.c agent-msg-filter.h \
-	cache-item.h char-device.c char-device.h \
+	spice-core.h spice-input.h spice-migration.h spice-qxl.h \
+	spice-server.h spice-version.h spice-replay.h spice.h \
+	spice-server-enums.h spice-server-enums.c agent-msg-filter.c \
+	agent-msg-filter.h cache-item.h char-device.c char-device.h \
 	common-graphics-channel.c common-graphics-channel.h \
 	cursor-channel.c cursor-channel-client.c \
 	cursor-channel-client.h cursor-channel.h dcc.c dcc.h \
 	dcc-private.h dcc-send.c dispatcher.c dispatcher.h \
 	display-channel.c display-channel.h display-channel-private.h \
-	display-limits.h event-loop.c glib-compat.h glz-encoder.c \
-	glz-encoder-dict.c glz-encoder-dict.h glz-encoder.h \
-	glz-encoder-priv.h image-cache.c image-cache.h \
-	image-encoders.c image-encoders.h inputs-channel.c \
-	inputs-channel-client.c inputs-channel-client.h \
-	inputs-channel.h jpeg-encoder.c jpeg-encoder.h main-channel.c \
-	main-channel-client.c main-channel-client.h main-channel.h \
-	main-dispatcher.c main-dispatcher.h memslot.c memslot.h \
-	migration-protocol.h mjpeg-encoder.c net-utils.c net-utils.h \
-	pixmap-cache.c pixmap-cache.h red-channel.c \
-	red-channel-capabilities.c red-channel-capabilities.h \
-	red-channel-client.c red-channel-client.h red-channel.h \
-	red-client.c red-client.h red-common.h red-parse-qxl.c \
-	red-parse-qxl.h red-pipe-item.c red-pipe-item.h red-qxl.c \
-	red-qxl.h red-record-qxl.c red-record-qxl.h red-replay-qxl.c \
-	reds.c reds.h reds-private.h red-stream.c red-stream.h \
-	red-worker.c red-worker.h sound.c sound.h spice-bitmap-utils.c \
-	spice-bitmap-utils.h spicevmc.c stat-file.c stat-file.h stat.h \
-	stream-channel.c stream-channel.h red-stream-device.c \
+	display-limits.h event-loop.c glz-encoder.c glz-encoder-dict.c \
+	glz-encoder-dict.h glz-encoder.h glz-encoder-priv.h \
+	image-cache.c image-cache.h image-encoders.c image-encoders.h \
+	inputs-channel.c inputs-channel-client.c \
+	inputs-channel-client.h inputs-channel.h jpeg-encoder.c \
+	jpeg-encoder.h main-channel.c main-channel-client.c \
+	main-channel-client.h main-channel.h main-dispatcher.c \
+	main-dispatcher.h memslot.c memslot.h migration-protocol.h \
+	mjpeg-encoder.c net-utils.c net-utils.h pixmap-cache.c \
+	pixmap-cache.h red-channel.c red-channel-capabilities.c \
+	red-channel-capabilities.h red-channel-client.c \
+	red-channel-client.h red-channel.h red-client.c red-client.h \
+	red-common.h red-parse-qxl.c red-parse-qxl.h red-pipe-item.c \
+	red-pipe-item.h red-qxl.c red-qxl.h red-record-qxl.c \
+	red-record-qxl.h red-replay-qxl.c reds.c reds.h reds-private.h \
+	red-stream.c red-stream.h red-worker.c red-worker.h sound.c \
+	sound.h spice-bitmap-utils.c spice-bitmap-utils.h spicevmc.c \
+	stat-file.c stat-file.h stat.h stream-channel.c \
+	stream-channel.h sys-socket.h sys-socket.c red-stream-device.c \
 	red-stream-device.h sw-canvas.c tree.c tree.h utils.c utils.h \
-	video-encoder.h video-stream.c video-stream.h zlib-encoder.c \
-	zlib-encoder.h lz4-encoder.c lz4-encoder.h smartcard.c \
-	smartcard.h smartcard-channel-client.c \
-	smartcard-channel-client.h gstreamer-encoder.c
+	video-encoder.h video-stream.c video-stream.h websocket.c \
+	websocket.h zlib-encoder.c zlib-encoder.h lz4-encoder.c \
+	lz4-encoder.h smartcard.c smartcard.h \
+	smartcard-channel-client.c smartcard-channel-client.h \
+	gstreamer-encoder.c
 am__objects_1 =
 am__objects_2 = $(am__objects_1)
 am__objects_3 = spice-server-enums.lo
@@ -227,9 +227,10 @@ am_libserver_la_OBJECTS = $(am__objects_2) $(am__objects_3) \
 	red-pipe-item.lo red-qxl.lo red-record-qxl.lo \
 	red-replay-qxl.lo reds.lo red-stream.lo red-worker.lo sound.lo \
 	spice-bitmap-utils.lo spicevmc.lo stat-file.lo \
-	stream-channel.lo red-stream-device.lo sw-canvas.lo tree.lo \
-	utils.lo video-stream.lo zlib-encoder.lo $(am__objects_1) \
-	$(am__objects_4) $(am__objects_5) $(am__objects_6)
+	stream-channel.lo sys-socket.lo red-stream-device.lo \
+	sw-canvas.lo tree.lo utils.lo video-stream.lo websocket.lo \
+	zlib-encoder.lo $(am__objects_1) $(am__objects_4) \
+	$(am__objects_5) $(am__objects_6)
 libserver_la_OBJECTS = $(am_libserver_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -286,8 +287,9 @@ am__depfiles_remade = ./$(DEPDIR)/agent-msg-filter.Plo \
 	./$(DEPDIR)/spice-bitmap-utils.Plo \
 	./$(DEPDIR)/spice-server-enums.Plo ./$(DEPDIR)/spicevmc.Plo \
 	./$(DEPDIR)/stat-file.Plo ./$(DEPDIR)/stream-channel.Plo \
-	./$(DEPDIR)/sw-canvas.Plo ./$(DEPDIR)/tree.Plo \
-	./$(DEPDIR)/utils.Plo ./$(DEPDIR)/video-stream.Plo \
+	./$(DEPDIR)/sw-canvas.Plo ./$(DEPDIR)/sys-socket.Plo \
+	./$(DEPDIR)/tree.Plo ./$(DEPDIR)/utils.Plo \
+	./$(DEPDIR)/video-stream.Plo ./$(DEPDIR)/websocket.Plo \
 	./$(DEPDIR)/zlib-encoder.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
@@ -568,7 +570,6 @@ AM_CPPFLAGS = \
 	$(LZ4_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
 	$(SASL_CFLAGS)				\
-	$(SLIRP_CFLAGS)				\
 	$(SMARTCARD_CFLAGS)			\
 	$(GSTREAMER_0_10_CFLAGS)		\
 	$(GSTREAMER_1_0_CFLAGS)			\
@@ -588,7 +589,6 @@ libspice_server_la_LDFLAGS = -version-info $(SPICE_LT_VERSION) \
 libserver_la_LIBADD = \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la			\
 	$(SPICE_COMMON_DIR)/common/libspice-common-server.la		\
-	$(GL_LIBS)							\
 	$(GLIB2_LIBS)							\
 	$(GOBJECT2_LIBS)						\
 	$(JPEG_LIBS)							\
@@ -596,7 +596,6 @@ libserver_la_LIBADD = \
 	$(LIBRT)							\
 	$(PIXMAN_LIBS)							\
 	$(SASL_LIBS)							\
-	$(SLIRP_LIBS)							\
 	$(GSTREAMER_0_10_LIBS)						\
 	$(GSTREAMER_1_0_LIBS)						\
 	$(SSL_LIBS)							\
@@ -610,7 +609,6 @@ libspice_serverinclude_HEADERS = \
 	spice-audio.h				\
 	spice-char.h				\
 	spice-core.h				\
-	spice-experimental.h			\
 	spice-input.h				\
 	spice-migration.h			\
 	spice-qxl.h				\
@@ -629,29 +627,29 @@ libserver_la_SOURCES = $(libspice_serverinclude_HEADERS) \
 	cursor-channel-client.h cursor-channel.h dcc.c dcc.h \
 	dcc-private.h dcc-send.c dispatcher.c dispatcher.h \
 	display-channel.c display-channel.h display-channel-private.h \
-	display-limits.h event-loop.c glib-compat.h glz-encoder.c \
-	glz-encoder-dict.c glz-encoder-dict.h glz-encoder.h \
-	glz-encoder-priv.h image-cache.c image-cache.h \
-	image-encoders.c image-encoders.h inputs-channel.c \
-	inputs-channel-client.c inputs-channel-client.h \
-	inputs-channel.h jpeg-encoder.c jpeg-encoder.h main-channel.c \
-	main-channel-client.c main-channel-client.h main-channel.h \
-	main-dispatcher.c main-dispatcher.h memslot.c memslot.h \
-	migration-protocol.h mjpeg-encoder.c net-utils.c net-utils.h \
-	pixmap-cache.c pixmap-cache.h red-channel.c \
-	red-channel-capabilities.c red-channel-capabilities.h \
-	red-channel-client.c red-channel-client.h red-channel.h \
-	red-client.c red-client.h red-common.h red-parse-qxl.c \
-	red-parse-qxl.h red-pipe-item.c red-pipe-item.h red-qxl.c \
-	red-qxl.h red-record-qxl.c red-record-qxl.h red-replay-qxl.c \
-	reds.c reds.h reds-private.h red-stream.c red-stream.h \
-	red-worker.c red-worker.h sound.c sound.h spice-bitmap-utils.c \
-	spice-bitmap-utils.h spicevmc.c stat-file.c stat-file.h stat.h \
-	stream-channel.c stream-channel.h red-stream-device.c \
+	display-limits.h event-loop.c glz-encoder.c glz-encoder-dict.c \
+	glz-encoder-dict.h glz-encoder.h glz-encoder-priv.h \
+	image-cache.c image-cache.h image-encoders.c image-encoders.h \
+	inputs-channel.c inputs-channel-client.c \
+	inputs-channel-client.h inputs-channel.h jpeg-encoder.c \
+	jpeg-encoder.h main-channel.c main-channel-client.c \
+	main-channel-client.h main-channel.h main-dispatcher.c \
+	main-dispatcher.h memslot.c memslot.h migration-protocol.h \
+	mjpeg-encoder.c net-utils.c net-utils.h pixmap-cache.c \
+	pixmap-cache.h red-channel.c red-channel-capabilities.c \
+	red-channel-capabilities.h red-channel-client.c \
+	red-channel-client.h red-channel.h red-client.c red-client.h \
+	red-common.h red-parse-qxl.c red-parse-qxl.h red-pipe-item.c \
+	red-pipe-item.h red-qxl.c red-qxl.h red-record-qxl.c \
+	red-record-qxl.h red-replay-qxl.c reds.c reds.h reds-private.h \
+	red-stream.c red-stream.h red-worker.c red-worker.h sound.c \
+	sound.h spice-bitmap-utils.c spice-bitmap-utils.h spicevmc.c \
+	stat-file.c stat-file.h stat.h stream-channel.c \
+	stream-channel.h sys-socket.h sys-socket.c red-stream-device.c \
 	red-stream-device.h sw-canvas.c tree.c tree.h utils.c utils.h \
-	video-encoder.h video-stream.c video-stream.h zlib-encoder.c \
-	zlib-encoder.h $(NULL) $(am__append_2) $(am__append_3) \
-	$(am__append_4)
+	video-encoder.h video-stream.c video-stream.h websocket.c \
+	websocket.h zlib-encoder.c zlib-encoder.h $(NULL) \
+	$(am__append_2) $(am__append_3) $(am__append_4)
 libspice_server_la_LIBADD = libserver.la
 libspice_server_la_SOURCES = 
 EXTRA_DIST = \
@@ -680,9 +678,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu server/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign server/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu server/Makefile
+	  $(AUTOMAKE) --foreign server/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -809,9 +807,11 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stat-file.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stream-channel.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sw-canvas.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sys-socket.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tree.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/video-stream.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/websocket.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zlib-encoder.Plo@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
@@ -1123,9 +1123,11 @@ distclean: distclean-recursive
 	-rm -f ./$(DEPDIR)/stat-file.Plo
 	-rm -f ./$(DEPDIR)/stream-channel.Plo
 	-rm -f ./$(DEPDIR)/sw-canvas.Plo
+	-rm -f ./$(DEPDIR)/sys-socket.Plo
 	-rm -f ./$(DEPDIR)/tree.Plo
 	-rm -f ./$(DEPDIR)/utils.Plo
 	-rm -f ./$(DEPDIR)/video-stream.Plo
+	-rm -f ./$(DEPDIR)/websocket.Plo
 	-rm -f ./$(DEPDIR)/zlib-encoder.Plo
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
@@ -1220,9 +1222,11 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -f ./$(DEPDIR)/stat-file.Plo
 	-rm -f ./$(DEPDIR)/stream-channel.Plo
 	-rm -f ./$(DEPDIR)/sw-canvas.Plo
+	-rm -f ./$(DEPDIR)/sys-socket.Plo
 	-rm -f ./$(DEPDIR)/tree.Plo
 	-rm -f ./$(DEPDIR)/utils.Plo
 	-rm -f ./$(DEPDIR)/video-stream.Plo
+	-rm -f ./$(DEPDIR)/websocket.Plo
 	-rm -f ./$(DEPDIR)/zlib-encoder.Plo
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic

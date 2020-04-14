@@ -15,10 +15,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
+#ifndef _WIN32
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -234,5 +233,6 @@ void stat_file_remove_node(RedStatFile *stat_file, StatNodeRef ref)
 
 void stat_file_remove_counter(RedStatFile *stat_file, uint64_t *counter)
 {
-    stat_file_remove(stat_file, (SpiceStatNode *)(counter - SPICE_OFFSETOF(SpiceStatNode, value)));
+    stat_file_remove(stat_file, SPICE_CONTAINEROF(counter, SpiceStatNode, value));
 }
+#endif

@@ -16,7 +16,7 @@
   License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "client_marshallers.h"
+#include "common/client_marshallers.h"
 #include <spice/protocol.h>
 #include "common/marshaller.h"
 

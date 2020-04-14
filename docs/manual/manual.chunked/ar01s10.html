@@ -5,7 +5,7 @@ file. For testing, you can use the <code class="literal">digest-md5</code> mecha
 a test database using <code class="literal">saslpasswd2 -f /etc/qemu/passwd.db -c
 foo</code>. These files have to be readable by the QEMU process that will
 handle your VM.</p><p>To troubleshoot SASL issues, running <code class="literal">strace -e open</code> on the QEMU
-process can be a useful first step.</p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="_configuration_8"></a>10.1. Configuration</h3></div></div></div><p><strong>Using virt-manager. </strong>It’s currently not possible to enable SASL from virt-manager.</p><p><strong>Using libvirt. </strong>SASL support for SPICE has been added to libvirt mid-October 2013 so
+process can be a useful first step.</p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="_configuration_7"></a>10.1. Configuration</h3></div></div></div><p><strong>Using virt-manager. </strong>It’s currently not possible to enable SASL from virt-manager.</p><p><strong>Using libvirt. </strong>SASL support for SPICE has been added to libvirt mid-October 2013 so
 you need a libvirt version that was released after this date. To
 enable SASL, you need to add <code class="literal">spice_sasl = 1</code> in <span class="emphasis"><em>/etc/libvirt/qemu.conf</em></span>
 for the system libvirtd instance, and to <span class="emphasis"><em>~/.config/libvirt/qemu.conf</em></span>

@@ -18,9 +18,7 @@
 
 /* Do some tests on memory parsing
  */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #undef NDEBUG
 #include <string.h>
@@ -98,7 +96,7 @@ static void test_memslot_invalid_slot_id(void)
     RedMemSlotInfo mem_info;
     init_meminfo(&mem_info);
 
-    memslot_get_virt(&mem_info, 1 << mem_info.memslot_id_shift, 16, 0);
+    memslot_get_virt(&mem_info, UINT64_C(1) << mem_info.memslot_id_shift, 16, 0);
 }
 
 static void test_memslot_invalid_addresses(void)

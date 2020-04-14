@@ -1,13 +1,19 @@
 test_lib_include = [spice_server_include, include_directories('.')]
-test_lib_deps = [spice_server_deps, dependency('gio-unix-2.0')]
+test_lib_deps = [spice_server_deps]
+if host_machine.system() != 'windows'
+  test_lib_deps += [dependency('gio-unix-2.0')]
+endif
 
 test_lib_sources = [
   'basic-event-loop.c',
   'basic-event-loop.h',
   'test-display-base.c',
   'test-display-base.h',
-  'test-glib-compat.c',
   'test-glib-compat.h',
+  'win-alarm.c',
+  'win-alarm.h',
+  'vmc-emu.c',
+  'vmc-emu.h',
 ]
 
 test_libs = []
@@ -35,11 +41,9 @@ tests = [
   ['test-codecs-parsing', true],
   ['test-options', true],
   ['test-stat', true],
-  ['test-stream', true],
   ['test-agent-msg-filter', true],
   ['test-loop', true],
   ['test-qxl-parsing', true],
-  ['test-stat-file', true],
   ['test-leaks', true],
   ['test-vdagent', true],
   ['test-fail-on-null-core-interface', true],
@@ -60,10 +64,22 @@ if spice_server_has_sasl
   tests += [['test-sasl', true]]
 endif
 
+if spice_server_has_smartcard == true
+  tests += [['test-smartcard', true]]
+endif
+
+if host_machine.system() != 'windows'
+  tests += [
+    ['test-stream', true],
+    ['test-stat-file', true],
+    ['test-websocket', false],
+  ]
+endif
+
 if spice_server_has_gstreamer
   tests += [['test-gst', false]]
   if get_option('extra-checks')
-    test('video-encoders', files('video-encoders'))
+    test('test-video-encoders', files('test-video-encoders'))
   endif
 endif
 

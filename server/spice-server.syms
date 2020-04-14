@@ -10,7 +10,6 @@ global:
     spice_server_get_sock_info;
     spice_server_init;
     spice_server_kbd_leds;
-    spice_server_migrate_client_state;
     spice_server_migrate_end;
     spice_server_migrate_info;
     spice_server_migrate_start;
@@ -178,3 +177,9 @@ SPICE_SERVER_0.14.2 {
 global:
     spice_qxl_set_device_info;
 } SPICE_SERVER_0.13.2;
+
+SPICE_SERVER_0.14.3 {
+global:
+    spice_server_get_video_codecs;
+    spice_server_free_video_codecs;
+} SPICE_SERVER_0.14.2;

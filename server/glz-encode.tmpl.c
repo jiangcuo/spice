@@ -14,9 +14,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #define DJB2_START 5381
 #define DJB2_HASH(hash, c) (hash = ((hash << 5) + hash) ^ (c)) //|{hash = ((hash << 5) + hash) + c;}
@@ -278,19 +276,15 @@ static void FNAME(compress_seg)(Encoder *encoder, uint32_t seg_idx, PIXEL *from,
 
         if (LZ_EXPECT_CONDITIONAL(ip > (PIXEL *)(seg->lines))) {
             if (SAME_PIXEL(ip[-1], ip[0]) && SAME_PIXEL(ip[0], ip[1]) && SAME_PIXEL(ip[1], ip[2])) {
-                PIXEL x;
+                PIXEL x = ip[2];
+
                 pix_dist = 1;
                 image_dist = 0;
 
                 ip += 3;
-                ref = anchor + 2;
-                ref_limit = (PIXEL *)(seg->lines_end);
                 len = 3;
 
-                x = *ref;
-
-                while (ip < ip_bound) { // TODO: maybe separate a run from the same seg or from
-                                       // different ones in order to spare ref < ref_limit
+                while (ip < ip_bound) {
                     if (!SAME_PIXEL(*ip, x)) {
                         ip++;
                         break;

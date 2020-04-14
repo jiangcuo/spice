@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -38,7 +36,9 @@
 #include <ws2tcpip.h>
 #endif
 
+#include <openssl/bn.h>
 #include <openssl/err.h>
+#include <openssl/rsa.h>
 
 #if HAVE_SASL
 #include <sasl/sasl.h>
@@ -75,7 +75,6 @@
 #include "red-channel-client.h"
 #include "main-channel-client.h"
 #include "red-client.h"
-#include "glib-compat.h"
 #include "net-utils.h"
 #include "red-stream-device.h"
 
@@ -84,59 +83,6 @@
 static void reds_client_monitors_config(RedsState *reds, VDAgentMonitorsConfig *monitors_config);
 static gboolean reds_use_client_monitors_config(RedsState *reds);
 static void reds_set_video_codecs(RedsState *reds, GArray *video_codecs);
-
-static SpiceTimer *adapter_timer_add(const SpiceCoreInterfaceInternal *iface, SpiceTimerFunc func, void *opaque)
-{
-    return iface->public_interface->timer_add(func, opaque);
-}
-
-static void adapter_timer_start(const SpiceCoreInterfaceInternal *iface, SpiceTimer *timer, uint32_t ms)
-{
-    iface->public_interface->timer_start(timer, ms);
-}
-
-static void adapter_timer_cancel(const SpiceCoreInterfaceInternal *iface, SpiceTimer *timer)
-{
-    iface->public_interface->timer_cancel(timer);
-}
-
-static void adapter_timer_remove(const SpiceCoreInterfaceInternal *iface, SpiceTimer *timer)
-{
-    iface->public_interface->timer_remove(timer);
-}
-
-static SpiceWatch *adapter_watch_add(const SpiceCoreInterfaceInternal *iface,
-                                     int fd, int event_mask, SpiceWatchFunc func, void *opaque)
-{
-    return iface->public_interface->watch_add(fd, event_mask, func, opaque);
-}
-
-static void adapter_watch_update_mask(const SpiceCoreInterfaceInternal *iface, SpiceWatch *watch, int event_mask)
-{
-    iface->public_interface->watch_update_mask(watch, event_mask);
-}
-
-static void adapter_watch_remove(const SpiceCoreInterfaceInternal *iface, SpiceWatch *watch)
-{
-    iface->public_interface->watch_remove(watch);
-}
-
-static void adapter_channel_event(const SpiceCoreInterfaceInternal *iface, int event, SpiceChannelEventInfo *info)
-{
-    if (iface->public_interface->base.minor_version >= 3 && iface->public_interface->channel_event != NULL)
-        iface->public_interface->channel_event(event, info);
-}
-
-static const SpiceCoreInterfaceInternal core_interface_adapter = {
-    .timer_add = adapter_timer_add,
-    .timer_start = adapter_timer_start,
-    .timer_cancel = adapter_timer_cancel,
-    .timer_remove = adapter_timer_remove,
-    .watch_add = adapter_watch_add,
-    .watch_update_mask = adapter_watch_update_mask,
-    .watch_remove = adapter_watch_remove,
-    .channel_event = adapter_channel_event,
-};
 
 /* Debugging only variable: allow multiple client connections to the spice
  * server */
@@ -204,7 +150,6 @@ typedef struct RedLinkInfo {
     RedStream *stream;
     SpiceLinkHeader link_header;
     SpiceLinkMess *link_mess;
-    int mess_pos;
     TicketInfo tiTicketing;
     SpiceLinkAuthMechanism auth_mechanism;
     int skip_auth;
@@ -257,7 +202,8 @@ struct RedCharDeviceVDIPortPrivate {
 };
 
 /* messages that are addressed to the agent and are created in the server */
-typedef struct __attribute__ ((__packed__)) VDInternalBuf {
+#include <spice/start-packed.h>
+typedef struct SPICE_ATTR_PACKED VDInternalBuf {
     VDIChunkHeader chunk_header;
     VDAgentMessage header;
     union {
@@ -266,6 +212,7 @@ typedef struct __attribute__ ((__packed__)) VDInternalBuf {
     }
     u;
 } VDInternalBuf;
+#include <spice/end-packed.h>
 
 SPICE_DECLARE_TYPE(RedCharDeviceVDIPort, red_char_device_vdi_port, CHAR_DEVICE_VDIPORT);
 #define RED_TYPE_CHAR_DEVICE_VDIPORT red_char_device_vdi_port_get_type()
@@ -463,7 +410,7 @@ static void reds_mig_cleanup(RedsState *reds)
         reds->mig_inprogress = FALSE;
         reds->mig_wait_connect = FALSE;
         reds->mig_wait_disconnect = FALSE;
-        reds_core_timer_cancel(reds, reds->mig_timer);
+        red_timer_cancel(reds->mig_timer);
         reds_mig_cleanup_wait_disconnect(reds);
     }
 }
@@ -921,24 +868,7 @@ void reds_marshall_device_display_info(RedsState *reds, SpiceMarshaller *m)
 
     // add the qxl devices to the message
     FOREACH_QXL_INSTANCE(reds, qxl) {
-        const char *const device_address = red_qxl_get_device_address(qxl);
-        const size_t device_address_len = strlen(device_address) + 1;
-        if (device_address_len == 1) {
-            continue;
-        }
-        for (size_t i = 0; i < red_qxl_get_monitors_count(qxl); ++i) {
-            spice_marshaller_add_uint32(m, qxl->id);
-            spice_marshaller_add_uint32(m, i);
-            spice_marshaller_add_uint32(m, red_qxl_get_device_display_ids(qxl)[i]);
-            spice_marshaller_add_uint32(m, device_address_len);
-            spice_marshaller_add(m, (void*) device_address, device_address_len);
-            ++device_count;
-
-            g_debug("   (qxl)    channel_id: %u monitor_id: %zu, device_address: %s, "
-                    "device_display_id: %u",
-                    qxl->id, i, device_address,
-                    red_qxl_get_device_display_ids(qxl)[i]);
-        }
+        device_count += red_qxl_marshall_device_display_info(qxl, m);
     }
 
     // add the stream devices to the message
@@ -1262,9 +1192,9 @@ void reds_release_agent_data_buffer(RedsState *reds, uint8_t *buf)
 static void reds_on_main_agent_monitors_config(RedsState *reds,
         MainChannelClient *mcc, const void *message, size_t size)
 {
-    const unsigned int MAX_MONITORS = 256;
+    const unsigned int MAX_NUM_MONITORS = 256;
     const unsigned int MAX_MONITOR_CONFIG_SIZE =
-       sizeof(VDAgentMonitorsConfig) + MAX_MONITORS * sizeof(VDAgentMonConfig);
+       sizeof(VDAgentMonitorsConfig) + MAX_NUM_MONITORS * sizeof(VDAgentMonConfig);
 
     VDAgentMessage *msg_header;
     VDAgentMonitorsConfig *monitors_config;
@@ -1442,12 +1372,9 @@ void reds_marshall_migrate_data(RedsState *reds, SpiceMarshaller *m)
            (see reds_reset_vdp) */
         spice_assert(!agent_dev->priv->agent_attached);
         red_char_device_migrate_data_marshall_empty(m);
-        null_agent_mig_data = spice_marshaller_reserve_space(m,
-                                                             sizeof(SpiceMigrateDataMain) -
-                                                             sizeof(SpiceMigrateDataCharDevice));
-        memset(null_agent_mig_data,
-               0,
-               sizeof(SpiceMigrateDataMain) - sizeof(SpiceMigrateDataCharDevice));
+        size_t padding_len = sizeof(SpiceMigrateDataMain) - sizeof(SpiceMigrateDataCharDevice);
+        null_agent_mig_data = spice_marshaller_reserve_space(m, padding_len);
+        memset(null_agent_mig_data, 0, padding_len);
         return;
     }
 
@@ -1971,7 +1898,6 @@ static void reds_handle_main_link(RedsState *reds, RedLinkInfo *link)
     red_channel_capabilities_reset(&caps);
     spice_debug("NEW Client %p mcc %p connect-id %d", client, mcc, connection_id);
     g_free(link_mess);
-    red_client_set_main(client, mcc);
 
     if (reds->vdagent) {
         if (mig_target) {
@@ -2419,6 +2345,7 @@ static void reds_handle_link_error(void *opaque, int err)
     reds_link_free(link);
 }
 
+static void reds_handle_new_link(RedLinkInfo *link);
 static void reds_handle_read_header_done(void *opaque)
 {
     RedLinkInfo *link = (RedLinkInfo *)opaque;
@@ -2461,6 +2388,18 @@ static void reds_handle_read_magic_done(void *opaque)
     const SpiceLinkHeader *header = &link->link_header;
 
     if (header->magic != SPICE_MAGIC) {
+        /* Attempt to detect and support a WebSocket connection,
+           which will be proceeded by a variable length GET style request.
+           We cannot know we are dealing with a WebSocket connection
+           until we have read at least 3 bytes, and we will have to
+           read many more bytes than are contained in a SpiceLinkHeader.
+           So we may as well read a SpiceLinkHeader's worth of data, and if it's
+           clear that a WebSocket connection was requested, we switch
+           before proceeding further. */
+        if (red_stream_is_websocket(link->stream, &header->magic, sizeof(header->magic))) {
+            reds_handle_new_link(link);
+            return;
+        }
         reds_send_link_error(link, SPICE_LINK_ERR_INVALID_MAGIC);
         reds_link_free(link);
         return;
@@ -2486,7 +2425,6 @@ static void reds_handle_new_link(RedLinkInfo *link)
 static void reds_handle_ssl_accept(int fd, int event, void *data)
 {
     RedLinkInfo *link = (RedLinkInfo *)data;
-    RedsState *reds = link->reds;
     RedStreamSslStatus return_code = red_stream_ssl_accept(link->stream);
 
     switch (return_code) {
@@ -2494,12 +2432,10 @@ static void reds_handle_ssl_accept(int fd, int event, void *data)
             reds_link_free(link);
             return;
         case RED_STREAM_SSL_STATUS_WAIT_FOR_READ:
-            reds_core_watch_update_mask(reds, link->stream->watch,
-                                        SPICE_WATCH_EVENT_READ);
+            red_watch_update_mask(link->stream->watch, SPICE_WATCH_EVENT_READ);
             return;
         case RED_STREAM_SSL_STATUS_WAIT_FOR_WRITE:
-            reds_core_watch_update_mask(reds, link->stream->watch,
-                                        SPICE_WATCH_EVENT_WRITE);
+            red_watch_update_mask(link->stream->watch, SPICE_WATCH_EVENT_WRITE);
             return;
         case RED_STREAM_SSL_STATUS_OK:
             red_stream_remove_watch(link->stream);
@@ -2645,9 +2581,11 @@ static int reds_init_socket(const char *addr, int portnr, int family)
     static const int on=1, off=0;
     struct addrinfo ai,*res,*e;
     char port[33];
-    int slisten, rc, len;
+    int slisten, rc;
 
     if (family == AF_UNIX) {
+#ifndef _WIN32
+        int len;
         struct sockaddr_un local = { 0, };
 
         if ((slisten = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -2661,11 +2599,14 @@ static int reds_init_socket(const char *addr, int portnr, int family)
         len = SUN_LEN(&local);
         if (bind(slisten, (struct sockaddr *)&local, len) == -1) {
             perror("bind");
-            close(slisten);
+            socket_close(slisten);
             return -1;
         }
 
         goto listen;
+#else
+        return -1;
+#endif
     }
 
     memset(&ai,0, sizeof(ai));
@@ -2709,7 +2650,7 @@ static int reds_init_socket(const char *addr, int portnr, int family)
             freeaddrinfo(res);
             goto listen;
         }
-        close(slisten);
+        socket_close(slisten);
     }
     spice_warning("binding socket to %s:%d failed", addr, portnr);
     freeaddrinfo(res);
@@ -2718,7 +2659,7 @@ static int reds_init_socket(const char *addr, int portnr, int family)
 listen:
     if (listen(slisten, SOMAXCONN) != 0) {
         spice_warning("listen: %s", strerror(errno));
-        close(slisten);
+        socket_close(slisten);
         return -1;
     }
     return slisten;
@@ -2754,16 +2695,16 @@ void reds_set_client_mm_time_latency(RedsState *reds, RedClient *client, uint32_
 static void reds_cleanup_net(SpiceServer *reds)
 {
     if (reds->listen_socket != -1) {
-       reds_core_watch_remove(reds, reds->listen_watch);
+       red_watch_remove(reds->listen_watch);
        if (reds->config->spice_listen_socket_fd != reds->listen_socket) {
-          close(reds->listen_socket);
+          socket_close(reds->listen_socket);
        }
        reds->listen_watch = NULL;
        reds->listen_socket = -1;
     }
     if (reds->secure_listen_socket != -1) {
-       reds_core_watch_remove(reds, reds->secure_listen_watch);
-       close(reds->secure_listen_socket);
+       red_watch_remove(reds->secure_listen_watch);
+       socket_close(reds->secure_listen_socket);
        reds->secure_listen_watch = NULL;
        reds->secure_listen_socket = -1;
     }
@@ -2855,12 +2796,9 @@ static int ssl_password_cb(char *buf, int size, int flags, void *userdata)
 #if OPENSSL_VERSION_NUMBER < 0x1010000FL
 static pthread_mutex_t *lock_cs;
 
-static unsigned long pthreads_thread_id(void)
+static void pthreads_thread_id(CRYPTO_THREADID *tid)
 {
-    unsigned long ret;
-
-    ret = (unsigned long)pthread_self();
-    return (ret);
+    CRYPTO_THREADID_set_numeric(tid, (unsigned long)pthread_self());
 }
 
 static void pthreads_locking_callback(int mode, int type, const char *file, int line)
@@ -2890,16 +2828,11 @@ static void openssl_thread_setup(void)
         pthread_mutex_init(&(lock_cs[i]), NULL);
     }
 
-    CRYPTO_set_id_callback(pthreads_thread_id);
+    CRYPTO_THREADID_set_callback(pthreads_thread_id);
     CRYPTO_set_locking_callback(pthreads_locking_callback);
 }
-#else
-static inline void openssl_thread_setup(void)
-{
-}
-#endif
 
-static gpointer openssl_global_init(gpointer arg)
+static gpointer openssl_global_init_once(gpointer arg)
 {
     SSL_library_init();
     SSL_load_error_strings();
@@ -2909,9 +2842,20 @@ static gpointer openssl_global_init(gpointer arg)
     return NULL;
 }
 
-static int reds_init_ssl(RedsState *reds)
+static inline void openssl_global_init(void)
 {
     static GOnce openssl_once = G_ONCE_INIT;
+    g_once(&openssl_once, openssl_global_init_once, NULL);
+}
+
+#else
+static inline void openssl_global_init(void)
+{
+}
+#endif
+
+static int reds_init_ssl(RedsState *reds)
+{
     const SSL_METHOD *ssl_method;
     int return_code;
     /* Limit connection to TLSv1.1 or newer.
@@ -2920,7 +2864,7 @@ static int reds_init_ssl(RedsState *reds)
     long ssl_options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION | SSL_OP_NO_TLSv1;
 
     /* Global system initialization*/
-    g_once(&openssl_once, openssl_global_init, NULL);
+    openssl_global_init();
 
     /* Create our context*/
     /* SSLv23_method() handles TLSv1.x in addition to SSLv2/v3 */
@@ -2933,7 +2877,9 @@ static int reds_init_ssl(RedsState *reds)
     }
 
     SSL_CTX_set_options(reds->ctx, ssl_options);
+#if HAVE_DECL_SSL_CTX_SET_ECDH_AUTO || defined(SSL_CTX_set_ecdh_auto)
     SSL_CTX_set_ecdh_auto(reds->ctx, 1);
+#endif
 
     /* Load our keys and certificates*/
     return_code = SSL_CTX_use_certificate_chain_file(reds->ctx, reds->config->ssl_parameters.certs_file);
@@ -3081,7 +3027,7 @@ static void reds_mig_started(RedsState *reds)
 
     reds->mig_inprogress = TRUE;
     reds->mig_wait_connect = TRUE;
-    reds_core_timer_start(reds, reds->mig_timer, MIGRATE_TIMEOUT);
+    red_timer_start(reds->mig_timer, MIGRATE_TIMEOUT);
 }
 
 static void reds_mig_fill_wait_disconnect(RedsState *reds)
@@ -3096,7 +3042,7 @@ static void reds_mig_fill_wait_disconnect(RedsState *reds)
     }
     reds->mig_wait_connect = FALSE;
     reds->mig_wait_disconnect = TRUE;
-    reds_core_timer_start(reds, reds->mig_timer, MIGRATE_TIMEOUT);
+    red_timer_start(reds->mig_timer, MIGRATE_TIMEOUT);
 }
 
 static void reds_mig_cleanup_wait_disconnect(RedsState *reds)
@@ -3144,16 +3090,6 @@ static void reds_mig_finished(RedsState *reds, int completed)
     reds_mig_release(reds->config);
 }
 
-static void reds_mig_switch(RedsState *reds)
-{
-    if (!reds->config->mig_spice) {
-        spice_warning("reds_mig_switch called without migrate_info set");
-        return;
-    }
-    main_channel_migrate_switch(reds->main_channel, reds->config->mig_spice);
-    reds_mig_release(reds->config);
-}
-
 static void migrate_timeout(void *opaque)
 {
     RedsState *reds = opaque;
@@ -3198,9 +3134,9 @@ static RedCharDevice *attach_to_red_agent(RedsState *reds, SpiceCharDeviceInstan
     reds->vdagent = sin;
     reds_update_mouse_mode(reds);
 
-    sif = spice_char_device_get_interface(reds->vdagent);
+    sif = spice_char_device_get_interface(sin);
     if (sif->state) {
-        sif->state(reds->vdagent, 1);
+        sif->state(sin, 1);
     }
 
     if (!reds_main_channel_connected(reds)) {
@@ -3297,8 +3233,8 @@ static void reds_on_char_device_destroy(RedsState *reds,
     reds->char_devices = g_list_remove(reds->char_devices, dev);
 }
 
-static int spice_server_char_device_add_interface(SpiceServer *reds,
-                                           SpiceBaseInstance *sin)
+static int
+spice_server_char_device_add_interface(SpiceServer *reds, SpiceBaseInstance *sin)
 {
     SpiceCharDeviceInstance* char_device =
             SPICE_UPCAST(SpiceCharDeviceInstance, sin);
@@ -3375,7 +3311,7 @@ static int spice_server_char_device_remove_interface(RedsState *reds, SpiceBaseI
 #endif
     else if (strcmp(char_device->subtype, SUBTYPE_USBREDIR) == 0 ||
              strcmp(char_device->subtype, SUBTYPE_PORT) == 0) {
-        spicevmc_device_disconnect(reds, char_device);
+        spicevmc_device_disconnect(char_device);
     } else {
         spice_warning("failed to remove char device %s", char_device->subtype);
     }
@@ -3387,12 +3323,12 @@ static int spice_server_char_device_remove_interface(RedsState *reds, SpiceBaseI
 SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *reds,
                                                   SpiceBaseInstance *sin)
 {
-    const SpiceBaseInterface *interface = sin->sif;
+    const SpiceBaseInterface *base_interface = sin->sif;
 
-    if (strcmp(interface->type, SPICE_INTERFACE_KEYBOARD) == 0) {
+    if (strcmp(base_interface->type, SPICE_INTERFACE_KEYBOARD) == 0) {
         spice_debug("SPICE_INTERFACE_KEYBOARD");
-        if (interface->major_version != SPICE_INTERFACE_KEYBOARD_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_KEYBOARD_MINOR) {
+        if (base_interface->major_version != SPICE_INTERFACE_KEYBOARD_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_KEYBOARD_MINOR) {
             spice_warning("unsupported keyboard interface");
             return -1;
         }
@@ -3400,10 +3336,10 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *reds,
                                         SPICE_UPCAST(SpiceKbdInstance, sin)) != 0) {
             return -1;
         }
-    } else if (strcmp(interface->type, SPICE_INTERFACE_MOUSE) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_MOUSE) == 0) {
         spice_debug("SPICE_INTERFACE_MOUSE");
-        if (interface->major_version != SPICE_INTERFACE_MOUSE_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_MOUSE_MINOR) {
+        if (base_interface->major_version != SPICE_INTERFACE_MOUSE_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_MOUSE_MINOR) {
             spice_warning("unsupported mouse interface");
             return -1;
         }
@@ -3411,12 +3347,12 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *reds,
                                      SPICE_UPCAST(SpiceMouseInstance, sin)) != 0) {
             return -1;
         }
-    } else if (strcmp(interface->type, SPICE_INTERFACE_QXL) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_QXL) == 0) {
         QXLInstance *qxl;
 
         spice_debug("SPICE_INTERFACE_QXL");
-        if (interface->major_version != SPICE_INTERFACE_QXL_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_QXL_MINOR) {
+        if (base_interface->major_version != SPICE_INTERFACE_QXL_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_QXL_MINOR) {
             spice_warning("unsupported qxl interface");
             return -1;
         }
@@ -3440,11 +3376,11 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *reds,
          * be called. */
         red_qxl_attach_worker(qxl);
         red_qxl_set_compression_level(qxl, calc_compression_level(reds));
-    } else if (strcmp(interface->type, SPICE_INTERFACE_TABLET) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_TABLET) == 0) {
         SpiceTabletInstance *tablet = SPICE_UPCAST(SpiceTabletInstance, sin);
         spice_debug("SPICE_INTERFACE_TABLET");
-        if (interface->major_version != SPICE_INTERFACE_TABLET_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_TABLET_MINOR) {
+        if (base_interface->major_version != SPICE_INTERFACE_TABLET_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_TABLET_MINOR) {
             spice_warning("unsupported tablet interface");
             return -1;
         }
@@ -3456,41 +3392,41 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *reds,
             inputs_channel_set_tablet_logical_size(reds->inputs_channel, reds->monitor_mode.x_res, reds->monitor_mode.y_res);
         }
 
-    } else if (strcmp(interface->type, SPICE_INTERFACE_PLAYBACK) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_PLAYBACK) == 0) {
         spice_debug("SPICE_INTERFACE_PLAYBACK");
-        if (interface->major_version != SPICE_INTERFACE_PLAYBACK_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_PLAYBACK_MINOR) {
+        if (base_interface->major_version != SPICE_INTERFACE_PLAYBACK_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_PLAYBACK_MINOR) {
             spice_warning("unsupported playback interface");
             return -1;
         }
         snd_attach_playback(reds, SPICE_UPCAST(SpicePlaybackInstance, sin));
 
-    } else if (strcmp(interface->type, SPICE_INTERFACE_RECORD) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_RECORD) == 0) {
         spice_debug("SPICE_INTERFACE_RECORD");
-        if (interface->major_version != SPICE_INTERFACE_RECORD_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_RECORD_MINOR) {
+        if (base_interface->major_version != SPICE_INTERFACE_RECORD_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_RECORD_MINOR) {
             spice_warning("unsupported record interface");
             return -1;
         }
         snd_attach_record(reds, SPICE_UPCAST(SpiceRecordInstance, sin));
 
-    } else if (strcmp(interface->type, SPICE_INTERFACE_CHAR_DEVICE) == 0) {
-        if (interface->major_version != SPICE_INTERFACE_CHAR_DEVICE_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_CHAR_DEVICE_MINOR) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_CHAR_DEVICE) == 0) {
+        if (base_interface->major_version != SPICE_INTERFACE_CHAR_DEVICE_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_CHAR_DEVICE_MINOR) {
             spice_warning("unsupported char device interface");
             return -1;
         }
         spice_server_char_device_add_interface(reds, sin);
 
-    } else if (strcmp(interface->type, SPICE_INTERFACE_MIGRATION) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_MIGRATION) == 0) {
         spice_debug("SPICE_INTERFACE_MIGRATION");
         if (reds->migration_interface) {
             spice_warning("already have migration");
             return -1;
         }
 
-        if (interface->major_version != SPICE_INTERFACE_MIGRATION_MAJOR ||
-            interface->minor_version > SPICE_INTERFACE_MIGRATION_MINOR) {
+        if (base_interface->major_version != SPICE_INTERFACE_MIGRATION_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_MIGRATION_MINOR) {
             spice_warning("unsupported migration interface");
             return -1;
         }
@@ -3504,30 +3440,30 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *reds,
 SPICE_GNUC_VISIBLE int spice_server_remove_interface(SpiceBaseInstance *sin)
 {
     RedsState *reds;
-    const SpiceBaseInterface *interface;
+    const SpiceBaseInterface *base_interface;
 
     g_return_val_if_fail(sin != NULL, -1);
 
-    interface = sin->sif;
-    if (strcmp(interface->type, SPICE_INTERFACE_TABLET) == 0) {
+    base_interface = sin->sif;
+    if (strcmp(base_interface->type, SPICE_INTERFACE_TABLET) == 0) {
         SpiceTabletInstance *tablet = SPICE_UPCAST(SpiceTabletInstance, sin);
         g_return_val_if_fail(tablet->st != NULL, -1);
         reds = spice_tablet_state_get_server(tablet->st);
         spice_debug("remove SPICE_INTERFACE_TABLET");
         inputs_channel_detach_tablet(reds->inputs_channel, tablet);
         reds_update_mouse_mode(reds);
-    } else if (strcmp(interface->type, SPICE_INTERFACE_PLAYBACK) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_PLAYBACK) == 0) {
         spice_debug("remove SPICE_INTERFACE_PLAYBACK");
         snd_detach_playback(SPICE_UPCAST(SpicePlaybackInstance, sin));
-    } else if (strcmp(interface->type, SPICE_INTERFACE_RECORD) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_RECORD) == 0) {
         spice_debug("remove SPICE_INTERFACE_RECORD");
         snd_detach_record(SPICE_UPCAST(SpiceRecordInstance, sin));
-    } else if (strcmp(interface->type, SPICE_INTERFACE_CHAR_DEVICE) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_CHAR_DEVICE) == 0) {
         SpiceCharDeviceInstance *char_device = SPICE_UPCAST(SpiceCharDeviceInstance, sin);
         g_return_val_if_fail(char_device->st != NULL, -1);
         reds = red_char_device_get_server(char_device->st);
         return spice_server_char_device_remove_interface(reds, sin);
-    } else if (strcmp(interface->type, SPICE_INTERFACE_QXL) == 0) {
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_QXL) == 0) {
         QXLInstance *qxl;
 
         qxl = SPICE_UPCAST(QXLInstance, sin);
@@ -3566,6 +3502,11 @@ static int do_spice_init(RedsState *reds, SpiceCoreInterface *core_interface)
     if (!(reds->mig_timer = reds->core.timer_add(&reds->core, migrate_timeout, reds))) {
         spice_error("migration timer create failed");
     }
+    /* Note that this will not actually send the mm_time to the client because
+     * the main channel is not connected yet. This would have been redundant
+     * with the RED_PIPE_ITEM_TYPE_MAIN_INIT message anyway.
+     */
+    reds_enable_mm_time(reds);
 
     if (reds_init_net(reds) < 0) {
         spice_warning("Failed to open SPICE sockets");
@@ -3684,6 +3625,16 @@ static gboolean get_name_index(const EnumNames names[], const char *name, uint32
     return FALSE;
 }
 
+/* returns NULL if index is invalid. */
+static const char *get_index_name(const EnumNames names[], uint32_t index)
+{
+    while (names->name != NULL && names->id != index) {
+        names++;
+    }
+
+    return names->name;
+}
+
 static const EnumNames renderer_names[] = {
     {RED_RENDERER_SW, "sw"},
     {RED_RENDERER_INVALID, NULL},
@@ -3731,6 +3682,24 @@ static const int video_codec_caps[] = {
     SPICE_DISPLAY_CAP_CODEC_VP9,
 };
 
+char *reds_get_video_codec_fullname(RedVideoCodec *codec)
+{
+    int i;
+    const char *encoder_name = NULL;
+    const char *codec_name = get_index_name(video_codec_names, codec->type);
+
+    spice_assert(codec_name);
+
+    for (i = 0; i < G_N_ELEMENTS(video_encoder_procs); i++) {
+        if (video_encoder_procs[i] == codec->create) {
+            encoder_name = get_index_name(video_encoder_names, i);
+            break;
+        }
+    }
+    spice_assert(encoder_name);
+
+    return g_strdup_printf("%s:%s", encoder_name, codec_name);
+}
 
 /* Parses the given codec string and returns newly-allocated strings describing
  * the next encoder and codec in the list. These strings must be freed by the
@@ -3741,8 +3710,7 @@ static const int video_codec_caps[] = {
  * @codec: a location to return the parsed codec
  * @return the position of the next codec in the string
  */
-static const char* parse_next_video_codec(const char *codecs, char **encoder,
-                                          char **codec)
+static char* parse_next_video_codec(char *codecs, char **encoder, char **codec)
 {
     if (!codecs) {
         return NULL;
@@ -3751,44 +3719,60 @@ static const char* parse_next_video_codec(const char *codecs, char **encoder,
     if (!*codecs) {
         return NULL;
     }
-    int n;
+    int end_encoder, end_codec = -1;
     *encoder = *codec = NULL;
-    if (sscanf(codecs, "%m[0-9a-zA-Z_]:%m[0-9a-zA-Z_]%n", encoder, codec, &n) == 2) {
-        // this avoids accepting "encoder:codec" followed by garbage like "$%*"
-        if (codecs[n] != ';' && codecs[n] != '\0') {
-            free(*codec);
-            *codec = NULL;
-        }
+    if (sscanf(codecs, "%*[0-9a-zA-Z_]:%n%*[0-9a-zA-Z_];%n", &end_encoder, &end_codec) == 0
+        && end_codec > 0) {
+        codecs[end_encoder - 1] = '\0';
+        codecs[end_codec - 1] = '\0';
+        *encoder = codecs;
+        *codec = codecs + end_encoder;
+        return codecs + end_codec;
     }
     return codecs + strcspn(codecs, ";");
 }
 
-static void reds_set_video_codecs_from_string(RedsState *reds, const char *codecs)
+/* Enable the encoders/codecs from the list specified in @codecs.
+ *
+ * @reds: the #RedsState to modify
+ * @codecs: a codec string in the following format: encoder:codec;encoder:codec
+ * @installed: (optional): a location to return the number of codecs successfull installed
+ * @return -1 if @codecs is %NULL (@installed is not modified) or the number of invalid
+ *         encoders/codecs found in @codecs.
+ */
+static int reds_set_video_codecs_from_string(RedsState *reds, const char *codecs,
+                                             unsigned int *installed)
 {
     char *encoder_name, *codec_name;
     GArray *video_codecs;
+    int invalid_codecs = 0;
 
-    g_return_if_fail(codecs != NULL);
+    g_return_val_if_fail(codecs != NULL, -1);
 
     if (strcmp(codecs, "auto") == 0) {
         codecs = default_video_codecs;
     }
 
     video_codecs = g_array_new(FALSE, FALSE, sizeof(RedVideoCodec));
-    const char *c = codecs;
+    char *codecs_copy = g_strdup_printf("%s;", codecs);
+    char *c = codecs_copy;
     while ( (c = parse_next_video_codec(c, &encoder_name, &codec_name)) ) {
         uint32_t encoder_index, codec_index;
         if (!encoder_name || !codec_name) {
             spice_warning("spice: invalid encoder:codec value at %s", codecs);
+            invalid_codecs++;
 
         } else if (!get_name_index(video_encoder_names, encoder_name, &encoder_index)){
             spice_warning("spice: unknown video encoder %s", encoder_name);
+            invalid_codecs++;
 
         } else if (!get_name_index(video_codec_names, codec_name, &codec_index)) {
             spice_warning("spice: unknown video codec %s", codec_name);
+            invalid_codecs++;
 
         } else if (!video_encoder_procs[encoder_index]) {
             spice_warning("spice: unsupported video encoder %s", encoder_name);
+            invalid_codecs++;
 
         } else {
             RedVideoCodec new_codec;
@@ -3798,19 +3782,23 @@ static void reds_set_video_codecs_from_string(RedsState *reds, const char *codec
             g_array_append_val(video_codecs, new_codec);
         }
 
-        /* these are allocated by sscanf, do not use g_free */
-        free(encoder_name);
-        free(codec_name);
         codecs = c;
+    }
+
+    if (installed) {
+        *installed = video_codecs->len;
     }
 
     if (video_codecs->len == 0) {
         spice_warning("Failed to set video codecs, input string: '%s'", codecs);
         g_array_unref(video_codecs);
-        return;
+    } else {
+        reds_set_video_codecs(reds, video_codecs);
     }
 
-    reds_set_video_codecs(reds, video_codecs);
+    g_free(codecs_copy);
+
+    return invalid_codecs;
 }
 
 SPICE_GNUC_VISIBLE int spice_server_init(SpiceServer *reds, SpiceCoreInterface *core)
@@ -3822,7 +3810,7 @@ SPICE_GNUC_VISIBLE int spice_server_init(SpiceServer *reds, SpiceCoreInterface *
         reds_add_renderer(reds, default_renderer);
     }
     if (reds->config->video_codecs->len == 0) {
-        reds_set_video_codecs_from_string(reds, default_video_codecs);
+        reds_set_video_codecs_from_string(reds, default_video_codecs, NULL);
     }
     return ret;
 }
@@ -3861,7 +3849,7 @@ SPICE_GNUC_VISIBLE void spice_server_destroy(SpiceServer *reds)
     if (reds->main_channel) {
         red_channel_destroy(RED_CHANNEL(reds->main_channel));
     }
-    reds_core_timer_remove(reds, reds->mig_timer);
+    red_timer_remove(reds->mig_timer);
 
     if (reds->ctx) {
         SSL_CTX_free(reds->ctx);
@@ -4168,9 +4156,26 @@ uint32_t reds_get_streaming_video(const RedsState *reds)
 
 SPICE_GNUC_VISIBLE int spice_server_set_video_codecs(SpiceServer *reds, const char *video_codecs)
 {
-    reds_set_video_codecs_from_string(reds, video_codecs);
+    unsigned int installed = 0;
+
+    reds_set_video_codecs_from_string(reds, video_codecs, &installed);
+
+    if (!installed) {
+        return -1;
+    }
     reds_on_vc_change(reds);
+
     return 0;
+}
+
+SPICE_GNUC_VISIBLE const char *spice_server_get_video_codecs(SpiceServer *reds)
+{
+    return video_codecs_to_string(reds_get_video_codecs(reds), ";");
+}
+
+SPICE_GNUC_VISIBLE void spice_server_free_video_codecs(SpiceServer *reds, const char *video_codecs)
+{
+    g_free((char *) video_codecs);
 }
 
 GArray* reds_get_video_codecs(const RedsState *reds)
@@ -4354,7 +4359,12 @@ SPICE_GNUC_VISIBLE int spice_server_migrate_switch(SpiceServer *reds)
        return 0;
     }
     reds->expect_migrate = FALSE;
-    reds_mig_switch(reds);
+    if (!reds->config->mig_spice) {
+        spice_warning("spice_server_migrate_switch called without migrate_info set");
+        return 0;
+    }
+    main_channel_migrate_switch(reds->main_channel, reds->config->mig_spice);
+    reds_mig_release(reds->config);
     return 0;
 }
 
@@ -4418,24 +4428,6 @@ SpiceWatch *reds_core_watch_add(RedsState *reds,
    return reds->core.watch_add(&reds->core, fd, event_mask, func, opaque);
 }
 
-void reds_core_watch_update_mask(RedsState *reds,
-                                 SpiceWatch *watch,
-                                 int event_mask)
-{
-   g_return_if_fail(reds != NULL);
-   g_return_if_fail(reds->core.watch_update_mask != NULL);
-
-   reds->core.watch_update_mask(&reds->core, watch, event_mask);
-}
-
-void reds_core_watch_remove(RedsState *reds, SpiceWatch *watch)
-{
-   g_return_if_fail(reds != NULL);
-   g_return_if_fail(reds->core.watch_remove != NULL);
-
-   reds->core.watch_remove(&reds->core, watch);
-}
-
 SpiceTimer *reds_core_timer_add(RedsState *reds,
                                 SpiceTimerFunc func,
                                 void *opaque)
@@ -4445,38 +4437,6 @@ SpiceTimer *reds_core_timer_add(RedsState *reds,
 
    return reds->core.timer_add(&reds->core, func, opaque);
 
-}
-
-void reds_core_timer_start(RedsState *reds,
-                           SpiceTimer *timer,
-                           uint32_t ms)
-{
-   g_return_if_fail(reds != NULL);
-   g_return_if_fail(reds->core.timer_start != NULL);
-
-   return reds->core.timer_start(&reds->core, timer, ms);
-}
-
-void reds_core_timer_cancel(RedsState *reds,
-                            SpiceTimer *timer)
-{
-   g_return_if_fail(reds != NULL);
-   g_return_if_fail(reds->core.timer_cancel != NULL);
-
-   return reds->core.timer_cancel(&reds->core, timer);
-}
-
-void reds_core_timer_remove(RedsState *reds,
-                            SpiceTimer *timer)
-{
-    if (timer == NULL) {
-        return;
-    }
-
-    g_return_if_fail(reds != NULL);
-    g_return_if_fail(reds->core.timer_remove != NULL);
-
-    reds->core.timer_remove(&reds->core, timer);
 }
 
 void reds_update_client_mouse_allowed(RedsState *reds)

@@ -10,8 +10,7 @@ if not meson.is_subproject()
 endif
 
 # some global vars
-spice_common_global_cflags = ['-DHAVE_CONFIG_H',
-                              '-DG_LOG_DOMAIN="Spice"',
+spice_common_global_cflags = ['-DG_LOG_DOMAIN="Spice"',
                               '-Wall',
                               '-Wextra',
                               '-Werror',
@@ -37,8 +36,11 @@ if host_machine.endian() == 'big'
   spice_common_config_data.set('WORDS_BIGENDIAN', '1')
 endif
 
-if get_option('recorder')
+if get_option('instrumentation') == 'recorder'
   spice_common_config_data.set('ENABLE_RECORDER', '1')
+endif
+if get_option('instrumentation') == 'agent'
+  spice_common_config_data.set('ENABLE_AGENT_INTERFACE', '1')
 endif
 
 spice_common_generate_code = get_option('generate-code')
@@ -164,12 +166,13 @@ add_project_arguments(compiler.get_supported_arguments(spice_common_global_cflag
 #
 subdir('python_modules')
 subdir('common')
-subdir('tests')
+if get_option('tests')
+  subdir('tests')
+endif
 subdir('docs')
 
 #
 # write config.h
 #
 configure_file(output : 'config.h',
-               install : false,
                configuration : spice_common_config_data)

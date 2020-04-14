@@ -14,9 +14,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <pthread.h>
 #include <string.h>
@@ -412,7 +410,7 @@ static WindowImage *glz_dictionary_window_get_new_head(SharedDictionary *dict, i
     GLZ_ASSERT(dict->cur_usr, dict->window.used_segs_head != NULL_IMAGE_SEG_ID);
     GLZ_ASSERT(dict->cur_usr, dict->window.used_segs_tail != NULL_IMAGE_SEG_ID);
 
-    // used_segs_head is the latest logical head (the physical head may preceed it)
+    // used_segs_head is the latest logical head (the physical head may precede it)
     cur_head = dict->window.segs[dict->window.used_segs_head].image;
     cur_win_size = dict->window.segs[dict->window.used_segs_tail].pixels_num +
         dict->window.segs[dict->window.used_segs_tail].pixels_so_far -

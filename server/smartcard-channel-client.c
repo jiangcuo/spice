@@ -14,9 +14,9 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
+
+#define RedCharDeviceClientOpaque RedChannelClient
 
 #include "smartcard-channel-client.h"
 
@@ -47,30 +47,6 @@ smartcard_channel_client_release_msg_rcv_buf(RedChannelClient *rcc, uint16_t typ
                                              uint32_t size, uint8_t *msg);
 static void smartcard_channel_client_on_disconnect(RedChannelClient *rcc);
 
-static void smart_card_channel_client_get_property(GObject *object,
-                                                   guint property_id,
-                                                   GValue *value,
-                                                   GParamSpec *pspec)
-{
-    switch (property_id)
-    {
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-    }
-}
-
-static void smart_card_channel_client_set_property(GObject *object,
-                                                   guint property_id,
-                                                   const GValue *value,
-                                                   GParamSpec *pspec)
-{
-    switch (property_id)
-    {
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-    }
-}
-
 static void smart_card_channel_client_finalize(GObject *object)
 {
     SmartCardChannelClient *self = SMARTCARD_CHANNEL_CLIENT(object);
@@ -90,8 +66,6 @@ static void smart_card_channel_client_class_init(SmartCardChannelClientClass *kl
     client_class->release_recv_buf = smartcard_channel_client_release_msg_rcv_buf;
     client_class->on_disconnect = smartcard_channel_client_on_disconnect;
 
-    object_class->get_property = smart_card_channel_client_get_property;
-    object_class->set_property = smart_card_channel_client_set_property;
     object_class->finalize = smart_card_channel_client_finalize;
 }
 
@@ -123,11 +97,10 @@ smartcard_channel_client_alloc_msg_rcv_buf(RedChannelClient *rcc,
                                            uint16_t type, uint32_t size)
 {
     SmartCardChannelClient *scc = SMARTCARD_CHANNEL_CLIENT(rcc);
-    RedClient *client = red_channel_client_get_client(rcc);
 
-    /* todo: only one reader is actually supported. When we fix the code to support
-     * multiple readers, we will porbably associate different devices to
-     * differenc channels */
+    /* TODO: only one reader is actually supported. When we fix the code to support
+     * multiple readers, we will probably associate different devices to
+     * different channels */
     if (!scc->priv->smartcard) {
         scc->priv->msg_in_write_buf = FALSE;
         return g_malloc(size);
@@ -139,7 +112,7 @@ smartcard_channel_client_alloc_msg_rcv_buf(RedChannelClient *rcc,
         spice_assert(smartcard_char_device_get_client(smartcard) || scc->priv->smartcard);
         spice_assert(!scc->priv->write_buf);
         scc->priv->write_buf =
-            red_char_device_write_buffer_get_client(RED_CHAR_DEVICE(smartcard), client, size);
+            red_char_device_write_buffer_get_client(RED_CHAR_DEVICE(smartcard), rcc, size);
 
         if (!scc->priv->write_buf) {
             spice_error("failed to allocate write buffer");
@@ -220,8 +193,7 @@ static void smartcard_channel_client_push_error(RedChannelClient *rcc,
     red_channel_client_pipe_add_push(rcc, &error_item->base);
 }
 
-static void smartcard_channel_client_add_reader(SmartCardChannelClient *scc,
-                                                uint8_t *name)
+static void smartcard_channel_client_add_reader(SmartCardChannelClient *scc)
 {
     if (!scc->priv->smartcard) { /* we already tried to attach a reader to the client
                                           when it connected */
@@ -276,20 +248,17 @@ bool smartcard_channel_client_handle_message(RedChannelClient *rcc,
                                              uint32_t size,
                                              void *message)
 {
-    uint8_t *msg = message;
     VSCMsgHeader* vheader = message;
     SmartCardChannelClient *scc = SMARTCARD_CHANNEL_CLIENT(rcc);
 
     if (type != SPICE_MSGC_SMARTCARD_DATA) {
-        /* Handles seamless migration protocol. Also handles ack's,
-         * spicy sends them while spicec does not */
-        return red_channel_client_handle_message(rcc, type, size, msg);
+        /* Handles seamless migration protocol. Also handles ack's */
+        return red_channel_client_handle_message(rcc, type, size, message);
     }
 
-    spice_assert(size == vheader->length + sizeof(VSCMsgHeader));
     switch (vheader->type) {
         case VSC_ReaderAdd:
-            smartcard_channel_client_add_reader(scc, msg + sizeof(VSCMsgHeader));
+            smartcard_channel_client_add_reader(scc);
             return TRUE;
             break;
         case VSC_ReaderRemove:
@@ -306,7 +275,8 @@ bool smartcard_channel_client_handle_message(RedChannelClient *rcc,
         case VSC_APDU:
             break; // passed on to device
         default:
-            printf("ERROR: unexpected message on smartcard channel\n");
+            red_channel_warning(red_channel_client_get_channel(rcc),
+                                "ERROR: unexpected message on smartcard channel");
             return TRUE;
     }
 
@@ -317,7 +287,8 @@ bool smartcard_channel_client_handle_message(RedChannelClient *rcc,
                             vheader->reader_id, vheader->type, vheader->length);
         return FALSE;
     }
-    spice_assert(scc->priv->write_buf->buf == msg);
+    spice_assert(scc->priv->write_buf->buf_size >= size);
+    memcpy(scc->priv->write_buf->buf, message, size);
     smartcard_channel_client_write_to_reader(scc);
 
     return TRUE;

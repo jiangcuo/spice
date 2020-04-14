@@ -65,6 +65,13 @@ libspice_common_la_SOURCES += \
 	$(NULL)
 endif
 
+if ENABLE_AGENT_INTERFACE
+libspice_common_la_SOURCES += \
+	agent_interface.c		\
+	agent_interface.h		\
+	$(NULL)
+endif
+
 # These 2 files are not build as part of spice-common
 # build system, but modules using spice-common will build
 # them with the appropriate options. We need to let automake
@@ -114,7 +121,7 @@ generated_client_demarshallers.c generated_messages.h: $(top_srcdir)/spice.proto
 	--generated-declaration-file generated_messages.h $< $@ >/dev/null
 
 generated_client_marshallers.c generated_client_marshallers.h: $(top_srcdir)/spice.proto $(MARSHALLERS_DEPS)
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P --include client_marshallers.h --client \
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers -P --include common/client_marshallers.h --client \
 	--generate-header $< $@ >/dev/null
 
 generated_server_demarshallers.c: $(top_srcdir)/spice.proto $(MARSHALLERS_DEPS)
@@ -136,6 +143,10 @@ EXTRA_DIST =				\
 	lz_decompress_tmpl.c		\
 	quic_family_tmpl.c		\
 	quic_tmpl.c			\
+	$(NULL)
+
+GITIGNOREFILES = \
+	generated_messages.h \
 	$(NULL)
 
 -include $(top_srcdir)/git.mk

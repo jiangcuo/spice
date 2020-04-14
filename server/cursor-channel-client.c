@@ -15,9 +15,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <common/generated_server_marshallers.h>
 
@@ -40,7 +38,6 @@ struct CursorChannelClientPrivate
     RedCacheItem *cursor_cache[CURSOR_CACHE_HASH_SIZE];
     Ring cursor_cache_lru;
     long cursor_cache_available;
-    uint32_t cursor_cache_items;
 };
 
 G_DEFINE_TYPE_WITH_PRIVATE(CursorChannelClient, cursor_channel_client,

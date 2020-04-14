@@ -16,9 +16,7 @@
   License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 #include "common/messages.h"
 #include <string.h>
 #include <assert.h>
@@ -398,6 +396,7 @@ static uint8_t * parse_msg_wait_for_channels(uint8_t *message_start, uint8_t *me
     out = (SpiceMsgWaitForChannels *)data;
 
     out->wait_count = consume_uint8(&in);
+    verify(sizeof(out->wait_list) == 0);
     for (i = 0; i < wait_list__nelements; i++) {
         SpiceWaitForChannel *out2;
         out2 = (SpiceWaitForChannel *)end;
@@ -511,6 +510,7 @@ static uint8_t * parse_msg_notify(uint8_t *message_start, uint8_t *message_end, 
     out->visibilty = consume_uint32(&in);
     out->what = consume_uint32(&in);
     out->message_len = consume_uint32(&in);
+    verify(sizeof(out->message) == 0);
     memcpy(out->message, in, message__nelements);
     in += message__nelements;
     end += message__nelements;
@@ -820,6 +820,7 @@ static uint8_t * parse_msg_main_channels_list(uint8_t *message_start, uint8_t *m
     out = (SpiceMsgChannels *)data;
 
     out->num_of_channels = consume_uint32(&in);
+    verify(sizeof(out->channels) == 0);
     for (i = 0; i < channels__nelements; i++) {
         SpiceChannelId *out2;
         out2 = (SpiceChannelId *)end;
@@ -1188,6 +1189,7 @@ static uint8_t * parse_msg_main_name(uint8_t *message_start, uint8_t *message_en
     out = (SpiceMsgMainName *)data;
 
     out->name_len = consume_uint32(&in);
+    verify(sizeof(out->name) == 0);
     memcpy(out->name, in, name__nelements);
     in += name__nelements;
     end += name__nelements;
@@ -1541,6 +1543,7 @@ static uint8_t * parse_struct_SpiceClipRects(uint8_t *message_start, SPICE_GNUC_
 
     out->num_rects = consume_uint32(&in);
     rects__nelements = out->num_rects;
+    verify(sizeof(out->rects) == 0);
     for (i = 0; i < rects__nelements; i++) {
         SpiceRect *out2;
         out2 = (SpiceRect *)end;
@@ -1734,6 +1737,7 @@ static uint8_t * parse_msg_display_inval_list(uint8_t *message_start, uint8_t *m
     out = (SpiceResourceList *)data;
 
     out->count = consume_uint16(&in);
+    verify(sizeof(out->resources) == 0);
     for (i = 0; i < resources__nelements; i++) {
         SpiceResourceID *out2;
         out2 = (SpiceResourceID *)end;
@@ -1800,6 +1804,7 @@ static uint8_t * parse_msg_display_inval_all_pixmaps(uint8_t *message_start, uin
     out = (SpiceMsgWaitForChannels *)data;
 
     out->wait_count = consume_uint8(&in);
+    verify(sizeof(out->wait_list) == 0);
     for (i = 0; i < wait_list__nelements; i++) {
         SpiceWaitForChannel *out2;
         out2 = (SpiceWaitForChannel *)end;
@@ -2042,6 +2047,7 @@ static uint8_t * parse_msg_display_stream_data(uint8_t *message_start, uint8_t *
         out->base.multi_media_time = consume_uint32(&in);
     }
     out->data_size = consume_uint32(&in);
+    verify(sizeof(out->data) == 0);
     memcpy(out->data, in, data__nelements);
     in += data__nelements;
     end += data__nelements;
@@ -2542,6 +2548,7 @@ static uint8_t * parse_struct_SpicePalette(uint8_t *message_start, SPICE_GNUC_UN
     out->unique = consume_uint64(&in);
     out->num_ents = consume_uint16(&in);
     ents__nelements = out->num_ents;
+    verify(sizeof(out->ents) == 0);
     for (i = 0; i < ents__nelements; i++) {
         out->ents[i] = consume_uint32(&in);
         end += sizeof(uint32_t);
@@ -4501,6 +4508,7 @@ static uint8_t * parse_struct_SpicePath(uint8_t *message_start, SPICE_GNUC_UNUSE
         out2->flags = consume_uint8(&in);
         out2->count = consume_uint32(&in);
         points__nelements = out2->count;
+        verify(sizeof(out2->points) == 0);
         for (j = 0; j < points__nelements; j++) {
             SpicePointFix *out3;
             out3 = (SpicePointFix *)end;
@@ -5050,6 +5058,7 @@ static uint8_t * parse_struct_SpiceString(uint8_t *message_start, SPICE_GNUC_UNU
             out2->width = consume_uint16(&in);
             out2->height = consume_uint16(&in);
             data__nelements = (((uint64_t) out2->width + 7U) / 8U ) * out2->height;
+            verify(sizeof(out2->data) == 0);
             memcpy(out2->data, in, data__nelements);
             in += data__nelements;
             end += data__nelements;
@@ -5082,6 +5091,7 @@ static uint8_t * parse_struct_SpiceString(uint8_t *message_start, SPICE_GNUC_UNU
             out2->width = consume_uint16(&in);
             out2->height = consume_uint16(&in);
             data__nelements = ((4U * (uint64_t) out2->width + 7U) / 8U ) * out2->height;
+            verify(sizeof(out2->data) == 0);
             memcpy(out2->data, in, data__nelements);
             in += data__nelements;
             end += data__nelements;
@@ -5114,6 +5124,7 @@ static uint8_t * parse_struct_SpiceString(uint8_t *message_start, SPICE_GNUC_UNU
             out2->width = consume_uint16(&in);
             out2->height = consume_uint16(&in);
             data__nelements = ((uint64_t) out2->width * out2->height);
+            verify(sizeof(out2->data) == 0);
             memcpy(out2->data, in, data__nelements);
             in += data__nelements;
             end += data__nelements;
@@ -5894,6 +5905,7 @@ static uint8_t * parse_msg_display_stream_data_sized(uint8_t *message_start, uin
         out->dest.right = consume_int32(&in);
     }
     out->data_size = consume_uint32(&in);
+    verify(sizeof(out->data) == 0);
     memcpy(out->data, in, data__nelements);
     in += data__nelements;
     end += data__nelements;
@@ -5956,6 +5968,7 @@ static uint8_t * parse_msg_display_monitors_config(uint8_t *message_start, uint8
 
     out->count = consume_uint16(&in);
     out->max_allowed = consume_uint16(&in);
+    verify(sizeof(out->heads) == 0);
     for (i = 0; i < heads__nelements; i++) {
         SpiceHead *out2;
         out2 = (SpiceHead *)end;
@@ -7115,6 +7128,7 @@ static uint8_t * parse_SpiceMsgAudioVolume(uint8_t *message_start, uint8_t *mess
     out = (SpiceMsgAudioVolume *)data;
 
     out->nchannels = consume_uint8(&in);
+    verify(sizeof(out->volume) == 0);
     for (i = 0; i < volume__nelements; i++) {
         out->volume[i] = consume_uint16(&in);
         end += sizeof(uint16_t);
@@ -7376,6 +7390,7 @@ static uint8_t * parse_msg_smartcard_data(uint8_t *message_start, uint8_t *messa
     out->type = consume_uint32(&in);
     out->reader_id = consume_uint32(&in);
     out->length = consume_uint32(&in);
+    verify(sizeof(out->data) == 0);
     memcpy(out->data, in, data__nelements);
     in += data__nelements;
     end += data__nelements;

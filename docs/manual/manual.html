@@ -1386,17 +1386,19 @@ which are described when running remote-viewer with <code>--help-spice</code>.</
 </div>
 </div>
 <div class="sect1">
-<h2 id="streamingagent">Streaming Agent</h2>
+<h2 id="videostreaming">Video Streaming</h2>
 <div class="sectionbody">
-<div class="paragraph"><p>The SPICE streaming agent allows to send an encoded video stream of the guest
-desktop to the client.</p></div>
+<div class="paragraph"><p>SPICE streaming allows sending an encoded video stream of the guest
+desktop to the client. The encoding can be done from the host (inside
+SPICE server) or from the guest, with the help of the SPICE streaming
+agent.</p></div>
 <div class="paragraph"><p>The streaming agent is a daemon/service running in the guest OS so it must be
 installed if it does not yet exist on the guest system.  It relies on a
 dedicated spiceport char device to achieve communication between the guest and
 the host.  This device must be added to the virtual machine as described below
 for the streaming agent to work in the guest.</p></div>
 <div class="sect2">
-<h3 id="_configuration_4">Configuration</h3>
+<h3 id="_guest_video_encoding_agent_configuration">Guest Video Encoding: Agent Configuration</h3>
 <div class="paragraph"><div class="title">Using virt-manager</div><p>The needed device can be added from the virtual machine
 details. Click on "Add hardware" and then add a "Channel" device with
 type "Spice port (spiceport)". The port should be named
@@ -1438,6 +1440,49 @@ http://www.gnu.org/software/src-highlite -->
 <pre><tt>-device virtserialport<span style="color: #990000">,</span><span style="color: #009900">bus</span><span style="color: #990000">=</span>virtio-serial<span style="color: #993399">0.0</span><span style="color: #990000">,</span><span style="color: #009900">nr</span><span style="color: #990000">=</span><span style="color: #993399">1</span><span style="color: #990000">,</span><span style="color: #009900">chardev</span><span style="color: #990000">=</span>charchannel1<span style="color: #990000">,</span><span style="color: #009900">id</span><span style="color: #990000">=</span>channel1<span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>org<span style="color: #990000">.</span>spice-space<span style="color: #990000">.</span>stream<span style="color: #990000">.</span><span style="color: #993399">0</span> <span style="color: #990000">\</span>
 -chardev spiceport<span style="color: #990000">,</span><span style="color: #009900">name</span><span style="color: #990000">=</span>org<span style="color: #990000">.</span>spice-space<span style="color: #990000">.</span>stream<span style="color: #990000">.</span><span style="color: #993399">0</span><span style="color: #990000">,</span><span style="color: #009900">id</span><span style="color: #990000">=</span>charchannel1</tt></pre></div></div>
 </div>
+<div class="sect2">
+<h3 id="_host_video_encoding">Host Video Encoding</h3>
+<div class="paragraph"><p>For host video encoding, SPICE natively supports MJPEG encoding. For
+using further codecs, SPICE server must be compiled with GStreamer
+support.</p></div>
+<div class="paragraph"><div class="title">Setting</div><p>SPICE video streaming parameter can take three values:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+<code>off</code>: no video detection is performed,
+</p>
+</li>
+<li>
+<p>
+<code>all</code>: any fast-refreshing window can be encoded into a video stream,
+</p>
+</li>
+<li>
+<p>
+<code>filter</code>: SPICE server adds additional filters to decide if video
+  streaming should be activated (at the moment, only small window
+  surfaces are skipped),
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><div class="title">Using libvirt</div><p>The <code>streaming</code> tag must be added to Spice <code>graphics</code>:</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #0000FF">&lt;graphics</span></span> <span style="color: #009900">type</span><span style="color: #990000">=</span><span style="color: #FF0000">'spice'</span> <span style="color: #009900">autoport</span><span style="color: #990000">=</span><span style="color: #FF0000">'yes'</span><span style="font-weight: bold"><span style="color: #0000FF">&gt;</span></span>
+    <span style="font-weight: bold"><span style="color: #0000FF">&lt;streaming</span></span> <span style="color: #009900">mode</span><span style="color: #990000">=</span><span style="color: #FF0000">'off|all|filter'</span><span style="font-weight: bold"><span style="color: #0000FF">/&gt;</span></span>
+<span style="font-weight: bold"><span style="color: #0000FF">&lt;/graphics&gt;</span></span></tt></pre></div></div>
+<div class="paragraph"><div class="title">Using QEMU</div><p>Adding the following parameters to your QEMU command line will enable
+SPICE server video encoding:</p></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>-spice <span style="color: #990000">...,</span>streaming-video<span style="color: #990000">=</span>off<span style="color: #990000">|</span>all<span style="color: #990000">|</span>filter<span style="color: #990000">,...</span></tt></pre></div></div>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -1452,7 +1497,7 @@ the client and the remote simultaneously.</p></div>
 and its certificates. It can successfully be used with the coolkey
 PKCS#11 module.</p></div>
 <div class="sect2">
-<h3 id="_configuration_5">Configuration</h3>
+<h3 id="_configuration_4">Configuration</h3>
 <div class="paragraph"><div class="title">Using virt-manager</div><p>In the hardware details, click on "Add Hardware", then select
 "Smartcard". Add a "passthrough" device type.</p></div>
 <div class="paragraph"><div class="title">Using libvirt</div><p>Setup a "passthrough" smartcard of type "spicevmc" on a CCID
@@ -1510,7 +1555,7 @@ make any other change to get multiple heads in a Linux guest. The
 following paragraph will deal with adding multiple QXL devices to get
 multiple monitors in a Windows guest.</p></div>
 <div class="sect2">
-<h3 id="_configuration_6">Configuration</h3>
+<h3 id="_configuration_5">Configuration</h3>
 <div class="paragraph"><div class="title">Using virt-manager</div><p>To add an additional QXL device for Windows guests, simply go to your
 virtual machine details. Check that you already have a "Video QXL"
 device, if not, click on "Add Hardware", and add a "Video" device with
@@ -1566,7 +1611,7 @@ official CA, or by passing to the client the certificate of the
 authority which signed the host certificate. The latter allows the use
 of self-signed certificates.</p></div>
 <div class="sect2">
-<h3 id="_configuration_7">Configuration</h3>
+<h3 id="_configuration_6">Configuration</h3>
 <div class="admonitionblock">
 <table><tr>
 <td class="icon">
@@ -1724,7 +1769,7 @@ handle your VM.</p></div>
 <div class="paragraph"><p>To troubleshoot SASL issues, running <code>strace -e open</code> on the QEMU
 process can be a useful first step.</p></div>
 <div class="sect2">
-<h3 id="_configuration_8">Configuration</h3>
+<h3 id="_configuration_7">Configuration</h3>
 <div class="paragraph"><div class="title">Using virt-manager</div><p>It&#8217;s currently not possible to enable SASL from virt-manager.</p></div>
 <div class="paragraph"><div class="title">Using libvirt</div><p>SASL support for SPICE has been added to libvirt mid-October 2013 so
 you need a libvirt version that was released after this date. To
@@ -1756,9 +1801,9 @@ ticket was passed to the client.</p></div>
 sharing is disabled. Use the remote-viewer "File" &#8594; "Preferences" menu
 to enable it. The default shared directory is the XDG Public Share directory
 (ie <em>~/Public</em> if you use a regular system). You may specify a different folder
-with <code>--spice-share-dir</code> client option.</p></div>
+with <code>--spice-shared-dir</code> client option.</p></div>
 <div class="sect2">
-<h3 id="_configuration_9">Configuration</h3>
+<h3 id="_configuration_8">Configuration</h3>
 <div class="paragraph"><div class="title">Using virt-manager</div><p>In the hardware details, click on "Add Hardware", then select
 "Channel". Add a "Spice port" device type with the
 "org.spice-space.webdav.0" name.</p></div>
@@ -1810,7 +1855,7 @@ Linux kernel and Mesa 11.1.</p></div>
 <div class="paragraph"><p>Client-side, you need spice-gtk 0.31.</p></div>
 <div class="paragraph"><p>Guest-side, you need Mesa 11.1 and a 4.4 Linux kernel.</p></div>
 <div class="sect2">
-<h3 id="_configuration_10">Configuration</h3>
+<h3 id="_configuration_9">Configuration</h3>
 <div class="paragraph"><div class="title">Using libvirt</div><p>You need to add a virtio-gpu video device to your virtual machine instead of QXL.</p></div>
 <div class="listingblock">
 <div class="content"><!-- Generator: GNU source-highlight
@@ -2029,7 +2074,7 @@ their repositories. It will show you step by step how to build the
 required Spice components.</p></div>
 <div class="sect3">
 <h4 id="_client_requirements">Client requirements</h4>
-<div class="paragraph"><p>See the <a href="https://gitlab.freedesktop.org/spice/spice-gtk/raw/master/README">https://gitlab.freedesktop.org/spice/spice-gtk/raw/master/README</a>
+<div class="paragraph"><p>See the <a href="https://gitlab.freedesktop.org/spice/spice-gtk/raw/master/README.md">https://gitlab.freedesktop.org/spice/spice-gtk/raw/master/README.md</a>
 [README file in spice-gtk] for the list of dependencies.</p></div>
 </div>
 <div class="sect3">
@@ -2212,11 +2257,8 @@ Christophe Fergeau<br />
 Lubos Kocman<br />
 Marc-André Lureau<br />
 Yaniv Kamay</p></div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="glossary">Glossary</h2>
-<div class="sectionbody">
+<div class="sect2">
+<h3 id="glossary">Glossary</h3>
 <div class="dlist glossary"><dl>
 <dt>
 Host
@@ -2246,11 +2288,12 @@ Client is referring to a system running the Spice client (the recommended one is
 </div>
 </div>
 </div>
+</div>
 <div id="footnotes"><hr /></div>
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2019-04-30 09:51:04 BST
+ 2020-02-27 11:26:12 GMT
 </div>
 </div>
 </body>

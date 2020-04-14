@@ -60,6 +60,9 @@ valid_attributes=set([
     'outvar',
     # C structure has an anonymous member (used in switch)
     'anon',
+    # the C structure contains a pointer to a SpiceChunks structure.
+    # The SpiceChunks structure is allocated inside the demarshalled
+    # buffer and data will point to original message.
     'chunk',
     # this channel is contained in an #ifdef section
     # the argument specifies the preprocessor define to check
@@ -98,7 +101,7 @@ def fix_attributes(attribute_list):
         attrs[name] = lst
 
     # these attributes specify output format, only one can be set
-    output_attrs = set(['end', 'to_ptr', 'as_ptr', 'ptr_array', 'zero'])
+    output_attrs = set(['end', 'to_ptr', 'as_ptr', 'ptr_array', 'zero', 'chunk'])
     if len(output_attrs.intersection(attrs.keys())) > 1:
         raise Exception("Multiple output type attributes specified %s" % output_attrs)
 
@@ -485,7 +488,36 @@ class ArrayType(Type):
     def c_type(self):
         return self.element_type.c_type()
 
+    def check_valid(self, member):
+        # These attribute corresponds to specific structure size
+        if member.has_attr("chunk") or member.has_attr("as_ptr"):
+            return
+        # These attribute indicate that the array is stored in the structure
+        # as a pointer of the array. If there's no way to retrieve the length
+        # of the array give error, as the user has no way to do bound checks
+        if member.has_attr("to_ptr") or member.has_attr("ptr_array"):
+            if not (self.is_identifier_length() or self.is_constant_length()):
+                raise Exception("Unsecure, no length of array")
+            return
+        # This attribute indicate that the array is store at the end
+        # of the structure, the user will compute the length from the
+        # entire message size
+        if member.has_end_attr():
+            return
+        # Avoid bug, the array has no length specified and no space
+        # would be allocated
+        if self.is_remaining_length():
+            raise Exception('C output array is not allocated')
+        # For constant length (like "foo[5]") the field is a sized array
+        # For identifier automatically a pointer to allocated data is store,
+        # in this case user can read the size using the other field specified
+        # by the identifier
+        if self.is_constant_length() or self.is_identifier_length():
+            return
+        raise NotImplementedError('unknown array %s' % str(self))
+
     def generate_c_declaration(self, writer, member):
+        self.check_valid(member)
         name = member.name
         if member.has_attr("chunk"):
             return writer.writeln('SpiceChunks *%s;' % name)
@@ -497,7 +529,7 @@ class ArrayType(Type):
             return writer.writeln('%s *%s;' % (self.c_type(), name))
         if member.has_attr("ptr_array"):
             return writer.writeln('%s *%s[0];' % (self.c_type(), name))
-        if member.has_end_attr() or self.is_remaining_length():
+        if member.has_end_attr():
             return writer.writeln('%s %s[0];' % (self.c_type(), name))
         if self.is_constant_length():
             return writer.writeln('%s %s[%s];' % (self.c_type(), name, self.size))
@@ -884,8 +916,6 @@ class ContainerType(Type):
                     member = m.lookup_case_member(name)
                     if member != None:
                         break
-                if member != None:
-                    break
 
         if member == None:
             raise Exception("No member called %s found" % name)

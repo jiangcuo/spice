@@ -14,14 +14,11 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <common/sw_canvas.h>
 
 #include "display-channel-private.h"
-#include "glib-compat.h"
 #include "red-qxl.h"
 
 G_DEFINE_TYPE(DisplayChannel, display_channel, TYPE_COMMON_GRAPHICS_CHANNEL)
@@ -257,6 +254,8 @@ void display_channel_set_video_codecs(DisplayChannel *display, GArray *video_cod
     g_clear_pointer(&display->priv->video_codecs, g_array_unref);
     display->priv->video_codecs = g_array_ref(video_codecs);
     g_object_notify(G_OBJECT(display), "video-codecs");
+
+    video_stream_detach_and_stop(display);
 }
 
 GArray *display_channel_get_video_codecs(DisplayChannel *display)
@@ -2034,7 +2033,11 @@ void display_channel_update(DisplayChannel *display,
     SpiceRect rect;
     RedSurface *surface;
 
-    spice_return_if_fail(display_channel_validate_surface(display, surface_id));
+    // Check that the request is valid, the surface_id comes directly from the guest
+    if (!display_channel_validate_surface(display, surface_id)) {
+        // just return, display_channel_validate_surface already logged a warning
+        return;
+    }
 
     red_get_rect_ptr(&rect, area);
     display_channel_draw(display, &rect, surface_id);
@@ -2261,8 +2264,6 @@ DisplayChannel* display_channel_new(RedsState *reds,
     return display;
 }
 
-static SpiceCanvas *image_surfaces_get(SpiceImageSurfaces *surfaces, uint32_t surface_id);
-static void drawables_init(DisplayChannel *display);
 static void
 display_channel_init(DisplayChannel *self)
 {
@@ -2275,12 +2276,17 @@ display_channel_init(DisplayChannel *self)
     self->priv = g_new0(DisplayChannelPrivate, 1);
     self->priv->image_compression = SPICE_IMAGE_COMPRESSION_AUTO_GLZ;
     self->priv->pub = self;
+    self->priv->renderer = RED_RENDERER_INVALID;
+    self->priv->stream_video = SPICE_STREAM_VIDEO_OFF;
 
     image_encoder_shared_init(&self->priv->encoder_shared_data);
 
     ring_init(&self->priv->current_list);
     drawables_init(self);
     self->priv->image_surfaces.ops = &image_surfaces_ops;
+
+    image_cache_init(&self->priv->image_cache);
+    display_channel_init_video_streams(self);
 }
 
 static void
@@ -2293,8 +2299,6 @@ display_channel_constructed(GObject *object)
 
     spice_assert(self->priv->video_codecs);
 
-    self->priv->renderer = RED_RENDERER_INVALID;
-
     stat_init(&self->priv->add_stat, "add", CLOCK_THREAD_CPUTIME_ID);
     stat_init(&self->priv->exclude_stat, "exclude", CLOCK_THREAD_CPUTIME_ID);
     stat_init(&self->priv->__exclude_stat, "__exclude", CLOCK_THREAD_CPUTIME_ID);
@@ -2306,9 +2310,6 @@ display_channel_constructed(GObject *object)
                       "add_to_cache", TRUE);
     stat_init_counter(&self->priv->non_cache_counter, reds, stat,
                       "non_cache", TRUE);
-    image_cache_init(&self->priv->image_cache);
-    self->priv->stream_video = SPICE_STREAM_VIDEO_OFF;
-    display_channel_init_video_streams(self);
 
     red_channel_set_cap(channel, SPICE_DISPLAY_CAP_MONITORS_CONFIG);
     red_channel_set_cap(channel, SPICE_DISPLAY_CAP_PREF_COMPRESSION);

@@ -14,9 +14,7 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif
 
 #include <fcntl.h>
 
@@ -55,7 +53,7 @@ static uint8_t *common_alloc_recv_buf(RedChannelClient *rcc, uint16_t type, uint
     }
 
     if (size > CHANNEL_RECEIVE_BUF_SIZE) {
-        spice_critical("unexpected message size %u (max is %d)", size, CHANNEL_RECEIVE_BUF_SIZE);
+        spice_warning("unexpected message size %u (max is %d)", size, CHANNEL_RECEIVE_BUF_SIZE);
         return NULL;
     }
     return common->priv->recv_buf;

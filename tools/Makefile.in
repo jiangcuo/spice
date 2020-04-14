@@ -88,7 +88,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-noinst_PROGRAMS = reds_stat$(EXEEXT) $(am__EXEEXT_1)
+@OS_WIN32_FALSE@noinst_PROGRAMS = reds_stat$(EXEEXT) $(am__EXEEXT_1)
 subdir = tools
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_valgrind_check.m4 \
@@ -111,8 +111,10 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__EXEEXT_1 =
 PROGRAMS = $(noinst_PROGRAMS)
+am__reds_stat_SOURCES_DIST = reds_stat.c
 am__objects_1 =
-am_reds_stat_OBJECTS = reds_stat.$(OBJEXT) $(am__objects_1)
+@OS_WIN32_FALSE@am_reds_stat_OBJECTS = reds_stat.$(OBJEXT) \
+@OS_WIN32_FALSE@	$(am__objects_1)
 reds_stat_OBJECTS = $(am_reds_stat_OBJECTS)
 reds_stat_LDADD = $(LDADD)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -155,7 +157,7 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(reds_stat_SOURCES)
-DIST_SOURCES = $(reds_stat_SOURCES)
+DIST_SOURCES = $(am__reds_stat_SOURCES_DIST)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -370,9 +372,9 @@ AM_LDFLAGS = \
 	$(LIBRT) \
 	$(NULL)
 
-reds_stat_SOURCES = \
-	reds_stat.c \
-	$(NULL)
+@OS_WIN32_FALSE@reds_stat_SOURCES = \
+@OS_WIN32_FALSE@	reds_stat.c \
+@OS_WIN32_FALSE@	$(NULL)
 
 EXTRA_DIST = \
 	meson.build \
@@ -391,9 +393,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu tools/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign tools/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu tools/Makefile
+	  $(AUTOMAKE) --foreign tools/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \

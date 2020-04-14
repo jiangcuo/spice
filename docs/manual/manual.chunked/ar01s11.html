@@ -3,7 +3,7 @@
 sharing is disabled. Use the remote-viewer "File" → "Preferences" menu
 to enable it. The default shared directory is the XDG Public Share directory
 (ie <span class="emphasis"><em>~/Public</em></span> if you use a regular system). You may specify a different folder
-with <code class="literal">--spice-share-dir</code> client option.</p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="_configuration_9"></a>11.1. Configuration</h3></div></div></div><p><strong>Using virt-manager. </strong>In the hardware details, click on "Add Hardware", then select
+with <code class="literal">--spice-shared-dir</code> client option.</p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="_configuration_8"></a>11.1. Configuration</h3></div></div></div><p><strong>Using virt-manager. </strong>In the hardware details, click on "Add Hardware", then select
 "Channel". Add a "Spice port" device type with the
 "org.spice-space.webdav.0" name.</p><p><strong>Using libvirt. </strong>In order to set up folder sharing, qemu needs to expose a
 <code class="literal">org.spice-space.webdav.0</code> virtio port, associated with a

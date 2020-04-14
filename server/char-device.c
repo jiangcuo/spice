@@ -22,10 +22,13 @@
 
 #include <config.h>
 #include <inttypes.h>
+
+
+typedef struct RedCharDeviceClientOpaque RedCharDeviceClientOpaque;
+#define RedCharDeviceClientOpaque RedCharDeviceClientOpaque
+
 #include "char-device.h"
-#include "red-client.h"
 #include "reds.h"
-#include "glib-compat.h"
 
 #define CHAR_DEVICE_WRITE_TO_TIMEOUT 100
 #define RED_CHAR_DEVICE_WAIT_TOKENS_TIMEOUT 30000
@@ -39,7 +42,7 @@ typedef enum {
 } WriteBufferOrigin;
 
 struct RedCharDeviceWriteBufferPrivate {
-    RedClient *client; /* The client that sent the message to the device.
+    RedCharDeviceClientOpaque *client; /* The client that sent the message to the device.
                           NULL if the server created the message */
     WriteBufferOrigin origin;
     uint32_t token_price;
@@ -49,7 +52,7 @@ struct RedCharDeviceWriteBufferPrivate {
 typedef struct RedCharDeviceClient RedCharDeviceClient;
 struct RedCharDeviceClient {
     RedCharDevice *dev;
-    RedClient *client;
+    RedCharDeviceClientOpaque *client;
     int do_flow_control;
     uint64_t num_client_tokens;
     uint64_t num_client_tokens_free; /* client messages that were consumed by the device */
@@ -108,16 +111,18 @@ red_char_device_read_one_msg_from_device(RedCharDevice *dev)
 static void
 red_char_device_send_msg_to_client(RedCharDevice *dev,
                                    RedPipeItem *msg,
-                                   RedClient *client)
+                                   RedCharDeviceClientOpaque *client)
 {
-   RedCharDeviceClass *klass = RED_CHAR_DEVICE_GET_CLASS(dev);
+    RedCharDeviceClass *klass = RED_CHAR_DEVICE_GET_CLASS(dev);
 
-   klass->send_msg_to_client(dev, msg, client);
+    if (klass->send_msg_to_client != NULL) {
+        klass->send_msg_to_client(dev, msg, client);
+    }
 }
 
 static void
 red_char_device_send_tokens_to_client(RedCharDevice *dev,
-                                      RedClient *client,
+                                      RedCharDeviceClientOpaque *client,
                                       uint32_t tokens)
 {
    RedCharDeviceClass *klass = RED_CHAR_DEVICE_GET_CLASS(dev);
@@ -140,7 +145,7 @@ red_char_device_on_free_self_token(RedCharDevice *dev)
 }
 
 static void
-red_char_device_remove_client(RedCharDevice *dev, RedClient *client)
+red_char_device_remove_client(RedCharDevice *dev, RedCharDeviceClientOpaque *client)
 {
    RedCharDeviceClass *klass = RED_CHAR_DEVICE_GET_CLASS(dev);
 
@@ -149,11 +154,11 @@ red_char_device_remove_client(RedCharDevice *dev, RedClient *client)
 
 static void red_char_device_write_buffer_free(RedCharDeviceWriteBuffer *buf)
 {
-    if (buf == NULL)
-        return;
-
-    g_free(buf->buf);
-    g_free(buf);
+    if (buf) {
+        g_free(buf->priv);
+    }
+    /* NOTE: do not free buf. buf was contained into a larger structure
+     * which contained both private and public part and was freed above */
 }
 
 static void write_buffers_queue_free(GQueue *write_queue)
@@ -185,7 +190,7 @@ static void red_char_device_client_free(RedCharDevice *dev,
 {
     GList *l, *next;
 
-    reds_core_timer_remove(dev->priv->reds, dev_client->wait_for_tokens_timer);
+    red_timer_remove(dev_client->wait_for_tokens_timer);
     dev_client->wait_for_tokens_timer = NULL;
 
     g_queue_free_full(dev_client->send_queue, (GDestroyNotify)red_pipe_item_unref);
@@ -222,13 +227,11 @@ static void red_char_device_handle_client_overflow(RedCharDeviceClient *dev_clie
 }
 
 static RedCharDeviceClient *red_char_device_client_find(RedCharDevice *dev,
-                                                        RedClient *client)
+                                                        RedCharDeviceClientOpaque *client)
 {
-    GList *item;
+    RedCharDeviceClient *dev_client;
 
-    for (item = dev->priv->clients; item != NULL; item = item->next) {
-        RedCharDeviceClient *dev_client = item->data;
-
+    GLIST_FOREACH(dev->priv->clients, RedCharDeviceClient, dev_client) {
         if (dev_client->client == client) {
             return dev_client;
         }
@@ -254,12 +257,10 @@ static int red_char_device_can_send_to_client(RedCharDeviceClient *dev_client)
 
 static uint64_t red_char_device_max_send_tokens(RedCharDevice *dev)
 {
-    GList *item;
+    RedCharDeviceClient *dev_client;
     uint64_t max = 0;
 
-    for (item = dev->priv->clients; item != NULL; item = item->next) {
-        RedCharDeviceClient *dev_client = item->data;
-
+    GLIST_FOREACH(dev->priv->clients, RedCharDeviceClient, dev_client) {
         if (!dev_client->do_flow_control) {
             max = ~0;
             break;
@@ -275,8 +276,6 @@ static uint64_t red_char_device_max_send_tokens(RedCharDevice *dev)
 static void red_char_device_add_msg_to_client_queue(RedCharDeviceClient *dev_client,
                                                     RedPipeItem *msg)
 {
-    RedCharDevice *dev = dev_client->dev;
-
     if (g_queue_get_length(dev_client->send_queue) >= dev_client->max_send_queue_size) {
         red_char_device_handle_client_overflow(dev_client);
         return;
@@ -285,8 +284,8 @@ static void red_char_device_add_msg_to_client_queue(RedCharDeviceClient *dev_cli
     red_pipe_item_ref(msg);
     g_queue_push_head(dev_client->send_queue, msg);
     if (!dev_client->wait_for_tokens_started) {
-        reds_core_timer_start(dev->priv->reds, dev_client->wait_for_tokens_timer,
-                              RED_CHAR_DEVICE_WAIT_TOKENS_TIMEOUT);
+        red_timer_start(dev_client->wait_for_tokens_timer,
+                        RED_CHAR_DEVICE_WAIT_TOKENS_TIMEOUT);
         dev_client->wait_for_tokens_started = TRUE;
     }
 }
@@ -294,13 +293,9 @@ static void red_char_device_add_msg_to_client_queue(RedCharDeviceClient *dev_cli
 static void red_char_device_send_msg_to_clients(RedCharDevice *dev,
                                                 RedPipeItem *msg)
 {
-    GList *l;
+    RedCharDeviceClient *dev_client;
 
-    l = dev->priv->clients;
-    while (l) {
-        GList *next = l->next;
-        RedCharDeviceClient *dev_client = l->data;
-
+    GLIST_FOREACH(dev->priv->clients, RedCharDeviceClient, dev_client) {
         if (red_char_device_can_send_to_client(dev_client)) {
             dev_client->num_send_tokens--;
             spice_assert(g_queue_is_empty(dev_client->send_queue));
@@ -310,7 +305,6 @@ static void red_char_device_send_msg_to_clients(RedCharDevice *dev,
         } else {
             red_char_device_add_msg_to_client_queue(dev_client, msg);
         }
-        l = next;
     }
 }
 
@@ -377,10 +371,24 @@ static void red_char_device_client_send_queue_push(RedCharDeviceClient *dev_clie
     }
 }
 
-static void red_char_device_send_to_client_tokens_absorb(RedCharDeviceClient *dev_client,
-                                                         uint32_t tokens)
+static void
+red_char_device_send_to_client_tokens_absorb(RedCharDevice *dev,
+                                             RedCharDeviceClientOpaque *client,
+                                             uint32_t tokens,
+                                             bool reset)
 {
-    RedCharDevice *dev = dev_client->dev;
+    RedCharDeviceClient *dev_client;
+
+    dev_client = red_char_device_client_find(dev, client);
+
+    if (!dev_client) {
+        spice_error("client wasn't found dev %p client %p", dev, client);
+        return;
+    }
+
+    if (reset) {
+        dev_client->num_send_tokens = 0;
+    }
     dev_client->num_send_tokens += tokens;
 
     if (g_queue_get_length(dev_client->send_queue)) {
@@ -389,46 +397,28 @@ static void red_char_device_send_to_client_tokens_absorb(RedCharDeviceClient *de
     }
 
     if (red_char_device_can_send_to_client(dev_client)) {
-        reds_core_timer_cancel(dev->priv->reds, dev_client->wait_for_tokens_timer);
+        red_timer_cancel(dev_client->wait_for_tokens_timer);
         dev_client->wait_for_tokens_started = FALSE;
         red_char_device_read_from_device(dev_client->dev);
     } else if (!g_queue_is_empty(dev_client->send_queue)) {
-        reds_core_timer_start(dev->priv->reds, dev_client->wait_for_tokens_timer,
-                              RED_CHAR_DEVICE_WAIT_TOKENS_TIMEOUT);
+        red_timer_start(dev_client->wait_for_tokens_timer,
+                        RED_CHAR_DEVICE_WAIT_TOKENS_TIMEOUT);
         dev_client->wait_for_tokens_started = TRUE;
     }
 }
 
 void red_char_device_send_to_client_tokens_add(RedCharDevice *dev,
-                                               RedClient *client,
+                                               RedCharDeviceClientOpaque *client,
                                                uint32_t tokens)
 {
-    RedCharDeviceClient *dev_client;
-
-    dev_client = red_char_device_client_find(dev, client);
-
-    if (!dev_client) {
-        spice_error("client wasn't found dev %p client %p", dev, client);
-        return;
-    }
-    red_char_device_send_to_client_tokens_absorb(dev_client, tokens);
+    red_char_device_send_to_client_tokens_absorb(dev, client, tokens, false);
 }
 
 void red_char_device_send_to_client_tokens_set(RedCharDevice *dev,
-                                               RedClient *client,
+                                               RedCharDeviceClientOpaque *client,
                                                uint32_t tokens)
 {
-    RedCharDeviceClient *dev_client;
-
-    dev_client = red_char_device_client_find(dev, client);
-
-    if (!dev_client) {
-        spice_error("client wasn't found dev %p client %p", dev, client);
-        return;
-    }
-
-    dev_client->num_send_tokens = 0;
-    red_char_device_send_to_client_tokens_absorb(dev_client, tokens);
+    red_char_device_send_to_client_tokens_absorb(dev, client, tokens, true);
 }
 
 /**************************
@@ -473,7 +463,7 @@ static int red_char_device_write_to_device(RedCharDevice *dev)
     g_object_ref(dev);
 
     if (dev->priv->write_to_dev_timer) {
-        reds_core_timer_cancel(dev->priv->reds, dev->priv->write_to_dev_timer);
+        red_timer_cancel(dev->priv->write_to_dev_timer);
     }
 
     sif = spice_char_device_get_interface(dev->priv->sin);
@@ -510,8 +500,8 @@ static int red_char_device_write_to_device(RedCharDevice *dev)
     if (dev->priv->running) {
         if (dev->priv->cur_write_buf) {
             if (dev->priv->write_to_dev_timer) {
-                reds_core_timer_start(dev->priv->reds, dev->priv->write_to_dev_timer,
-                                      CHAR_DEVICE_WRITE_TO_TIMEOUT);
+                red_timer_start(dev->priv->write_to_dev_timer,
+                                CHAR_DEVICE_WRITE_TO_TIMEOUT);
             }
         } else {
             spice_assert(g_queue_is_empty(&dev->priv->write_queue));
@@ -528,13 +518,13 @@ static void red_char_device_write_retry(void *opaque)
     RedCharDevice *dev = opaque;
 
     if (dev->priv->write_to_dev_timer) {
-        reds_core_timer_cancel(dev->priv->reds, dev->priv->write_to_dev_timer);
+        red_timer_cancel(dev->priv->write_to_dev_timer);
     }
     red_char_device_write_to_device(dev);
 }
 
 static RedCharDeviceWriteBuffer *
-red_char_device_write_buffer_get(RedCharDevice *dev, RedClient *client, int size,
+red_char_device_write_buffer_get(RedCharDevice *dev, RedCharDeviceClientOpaque *client, int size,
                                  WriteBufferOrigin origin, int migrated_data_tokens)
 {
     RedCharDeviceWriteBuffer *ret;
@@ -546,22 +536,27 @@ red_char_device_write_buffer_get(RedCharDevice *dev, RedClient *client, int size
     ret = g_queue_pop_tail(&dev->priv->write_bufs_pool);
     if (ret) {
         dev->priv->cur_pool_size -= ret->buf_size;
-    } else {
+        if (ret->buf_size < size) {
+            spice_assert(!spice_extra_checks || ret->priv->refs == 1);
+            red_char_device_write_buffer_free(ret);
+            ret = NULL;
+        }
+    }
+    if (ret == NULL) {
         struct RedCharDeviceWriteBufferFull {
-            RedCharDeviceWriteBuffer buffer;
             RedCharDeviceWriteBufferPrivate priv;
+            RedCharDeviceWriteBuffer buffer;
         } *write_buf;
-        write_buf = g_new0(struct RedCharDeviceWriteBufferFull, 1);
+        write_buf = g_malloc(sizeof(struct RedCharDeviceWriteBufferFull) + size);
+        memset(write_buf, 0, sizeof(*write_buf));
+        write_buf->priv.refs = 1;
         ret = &write_buf->buffer;
+        ret->buf_size = size;
         ret->priv = &write_buf->priv;
     }
 
     spice_assert(!ret->buf_used);
 
-    if (ret->buf_size < size) {
-        ret->buf = g_realloc(ret->buf, size);
-        ret->buf_size = size;
-    }
     ret->priv->origin = origin;
 
     if (origin == WRITE_BUFFER_ORIGIN_CLIENT) {
@@ -598,7 +593,7 @@ error:
 }
 
 RedCharDeviceWriteBuffer *red_char_device_write_buffer_get_client(RedCharDevice *dev,
-                                                                  RedClient *client,
+                                                                  RedCharDeviceClientOpaque *client,
                                                                   int size)
 {
     spice_assert(client);
@@ -658,7 +653,7 @@ void red_char_device_write_buffer_release(RedCharDevice *dev,
 
     WriteBufferOrigin buf_origin = write_buf->priv->origin;
     uint32_t buf_token_price = write_buf->priv->token_price;
-    RedClient *client = write_buf->priv->client;
+    RedCharDeviceClientOpaque *client = write_buf->priv->client;
 
     if (!dev) {
         g_warning("no device. write buffer is freed");
@@ -697,17 +692,13 @@ void red_char_device_reset_dev_instance(RedCharDevice *dev,
     g_object_notify(G_OBJECT(dev), "sin");
 }
 
-void red_char_device_destroy(RedCharDevice *char_dev)
-{
-    g_return_if_fail(RED_IS_CHAR_DEVICE(char_dev));
-    g_object_unref(char_dev);
-}
-
-static RedCharDeviceClient *red_char_device_client_new(RedClient *client,
-                                                       int do_flow_control,
-                                                       uint32_t max_send_queue_size,
-                                                       uint32_t num_client_tokens,
-                                                       uint32_t num_send_tokens)
+static RedCharDeviceClient *
+red_char_device_client_new(RedsState *reds,
+                           RedCharDeviceClientOpaque *client,
+                           int do_flow_control,
+                           uint32_t max_send_queue_size,
+                           uint32_t num_client_tokens,
+                           uint32_t num_send_tokens)
 {
     RedCharDeviceClient *dev_client;
 
@@ -717,8 +708,6 @@ static RedCharDeviceClient *red_char_device_client_new(RedClient *client,
     dev_client->max_send_queue_size = max_send_queue_size;
     dev_client->do_flow_control = do_flow_control;
     if (do_flow_control) {
-        RedsState *reds = red_client_get_server(client);
-
         dev_client->wait_for_tokens_timer =
             reds_core_timer_add(reds, device_client_wait_for_tokens_timeout,
                                 dev_client);
@@ -736,7 +725,7 @@ static RedCharDeviceClient *red_char_device_client_new(RedClient *client,
 }
 
 bool red_char_device_client_add(RedCharDevice *dev,
-                                RedClient *client,
+                                RedCharDeviceClientOpaque *client,
                                 int do_flow_control,
                                 uint32_t max_send_queue_size,
                                 uint32_t num_client_tokens,
@@ -757,7 +746,9 @@ bool red_char_device_client_add(RedCharDevice *dev,
     dev->priv->wait_for_migrate_data = wait_for_migrate_data;
 
     spice_debug("char device %p, client %p", dev, client);
-    dev_client = red_char_device_client_new(client, do_flow_control,
+    dev_client = red_char_device_client_new(dev->priv->reds,
+                                            client,
+                                            do_flow_control,
                                             max_send_queue_size,
                                             num_client_tokens,
                                             num_send_tokens);
@@ -769,7 +760,7 @@ bool red_char_device_client_add(RedCharDevice *dev,
 }
 
 void red_char_device_client_remove(RedCharDevice *dev,
-                                   RedClient *client)
+                                   RedCharDeviceClientOpaque *client)
 {
     RedCharDeviceClient *dev_client;
 
@@ -796,7 +787,7 @@ void red_char_device_client_remove(RedCharDevice *dev,
 }
 
 int red_char_device_client_exists(RedCharDevice *dev,
-                                  RedClient *client)
+                                  RedCharDeviceClientOpaque *client)
 {
     return (red_char_device_client_find(dev, client) != NULL);
 }
@@ -817,13 +808,13 @@ void red_char_device_stop(RedCharDevice *dev)
     dev->priv->running = FALSE;
     dev->priv->active = FALSE;
     if (dev->priv->write_to_dev_timer) {
-        reds_core_timer_cancel(dev->priv->reds, dev->priv->write_to_dev_timer);
+        red_timer_cancel(dev->priv->write_to_dev_timer);
     }
 }
 
 void red_char_device_reset(RedCharDevice *dev)
 {
-    GList *client_item;
+    RedCharDeviceClient *dev_client;
     RedCharDeviceWriteBuffer *buf;
 
     dev->priv->wait_for_migrate_data = FALSE;
@@ -833,9 +824,7 @@ void red_char_device_reset(RedCharDevice *dev)
     }
     red_char_device_write_buffer_release(dev, &dev->priv->cur_write_buf);
 
-    for (client_item = dev->priv->clients; client_item != NULL; client_item = client_item->next) {
-        RedCharDeviceClient *dev_client = client_item->data;
-
+    GLIST_FOREACH(dev->priv->clients, RedCharDeviceClient, dev_client) {
         spice_debug("send_queue_empty %d", g_queue_is_empty(dev_client->send_queue));
         dev_client->num_send_tokens += g_queue_get_length(dev_client->send_queue);
         g_queue_free_full(dev_client->send_queue, (GDestroyNotify)red_pipe_item_unref);
@@ -1004,7 +993,7 @@ static void red_char_device_init_device_instance(RedCharDevice *self)
 
     g_return_if_fail(self->priv->reds);
 
-    reds_core_timer_remove(self->priv->reds, self->priv->write_to_dev_timer);
+    red_timer_remove(self->priv->write_to_dev_timer);
     self->priv->write_to_dev_timer = NULL;
 
     if (self->priv->sin == NULL) {
@@ -1094,7 +1083,7 @@ red_char_device_finalize(GObject *object)
 {
     RedCharDevice *self = RED_CHAR_DEVICE(object);
 
-    reds_core_timer_remove(self->priv->reds, self->priv->write_to_dev_timer);
+    red_timer_remove(self->priv->write_to_dev_timer);
     self->priv->write_to_dev_timer = NULL;
 
     write_buffers_queue_free(&self->priv->write_queue);
@@ -1176,6 +1165,11 @@ SPICE_GNUC_VISIBLE void spice_server_port_event(SpiceCharDeviceInstance *sin, ui
     }
 
     return klass->port_event(sin->st, event);
+}
+
+SpiceCharDeviceInstance *red_char_device_get_device_instance(RedCharDevice *dev)
+{
+    return dev->priv->sin;
 }
 
 static void

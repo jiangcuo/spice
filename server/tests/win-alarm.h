@@ -1,6 +1,6 @@
 /* -*- Mode: C; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
-   Copyright (C) 2009-2015 Red Hat, Inc.
+   Copyright (C) 2018 Red Hat, Inc.
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -15,10 +15,12 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+#ifndef TEST_WIN_ALARM_H
+#define TEST_WIN_ALARM_H
 
-#ifndef SPICE_EXPERIMENTAL_H_
-#define SPICE_EXPERIMENTAL_H_
+#ifdef _WIN32
+void test_alarm(unsigned int timeout);
+#define alarm test_alarm
+#endif
 
-#warning spice-experimental.h is deprecated
-
-#endif /* SPICE_EXPERIMENTAL_H_ */
+#endif // TEST_WIN_ALARM_H
