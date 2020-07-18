@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 
-%:
+build-arch build-indep build clean install-indep install-arch install binary-arch binary-indep binary: %:
 	dh $@
 
 override_dh_auto_configure:
