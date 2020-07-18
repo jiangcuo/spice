@@ -1,6 +1,6 @@
-Format: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=174
+Format: https://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=174
 Upstream-Name: spice
-Source: http://www.spice-space.org/
+Source: https://www.spice-space.org/
 
 Files: *
 Copyright: Copyright (C) 2009-2017 Red Hat, Inc.
