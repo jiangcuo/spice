@@ -1,1 +1,5 @@
 disable-failing-test-listen.patch
+CVE-2020-14355/0001-quic-Check-we-have-some-data-to-start-decoding-quic-.patch
+CVE-2020-14355/0002-quic-Check-image-size-in-quic_decode_begin.patch
+CVE-2020-14355/0003-quic-Check-RLE-lengths.patch
+CVE-2020-14355/0004-quic-Avoid-possible-buffer-overflow-in-find_bucket.patch
