@@ -1,3 +1,27 @@
+spice (0.14.3-2) unstable; urgency=medium
+
+  [ Christian Ehrhardt ]
+  * - d/t/automated-tests: d/t/control: make test work again
+  * - d/t/control: install new test dependency python-pil
+  * - d/t/regression-test.py,d/t/base_test.ppm: add files
+      dropped in release tarball but needed for autopkgtests
+  * - d/source/include-binaries: allow binary base_test.ppm in package
+
+  [ Michael Tokarev ]
+  * build on riscv64 too (Closes: #958349)
+  * bump debhelper compat to 12 and switch to debhelper-compat build-dep
+  * add Rules-Requires-Root: no
+  * d/rules: run dh for recognized targets only
+  * use secure (https) URLs in d/control & d/copyright
+
+  [ Salvatore Bonaccorso ]
+  * Point Vcs-{Git,Browser} field to qemu-team packaging repository
+    (Closes: #971873)
+  * Fix multiple buffer overflow vulnerabilities in QUIC image decoding
+    (CVE-2020-14355) (Closes: #971750)
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Thu, 29 Oct 2020 10:57:02 +0300
+
 spice (0.14.3-1) unstable; urgency=medium
 
   * new upstream version (Closes: #940057, #954629)
