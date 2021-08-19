@@ -26,6 +26,8 @@
 #include <common/draw.h>
 
 
+SPICE_BEGIN_DECLS
+
 /* A structure containing the data for a compressed frame. See encode_frame(). */
 typedef struct VideoBuffer VideoBuffer;
 struct VideoBuffer {
@@ -42,11 +44,11 @@ struct VideoBuffer {
     void (*free)(VideoBuffer *buffer);
 };
 
-enum {
+typedef enum {
     VIDEO_ENCODER_FRAME_UNSUPPORTED = -1,
     VIDEO_ENCODER_FRAME_DROP,
     VIDEO_ENCODER_FRAME_ENCODE_DONE,
-};
+} VideoEncodeResults;
 
 typedef struct VideoEncoderStats {
     uint64_t starting_bit_rate;
@@ -77,10 +79,10 @@ struct VideoEncoder {
      *     VIDEO_ENCODER_FRAME_DROP if the frame was dropped. This value can
      *                              only happen if rate control is active.
      */
-    int (*encode_frame)(VideoEncoder *encoder, uint32_t frame_mm_time,
-                        const SpiceBitmap *bitmap,
-                        const SpiceRect *src, int top_down,
-                        gpointer bitmap_opaque, VideoBuffer** outbuf);
+    VideoEncodeResults (*encode_frame)(VideoEncoder *encoder, uint32_t frame_mm_time,
+                                       const SpiceBitmap *bitmap,
+                                       const SpiceRect *src, int top_down,
+                                       gpointer bitmap_opaque, VideoBuffer** outbuf);
 
     /*
      * Bit rate control methods.
@@ -100,7 +102,7 @@ struct VideoEncoder {
      *                 report.
      * @end_frame_delay: This indicates how long in advance the client
      *                 received the last frame before having to display it.
-     * @audio delay:   The latency of the audio playback or MAX_UINT if it
+     * @audio_delay:   The latency of the audio playback or MAX_UINT if it
      *                 is not tracked.
      */
     void (*client_stream_report)(VideoEncoder *encoder,
@@ -214,5 +216,7 @@ typedef struct RedVideoCodec {
 } RedVideoCodec;
 
 char *video_codecs_to_string(GArray *video_codecs, const char *sep);
+
+SPICE_END_DECLS
 
 #endif /* VIDEO_ENCODER_H_ */

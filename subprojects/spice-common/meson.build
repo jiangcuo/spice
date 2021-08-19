@@ -2,8 +2,9 @@
 # project definition
 #
 project('spice-common', 'c',
-         meson_version : '>= 0.48.0',
-         license : 'LGPLv2.1')
+        meson_version : '>= 0.48.0',
+        license : 'LGPLv2.1',
+        default_options : ['warning_level=2'])
 
 if not meson.is_subproject()
   warning('This project is only intended to be used as a subproject!')
@@ -11,9 +12,6 @@ endif
 
 # some global vars
 spice_common_global_cflags = ['-DG_LOG_DOMAIN="Spice"',
-                              '-Wall',
-                              '-Wextra',
-                              '-Werror',
                               '-Wno-unused-parameter']
 
 if get_option('alignment-checks')
@@ -54,14 +52,8 @@ headers = ['alloca.h',
            'arpa/inet.h',
            'dlfcn.h',
            'inttypes.h',
-           'malloc.h',
-           'memory.h',
            'netinet/in.h',
-           'stddef.h',
-           'stdint.h',
            'stdlib.h',
-           'strings.h',
-           'string.h',
            'sys/socket.h',
            'sys/stat.h',
            'sys/types.h',
@@ -89,15 +81,11 @@ foreach func : functions
   endif
 endforeach
 
-# check for hypot function
-#
-# Include math.h header to avoid problems with builtins.
-# In some systems the function is in libm.
-if not compiler.has_function('hypot', prefix : '#include <math.h>')
-  libm = compiler.find_library('m', required : false)
-  if compiler.has_function('hypot', prefix : '#include <math.h>', dependencies : libm)
-    spice_common_deps += libm
-  endif
+# FIXME
+# check for libm, as workaround for https://github.com/mesonbuild/meson/issues/3740
+libm = compiler.find_library('m', required : false)
+if libm.found()
+  spice_common_deps += libm
 endif
 
 #
@@ -106,10 +94,15 @@ endif
 glib_version = '2.38'
 glib_version_info = '>= @0@'.format(glib_version)
 
-deps = {'spice-protocol' : '>= 0.12.12',
+spice_protocol_version = '0.14.2'
+
+spice_protocol_version_req = get_option('spice-protocol-version')
+if spice_protocol_version_req.version_compare('> @0@'.format(spice_protocol_version))
+  spice_protocol_version = spice_protocol_version_req
+endif
+
+deps = {'spice-protocol' : '>= @0@'.format(spice_protocol_version),
         'glib-2.0'       : glib_version_info,
-        'gio-2.0'        : glib_version_info,
-        'gthread-2.0'    : glib_version_info,
         'pixman-1'       : '>= 0.17.7',
         'openssl'        : '>= 1.0.0'}
 
@@ -117,11 +110,12 @@ foreach dep, version : deps
   spice_common_deps += dependency(dep, version : version)
 endforeach
 
+gio2_deps = dependency('gio-2.0', version : glib_version_info)
+
 #
 # Non-mandatory/optional dependencies
 #
-optional_deps = {'celt051' : '>= 0.5.1.1',
-                 'opus'    : '>= 0.9.14'}
+optional_deps = {'opus' : '>= 0.9.14'}
 foreach dep, version : optional_deps
   d = dependency(dep, required : get_option(dep), version : version)
   if d.found()
@@ -131,17 +125,19 @@ foreach dep, version : optional_deps
 endforeach
 
 # Python
-py_module = import('python')
-python = py_module.find_installation()
+if spice_common_generate_client_code or spice_common_generate_server_code
+  py_module = import('python')
+  python = py_module.find_installation()
 
-if get_option('python-checks')
-  foreach module : ['six', 'pyparsing']
-    message('Checking for python module @0@'.format(module))
-    cmd = run_command(python, '-m', module)
-    if cmd.returncode() != 0
-      error('Python module @0@ not found'.format(module))
-    endif
-  endforeach
+  if get_option('python-checks')
+    foreach module : ['six', 'pyparsing']
+      message('Checking for python module @0@'.format(module))
+      cmd = run_command(python, '-m', module)
+      if cmd.returncode() != 0
+        error('Python module @0@ not found'.format(module))
+      endif
+    endforeach
+  endif
 endif
 
 # smartcard check

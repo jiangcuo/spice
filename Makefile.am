@@ -3,14 +3,15 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = subprojects/spice-common server docs tools
 
+if ENABLE_TESTS
 check-valgrind:
 	$(MAKE) -C server check-valgrind
+endif
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = spice-server.pc
 
 DISTCHECK_CONFIGURE_FLAGS =			\
-	--disable-celt051			\
 	--enable-smartcard			\
 	--with-sasl				\
 	--enable-manual				\
@@ -32,3 +33,6 @@ dist-hook:
 BUILT_SOURCES = $(top_srcdir)/.version
 $(top_srcdir)/.version:
 	echo $(VERSION) > $@-t && mv $@-t $@
+
+doxy:
+	$(srcdir)/doxygen.sh

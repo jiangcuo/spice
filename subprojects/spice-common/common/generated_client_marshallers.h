@@ -52,7 +52,7 @@ typedef struct {
     void (*msgc_record_mode)(SpiceMarshaller *m, SpiceMsgPlaybackMode *msg);
     void (*msgc_record_start_mark)(SpiceMarshaller *m, SpiceMsgcRecordStartMark *msg);
 #ifdef USE_SMARTCARD
-    void (*msgc_smartcard_header)(SpiceMarshaller *m, VSCMsgHeader *msg);
+    void (*msgc_smartcard_data)(SpiceMarshaller *m, VSCMsgHeader *msg);
 #endif /* USE_SMARTCARD */
     void (*msg_SpiceMsgCompressedData)(SpiceMarshaller *m, SpiceMsgCompressedData *msg);
     void (*msgc_port_event)(SpiceMarshaller *m, SpiceMsgcPortEvent *msg);

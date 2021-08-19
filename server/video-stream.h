@@ -27,6 +27,8 @@
 #include "red-channel.h"
 #include "dcc.h"
 
+SPICE_BEGIN_DECLS
+
 #define RED_STREAM_DETECTION_MAX_DELTA (NSEC_PER_SEC / 5)
 #define RED_STREAM_CONTINUOUS_MAX_DELTA NSEC_PER_SEC
 #define RED_STREAM_TIMEOUT NSEC_PER_SEC
@@ -44,20 +46,6 @@
 #define MAX_FPS 30
 
 typedef struct VideoStream VideoStream;
-
-/* This item is used to send a full quality image (lossless) of the area where the stream was.
- * This to avoid the artifacts due to the lossy compression. */
-typedef struct RedUpgradeItem {
-    RedPipeItem base;
-    Drawable *drawable;
-    SpiceClipRects *rects;
-} RedUpgradeItem;
-
-typedef struct RedStreamActivateReportItem {
-    RedPipeItem base;
-    uint32_t stream_id;
-    uint32_t report_id;
-} RedStreamActivateReportItem;
 
 #ifdef STREAM_STATS
 typedef struct StreamStats {
@@ -86,8 +74,6 @@ typedef struct VideoStreamAgent {
     VideoEncoder *video_encoder;
     DisplayChannelClient *dcc;
 
-    int fps;
-
     uint32_t report_id;
     uint32_t client_required_latency;
 #ifdef STREAM_STATS
@@ -95,19 +81,20 @@ typedef struct VideoStreamAgent {
 #endif
 } VideoStreamAgent;
 
-typedef struct VideoStreamClipItem {
-    RedPipeItem base;
+struct VideoStreamClipItem: public RedPipeItem {
+    VideoStreamClipItem(VideoStreamAgent *agent);
+    ~VideoStreamClipItem();
+
     VideoStreamAgent *stream_agent;
     int clip_type;
-    SpiceClipRects *rects;
-} VideoStreamClipItem;
+    red::glib_unique_ptr<SpiceClipRects> rects;
+};
 
-VideoStreamClipItem *video_stream_clip_item_new(VideoStreamAgent *agent);
-
-typedef struct StreamCreateDestroyItem {
-    RedPipeItem base;
+struct StreamCreateDestroyItem: public RedPipeItem {
+    StreamCreateDestroyItem(VideoStreamAgent *agent, int type);
+    ~StreamCreateDestroyItem();
     VideoStreamAgent *agent;
-} StreamCreateDestroyItem;
+};
 
 typedef struct ItemTrace {
     red_time_t time;
@@ -138,7 +125,6 @@ struct VideoStream {
 
 void display_channel_init_video_streams(DisplayChannel *display);
 void video_stream_stop(DisplayChannel *display, VideoStream *stream);
-void video_stream_unref(DisplayChannel *display, VideoStream *stream);
 void video_stream_trace_update(DisplayChannel *display, Drawable *drawable);
 void video_stream_maintenance(DisplayChannel *display, Drawable *candidate,
                               Drawable *prev);
@@ -149,9 +135,10 @@ void video_stream_detach_behind(DisplayChannel *display, QRegion *region,
                                 Drawable *drawable);
 GArray *video_stream_parse_preferred_codecs(SpiceMsgcDisplayPreferredVideoCodecType *msg);
 
-void video_stream_agent_unref(DisplayChannel *display, VideoStreamAgent *agent);
 void video_stream_agent_stop(VideoStreamAgent *agent);
 
 void video_stream_detach_drawable(VideoStream *stream);
+
+SPICE_END_DECLS
 
 #endif /* VIDEO_STREAM_H_ */

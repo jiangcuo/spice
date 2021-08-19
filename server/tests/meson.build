@@ -7,12 +7,12 @@ endif
 test_lib_sources = [
   'basic-event-loop.c',
   'basic-event-loop.h',
-  'test-display-base.c',
+  'test-display-base.cpp',
   'test-display-base.h',
   'test-glib-compat.h',
   'win-alarm.c',
   'win-alarm.h',
-  'vmc-emu.c',
+  'vmc-emu.cpp',
   'vmc-emu.h',
 ]
 
@@ -39,6 +39,7 @@ endforeach
 
 tests = [
   ['test-codecs-parsing', true],
+  ['test-dispatcher', true, 'cpp'],
   ['test-options', true],
   ['test-stat', true],
   ['test-agent-msg-filter', true],
@@ -48,8 +49,9 @@ tests = [
   ['test-vdagent', true],
   ['test-fail-on-null-core-interface', true],
   ['test-empty-success', true],
-  ['test-channel', true],
-  ['test-stream-device', true],
+  ['test-channel', true, 'cpp'],
+  ['test-stream-device', true, 'cpp'],
+  ['test-set-ticket', true],
   ['test-listen', true],
   ['test-record', true],
   ['test-display-no-ssl', false],
@@ -65,7 +67,7 @@ if spice_server_has_sasl
 endif
 
 if spice_server_has_smartcard == true
-  tests += [['test-smartcard', true]]
+  tests += [['test-smartcard', true, 'cpp']]
 endif
 
 if host_machine.system() != 'windows'
@@ -77,7 +79,7 @@ if host_machine.system() != 'windows'
 endif
 
 if spice_server_has_gstreamer
-  tests += [['test-gst', false]]
+  tests += [['test-gst', false, 'cpp']]
   if get_option('extra-checks')
     test('test-video-encoders', files('test-video-encoders'))
   endif
@@ -86,11 +88,17 @@ endif
 foreach t : tests
   test_name = t[0]
   is_test = t[1]
+  if t.length() > 2
+    language = t[2]
+  else
+    language = 'c'
+  endif
   exe = executable(test_name,
-                   sources : '@0@.c'.format(test_name),
+                   sources : '@0@.@1@'.format(test_name, language),
                    link_with : test_libs,
                    include_directories : test_lib_include,
                    c_args : ['-DSPICE_TOP_SRCDIR="@0@"'.format(meson.source_root())],
+                   cpp_args : ['-DSPICE_TOP_SRCDIR="@0@"'.format(meson.source_root())],
                    dependencies : test_lib_deps,
                    install : false)
 

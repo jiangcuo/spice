@@ -18,92 +18,82 @@
 #ifndef MAIN_CHANNEL_CLIENT_H_
 #define MAIN_CHANNEL_CLIENT_H_
 
-#include <glib-object.h>
 #include <common/messages.h>
 
 #include "red-channel-client.h"
 #include "main-channel.h"
+#include "utils.hpp"
 
-G_BEGIN_DECLS
+#include "push-visibility.h"
 
-#define TYPE_MAIN_CHANNEL_CLIENT main_channel_client_get_type()
-
-#define MAIN_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_MAIN_CHANNEL_CLIENT, MainChannelClient))
-#define MAIN_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_MAIN_CHANNEL_CLIENT, MainChannelClientClass))
-#define IS_MAIN_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_MAIN_CHANNEL_CLIENT))
-#define IS_MAIN_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_MAIN_CHANNEL_CLIENT))
-#define MAIN_CHANNEL_CLIENT_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_MAIN_CHANNEL_CLIENT, MainChannelClientClass))
-
-typedef struct MainChannelClient MainChannelClient;
-typedef struct MainChannelClientClass MainChannelClientClass;
-typedef struct MainChannelClientPrivate MainChannelClientPrivate;
-
-struct MainChannelClient
-{
-    RedChannelClient parent;
-
-    MainChannelClientPrivate *priv;
-};
-
-struct MainChannelClientClass
-{
-    RedChannelClientClass parent_class;
-};
-
-GType main_channel_client_get_type(void) G_GNUC_CONST;
+class MainChannelClientPrivate;
 
 MainChannelClient *main_channel_client_create(MainChannel *main_chan, RedClient *client,
                                               RedStream *stream, uint32_t connection_id,
                                               RedChannelCapabilities *caps);
 
-void main_channel_client_push_agent_tokens(MainChannelClient *mcc, uint32_t num_tokens);
-void main_channel_client_push_agent_data(MainChannelClient *mcc, uint8_t* data, size_t len,
-                                         spice_marshaller_item_free_func free_data, void *opaque);
-void main_channel_client_start_net_test(MainChannelClient *mcc, int test_rate);
-// TODO: huge. Consider making a reds_* interface for these functions
-// and calling from main.
-void main_channel_client_push_init(MainChannelClient *mcc,
-                                   int display_channels_hint,
-                                   SpiceMouseMode current_mouse_mode,
-                                   int is_client_mouse_allowed,
-                                   int multi_media_time,
-                                   int ram_hint);
-void main_channel_client_push_notify(MainChannelClient *mcc, const char *msg);
-void main_channel_client_migrate(RedChannelClient *rcc);
-gboolean main_channel_client_connect_semi_seamless(MainChannelClient *mcc);
-void main_channel_client_connect_seamless(MainChannelClient *mcc);
-void main_channel_client_handle_migrate_connected(MainChannelClient *mcc,
-                                                  int success,
-                                                  int seamless);
-void main_channel_client_handle_migrate_dst_do_seamless(MainChannelClient *mcc,
-                                                        uint32_t src_version);
-void main_channel_client_handle_migrate_end(MainChannelClient *mcc);
-void main_channel_client_migrate_cancel_wait(MainChannelClient *mcc);
-void main_channel_client_migrate_dst_complete(MainChannelClient *mcc);
-gboolean main_channel_client_migrate_src_complete(MainChannelClient *mcc,
-                                                  gboolean success);
+struct RedAgentDataPipeItem;
 
-void main_channel_client_handle_pong(MainChannelClient *mcc, SpiceMsgPing *ping, uint32_t size);
+class MainChannelClient final: public RedChannelClient
+{
+public:
+    void push_agent_tokens(uint32_t num_tokens);
+    void push_agent_data(red::shared_ptr<RedAgentDataPipeItem>&& item);
+    // TODO: huge. Consider making a reds_* interface for these functions
+    // and calling from main.
+    void push_init(int display_channels_hint, SpiceMouseMode current_mouse_mode,
+                   int is_client_mouse_allowed, int multi_media_time,
+                   int ram_hint);
+    void push_notify(const char *msg);
+    gboolean connect_semi_seamless();
+    void connect_seamless();
+    void handle_migrate_connected(int success, int seamless);
+    void handle_migrate_dst_do_seamless(uint32_t src_version);
+    void handle_migrate_end();
+    void migrate_cancel_wait();
+    void migrate_dst_complete();
+    gboolean migrate_src_complete(gboolean success);
 
-/*
- * return TRUE if network test had been completed successfully.
- * If FALSE, bitrate_per_sec is set to MAX_UINT64 and the roundtrip is set to 0
- */
-int main_channel_client_is_network_info_initialized(MainChannelClient *mcc);
-int main_channel_client_is_low_bandwidth(MainChannelClient *mcc);
-uint64_t main_channel_client_get_bitrate_per_sec(MainChannelClient *mcc);
-uint64_t main_channel_client_get_roundtrip_ms(MainChannelClient *mcc);
+    /*
+     * return TRUE if network test had been completed successfully.
+     * If FALSE, bitrate_per_sec is set to MAX_UINT64 and the roundtrip is set to 0
+     */
+    bool is_network_info_initialized() const;
+    bool is_low_bandwidth() const;
+    uint64_t get_bitrate_per_sec() const;
+    uint64_t get_roundtrip_ms() const;
 
-void main_channel_client_push_name(MainChannelClient *mcc, const char *name);
-void main_channel_client_push_uuid(MainChannelClient *mcc, const uint8_t uuid[16]);
+    void push_name(const char *name);
+    void push_uuid(const uint8_t uuid[16]);
 
-uint32_t main_channel_client_get_connection_id(MainChannelClient *mcc);
-void main_channel_client_send_item(RedChannelClient *rcc, RedPipeItem *base);
+    uint32_t get_connection_id() const;
+
+    MainChannelClient(MainChannel *channel,
+                      RedClient *client,
+                      RedStream *stream,
+                      RedChannelCapabilities *caps,
+                      uint32_t connection_id);
+
+    void handle_pong(SpiceMsgPing *ping, uint32_t size);
+    void start_net_test(int test_rate);
+    MainChannel* get_channel()
+    {
+        return static_cast<MainChannel*>(RedChannelClient::get_channel());
+    }
+
+protected:
+    virtual uint8_t *alloc_recv_buf(uint16_t type, uint32_t size) override;
+    virtual void release_recv_buf(uint16_t type, uint32_t size, uint8_t *msg) override;
+    virtual void on_disconnect() override;
+    virtual bool handle_message(uint16_t type, uint32_t size, void *message) override;
+    virtual void send_item(RedPipeItem *item)  override;
+    virtual bool handle_migrate_data(uint32_t size, void *message) override;
+    virtual void migrate() override;
+    virtual void handle_migrate_flush_mark() override;
+
+public:
+    red::unique_link<MainChannelClientPrivate> priv;
+};
 
 enum {
     RED_PIPE_ITEM_TYPE_MAIN_CHANNELS_LIST = RED_PIPE_ITEM_TYPE_CHANNEL_BASE,
@@ -125,12 +115,17 @@ enum {
     RED_PIPE_ITEM_TYPE_MAIN_REGISTERED_CHANNEL,
 };
 
-RedPipeItem *main_mouse_mode_item_new(SpiceMouseMode current_mode, int is_client_mouse_allowed);
+struct RedAgentDataPipeItem: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_MAIN_AGENT_DATA> {
+    int len = 0;
+    uint8_t data[SPICE_AGENT_MAX_DATA_SIZE];
+};
 
-RedPipeItem *main_multi_media_time_item_new(uint32_t mm_time);
+RedPipeItemPtr main_mouse_mode_item_new(SpiceMouseMode current_mode, int is_client_mouse_allowed);
 
-RedPipeItem *registered_channel_item_new(RedChannel *channel);
+RedPipeItemPtr main_multi_media_time_item_new(uint32_t mm_time);
 
-G_END_DECLS
+RedPipeItemPtr registered_channel_item_new(RedChannel *channel);
+
+#include "pop-visibility.h"
 
 #endif /* MAIN_CHANNEL_CLIENT_H_ */

@@ -19,76 +19,16 @@
 #ifndef CHAR_DEVICE_H_
 #define CHAR_DEVICE_H_
 
-#include <glib-object.h>
-
-#include "spice.h"
+#include "spice-wrapped.h"
 #include "red-channel.h"
 #include "migration-protocol.h"
+#include "utils.hpp"
 
-#define RED_TYPE_CHAR_DEVICE red_char_device_get_type()
+#include "push-visibility.h"
 
-#define RED_CHAR_DEVICE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), RED_TYPE_CHAR_DEVICE, RedCharDevice))
-#define RED_CHAR_DEVICE_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), RED_TYPE_CHAR_DEVICE, RedCharDeviceClass))
-#define RED_IS_CHAR_DEVICE(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), RED_TYPE_CHAR_DEVICE))
-#define RED_IS_CHAR_DEVICE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), RED_TYPE_CHAR_DEVICE))
-#define RED_CHAR_DEVICE_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), RED_TYPE_CHAR_DEVICE, RedCharDeviceClass))
-
-/* SpiceCharDeviceState is public API, but internally we use RedCharDevice */
-typedef struct SpiceCharDeviceState RedCharDevice;
-typedef struct RedCharDeviceClass RedCharDeviceClass;
-typedef struct RedCharDevicePrivate RedCharDevicePrivate;
-
-#ifndef RedCharDeviceClientOpaque
-#define RedCharDeviceClientOpaque RedClient
-#endif
-
-/* 'SpiceCharDeviceState' name is used for consistency with what spice-char.h exports */
-struct SpiceCharDeviceState
-{
-    GObject parent;
-
-    RedCharDevicePrivate *priv;
-};
-
-struct RedCharDeviceClass
-{
-    GObjectClass parent_class;
-
-    /*
-     * Messages that are addressed to the client can be queued in case we have
-     * multiple clients and some of them don't have enough tokens.
-     */
-
-    /* reads from the device till reaching a msg that should be sent to the client,
-     * or till the reading fails */
-    RedPipeItem* (*read_one_msg_from_device)(RedCharDevice *self,
-                                             SpiceCharDeviceInstance *sin);
-    /* After this call, the message is unreferenced.
-     * Can be NULL. */
-    void (*send_msg_to_client)(RedCharDevice *self,
-                               RedPipeItem *msg,
-                               RedCharDeviceClientOpaque *client);
-
-    /* The cb is called when a predefined number of write buffers were consumed by the
-     * device */
-    void (*send_tokens_to_client)(RedCharDevice *self,
-                                  RedCharDeviceClientOpaque *client,
-                                  uint32_t tokens);
-
-    /* The cb is called when a server (self) message that was addressed to the device,
-     * has been completely written to it */
-    void (*on_free_self_token)(RedCharDevice *self);
-
-    /* This cb is called if it is recommended to remove the client
-     * due to slow flow or due to some other error.
-     * The called instance should disconnect the client, or at least the corresponding channel */
-    void (*remove_client)(RedCharDevice *self, RedCharDeviceClientOpaque *client);
-
-    /* This cb is called when device receives an event */
-    void (*port_event)(RedCharDevice *self, uint8_t event);
-};
-
-GType red_char_device_get_type(void) G_GNUC_CONST;
+struct RedCharDevice;
+struct RedCharDevicePrivate;
+struct RedCharDeviceClientOpaque;
 
 /*
  * Shared code for char devices, mainly for flow control.
@@ -96,19 +36,19 @@ GType red_char_device_get_type(void) G_GNUC_CONST;
  * How to use the api:
  * ==================
  * device attached: create new object instantiating a RedCharDevice child class
- * device detached: call g_object_unref/red_char_device_reset
+ * device detached: unreference/RedCharDevice::reset
  *
- * client connected and associated with a device: red_char_device_client_add
- * client disconnected: red_char_device_client_remove
+ * client connected and associated with a device: RedCharDevice::client_add
+ * client disconnected: RedCharDevice::client_remove
  *
  * Writing to the device
  * ---------------------
  * Write the data into RedCharDeviceWriteBuffer:
- * call red_char_device_write_buffer_get_client/red_char_device_write_buffer_get_server
+ * call RedCharDevice::write_buffer_get_client/RedCharDevice::write_buffer_get_server
  * in order to get an appropriate buffer.
- * call red_char_device_write_buffer_add in order to push the buffer to the write queue.
+ * call RedCharDevice::write_buffer_add in order to push the buffer to the write queue.
  * If you choose not to push the buffer to the device, call
- * red_char_device_write_buffer_release
+ * RedCharDevice::write_buffer_release
  *
  * reading from the device
  * -----------------------
@@ -120,13 +60,13 @@ GType red_char_device_get_type(void) G_GNUC_CONST;
  *
  * calls triggered from the device (qemu):
  * --------------------------------------
- * red_char_device_start
- * red_char_device_stop
- * red_char_device_wakeup (for reading from the device)
+ * RedCharDevice::start
+ * RedCharDevice::stop
+ * RedCharDevice::wakeup (for reading from the device)
  */
 /* refcounting is used to protect the char_dev from being deallocated in
- * case g_object_unref has been called
- * during a callback, and we might still access the char_dev afterwards.
+ * case object is unreferenced during a callback, and we might still access
+ * the char_dev afterwards.
  */
 
 
@@ -154,98 +94,142 @@ GType red_char_device_get_type(void) G_GNUC_CONST;
  * */
 
 /* buffer that is used for writing to the device */
-typedef struct RedCharDeviceWriteBufferPrivate RedCharDeviceWriteBufferPrivate;
-typedef struct RedCharDeviceWriteBuffer {
+struct RedCharDeviceWriteBufferPrivate;
+struct RedCharDeviceWriteBuffer {
     uint32_t buf_size;
     uint32_t buf_used;
 
     RedCharDeviceWriteBufferPrivate *priv;
     uint8_t buf[0];
-} RedCharDeviceWriteBuffer;
-
-void red_char_device_reset_dev_instance(RedCharDevice *dev,
-                                        SpiceCharDeviceInstance *sin);
-
-/* only one client is supported */
-void red_char_device_migrate_data_marshall(RedCharDevice *dev,
-                                           SpiceMarshaller *m);
-void red_char_device_migrate_data_marshall_empty(SpiceMarshaller *m);
-
-bool red_char_device_restore(RedCharDevice *dev,
-                             SpiceMigrateDataCharDevice *mig_data);
-
-/*
- * Resets write/read queues, and moves that state to being stopped.
- * This routine is a workaround for a bad tokens management in the vdagent
- * protocol:
- *  The client tokens' are set only once, when the main channel is initialized.
- *  Instead, it would have been more appropriate to reset them upon AGENT_CONNECT.
- *  The client tokens are tracked as part of the RedCharDeviceClient. Thus,
- *  in order to be backward compatible with the client, we need to track the tokens
- *  event when the agent is detached. We don't destroy the char_device state, and
- *  instead we just reset it.
- *  In addition, there is a misshandling of AGENT_TOKENS message in spice-gtk: it
- *  overrides the amount of tokens, instead of adding the given amount.
- */
-void red_char_device_reset(RedCharDevice *dev);
-
-/* max_send_queue_size = how many messages we can read from the device and enqueue for this client,
- * when we have tokens for other clients and no tokens for this one */
-bool red_char_device_client_add(RedCharDevice *dev,
-                                RedCharDeviceClientOpaque *client,
-                                int do_flow_control,
-                                uint32_t max_send_queue_size,
-                                uint32_t num_client_tokens,
-                                uint32_t num_send_tokens,
-                                int wait_for_migrate_data);
-
-void red_char_device_client_remove(RedCharDevice *dev,
-                                   RedCharDeviceClientOpaque *client);
-int red_char_device_client_exists(RedCharDevice *dev,
-                                  RedCharDeviceClientOpaque *client);
-
-void red_char_device_start(RedCharDevice *dev);
-void red_char_device_stop(RedCharDevice *dev);
-SpiceServer* red_char_device_get_server(RedCharDevice *dev);
-
-/** Read from device **/
-
-void red_char_device_wakeup(RedCharDevice *dev);
-
-void red_char_device_send_to_client_tokens_add(RedCharDevice *dev,
-                                               RedCharDeviceClientOpaque *client,
-                                               uint32_t tokens);
+};
 
 
-void red_char_device_send_to_client_tokens_set(RedCharDevice *dev,
-                                               RedCharDeviceClientOpaque *client,
-                                               uint32_t tokens);
-/** Write to device **/
+class RedCharDevice: public red::shared_ptr_counted_weak
+{
+public:
+    RedCharDevice(RedsState *reds, SpiceCharDeviceInstance *sin,
+                  uint64_t client_tokens_interval, uint64_t num_self_tokens);
+    ~RedCharDevice();
 
-RedCharDeviceWriteBuffer *red_char_device_write_buffer_get_client(RedCharDevice *dev,
-                                                                  RedCharDeviceClientOpaque *client,
-                                                                  int size);
+    void reset_dev_instance(SpiceCharDeviceInstance *sin);
+    /* only one client is supported */
+    void migrate_data_marshall(SpiceMarshaller *m);
+    static void migrate_data_marshall_empty(SpiceMarshaller *m);
 
-/* Returns NULL if use_token == true and no tokens are available */
-RedCharDeviceWriteBuffer *red_char_device_write_buffer_get_server(RedCharDevice *dev,
-                                                                  int size,
-                                                                  bool use_token);
+    bool restore(SpiceMigrateDataCharDevice *mig_data);
 
-/* Either add the buffer to the write queue or release it */
-void red_char_device_write_buffer_add(RedCharDevice *dev,
-                                        RedCharDeviceWriteBuffer *write_buf);
-void red_char_device_write_buffer_release(RedCharDevice *dev,
-                                          RedCharDeviceWriteBuffer **p_write_buf);
+    /*
+     * Resets write/read queues, and moves that state to being stopped.
+     * This routine is a workaround for a bad tokens management in the vdagent
+     * protocol:
+     *  The client tokens' are set only once, when the main channel is initialized.
+     *  Instead, it would have been more appropriate to reset them upon AGENT_CONNECT.
+     *  The client tokens are tracked as part of the RedCharDeviceClient. Thus,
+     *  in order to be backward compatible with the client, we need to track the tokens
+     *  event when the agent is detached. We don't destroy the char_device state, and
+     *  instead we just reset it.
+     *  In addition, there is a misshandling of AGENT_TOKENS message in spice-gtk: it
+     *  overrides the amount of tokens, instead of adding the given amount.
+     */
+    void reset();
+
+    /* max_send_queue_size = how many messages we can read from the device and enqueue for this client,
+     * when we have tokens for other clients and no tokens for this one */
+    bool client_add(RedCharDeviceClientOpaque *client, int do_flow_control,
+                    uint32_t max_send_queue_size, uint32_t num_client_tokens,
+                    uint32_t num_send_tokens, int wait_for_migrate_data);
+
+    void client_remove(RedCharDeviceClientOpaque *client);
+    int client_exists(RedCharDeviceClientOpaque *client);
+
+    void start();
+    void stop();
+    SpiceServer* get_server();
+
+    /** Read from device **/
+
+    void wakeup();
+
+    void send_to_client_tokens_add(RedCharDeviceClientOpaque *client,
+                                   uint32_t tokens);
+
+
+    void send_to_client_tokens_set(RedCharDeviceClientOpaque *client,
+                                   uint32_t tokens);
+    /** Write to device **/
+
+    RedCharDeviceWriteBuffer *write_buffer_get_client(RedCharDeviceClientOpaque *client,
+                                                      int size);
+
+    /* Returns NULL if use_token == true and no tokens are available */
+    RedCharDeviceWriteBuffer *write_buffer_get_server(int size, bool use_token);
+
+    /* Either add the buffer to the write queue or release it */
+    void write_buffer_add(RedCharDeviceWriteBuffer *write_buf);
+
+    /* Release a buffer allocated.
+     * This is static as potentially you can pass a null pointer for the object */
+    static void write_buffer_release(RedCharDevice *dev,
+                                     RedCharDeviceWriteBuffer **p_write_buf);
+
+    SpiceCharDeviceInstance *get_device_instance();
+
+    /**
+     * Read data from device
+     */
+    int read(uint8_t *buf, int len);
+
+    red::unique_link<RedCharDevicePrivate> priv;
+
+//protected:
+public:
+    /*
+     * Messages that are addressed to the client can be queued in case we have
+     * multiple clients and some of them don't have enough tokens.
+     */
+
+    /* reads from the device till reaching a msg that should be sent to the client,
+     * or till the reading fails */
+    virtual RedPipeItemPtr read_one_msg_from_device() = 0;
+
+    /* After this call, the message is unreferenced.
+     * Can be NULL. */
+    virtual void send_msg_to_client(RedPipeItem *msg, RedCharDeviceClientOpaque *client) {};
+
+    /* The cb is called when a predefined number of write buffers were consumed by the
+     * device */
+    virtual void send_tokens_to_client(RedCharDeviceClientOpaque *client, uint32_t tokens);
+
+    /* The cb is called when a server (self) message that was addressed to the device,
+     * has been completely written to it */
+    virtual void on_free_self_token() {};
+
+    /* This cb is called if it is recommended to remove the client
+     * due to slow flow or due to some other error.
+     * The called instance should disconnect the client, or at least the corresponding channel */
+    virtual void remove_client(RedCharDeviceClientOpaque *client) = 0;
+
+    /* This cb is called when device receives an event */
+    virtual void port_event(uint8_t event);
+
+private:
+    inline void write_buffer_release(RedCharDeviceWriteBuffer **p_write_buf)
+    {
+        write_buffer_release(this, p_write_buf);
+    }
+    int write_to_device();
+    void init_device_instance();
+
+    static void write_retry(RedCharDevice *dev);
+};
 
 /* api for specific char devices */
 
-RedCharDevice *spicevmc_device_connect(RedsState *reds,
-                                       SpiceCharDeviceInstance *sin,
-                                       uint8_t channel_type);
-void spicevmc_device_disconnect(SpiceCharDeviceInstance *char_device);
-
-SpiceCharDeviceInstance *red_char_device_get_device_instance(RedCharDevice *dev);
+red::shared_ptr<RedCharDevice>
+spicevmc_device_connect(RedsState *reds, SpiceCharDeviceInstance *sin, uint8_t channel_type);
 
 SpiceCharDeviceInterface *spice_char_device_get_interface(SpiceCharDeviceInstance *instance);
+
+#include "pop-visibility.h"
 
 #endif /* CHAR_DEVICE_H_ */

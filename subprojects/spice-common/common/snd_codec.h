@@ -19,26 +19,8 @@
 #ifndef H_SPICE_COMMON_SND_CODEC
 #define H_SPICE_COMMON_SND_CODEC
 
-
-#if HAVE_CELT051
-#include <celt051/celt.h>
-#endif
-
-#if HAVE_OPUS
-#include  <opus.h>
-#endif
-
-/* Spice uses a very fixed protocol when transmitting CELT audio;
-   audio must be transmitted in frames of 256, and we must compress
-   data down to a fairly specific size (47, computation below).
-   While the protocol doesn't inherently specify this, the expectation
-   of older clients and server mandates it.
-*/
-#define SND_CODEC_CELT_FRAME_SIZE       256
-#define SND_CODEC_CELT_BIT_RATE         (64 * 1024)
-#define SND_CODEC_CELT_PLAYBACK_FREQ    44100
-#define SND_CODEC_CELT_COMPRESSED_FRAME_BYTES (SND_CODEC_CELT_FRAME_SIZE * SND_CODEC_CELT_BIT_RATE / \
-                                        SND_CODEC_CELT_PLAYBACK_FREQ / 8)
+#include <stdbool.h>
+#include <spice/enums.h>
 
 #define SND_CODEC_OPUS_FRAME_SIZE       480
 #define SND_CODEC_OPUS_PLAYBACK_FREQ    48000
@@ -46,36 +28,41 @@
 
 #define SND_CODEC_PLAYBACK_CHAN         2
 
-#define SND_CODEC_MAX_FRAME_SIZE        (MAX(SND_CODEC_CELT_FRAME_SIZE, SND_CODEC_OPUS_FRAME_SIZE))
+#define SND_CODEC_MAX_FRAME_SIZE        SND_CODEC_OPUS_FRAME_SIZE
 #define SND_CODEC_MAX_FRAME_BYTES       (SND_CODEC_MAX_FRAME_SIZE * SND_CODEC_PLAYBACK_CHAN * 2 /* FMT_S16 */)
-#define SND_CODEC_MAX_COMPRESSED_BYTES  MAX(SND_CODEC_CELT_COMPRESSED_FRAME_BYTES, SND_CODEC_OPUS_COMPRESSED_FRAME_BYTES)
+#define SND_CODEC_MAX_COMPRESSED_BYTES  SND_CODEC_OPUS_COMPRESSED_FRAME_BYTES
 
 #define SND_CODEC_ANY_FREQUENCY        -1
-
-#define SND_CODEC_OK                    0
-#define SND_CODEC_UNAVAILABLE           1
-#define SND_CODEC_ENCODER_UNAVAILABLE   2
-#define SND_CODEC_DECODER_UNAVAILABLE   3
-#define SND_CODEC_ENCODE_FAILED         4
-#define SND_CODEC_DECODE_FAILED         5
-#define SND_CODEC_INVALID_ENCODE_SIZE   6
 
 #define SND_CODEC_ENCODE                0x0001
 #define SND_CODEC_DECODE                0x0002
 
 SPICE_BEGIN_DECLS
 
+typedef enum {
+    SND_CODEC_OK,
+    SND_CODEC_UNAVAILABLE,
+    SND_CODEC_ENCODER_UNAVAILABLE,
+    SND_CODEC_DECODER_UNAVAILABLE,
+    SND_CODEC_ENCODE_FAILED,
+    SND_CODEC_DECODE_FAILED,
+    SND_CODEC_INVALID_ENCODE_SIZE,
+} SndCodecResult;
+
 typedef struct SndCodecInternal * SndCodec;
 
-int  snd_codec_is_capable(int mode, int frequency);
+bool snd_codec_is_capable(SpiceAudioDataMode mode, int frequency);
 
-int  snd_codec_create(SndCodec *codec, int mode, int frequency, int purpose);
+SndCodecResult snd_codec_create(SndCodec *codec,
+                                SpiceAudioDataMode mode, int frequency, int purpose);
 void snd_codec_destroy(SndCodec *codec);
 
 int  snd_codec_frame_size(SndCodec codec);
 
-int  snd_codec_encode(SndCodec codec, uint8_t *in_ptr, int in_size, uint8_t *out_ptr, int *out_size);
-int  snd_codec_decode(SndCodec codec, uint8_t *in_ptr, int in_size, uint8_t *out_ptr, int *out_size);
+SndCodecResult snd_codec_encode(SndCodec codec, uint8_t *in_ptr, int in_size,
+                                uint8_t *out_ptr, int *out_size);
+SndCodecResult snd_codec_decode(SndCodec codec, uint8_t *in_ptr, int in_size,
+                                uint8_t *out_ptr, int *out_size);
 
 SPICE_END_DECLS
 

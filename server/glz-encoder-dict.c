@@ -197,6 +197,9 @@ GlzEncDictContext *glz_enc_dictionary_restore(GlzEncDictRestoreData *restore_dat
     }
     SharedDictionary *ret = (SharedDictionary *)glz_enc_dictionary_create(
             restore_data->size, restore_data->max_encoders, usr);
+    if (!ret) {
+        return NULL;
+    }
     ret->last_image_id = restore_data->last_image_id;
     return ((GlzEncDictContext *)ret);
 }
@@ -261,9 +264,9 @@ static inline int __get_pixels_num(LzImageType image_type, unsigned int num_line
 {
     if (IS_IMAGE_TYPE_RGB[image_type]) {
         return num_lines * stride / RGB_BYTES_PER_PIXEL[image_type];
-    } else {
-        return num_lines * stride * PLT_PIXELS_PER_BYTE[image_type];
     }
+
+    return num_lines * stride * PLT_PIXELS_PER_BYTE[image_type];
 }
 
 static void __glz_dictionary_window_segs_realloc(SharedDictionary *dict)
@@ -492,6 +495,9 @@ static WindowImage *glz_dictionary_window_add_image(SharedDictionary *dict, LzIm
     uint8_t* lines = first_lines;
     // alloc image info,update used head tail,  if used_head null - update  head
     WindowImage *image = __glz_dictionary_window_alloc_image(dict);
+    if (!image) {
+        dict->cur_usr->error(dict->cur_usr, "glz-dictionary failed to allocate an image\n");
+    }
     image->id = dict->last_image_id++;
     image->size = image_size;
     image->type = image_type;

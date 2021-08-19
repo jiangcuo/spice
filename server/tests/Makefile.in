@@ -89,15 +89,16 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-check_PROGRAMS = test-codecs-parsing$(EXEEXT) test-options$(EXEEXT) \
-	test-stat$(EXEEXT) test-agent-msg-filter$(EXEEXT) \
-	test-loop$(EXEEXT) test-qxl-parsing$(EXEEXT) \
-	test-leaks$(EXEEXT) test-vdagent$(EXEEXT) \
+check_PROGRAMS = test-codecs-parsing$(EXEEXT) test-dispatcher$(EXEEXT) \
+	test-options$(EXEEXT) test-stat$(EXEEXT) \
+	test-agent-msg-filter$(EXEEXT) test-loop$(EXEEXT) \
+	test-qxl-parsing$(EXEEXT) test-leaks$(EXEEXT) \
+	test-vdagent$(EXEEXT) \
 	test-fail-on-null-core-interface$(EXEEXT) \
 	test-empty-success$(EXEEXT) test-channel$(EXEEXT) \
 	test-stream-device$(EXEEXT) test-listen$(EXEEXT) \
-	test-record$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2) \
-	$(am__EXEEXT_3) $(am__EXEEXT_4)
+	test-set-ticket$(EXEEXT) test-record$(EXEEXT) $(am__EXEEXT_1) \
+	$(am__EXEEXT_2) $(am__EXEEXT_3) $(am__EXEEXT_4)
 @HAVE_SMARTCARD_TRUE@am__append_1 = test-smartcard
 @OS_WIN32_FALSE@am__append_2 = \
 @OS_WIN32_FALSE@	test-stream				\
@@ -120,7 +121,9 @@ TESTS = $(check_PROGRAMS) $(am__EXEEXT_1) $(am__append_5)
 @HAVE_SASL_TRUE@am__append_6 = test-sasl
 subdir = server/tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/ax_valgrind_check.m4 \
+am__aclocal_m4_deps =  \
+	$(top_srcdir)/subprojects/spice-common/m4/spice-deps.m4 \
+	$(top_srcdir)/m4/ax_valgrind_check.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
 	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
 	$(top_srcdir)/m4/lt~obsolete.m4 \
@@ -129,7 +132,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_valgrind_check.m4 \
 	$(top_srcdir)/m4/virt-linker-no-indirect.m4 \
 	$(top_srcdir)/m4/virt-linker-relro.m4 \
 	$(top_srcdir)/m4/warnings.m4 \
-	$(top_srcdir)/subprojects/spice-common/m4/spice-deps.m4 \
+	$(top_srcdir)/subprojects/spice-common/m4/common.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -184,7 +187,7 @@ spice_server_replay_DEPENDENCIES =  \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libspice-server.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -196,15 +199,15 @@ test_agent_msg_filter_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-test_channel_SOURCES = test-channel.c
-test_channel_OBJECTS = test-channel.$(OBJEXT)
+	$(am__DEPENDENCIES_1)
+am_test_channel_OBJECTS = test-channel.$(OBJEXT)
+test_channel_OBJECTS = $(am_test_channel_OBJECTS)
 test_channel_LDADD = $(LDADD)
 test_channel_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_codecs_parsing_SOURCES = test-codecs-parsing.c
 test_codecs_parsing_OBJECTS = test-codecs-parsing.$(OBJEXT)
 test_codecs_parsing_LDADD = $(LDADD)
@@ -212,7 +215,15 @@ test_codecs_parsing_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
+am_test_dispatcher_OBJECTS = test-dispatcher.$(OBJEXT)
+test_dispatcher_OBJECTS = $(am_test_dispatcher_OBJECTS)
+test_dispatcher_LDADD = $(LDADD)
+test_dispatcher_DEPENDENCIES = libtest.a \
+	$(SPICE_COMMON_DIR)/common/libspice-common.la \
+	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 test_display_no_ssl_SOURCES = test-display-no-ssl.c
 test_display_no_ssl_OBJECTS = test-display-no-ssl.$(OBJEXT)
 test_display_no_ssl_LDADD = $(LDADD)
@@ -220,7 +231,7 @@ test_display_no_ssl_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_display_resolution_changes_SOURCES =  \
 	test-display-resolution-changes.c
 test_display_resolution_changes_OBJECTS =  \
@@ -230,7 +241,7 @@ test_display_resolution_changes_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_display_streaming_SOURCES = test-display-streaming.c
 test_display_streaming_OBJECTS = test-display-streaming.$(OBJEXT)
 test_display_streaming_LDADD = $(LDADD)
@@ -238,7 +249,7 @@ test_display_streaming_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_display_width_stride_SOURCES = test-display-width-stride.c
 test_display_width_stride_OBJECTS =  \
 	test-display-width-stride.$(OBJEXT)
@@ -247,7 +258,7 @@ test_display_width_stride_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_empty_success_SOURCES = test-empty-success.c
 test_empty_success_OBJECTS = test-empty-success.$(OBJEXT)
 test_empty_success_LDADD = $(LDADD)
@@ -255,7 +266,7 @@ test_empty_success_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_fail_on_null_core_interface_SOURCES =  \
 	test-fail-on-null-core-interface.c
 test_fail_on_null_core_interface_OBJECTS =  \
@@ -265,8 +276,8 @@ test_fail_on_null_core_interface_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am__test_gst_SOURCES_DIST = test-gst.c
+	$(am__DEPENDENCIES_1)
+am__test_gst_SOURCES_DIST = test-gst.cpp
 @HAVE_GSTREAMER_TRUE@am_test_gst_OBJECTS =  \
 @HAVE_GSTREAMER_TRUE@	test_gst-test-gst.$(OBJEXT) \
 @HAVE_GSTREAMER_TRUE@	$(am__objects_1)
@@ -276,7 +287,7 @@ test_gst_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_leaks_SOURCES = test-leaks.c
 test_leaks_OBJECTS = test-leaks.$(OBJEXT)
 test_leaks_LDADD = $(LDADD)
@@ -284,7 +295,7 @@ test_leaks_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_listen_SOURCES = test-listen.c
 test_listen_OBJECTS = test-listen.$(OBJEXT)
 test_listen_LDADD = $(LDADD)
@@ -292,7 +303,7 @@ test_listen_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_loop_SOURCES = test-loop.c
 test_loop_OBJECTS = test-loop.$(OBJEXT)
 test_loop_LDADD = $(LDADD)
@@ -300,7 +311,7 @@ test_loop_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_options_SOURCES = test-options.c
 test_options_OBJECTS = test-options.$(OBJEXT)
 test_options_LDADD = $(LDADD)
@@ -308,7 +319,7 @@ test_options_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_playback_SOURCES = test-playback.c
 test_playback_OBJECTS = test-playback.$(OBJEXT)
 test_playback_LDADD = $(LDADD)
@@ -316,7 +327,7 @@ test_playback_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_qxl_parsing_SOURCES = test-qxl-parsing.c
 test_qxl_parsing_OBJECTS = test-qxl-parsing.$(OBJEXT)
 test_qxl_parsing_LDADD = $(LDADD)
@@ -324,7 +335,7 @@ test_qxl_parsing_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_record_SOURCES = test-record.c
 test_record_OBJECTS = test-record.$(OBJEXT)
 test_record_LDADD = $(LDADD)
@@ -332,7 +343,7 @@ test_record_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_sasl_SOURCES = test-sasl.c
 test_sasl_OBJECTS = test-sasl.$(OBJEXT)
 test_sasl_LDADD = $(LDADD)
@@ -340,22 +351,32 @@ test_sasl_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-test_smartcard_SOURCES = test-smartcard.c
-test_smartcard_OBJECTS = test-smartcard.$(OBJEXT)
+	$(am__DEPENDENCIES_1)
+test_set_ticket_SOURCES = test-set-ticket.c
+test_set_ticket_OBJECTS = test-set-ticket.$(OBJEXT)
+test_set_ticket_LDADD = $(LDADD)
+test_set_ticket_DEPENDENCIES = libtest.a \
+	$(SPICE_COMMON_DIR)/common/libspice-common.la \
+	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am__test_smartcard_SOURCES_DIST = test-smartcard.cpp
+@HAVE_SMARTCARD_TRUE@am_test_smartcard_OBJECTS =  \
+@HAVE_SMARTCARD_TRUE@	test-smartcard.$(OBJEXT)
+test_smartcard_OBJECTS = $(am_test_smartcard_OBJECTS)
 test_smartcard_LDADD = $(LDADD)
 test_smartcard_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 am_test_stat_OBJECTS = test-stat.$(OBJEXT)
 test_stat_OBJECTS = $(am_test_stat_OBJECTS)
 am__DEPENDENCIES_2 = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_stat_DEPENDENCIES = libtest-stat1.a libtest-stat2.a \
 	libtest-stat3.a libtest-stat4.a $(am__DEPENDENCIES_2) \
 	$(am__DEPENDENCIES_1)
@@ -366,7 +387,7 @@ test_stat_file_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_stream_SOURCES = test-stream.c
 test_stream_OBJECTS = test-stream.$(OBJEXT)
 test_stream_LDADD = $(LDADD)
@@ -374,15 +395,15 @@ test_stream_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-test_stream_device_SOURCES = test-stream-device.c
-test_stream_device_OBJECTS = test-stream-device.$(OBJEXT)
+	$(am__DEPENDENCIES_1)
+am_test_stream_device_OBJECTS = test-stream-device.$(OBJEXT)
+test_stream_device_OBJECTS = $(am_test_stream_device_OBJECTS)
 test_stream_device_LDADD = $(LDADD)
 test_stream_device_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_two_servers_SOURCES = test-two-servers.c
 test_two_servers_OBJECTS = test-two-servers.$(OBJEXT)
 test_two_servers_LDADD = $(LDADD)
@@ -390,7 +411,7 @@ test_two_servers_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_vdagent_SOURCES = test-vdagent.c
 test_vdagent_OBJECTS = test-vdagent.$(OBJEXT)
 test_vdagent_LDADD = $(LDADD)
@@ -398,7 +419,7 @@ test_vdagent_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 test_websocket_SOURCES = test-websocket.c
 test_websocket_OBJECTS = test-websocket.$(OBJEXT)
 test_websocket_LDADD = $(LDADD)
@@ -406,7 +427,7 @@ test_websocket_DEPENDENCIES = libtest.a \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la \
 	$(top_builddir)/server/libserver.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -430,6 +451,7 @@ am__depfiles_remade = ../$(DEPDIR)/event-loop.Po \
 	./$(DEPDIR)/libtest_stat4_a-stat-test.Po ./$(DEPDIR)/replay.Po \
 	./$(DEPDIR)/test-agent-msg-filter.Po \
 	./$(DEPDIR)/test-channel.Po ./$(DEPDIR)/test-codecs-parsing.Po \
+	./$(DEPDIR)/test-dispatcher.Po \
 	./$(DEPDIR)/test-display-base.Po \
 	./$(DEPDIR)/test-display-no-ssl.Po \
 	./$(DEPDIR)/test-display-resolution-changes.Po \
@@ -441,12 +463,12 @@ am__depfiles_remade = ../$(DEPDIR)/event-loop.Po \
 	./$(DEPDIR)/test-loop.Po ./$(DEPDIR)/test-options.Po \
 	./$(DEPDIR)/test-playback.Po ./$(DEPDIR)/test-qxl-parsing.Po \
 	./$(DEPDIR)/test-record.Po ./$(DEPDIR)/test-sasl.Po \
-	./$(DEPDIR)/test-smartcard.Po ./$(DEPDIR)/test-stat-file.Po \
-	./$(DEPDIR)/test-stat.Po ./$(DEPDIR)/test-stream-device.Po \
-	./$(DEPDIR)/test-stream.Po ./$(DEPDIR)/test-two-servers.Po \
-	./$(DEPDIR)/test-vdagent.Po ./$(DEPDIR)/test-websocket.Po \
-	./$(DEPDIR)/test_gst-test-gst.Po ./$(DEPDIR)/vmc-emu.Po \
-	./$(DEPDIR)/win-alarm.Po
+	./$(DEPDIR)/test-set-ticket.Po ./$(DEPDIR)/test-smartcard.Po \
+	./$(DEPDIR)/test-stat-file.Po ./$(DEPDIR)/test-stat.Po \
+	./$(DEPDIR)/test-stream-device.Po ./$(DEPDIR)/test-stream.Po \
+	./$(DEPDIR)/test-two-servers.Po ./$(DEPDIR)/test-vdagent.Po \
+	./$(DEPDIR)/test-websocket.Po ./$(DEPDIR)/test_gst-test-gst.Po \
+	./$(DEPDIR)/vmc-emu.Po ./$(DEPDIR)/win-alarm.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -459,39 +481,56 @@ am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
 am__v_CC_0 = @echo "  CC      " $@;
 am__v_CC_1 = 
 CCLD = $(CC)
-LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
+CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
+	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
+LTCXXCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CXXFLAGS) $(CXXFLAGS)
+AM_V_CXX = $(am__v_CXX_@AM_V@)
+am__v_CXX_ = $(am__v_CXX_@AM_DEFAULT_V@)
+am__v_CXX_0 = @echo "  CXX     " $@;
+am__v_CXX_1 = 
+CXXLD = $(CXX)
+CXXLINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
+am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
+am__v_CXXLD_0 = @echo "  CXXLD   " $@;
+am__v_CXXLD_1 = 
 SOURCES = $(libtest_stat1_a_SOURCES) $(libtest_stat2_a_SOURCES) \
 	$(libtest_stat3_a_SOURCES) $(libtest_stat4_a_SOURCES) \
 	$(libtest_a_SOURCES) $(spice_server_replay_SOURCES) \
-	test-agent-msg-filter.c test-channel.c test-codecs-parsing.c \
+	test-agent-msg-filter.c $(test_channel_SOURCES) \
+	test-codecs-parsing.c $(test_dispatcher_SOURCES) \
 	test-display-no-ssl.c test-display-resolution-changes.c \
 	test-display-streaming.c test-display-width-stride.c \
 	test-empty-success.c test-fail-on-null-core-interface.c \
 	$(test_gst_SOURCES) test-leaks.c test-listen.c test-loop.c \
 	test-options.c test-playback.c test-qxl-parsing.c \
-	test-record.c test-sasl.c test-smartcard.c \
-	$(test_stat_SOURCES) test-stat-file.c test-stream.c \
-	test-stream-device.c test-two-servers.c test-vdagent.c \
-	test-websocket.c
+	test-record.c test-sasl.c test-set-ticket.c \
+	$(test_smartcard_SOURCES) $(test_stat_SOURCES) \
+	test-stat-file.c test-stream.c $(test_stream_device_SOURCES) \
+	test-two-servers.c test-vdagent.c test-websocket.c
 DIST_SOURCES = $(libtest_stat1_a_SOURCES) $(libtest_stat2_a_SOURCES) \
 	$(libtest_stat3_a_SOURCES) $(libtest_stat4_a_SOURCES) \
 	$(libtest_a_SOURCES) $(spice_server_replay_SOURCES) \
-	test-agent-msg-filter.c test-channel.c test-codecs-parsing.c \
+	test-agent-msg-filter.c $(test_channel_SOURCES) \
+	test-codecs-parsing.c $(test_dispatcher_SOURCES) \
 	test-display-no-ssl.c test-display-resolution-changes.c \
 	test-display-streaming.c test-display-width-stride.c \
 	test-empty-success.c test-fail-on-null-core-interface.c \
 	$(am__test_gst_SOURCES_DIST) test-leaks.c test-listen.c \
 	test-loop.c test-options.c test-playback.c test-qxl-parsing.c \
-	test-record.c test-sasl.c test-smartcard.c \
-	$(test_stat_SOURCES) test-stat-file.c test-stream.c \
-	test-stream-device.c test-two-servers.c test-vdagent.c \
-	test-websocket.c
+	test-record.c test-sasl.c test-set-ticket.c \
+	$(am__test_smartcard_SOURCES_DIST) $(test_stat_SOURCES) \
+	test-stat-file.c test-stream.c $(test_stream_device_SOURCES) \
+	test-two-servers.c test-vdagent.c test-websocket.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -736,12 +775,13 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
-CELT051_CFLAGS = @CELT051_CFLAGS@
-CELT051_LIBS = @CELT051_LIBS@
 CFLAGS = @CFLAGS@
-COMMON_CFLAGS = @COMMON_CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CXX = @CXX@
+CXXCPP = @CXXCPP@
+CXXDEPMODE = @CXXDEPMODE@
+CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
@@ -762,8 +802,6 @@ GIO_UNIX_CFLAGS = @GIO_UNIX_CFLAGS@
 GIO_UNIX_LIBS = @GIO_UNIX_LIBS@
 GLIB2_CFLAGS = @GLIB2_CFLAGS@
 GLIB2_LIBS = @GLIB2_LIBS@
-GOBJECT2_CFLAGS = @GOBJECT2_CFLAGS@
-GOBJECT2_LIBS = @GOBJECT2_LIBS@
 GREP = @GREP@
 GSTREAMER_0_10_CFLAGS = @GSTREAMER_0_10_CFLAGS@
 GSTREAMER_0_10_LIBS = @GSTREAMER_0_10_LIBS@
@@ -771,6 +809,7 @@ GSTREAMER_1_0_CFLAGS = @GSTREAMER_1_0_CFLAGS@
 GSTREAMER_1_0_LIBS = @GSTREAMER_1_0_LIBS@
 GST_INSPECT_0_10 = @GST_INSPECT_0_10@
 GST_INSPECT_1_0 = @GST_INSPECT_1_0@
+HAVE_CXX11 = @HAVE_CXX11@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -825,6 +864,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SMARTCARD_CFLAGS = @SMARTCARD_CFLAGS@
 SMARTCARD_LIBS = @SMARTCARD_LIBS@
+SPICE_COMMON_CFLAGS = @SPICE_COMMON_CFLAGS@
 SPICE_COMMON_DIR = @SPICE_COMMON_DIR@
 SPICE_LT_VERSION = @SPICE_LT_VERSION@
 SPICE_NONPKGCONFIG_CFLAGS = @SPICE_NONPKGCONFIG_CFLAGS@
@@ -851,6 +891,7 @@ abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
+ac_ct_CXX = @ac_ct_CXX@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
@@ -911,14 +952,19 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/server			\
 	-I$(top_builddir)/server		\
 	-I$(top_srcdir)/server/tests		\
-	$(COMMON_CFLAGS)			\
+	$(SPICE_COMMON_CFLAGS)			\
 	$(GIO_UNIX_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
-	$(GOBJECT2_CFLAGS)			\
 	$(SMARTCARD_CFLAGS)			\
 	$(SPICE_NONPKGCONFIG_CFLAGS)		\
-	$(SPICE_PROTOCOL_CFLAGS)		\
+	$(NULL)
+
+AM_CFLAGS = \
 	$(WARN_CFLAGS)				\
+	$(NULL)
+
+AM_CXXFLAGS = \
+	$(WARN_CXXFLAGS)			\
 	$(NULL)
 
 noinst_LIBRARIES = libtest.a libtest-stat1.a libtest-stat2.a \
@@ -926,12 +972,12 @@ noinst_LIBRARIES = libtest.a libtest-stat1.a libtest-stat2.a \
 libtest_a_SOURCES = \
 	basic-event-loop.c			\
 	basic-event-loop.h			\
-	test-display-base.c			\
+	test-display-base.cpp			\
 	test-display-base.h			\
 	test-glib-compat.h			\
 	win-alarm.c				\
 	win-alarm.h				\
-	vmc-emu.c				\
+	vmc-emu.cpp				\
 	vmc-emu.h				\
 	$(NULL)
 
@@ -941,10 +987,14 @@ LDADD = \
 	$(top_builddir)/server/libserver.la			\
 	$(GIO_UNIX_LIBS)					\
 	$(GLIB2_LIBS)						\
-	$(GOBJECT2_LIBS)					\
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
+LINK = $(CXXLINK)
+@HAVE_SMARTCARD_TRUE@test_smartcard_SOURCES = test-smartcard.cpp
+test_channel_SOURCES = test-channel.cpp
+test_stream_device_SOURCES = test-stream-device.cpp
+test_dispatcher_SOURCES = test-dispatcher.cpp
 spice_server_replay_SOURCES = replay.c		\
 	../event-loop.c				\
 	basic-event-loop.c			\
@@ -954,7 +1004,6 @@ spice_server_replay_LDADD = \
 	$(SPICE_COMMON_DIR)/common/libspice-common.la		\
 	$(top_builddir)/server/libspice-server.la		\
 	$(GLIB2_LIBS)						\
-	$(GOBJECT2_LIBS)					\
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
@@ -975,7 +1024,7 @@ libtest_stat3_a_SOURCES = stat-test.c
 libtest_stat3_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORKER_STAT=0 -DTEST_NAME=stat_test3
 libtest_stat4_a_SOURCES = stat-test.c
 libtest_stat4_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORKER_STAT=1 -DTEST_NAME=stat_test4
-@HAVE_GSTREAMER_TRUE@test_gst_SOURCES = test-gst.c \
+@HAVE_GSTREAMER_TRUE@test_gst_SOURCES = test-gst.cpp \
 @HAVE_GSTREAMER_TRUE@	$(NULL)
 
 @HAVE_GSTREAMER_TRUE@test_gst_CPPFLAGS = \
@@ -987,7 +1036,7 @@ libtest_stat4_a_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_COMPRESS_STAT=1 -DTEST_RED_WORK
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .c .lo .log .o .obj .test .test$(EXEEXT) .trs
+.SUFFIXES: .c .cpp .lo .log .o .obj .test .test$(EXEEXT) .trs
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -1082,11 +1131,15 @@ test-agent-msg-filter$(EXEEXT): $(test_agent_msg_filter_OBJECTS) $(test_agent_ms
 
 test-channel$(EXEEXT): $(test_channel_OBJECTS) $(test_channel_DEPENDENCIES) $(EXTRA_test_channel_DEPENDENCIES) 
 	@rm -f test-channel$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(test_channel_OBJECTS) $(test_channel_LDADD) $(LIBS)
+	$(AM_V_CXXLD)$(CXXLINK) $(test_channel_OBJECTS) $(test_channel_LDADD) $(LIBS)
 
 test-codecs-parsing$(EXEEXT): $(test_codecs_parsing_OBJECTS) $(test_codecs_parsing_DEPENDENCIES) $(EXTRA_test_codecs_parsing_DEPENDENCIES) 
 	@rm -f test-codecs-parsing$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_codecs_parsing_OBJECTS) $(test_codecs_parsing_LDADD) $(LIBS)
+
+test-dispatcher$(EXEEXT): $(test_dispatcher_OBJECTS) $(test_dispatcher_DEPENDENCIES) $(EXTRA_test_dispatcher_DEPENDENCIES) 
+	@rm -f test-dispatcher$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(test_dispatcher_OBJECTS) $(test_dispatcher_LDADD) $(LIBS)
 
 test-display-no-ssl$(EXEEXT): $(test_display_no_ssl_OBJECTS) $(test_display_no_ssl_DEPENDENCIES) $(EXTRA_test_display_no_ssl_DEPENDENCIES) 
 	@rm -f test-display-no-ssl$(EXEEXT)
@@ -1114,7 +1167,7 @@ test-fail-on-null-core-interface$(EXEEXT): $(test_fail_on_null_core_interface_OB
 
 test-gst$(EXEEXT): $(test_gst_OBJECTS) $(test_gst_DEPENDENCIES) $(EXTRA_test_gst_DEPENDENCIES) 
 	@rm -f test-gst$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(test_gst_OBJECTS) $(test_gst_LDADD) $(LIBS)
+	$(AM_V_CXXLD)$(CXXLINK) $(test_gst_OBJECTS) $(test_gst_LDADD) $(LIBS)
 
 test-leaks$(EXEEXT): $(test_leaks_OBJECTS) $(test_leaks_DEPENDENCIES) $(EXTRA_test_leaks_DEPENDENCIES) 
 	@rm -f test-leaks$(EXEEXT)
@@ -1148,9 +1201,13 @@ test-sasl$(EXEEXT): $(test_sasl_OBJECTS) $(test_sasl_DEPENDENCIES) $(EXTRA_test_
 	@rm -f test-sasl$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_sasl_OBJECTS) $(test_sasl_LDADD) $(LIBS)
 
+test-set-ticket$(EXEEXT): $(test_set_ticket_OBJECTS) $(test_set_ticket_DEPENDENCIES) $(EXTRA_test_set_ticket_DEPENDENCIES) 
+	@rm -f test-set-ticket$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_set_ticket_OBJECTS) $(test_set_ticket_LDADD) $(LIBS)
+
 test-smartcard$(EXEEXT): $(test_smartcard_OBJECTS) $(test_smartcard_DEPENDENCIES) $(EXTRA_test_smartcard_DEPENDENCIES) 
 	@rm -f test-smartcard$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(test_smartcard_OBJECTS) $(test_smartcard_LDADD) $(LIBS)
+	$(AM_V_CXXLD)$(CXXLINK) $(test_smartcard_OBJECTS) $(test_smartcard_LDADD) $(LIBS)
 
 test-stat$(EXEEXT): $(test_stat_OBJECTS) $(test_stat_DEPENDENCIES) $(EXTRA_test_stat_DEPENDENCIES) 
 	@rm -f test-stat$(EXEEXT)
@@ -1166,7 +1223,7 @@ test-stream$(EXEEXT): $(test_stream_OBJECTS) $(test_stream_DEPENDENCIES) $(EXTRA
 
 test-stream-device$(EXEEXT): $(test_stream_device_OBJECTS) $(test_stream_device_DEPENDENCIES) $(EXTRA_test_stream_device_DEPENDENCIES) 
 	@rm -f test-stream-device$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(test_stream_device_OBJECTS) $(test_stream_device_LDADD) $(LIBS)
+	$(AM_V_CXXLD)$(CXXLINK) $(test_stream_device_OBJECTS) $(test_stream_device_LDADD) $(LIBS)
 
 test-two-servers$(EXEEXT): $(test_two_servers_OBJECTS) $(test_two_servers_DEPENDENCIES) $(EXTRA_test_two_servers_DEPENDENCIES) 
 	@rm -f test-two-servers$(EXEEXT)
@@ -1197,6 +1254,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-agent-msg-filter.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-channel.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-codecs-parsing.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-dispatcher.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-display-base.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-display-no-ssl.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-display-resolution-changes.Po@am__quote@ # am--include-marker
@@ -1212,6 +1270,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-qxl-parsing.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-record.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-sasl.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-set-ticket.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-smartcard.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stat-file.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-stat.Po@am__quote@ # am--include-marker
@@ -1310,19 +1369,43 @@ libtest_stat4_a-stat-test.obj: stat-test.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libtest_stat4_a_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libtest_stat4_a-stat-test.obj `if test -f 'stat-test.c'; then $(CYGPATH_W) 'stat-test.c'; else $(CYGPATH_W) '$(srcdir)/stat-test.c'; fi`
 
-test_gst-test-gst.o: test-gst.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_gst-test-gst.o -MD -MP -MF $(DEPDIR)/test_gst-test-gst.Tpo -c -o test_gst-test-gst.o `test -f 'test-gst.c' || echo '$(srcdir)/'`test-gst.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_gst-test-gst.Tpo $(DEPDIR)/test_gst-test-gst.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-gst.c' object='test_gst-test-gst.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_gst-test-gst.o `test -f 'test-gst.c' || echo '$(srcdir)/'`test-gst.c
+.cpp.o:
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
-test_gst-test-gst.obj: test-gst.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test_gst-test-gst.obj -MD -MP -MF $(DEPDIR)/test_gst-test-gst.Tpo -c -o test_gst-test-gst.obj `if test -f 'test-gst.c'; then $(CYGPATH_W) 'test-gst.c'; else $(CYGPATH_W) '$(srcdir)/test-gst.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_gst-test-gst.Tpo $(DEPDIR)/test_gst-test-gst.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-gst.c' object='test_gst-test-gst.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test_gst-test-gst.obj `if test -f 'test-gst.c'; then $(CYGPATH_W) 'test-gst.c'; else $(CYGPATH_W) '$(srcdir)/test-gst.c'; fi`
+.cpp.obj:
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+.cpp.lo:
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
+
+test_gst-test-gst.o: test-gst.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT test_gst-test-gst.o -MD -MP -MF $(DEPDIR)/test_gst-test-gst.Tpo -c -o test_gst-test-gst.o `test -f 'test-gst.cpp' || echo '$(srcdir)/'`test-gst.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_gst-test-gst.Tpo $(DEPDIR)/test_gst-test-gst.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='test-gst.cpp' object='test_gst-test-gst.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o test_gst-test-gst.o `test -f 'test-gst.cpp' || echo '$(srcdir)/'`test-gst.cpp
+
+test_gst-test-gst.obj: test-gst.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT test_gst-test-gst.obj -MD -MP -MF $(DEPDIR)/test_gst-test-gst.Tpo -c -o test_gst-test-gst.obj `if test -f 'test-gst.cpp'; then $(CYGPATH_W) 'test-gst.cpp'; else $(CYGPATH_W) '$(srcdir)/test-gst.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_gst-test-gst.Tpo $(DEPDIR)/test_gst-test-gst.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='test-gst.cpp' object='test_gst-test-gst.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_gst_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o test_gst-test-gst.obj `if test -f 'test-gst.cpp'; then $(CYGPATH_W) 'test-gst.cpp'; else $(CYGPATH_W) '$(srcdir)/test-gst.cpp'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1530,6 +1613,13 @@ test-codecs-parsing.log: test-codecs-parsing$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test-dispatcher.log: test-dispatcher$(EXEEXT)
+	@p='test-dispatcher$(EXEEXT)'; \
+	b='test-dispatcher'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 test-options.log: test-options$(EXEEXT)
 	@p='test-options$(EXEEXT)'; \
 	b='test-options'; \
@@ -1610,6 +1700,13 @@ test-stream-device.log: test-stream-device$(EXEEXT)
 test-listen.log: test-listen$(EXEEXT)
 	@p='test-listen$(EXEEXT)'; \
 	b='test-listen'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test-set-ticket.log: test-set-ticket$(EXEEXT)
+	@p='test-set-ticket$(EXEEXT)'; \
+	b='test-set-ticket'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1761,6 +1858,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/test-agent-msg-filter.Po
 	-rm -f ./$(DEPDIR)/test-channel.Po
 	-rm -f ./$(DEPDIR)/test-codecs-parsing.Po
+	-rm -f ./$(DEPDIR)/test-dispatcher.Po
 	-rm -f ./$(DEPDIR)/test-display-base.Po
 	-rm -f ./$(DEPDIR)/test-display-no-ssl.Po
 	-rm -f ./$(DEPDIR)/test-display-resolution-changes.Po
@@ -1776,6 +1874,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/test-qxl-parsing.Po
 	-rm -f ./$(DEPDIR)/test-record.Po
 	-rm -f ./$(DEPDIR)/test-sasl.Po
+	-rm -f ./$(DEPDIR)/test-set-ticket.Po
 	-rm -f ./$(DEPDIR)/test-smartcard.Po
 	-rm -f ./$(DEPDIR)/test-stat-file.Po
 	-rm -f ./$(DEPDIR)/test-stat.Po
@@ -1842,6 +1941,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/test-agent-msg-filter.Po
 	-rm -f ./$(DEPDIR)/test-channel.Po
 	-rm -f ./$(DEPDIR)/test-codecs-parsing.Po
+	-rm -f ./$(DEPDIR)/test-dispatcher.Po
 	-rm -f ./$(DEPDIR)/test-display-base.Po
 	-rm -f ./$(DEPDIR)/test-display-no-ssl.Po
 	-rm -f ./$(DEPDIR)/test-display-resolution-changes.Po
@@ -1857,6 +1957,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/test-qxl-parsing.Po
 	-rm -f ./$(DEPDIR)/test-record.Po
 	-rm -f ./$(DEPDIR)/test-sasl.Po
+	-rm -f ./$(DEPDIR)/test-set-ticket.Po
 	-rm -f ./$(DEPDIR)/test-smartcard.Po
 	-rm -f ./$(DEPDIR)/test-stat-file.Po
 	-rm -f ./$(DEPDIR)/test-stat.Po

@@ -565,15 +565,24 @@ static uint8_t * parse_SpiceMsgEmpty(uint8_t *message_start, uint8_t *message_en
     return NULL;
 }
 
-static uint8_t * parse_array_uint8(uint8_t *message_start, SPICE_GNUC_UNUSED uint8_t *message_end, uint8_t *struct_data, PointerInfo *this_ptr_info)
+static uint8_t * parse_array_uint8_terminated(uint8_t *message_start, SPICE_GNUC_UNUSED uint8_t *message_end, uint8_t *struct_data, PointerInfo *this_ptr_info)
 {
     uint8_t *in = message_start + this_ptr_info->offset;
     uint8_t *end;
 
     end = struct_data;
     memcpy(end, in, this_ptr_info->nelements);
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
+    ((char *) (end))[this_ptr_info->nelements] = 0;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
     in += this_ptr_info->nelements;
     end += this_ptr_info->nelements;
+    end += 1;
     return end;
 }
 
@@ -622,8 +631,9 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
             dst_info_host_data__array__nelements = host_size__value;
 
             dst_info_host_data__array__nw_size = dst_info_host_data__array__nelements;
-            dst_info_host_data__array__mem_size = sizeof(uint8_t) * dst_info_host_data__array__nelements;
-            if (SPICE_UNLIKELY(host_data__value + dst_info_host_data__array__nw_size > (uintptr_t) (message_end - message_start))) {
+            dst_info_host_data__array__mem_size = sizeof(uint8_t) * dst_info_host_data__array__nelements + sizeof(uint8_t);
+            dst_info_host_data__array__mem_size = SPICE_ALIGN(dst_info_host_data__array__mem_size, 4);
+            if (SPICE_UNLIKELY(dst_info_host_data__array__nw_size > (uintptr_t) (message_end - message_start - host_data__value))) {
                 goto error;
             }
             dst_info_host_data__extra_size = dst_info_host_data__array__mem_size + /* for alignment */ 3;
@@ -650,8 +660,9 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
             dst_info_cert_subject_data__array__nelements = cert_subject_size__value;
 
             dst_info_cert_subject_data__array__nw_size = dst_info_cert_subject_data__array__nelements;
-            dst_info_cert_subject_data__array__mem_size = sizeof(uint8_t) * dst_info_cert_subject_data__array__nelements;
-            if (SPICE_UNLIKELY(cert_subject_data__value + dst_info_cert_subject_data__array__nw_size > (uintptr_t) (message_end - message_start))) {
+            dst_info_cert_subject_data__array__mem_size = sizeof(uint8_t) * dst_info_cert_subject_data__array__nelements + sizeof(uint8_t);
+            dst_info_cert_subject_data__array__mem_size = SPICE_ALIGN(dst_info_cert_subject_data__array__mem_size, 4);
+            if (SPICE_UNLIKELY(dst_info_cert_subject_data__array__nw_size > (uintptr_t) (message_end - message_start - cert_subject_data__value))) {
                 goto error;
             }
             dst_info_cert_subject_data__extra_size = dst_info_cert_subject_data__array__mem_size + /* for alignment */ 3;
@@ -685,14 +696,14 @@ static uint8_t * parse_msg_main_migrate_begin(uint8_t *message_start, uint8_t *m
         out->dst_info.sport = consume_uint16(&in);
         out->dst_info.host_size = consume_uint32(&in);
         ptr_info[n_ptr].offset = consume_uint32(&in);
-        ptr_info[n_ptr].parse = parse_array_uint8;
+        ptr_info[n_ptr].parse = parse_array_uint8_terminated;
         ptr_info[n_ptr].dest = (void **)&out->dst_info.host_data;
         host_data__array__nelements = out->dst_info.host_size;
         ptr_info[n_ptr].nelements = host_data__array__nelements;
         n_ptr++;
         out->dst_info.cert_subject_size = consume_uint32(&in);
         ptr_info[n_ptr].offset = consume_uint32(&in);
-        ptr_info[n_ptr].parse = parse_array_uint8;
+        ptr_info[n_ptr].parse = parse_array_uint8_terminated;
         ptr_info[n_ptr].dest = (void **)&out->dst_info.cert_subject_data;
         cert_subject_data__array__nelements = out->dst_info.cert_subject_size;
         ptr_info[n_ptr].nelements = cert_subject_data__array__nelements;
@@ -1050,8 +1061,9 @@ static uint8_t * parse_msg_main_migrate_switch_host(uint8_t *message_start, uint
         host_data__array__nelements = host_size__value;
 
         host_data__array__nw_size = host_data__array__nelements;
-        host_data__array__mem_size = sizeof(uint8_t) * host_data__array__nelements;
-        if (SPICE_UNLIKELY(host_data__value + host_data__array__nw_size > (uintptr_t) (message_end - message_start))) {
+        host_data__array__mem_size = sizeof(uint8_t) * host_data__array__nelements + sizeof(uint8_t);
+        host_data__array__mem_size = SPICE_ALIGN(host_data__array__mem_size, 4);
+        if (SPICE_UNLIKELY(host_data__array__nw_size > (uintptr_t) (message_end - message_start - host_data__value))) {
             goto error;
         }
         host_data__extra_size = host_data__array__mem_size + /* for alignment */ 3;
@@ -1078,8 +1090,9 @@ static uint8_t * parse_msg_main_migrate_switch_host(uint8_t *message_start, uint
         cert_subject_data__array__nelements = cert_subject_size__value;
 
         cert_subject_data__array__nw_size = cert_subject_data__array__nelements;
-        cert_subject_data__array__mem_size = sizeof(uint8_t) * cert_subject_data__array__nelements;
-        if (SPICE_UNLIKELY(cert_subject_data__value + cert_subject_data__array__nw_size > (uintptr_t) (message_end - message_start))) {
+        cert_subject_data__array__mem_size = sizeof(uint8_t) * cert_subject_data__array__nelements + sizeof(uint8_t);
+        cert_subject_data__array__mem_size = SPICE_ALIGN(cert_subject_data__array__mem_size, 4);
+        if (SPICE_UNLIKELY(cert_subject_data__array__nw_size > (uintptr_t) (message_end - message_start - cert_subject_data__value))) {
             goto error;
         }
         cert_subject_data__extra_size = cert_subject_data__array__mem_size + /* for alignment */ 3;
@@ -1107,13 +1120,13 @@ static uint8_t * parse_msg_main_migrate_switch_host(uint8_t *message_start, uint
     out->sport = consume_uint16(&in);
     out->host_size = consume_uint32(&in);
     ptr_info[n_ptr].offset = consume_uint32(&in);
-    ptr_info[n_ptr].parse = parse_array_uint8;
+    ptr_info[n_ptr].parse = parse_array_uint8_terminated;
     ptr_info[n_ptr].dest = (void **)&out->host_data;
     ptr_info[n_ptr].nelements = host_data__array__nelements;
     n_ptr++;
     out->cert_subject_size = consume_uint32(&in);
     ptr_info[n_ptr].offset = consume_uint32(&in);
-    ptr_info[n_ptr].parse = parse_array_uint8;
+    ptr_info[n_ptr].parse = parse_array_uint8_terminated;
     ptr_info[n_ptr].dest = (void **)&out->cert_subject_data;
     ptr_info[n_ptr].nelements = cert_subject_data__array__nelements;
     n_ptr++;
@@ -1338,8 +1351,9 @@ static uint8_t * parse_msg_main_migrate_begin_seamless(uint8_t *message_start, u
             dst_info_host_data__array__nelements = host_size__value;
 
             dst_info_host_data__array__nw_size = dst_info_host_data__array__nelements;
-            dst_info_host_data__array__mem_size = sizeof(uint8_t) * dst_info_host_data__array__nelements;
-            if (SPICE_UNLIKELY(host_data__value + dst_info_host_data__array__nw_size > (uintptr_t) (message_end - message_start))) {
+            dst_info_host_data__array__mem_size = sizeof(uint8_t) * dst_info_host_data__array__nelements + sizeof(uint8_t);
+            dst_info_host_data__array__mem_size = SPICE_ALIGN(dst_info_host_data__array__mem_size, 4);
+            if (SPICE_UNLIKELY(dst_info_host_data__array__nw_size > (uintptr_t) (message_end - message_start - host_data__value))) {
                 goto error;
             }
             dst_info_host_data__extra_size = dst_info_host_data__array__mem_size + /* for alignment */ 3;
@@ -1366,8 +1380,9 @@ static uint8_t * parse_msg_main_migrate_begin_seamless(uint8_t *message_start, u
             dst_info_cert_subject_data__array__nelements = cert_subject_size__value;
 
             dst_info_cert_subject_data__array__nw_size = dst_info_cert_subject_data__array__nelements;
-            dst_info_cert_subject_data__array__mem_size = sizeof(uint8_t) * dst_info_cert_subject_data__array__nelements;
-            if (SPICE_UNLIKELY(cert_subject_data__value + dst_info_cert_subject_data__array__nw_size > (uintptr_t) (message_end - message_start))) {
+            dst_info_cert_subject_data__array__mem_size = sizeof(uint8_t) * dst_info_cert_subject_data__array__nelements + sizeof(uint8_t);
+            dst_info_cert_subject_data__array__mem_size = SPICE_ALIGN(dst_info_cert_subject_data__array__mem_size, 4);
+            if (SPICE_UNLIKELY(dst_info_cert_subject_data__array__nw_size > (uintptr_t) (message_end - message_start - cert_subject_data__value))) {
                 goto error;
             }
             dst_info_cert_subject_data__extra_size = dst_info_cert_subject_data__array__mem_size + /* for alignment */ 3;
@@ -1401,14 +1416,14 @@ static uint8_t * parse_msg_main_migrate_begin_seamless(uint8_t *message_start, u
         out->dst_info.sport = consume_uint16(&in);
         out->dst_info.host_size = consume_uint32(&in);
         ptr_info[n_ptr].offset = consume_uint32(&in);
-        ptr_info[n_ptr].parse = parse_array_uint8;
+        ptr_info[n_ptr].parse = parse_array_uint8_terminated;
         ptr_info[n_ptr].dest = (void **)&out->dst_info.host_data;
         host_data__array__nelements = out->dst_info.host_size;
         ptr_info[n_ptr].nelements = host_data__array__nelements;
         n_ptr++;
         out->dst_info.cert_subject_size = consume_uint32(&in);
         ptr_info[n_ptr].offset = consume_uint32(&in);
-        ptr_info[n_ptr].parse = parse_array_uint8;
+        ptr_info[n_ptr].parse = parse_array_uint8_terminated;
         ptr_info[n_ptr].dest = (void **)&out->dst_info.cert_subject_data;
         cert_subject_data__array__nelements = out->dst_info.cert_subject_size;
         ptr_info[n_ptr].nelements = cert_subject_data__array__nelements;
@@ -2234,7 +2249,7 @@ static intptr_t validate_SpicePalette(uint8_t *message_start, uint8_t *message_e
         return 0;
     }
 
-    if (SPICE_UNLIKELY(start >= message_end)) {
+    if (SPICE_UNLIKELY(offset >= (uintptr_t) (message_end - message_start))) {
         goto error;
     }
 
@@ -2277,7 +2292,7 @@ static intptr_t validate_SpiceImage(uint8_t *message_start, uint8_t *message_end
         return 0;
     }
 
-    if (SPICE_UNLIKELY(start >= message_end)) {
+    if (SPICE_UNLIKELY(offset >= (uintptr_t) (message_end - message_start))) {
         goto error;
     }
 
@@ -4423,7 +4438,7 @@ static intptr_t validate_SpicePath(uint8_t *message_start, uint8_t *message_end,
         return 0;
     }
 
-    if (SPICE_UNLIKELY(start >= message_end)) {
+    if (SPICE_UNLIKELY(offset >= (uintptr_t) (message_end - message_start))) {
         goto error;
     }
 
@@ -4675,7 +4690,7 @@ static uint8_t * parse_msg_display_draw_stroke(uint8_t *message_start, uint8_t *
 
                     data_attr_u2__array__nw_size = (4) * data_attr_u2__array__nelements;
                     data_attr_u2__array__mem_size = sizeof(SPICE_FIXED28_4) * data_attr_u2__array__nelements;
-                    if (SPICE_UNLIKELY(data_attr_u2_style__value + data_attr_u2__array__nw_size > (uintptr_t) (message_end - message_start))) {
+                    if (SPICE_UNLIKELY(data_attr_u2__array__nw_size > (uintptr_t) (message_end - message_start - data_attr_u2_style__value))) {
                         goto error;
                     }
                     data_attr_u2__extra_size = data_attr_u2__array__mem_size + /* for alignment */ 3;
@@ -4856,7 +4871,7 @@ static intptr_t validate_SpiceString(uint8_t *message_start, uint8_t *message_en
         return 0;
     }
 
-    if (SPICE_UNLIKELY(start >= message_end)) {
+    if (SPICE_UNLIKELY(offset >= (uintptr_t) (message_end - message_start))) {
         goto error;
     }
 
@@ -6412,7 +6427,7 @@ static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *messa
         parse_msg_display_stream_destroy,
         parse_SpiceMsgEmpty
     };
-    static parse_msg_func_t funcs4[20] =  {
+    static parse_msg_func_t funcs4[21] =  {
         parse_msg_display_draw_fill,
         parse_msg_display_draw_opaque,
         parse_msg_display_draw_copy,
@@ -6432,7 +6447,8 @@ static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *messa
         parse_msg_display_draw_composite,
         parse_msg_display_stream_activate_report,
         parse_msg_display_gl_scanout_unix,
-        parse_msg_display_gl_draw
+        parse_msg_display_gl_draw,
+        parse_SpiceMsgData
     };
     if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, size_out, free_message);
@@ -6440,7 +6456,7 @@ static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *messa
         return funcs2[message_type-100](message_start, message_end, size_out, free_message);
     } else if (message_type >= 122 && message_type < 127) {
         return funcs3[message_type-122](message_start, message_end, size_out, free_message);
-    } else if (message_type >= 302 && message_type < 322) {
+    } else if (message_type >= 302 && message_type < 323) {
         return funcs4[message_type-302](message_start, message_end, size_out, free_message);
     }
     return NULL;
@@ -7581,8 +7597,9 @@ static uint8_t * parse_msg_port_init(uint8_t *message_start, uint8_t *message_en
         name__array__nelements = name_size__value;
 
         name__array__nw_size = name__array__nelements;
-        name__array__mem_size = sizeof(uint8_t) * name__array__nelements;
-        if (SPICE_UNLIKELY(name__value + name__array__nw_size > (uintptr_t) (message_end - message_start))) {
+        name__array__mem_size = sizeof(uint8_t) * name__array__nelements + sizeof(uint8_t);
+        name__array__mem_size = SPICE_ALIGN(name__array__mem_size, 4);
+        if (SPICE_UNLIKELY(name__array__nw_size > (uintptr_t) (message_end - message_start - name__value))) {
             goto error;
         }
         name__extra_size = name__array__mem_size + /* for alignment */ 3;
@@ -7608,7 +7625,7 @@ static uint8_t * parse_msg_port_init(uint8_t *message_start, uint8_t *message_en
 
     out->name_size = consume_uint32(&in);
     ptr_info[n_ptr].offset = consume_uint32(&in);
-    ptr_info[n_ptr].parse = parse_array_uint8;
+    ptr_info[n_ptr].parse = parse_array_uint8_terminated;
     ptr_info[n_ptr].dest = (void **)&out->name;
     ptr_info[n_ptr].nelements = name__array__nelements;
     n_ptr++;
@@ -7752,7 +7769,7 @@ spice_parse_channel_func_t spice_get_server_channel_parser(uint32_t channel, uns
     static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[12] =  {
         { NULL, 0 },
         { parse_MainChannel_msg, 118},
-        { parse_DisplayChannel_msg, 321},
+        { parse_DisplayChannel_msg, 322},
         { parse_InputsChannel_msg, 111},
         { parse_CursorChannel_msg, 108},
         { parse_PlaybackChannel_msg, 107},

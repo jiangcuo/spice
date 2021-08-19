@@ -19,33 +19,32 @@
 #ifndef SMART_CARD_H_
 #define SMART_CARD_H_
 
-#include <glib-object.h>
-
 #include "char-device.h"
 #include "red-channel-client.h"
 
-SPICE_DECLARE_TYPE(RedCharDeviceSmartcard, red_char_device_smartcard, CHAR_DEVICE_SMARTCARD);
-#define RED_TYPE_CHAR_DEVICE_SMARTCARD red_char_device_smartcard_get_type()
+#include "push-visibility.h"
 
-typedef struct SmartCardChannelClient SmartCardChannelClient;
+struct SmartCardChannelClient;
+struct RedCharDeviceSmartcardPrivate;
 
-struct RedCharDeviceSmartcard
+class RedCharDeviceSmartcard: public RedCharDevice
 {
-    RedCharDevice parent;
-
-    RedCharDeviceSmartcardPrivate *priv;
-};
-
-struct RedCharDeviceSmartcardClass
-{
-    RedCharDeviceClass parent_class;
+public:
+    RedCharDeviceSmartcard(RedsState *reds, SpiceCharDeviceInstance *sin);
+protected:
+    ~RedCharDeviceSmartcard();
+private:
+    RedPipeItemPtr read_one_msg_from_device() override;
+    void remove_client(RedCharDeviceClientOpaque *client) override;
+public: // XXX make private
+    red::unique_link<RedCharDeviceSmartcardPrivate> priv;
 };
 
 /*
  * connect to smartcard interface, used by smartcard channel
  */
-RedCharDevice *smartcard_device_connect(RedsState *reds, SpiceCharDeviceInstance *char_device);
-void smartcard_device_disconnect(SpiceCharDeviceInstance *char_device);
+red::shared_ptr<RedCharDeviceSmartcard>
+smartcard_device_connect(RedsState *reds, SpiceCharDeviceInstance *char_device);
 void smartcard_channel_write_to_reader(RedCharDeviceWriteBuffer *write_buf);
 SpiceCharDeviceInstance* smartcard_readers_get(uint32_t reader_id);
 SpiceCharDeviceInstance *smartcard_readers_get_unattached(void);
@@ -65,5 +64,7 @@ enum {
     RED_PIPE_ITEM_TYPE_SMARTCARD_DATA,
     RED_PIPE_ITEM_TYPE_SMARTCARD_MIGRATE_DATA,
 };
+
+#include "pop-visibility.h"
 
 #endif /* SMART_CARD_H_ */

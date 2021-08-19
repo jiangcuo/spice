@@ -21,8 +21,7 @@
 
 #include <config.h>
 
-#include <glib.h>
-
+#include "quic_config.h"
 #include "quic.h"
 #include "log.h"
 
@@ -56,6 +55,9 @@ typedef uint8_t BYTE;
 #define DEFwminext 2048
 #define MINwminext 1
 #define MAXwminext 100000000
+
+/* Maximum image size in pixels, mainly to avoid possible integer overflows */
+#define SPICE_MAX_IMAGE_SIZE (512 * 1024 * 1024 - 1)
 
 typedef struct QuicFamily {
     unsigned int nGRcodewords[MAXNUMCODES];      /* indexed by code number, contains number of
@@ -280,9 +282,7 @@ static const BYTE lzeroes[256] = {
 /* count leading zeroes */
 static unsigned int cnt_l_zeroes(const unsigned int bits)
 {
-    if (spice_extra_checks) {
-        spice_assert(bits != 0);
-    }
+    spice_extra_assert(bits != 0);
 #if defined(__GNUC__) && __GNUC__ >= 4
     return __builtin_clz(bits);
 #else
@@ -337,7 +337,7 @@ static void correlate_init(QuicFamily *family, int bpc)
     }
 }
 
-static void golomb_coding_slow(QuicFamily *family, const BYTE n, const unsigned int l,
+static void golomb_coding_slow(const QuicFamily *family, const BYTE n, const unsigned int l,
                                unsigned int * const codeword,
                                unsigned int * const codewordlen)
 {
@@ -396,7 +396,7 @@ static void more_io_words(Encoder *encoder)
 
 static inline void write_io_word(Encoder *encoder)
 {
-    if (encoder->io_now == encoder->io_end) {
+    if (G_UNLIKELY(encoder->io_now == encoder->io_end)) {
         more_io_words(encoder);
     }
     *(encoder->io_now++) = GUINT32_TO_LE(encoder->io_word);
@@ -406,10 +406,9 @@ static inline void encode(Encoder *encoder, unsigned int word, unsigned int len)
 {
     int delta;
 
-    if (spice_extra_checks) {
-        spice_assert(len > 0 && len < 32);
-        spice_assert(!(word & ~bppmask[len]));
-    }
+    spice_extra_assert(len > 0 && len < 32);
+    spice_extra_assert(!(word & ~bppmask[len]));
+
     if ((delta = ((int)encoder->io_available_bits - len)) >= 0) {
         encoder->io_available_bits = delta;
         encoder->io_word |= word << encoder->io_available_bits;
@@ -421,10 +420,8 @@ static inline void encode(Encoder *encoder, unsigned int word, unsigned int len)
     encoder->io_available_bits = 32 - delta;
     encoder->io_word = word << encoder->io_available_bits;
 
-    if (spice_extra_checks) {
-        spice_assert(encoder->io_available_bits < 32);
-        spice_assert((encoder->io_word & bppmask[encoder->io_available_bits]) == 0);
-    }
+    spice_extra_assert(encoder->io_available_bits < 32);
+    spice_extra_assert((encoder->io_word & bppmask[encoder->io_available_bits]) == 0);
 }
 
 static inline void encode_32(Encoder *encoder, unsigned int word)
@@ -444,12 +441,11 @@ static inline void flush(Encoder *encoder)
 
 static inline void read_io_word(Encoder *encoder)
 {
-    if (encoder->io_now == encoder->io_end) {
+    if (G_UNLIKELY(encoder->io_now == encoder->io_end)) {
         more_io_words(encoder);
     }
-    if (spice_extra_checks) {
-        spice_assert(encoder->io_now < encoder->io_end);
-    }
+    spice_extra_assert(encoder->io_now < encoder->io_end);
+
     encoder->io_next_word = GUINT32_FROM_LE(*(encoder->io_now));
     encoder->io_now++;
 }
@@ -458,9 +454,7 @@ static inline void decode_eatbits(Encoder *encoder, int len)
 {
     int delta;
 
-    if (spice_extra_checks) {
-        spice_assert(len > 0 && len < 32);
-    }
+    spice_extra_assert(len > 0 && len < 32);
     encoder->io_word <<= len;
 
     if ((delta = ((int)encoder->io_available_bits - len)) >= 0) {
@@ -573,7 +567,7 @@ static int decode_state_run(Encoder *encoder, CommonState *state)
         decode_eatbits(encoder, state->melclen);
     }
 
-    /* adjust melcoder parameters */
+    /* adjust melcorder parameters */
     if (state->melcstate) {
         state->melclen = J[--state->melcstate];
         state->melcorder = (1U << state->melclen);
@@ -1145,7 +1139,7 @@ int quic_decode_begin(QuicContext *quic, uint32_t *io_ptr, unsigned int num_io_w
     int channels;
     int bpc;
 
-    if (!encoder_reset(encoder, io_ptr, io_ptr_end)) {
+    if (!num_io_words || !encoder_reset(encoder, io_ptr, io_ptr_end)) {
         return QUIC_ERROR;
     }
 
@@ -1173,6 +1167,16 @@ int quic_decode_begin(QuicContext *quic, uint32_t *io_ptr, unsigned int num_io_w
 
     height = encoder->io_word;
     decode_eat32bits(encoder);
+
+    if (width <= 0 || height <= 0) {
+        encoder->usr->warn(encoder->usr, "invalid size\n");
+        return QUIC_ERROR;
+    }
+
+    /* avoid too big images */
+    if ((uint64_t) width * height > SPICE_MAX_IMAGE_SIZE) {
+        encoder->usr->error(encoder->usr, "image too large\n");
+    }
 
     quic_image_params(encoder, type, &channels, &bpc);
 

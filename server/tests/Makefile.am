@@ -16,14 +16,19 @@ AM_CPPFLAGS =					\
 	-I$(top_srcdir)/server			\
 	-I$(top_builddir)/server		\
 	-I$(top_srcdir)/server/tests		\
-	$(COMMON_CFLAGS)			\
+	$(SPICE_COMMON_CFLAGS)			\
 	$(GIO_UNIX_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
-	$(GOBJECT2_CFLAGS)			\
 	$(SMARTCARD_CFLAGS)			\
 	$(SPICE_NONPKGCONFIG_CFLAGS)		\
-	$(SPICE_PROTOCOL_CFLAGS)		\
+	$(NULL)
+
+AM_CFLAGS =					\
 	$(WARN_CFLAGS)				\
+	$(NULL)
+
+AM_CXXFLAGS =					\
+	$(WARN_CXXFLAGS)			\
 	$(NULL)
 
 noinst_LIBRARIES = libtest.a
@@ -31,12 +36,12 @@ noinst_LIBRARIES = libtest.a
 libtest_a_SOURCES =				\
 	basic-event-loop.c			\
 	basic-event-loop.h			\
-	test-display-base.c			\
+	test-display-base.cpp			\
 	test-display-base.h			\
 	test-glib-compat.h			\
 	win-alarm.c				\
 	win-alarm.h				\
-	vmc-emu.c				\
+	vmc-emu.cpp				\
 	vmc-emu.h				\
 	$(NULL)
 
@@ -46,12 +51,12 @@ LDADD =								\
 	$(top_builddir)/server/libserver.la			\
 	$(GIO_UNIX_LIBS)					\
 	$(GLIB2_LIBS)						\
-	$(GOBJECT2_LIBS)					\
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
 check_PROGRAMS =				\
 	test-codecs-parsing			\
+	test-dispatcher				\
 	test-options				\
 	test-stat				\
 	test-agent-msg-filter			\
@@ -64,12 +69,20 @@ check_PROGRAMS =				\
 	test-channel				\
 	test-stream-device			\
 	test-listen				\
+	test-set-ticket				\
 	test-record				\
 	$(NULL)
 
+LINK = $(CXXLINK)
+
 if HAVE_SMARTCARD
 check_PROGRAMS += test-smartcard
+test_smartcard_SOURCES = test-smartcard.cpp
 endif
+
+test_channel_SOURCES = test-channel.cpp
+test_stream_device_SOURCES = test-stream-device.cpp
+test_dispatcher_SOURCES = test-dispatcher.cpp
 
 if !OS_WIN32
 check_PROGRAMS +=				\
@@ -110,7 +123,6 @@ spice_server_replay_LDADD =					\
 	$(SPICE_COMMON_DIR)/common/libspice-common.la		\
 	$(top_builddir)/server/libspice-server.la		\
 	$(GLIB2_LIBS)						\
-	$(GOBJECT2_LIBS)					\
 	$(SPICE_NONPKGCONFIG_LIBS)		                \
 	$(NULL)
 
@@ -153,7 +165,7 @@ if ENABLE_EXTRA_CHECKS
 TESTS += test-video-encoders
 endif
 
-test_gst_SOURCES = test-gst.c \
+test_gst_SOURCES = test-gst.cpp \
 	$(NULL)
 test_gst_CPPFLAGS = \
 	$(AM_CPPFLAGS) \

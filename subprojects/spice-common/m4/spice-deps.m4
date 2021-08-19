@@ -35,26 +35,14 @@ AM_COND_IF([ENABLE_EXTRA_CHECKS], AC_DEFINE([ENABLE_EXTRA_CHECKS], 1, [Enable ex
 AC_DEFUN([SPICE_CHECK_SYSDEPS], [
     AC_C_BIGENDIAN
     AC_FUNC_ALLOCA
-    AC_CHECK_HEADERS([arpa/inet.h malloc.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/socket.h unistd.h])
+    AC_CHECK_HEADERS([arpa/inet.h netinet/in.h stdlib.h sys/socket.h unistd.h])
 
     # Checks for typedefs, structures, and compiler characteristics
     AC_C_INLINE
-    AC_TYPE_INT16_T
-    AC_TYPE_INT32_T
-    AC_TYPE_INT64_T
-    AC_TYPE_INT8_T
-    AC_TYPE_PID_T
-    AC_TYPE_SIZE_T
-    AC_TYPE_UINT16_T
-    AC_TYPE_UINT32_T
-    AC_TYPE_UINT64_T
-    AC_TYPE_UINT8_T
 
     # Checks for library functions
     # do not check malloc or realloc, since that cannot be cross-compiled checked
-    AC_FUNC_ERROR_AT_LINE
-    AC_FUNC_FORK
-    AC_CHECK_FUNCS([dup2 floor memmove memset])
+    AC_CHECK_FUNCS([floor])
     AC_SEARCH_LIBS([hypot], [m], [], [
         AC_MSG_ERROR([unable to find the hypot() function])
     ])
@@ -87,34 +75,6 @@ AC_DEFUN([SPICE_CHECK_SMARTCARD], [
       fi
     fi
     AM_CONDITIONAL(HAVE_SMARTCARD, test "x$have_smartcard" = "xyes")
-])
-
-
-# SPICE_CHECK_CELT051
-# -------------------
-# Adds a --enable-celt051 switch in order to enable/disable CELT 0.5.1
-# support, and checks if the needed libraries are available. If found, it will
-# return the flags to use in the CELT051_CFLAGS and CELT051_LIBS variables, and
-# it will define a HAVE_CELT051 preprocessor symbol as well as a HAVE_CELT051
-# Makefile conditional.
-#--------------------
-AC_DEFUN([SPICE_CHECK_CELT051], [
-    AC_ARG_ENABLE([celt051],
-        AS_HELP_STRING([--enable-celt051],
-                       [Enable celt051 audio codec @<:@default=no@:>@]),,
-        [enable_celt051="no"])
-
-    if test "x$enable_celt051" != "xno"; then
-        PKG_CHECK_MODULES([CELT051], [celt051 >= 0.5.1.1], [have_celt051=yes], [have_celt051=no])
-        if test "x$enable_celt051" = "xyes" && test "x$have_celt051" != "xyes"; then
-            AC_MSG_ERROR(["--enable-celt051 has been specified, but CELT 0.5.1 is missing"])
-        fi
-    else
-        have_celt051=no
-    fi
-
-    AM_CONDITIONAL([HAVE_CELT051], [test "x$have_celt051" = "xyes"])
-    AM_COND_IF([HAVE_CELT051], AC_DEFINE([HAVE_CELT051], 1, [Define if we have celt051 codec]))
 ])
 
 
@@ -159,7 +119,8 @@ AC_DEFUN([SPICE_CHECK_PIXMAN], [
 # use in the GLIB2_CFLAGS and GLIB2_LIBS variables.
 #------------------
 AC_DEFUN([SPICE_CHECK_GLIB2], [
-    PKG_CHECK_MODULES(GLIB2, glib-2.0 >= 2.38 gio-2.0 >= 2.38 gthread-2.0 >= 2.38)
+    PKG_CHECK_MODULES(GLIB2, glib-2.0 >= 2.38)
+    PKG_CHECK_MODULES(GIO2, gio-2.0 >= 2.38)
     GLIB2_CFLAGS="$GLIB2_CFLAGS -DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_38 -DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_38"
 ])
 
@@ -357,4 +318,46 @@ AC_DEFUN([SPICE_CHECK_INSTRUMENTATION], [
            AC_DEFINE([ENABLE_AGENT_INTERFACE], [1], [Define if the agent-interface instrumentation is enabled]))
     AM_CONDITIONAL([ENABLE_RECORDER],[test "$enable_instrumentation" = "recorder"])
     AM_CONDITIONAL([ENABLE_AGENT_INTERFACE],[test "$enable_instrumentation" = "agent"])
+])
+
+# SPICE_COMMON
+# -----------------
+# Define variables in order to use spice-common
+# SPICE_COMMON_DIR        directory for output libraries
+# SPICE_COMMON_CFLAGS     CFLAGS to add to use the library
+#
+# SPICE_PROTOCOL_MIN_VER  input (m4) and output (autoconf) SPICE protocol version
+# SPICE_PROTOCOL_CFLAGS   CFLAGS for SPICE protocol, already automatically included
+#
+# GLIB2_MIN_VER           input (m4) and output (shell) GLib2 minimum version
+# GLIB2_MIN_VERSION       output (shell) variable like "GLIB_VERSION_1_2" from GLIB2_MIN_VER
+#------------------
+AC_DEFUN([SPICE_COMMON], [dnl
+dnl These add some flags and checks to component using spice-common
+dnl The flags are necessary in order to make included header working
+    AC_REQUIRE([SPICE_EXTRA_CHECKS])dnl
+    AC_REQUIRE([SPICE_CHECK_INSTRUMENTATION])dnl
+dnl Get the required spice protocol version
+    m4_define([SPICE_PROTOCOL_MIN_VER],m4_ifdef([SPICE_PROTOCOL_MIN_VER],SPICE_PROTOCOL_MIN_VER,[0.14.2]))dnl
+    m4_define([SPICE_PROTOCOL_MIN_VER],m4_if(m4_version_compare(SPICE_PROTOCOL_MIN_VER,[0.14.2]),[1],SPICE_PROTOCOL_MIN_VER,[0.14.2]))dnl
+    [SPICE_PROTOCOL_MIN_VER]=SPICE_PROTOCOL_MIN_VER
+    m4_undefine([SPICE_PROTOCOL_MIN_VER])dnl
+    PKG_CHECK_MODULES([SPICE_PROTOCOL], [spice-protocol >= $SPICE_PROTOCOL_MIN_VER])
+    AC_SUBST([SPICE_PROTOCOL_MIN_VER])dnl
+dnl Get the required GLib2 version
+    m4_define([GLIB2_MIN_VER],m4_ifdef([GLIB2_MIN_VER],GLIB2_MIN_VER,[2.38]))dnl
+    m4_define([GLIB2_MIN_VER],m4_if(m4_version_compare(GLIB2_MIN_VER,[2.38]),[1],GLIB2_MIN_VER,[2.38]))dnl
+    m4_define([GLIB2_MIN_VERSION],[GLIB_VERSION_]m4_translit(GLIB2_MIN_VER,[.],[_]))dnl
+    [GLIB2_MIN_VER]=GLIB2_MIN_VER
+    [GLIB2_MIN_VERSION]=GLIB2_MIN_VERSION
+    m4_undefine([GLIB2_MIN_VER])dnl
+    m4_undefine([GLIB2_MIN_VERSION])dnl
+    PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= $GLIB2_MIN_VER gio-2.0 >= $GLIB2_MIN_VER])
+dnl Configuration variables
+    AC_CONFIG_SUBDIRS([$1])dnl
+    SPICE_COMMON_CFLAGS='-I${top_srcdir}/$1 -I${top_builddir}/$1 -DG_LOG_DOMAIN=\"Spice\" $(SPICE_PROTOCOL_CFLAGS) $(GLIB2_CFLAGS)'
+    AC_SUBST([SPICE_COMMON_CFLAGS])dnl
+
+    SPICE_COMMON_DIR='${top_builddir}/$1'
+    AC_SUBST([SPICE_COMMON_DIR])dnl
 ])

@@ -18,50 +18,35 @@
 #ifndef COMMON_GRAPHICS_CHANNEL_H_
 #define COMMON_GRAPHICS_CHANNEL_H_
 
-#include <glib-object.h>
-
 #include "red-channel.h"
 #include "red-channel-client.h"
 
-G_BEGIN_DECLS
-
-bool common_channel_client_config_socket(RedChannelClient *rcc);
+#include "push-visibility.h"
 
 #define COMMON_CLIENT_TIMEOUT (NSEC_PER_SEC * 30)
 
-#define TYPE_COMMON_GRAPHICS_CHANNEL common_graphics_channel_get_type()
-
-#define COMMON_GRAPHICS_CHANNEL(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_COMMON_GRAPHICS_CHANNEL, CommonGraphicsChannel))
-#define COMMON_GRAPHICS_CHANNEL_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_COMMON_GRAPHICS_CHANNEL, CommonGraphicsChannelClass))
-#define COMMON_IS_GRAPHICS_CHANNEL(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_COMMON_GRAPHICS_CHANNEL))
-#define COMMON_IS_GRAPHICS_CHANNEL_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_COMMON_GRAPHICS_CHANNEL))
-#define COMMON_GRAPHICS_CHANNEL_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_COMMON_GRAPHICS_CHANNEL, CommonGraphicsChannelClass))
-
-typedef struct CommonGraphicsChannel CommonGraphicsChannel;
-typedef struct CommonGraphicsChannelClass CommonGraphicsChannelClass;
-typedef struct CommonGraphicsChannelPrivate CommonGraphicsChannelPrivate;
-
-struct CommonGraphicsChannel
+class CommonGraphicsChannel: public RedChannel
 {
-    RedChannel parent;
+public:
+    bool get_during_target_migrate() const
+    {
+        return during_target_migrate;
+    }
 
-    CommonGraphicsChannelPrivate *priv;
+    void set_during_target_migrate(bool value)
+    {
+        during_target_migrate = value;
+    }
+protected:
+    using RedChannel::RedChannel;
+
+private:
+    bool during_target_migrate = false; /* TRUE when the client that is associated with the channel
+                                  is during migration. Turned off when the vm is started.
+                                  The flag is used to avoid sending messages that are artifacts
+                                  of the transition from stopped vm to loaded vm (e.g., recreation
+                                  of the primary surface) */
 };
-
-struct CommonGraphicsChannelClass
-{
-    RedChannelClass parent_class;
-};
-
-GType common_graphics_channel_get_type(void) G_GNUC_CONST;
-
-void common_graphics_channel_set_during_target_migrate(CommonGraphicsChannel *self, gboolean value);
-gboolean common_graphics_channel_get_during_target_migrate(CommonGraphicsChannel *self);
 
 enum {
     RED_PIPE_ITEM_TYPE_INVAL_ONE = RED_PIPE_ITEM_TYPE_CHANNEL_BASE,
@@ -69,38 +54,25 @@ enum {
     RED_PIPE_ITEM_TYPE_COMMON_LAST
 };
 
-#define TYPE_COMMON_GRAPHICS_CHANNEL_CLIENT common_graphics_channel_client_get_type()
+class CommonGraphicsChannelClient: public RedChannelClient
+{
+    enum { CHANNEL_RECEIVE_BUF_SIZE = 1024 };
+    uint8_t recv_buf[CHANNEL_RECEIVE_BUF_SIZE];
 
-#define COMMON_GRAPHICS_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_COMMON_GRAPHICS_CHANNEL_CLIENT, \
-    CommonGraphicsChannelClient))
-#define COMMON_GRAPHICS_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_COMMON_GRAPHICS_CHANNEL_CLIENT, \
-    CommonGraphicsChannelClientClass))
-#define COMMON_IS_GRAPHICS_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_COMMON_GRAPHICS_CHANNEL_CLIENT))
-#define COMMON_IS_GRAPHICS_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_COMMON_GRAPHICS_CHANNEL_CLIENT))
-#define COMMON_GRAPHICS_CHANNEL_CLIENT_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_COMMON_GRAPHICS_CHANNEL_CLIENT, \
-    CommonGraphicsChannelClientClass))
+public:
+    using RedChannelClient::RedChannelClient;
 
-typedef struct CommonGraphicsChannelClient CommonGraphicsChannelClient;
-typedef struct CommonGraphicsChannelClientClass CommonGraphicsChannelClientClass;
-typedef struct CommonGraphicsChannelClientPrivate CommonGraphicsChannelClientPrivate;
-
-struct CommonGraphicsChannelClient {
-    RedChannelClient parent;
-
-    CommonGraphicsChannelClientPrivate *priv;
+protected:
+    virtual uint8_t *alloc_recv_buf(uint16_t type, uint32_t size) override;
+    virtual void release_recv_buf(uint16_t type, uint32_t size, uint8_t *msg) override;
+    virtual bool config_socket() override;
 };
 
-struct CommonGraphicsChannelClientClass {
-    RedChannelClientClass parent_class;
+/* pipe item used to release a specific cached item on the client */
+struct RedCachePipeItem final: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_INVAL_ONE> {
+    SpiceMsgDisplayInvalOne inval_one;
 };
 
-GType common_graphics_channel_client_get_type(void) G_GNUC_CONST;
-
-G_END_DECLS
+#include "pop-visibility.h"
 
 #endif /* COMMON_GRAPHICS_CHANNEL_H_ */

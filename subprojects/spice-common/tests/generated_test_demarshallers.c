@@ -220,7 +220,7 @@ static uint8_t * parse_msg_main_ShortDataSubMarshall(uint8_t *message_start, uin
 
         data__array__nw_size = (8) * data__array__nelements;
         data__array__mem_size = sizeof(uint64_t) * data__array__nelements;
-        if (SPICE_UNLIKELY(data__value + data__array__nw_size > (uintptr_t) (message_end - message_start))) {
+        if (SPICE_UNLIKELY(data__array__nw_size > (uintptr_t) (message_end - message_start - data__value))) {
             goto error;
         }
         data__extra_size = data__array__mem_size + /* for alignment */ 3;
@@ -506,26 +506,215 @@ static uint8_t * parse_msg_main_LenMessage(uint8_t *message_start, uint8_t *mess
     return NULL;
 }
 
+static uint8_t * parse_array_uint8_terminated(uint8_t *message_start, SPICE_GNUC_UNUSED uint8_t *message_end, uint8_t *struct_data, PointerInfo *this_ptr_info)
+{
+    uint8_t *in = message_start + this_ptr_info->offset;
+    uint8_t *end;
+
+    end = struct_data;
+    memcpy(end, in, this_ptr_info->nelements);
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
+    ((char *) (end))[this_ptr_info->nelements] = 0;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+    in += this_ptr_info->nelements;
+    end += this_ptr_info->nelements;
+    end += 1;
+    return end;
+}
+
+static uint8_t * parse_msg_main_ZeroLen1(uint8_t *message_start, uint8_t *message_end, size_t *size, message_destructor_t *free_message)
+{
+    SPICE_GNUC_UNUSED uint8_t *pos;
+    uint8_t *start = message_start;
+    uint8_t *data = NULL;
+    uint64_t nw_size;
+    uint64_t mem_size;
+    uint8_t *in, *end;
+    SPICE_GNUC_UNUSED intptr_t ptr_size;
+    uint32_t n_ptr=0;
+    PointerInfo ptr_info[2];
+    uint64_t txt2__extra_size;
+    uint64_t txt2__array__nelements;
+    uint64_t txt3__nw_size, txt3__mem_size;
+    uint64_t txt3__nelements;
+    uint32_t txt3__saved_size = 0;
+    uint64_t txt4__nw_size, txt4__mem_size;
+    uint64_t txt4__nelements;
+    SpiceMsgMainZeroLen1 *out;
+    uint64_t txt1__nelements;
+    uint64_t txt3__array__nelements;
+    uint32_t i;
+
+    { /* txt2 */
+        uint32_t txt2__value;
+        uint64_t txt2__array__nw_size;
+        uint64_t txt2__array__mem_size;
+        uint32_t txt2_len__value;
+        pos = (start + 9);
+        if (SPICE_UNLIKELY(pos + 4 > message_end)) {
+            goto error;
+        }
+        txt2__value = read_uint32(pos);
+        if (SPICE_UNLIKELY(txt2__value >= (uintptr_t) (message_end - message_start))) {
+            goto error;
+        }
+        pos = start + 5;
+        if (SPICE_UNLIKELY(pos + 4 > message_end)) {
+            goto error;
+        }
+        txt2_len__value = read_uint32(pos);
+        txt2__array__nelements = txt2_len__value;
+
+        txt2__array__nw_size = txt2__array__nelements;
+        txt2__array__mem_size = sizeof(uint8_t) * txt2__array__nelements + sizeof(uint8_t);
+        txt2__array__mem_size = SPICE_ALIGN(txt2__array__mem_size, 4);
+        if (SPICE_UNLIKELY(txt2__array__nw_size > (uintptr_t) (message_end - message_start - txt2__value))) {
+            goto error;
+        }
+        txt2__extra_size = txt2__array__mem_size + /* for alignment */ 3;
+    }
+
+    { /* txt3 */
+        uint32_t txt2_len__value;
+        pos = start + 5;
+        if (SPICE_UNLIKELY(pos + 4 > message_end)) {
+            goto error;
+        }
+        txt2_len__value = read_uint32(pos);
+        txt3__nelements = txt2_len__value;
+
+        txt3__nw_size = txt3__nelements;
+        txt3__mem_size = sizeof(uint8_t) * txt3__nelements + sizeof(uint8_t);
+        txt3__mem_size = SPICE_ALIGN(txt3__mem_size, 4);
+        txt3__saved_size = txt3__nw_size;
+    }
+
+    { /* txt4 */
+        uint16_t txt4_len__value;
+        pos = start + 17 + txt3__nw_size;
+        if (SPICE_UNLIKELY(pos + 2 > message_end)) {
+            goto error;
+        }
+        txt4_len__value = read_uint16(pos);
+        txt4__nelements = txt4_len__value;
+
+        txt4__nw_size = txt4__nelements;
+        txt4__mem_size = sizeof(uint8_t) * txt4__nelements + sizeof(uint8_t);
+        txt4__mem_size = SPICE_ALIGN(txt4__mem_size, 4);
+    }
+
+    nw_size = 19 + txt3__nw_size + txt4__nw_size;
+    mem_size = sizeof(SpiceMsgMainZeroLen1) + txt2__extra_size + txt3__mem_size + txt4__mem_size;
+
+    /* Check if message fits in reported side */
+    if (nw_size > (uintptr_t) (message_end - start)) {
+        return NULL;
+    }
+
+    /* Validated extents and calculated size */
+    data = (uint8_t *)(mem_size > UINT32_MAX ? NULL : malloc(mem_size));
+    if (SPICE_UNLIKELY(data == NULL)) {
+        goto error;
+    }
+    end = data + sizeof(SpiceMsgMainZeroLen1);
+    in = start;
+
+    out = (SpiceMsgMainZeroLen1 *)data;
+
+    txt1__nelements = 4;
+    memcpy(out->txt1, in, txt1__nelements);
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
+    ((char *) (out->txt1))[txt1__nelements] = 0;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+    in += txt1__nelements;
+    out->sep1 = consume_uint8(&in);
+    out->txt2_len = consume_uint32(&in);
+    ptr_info[n_ptr].offset = consume_uint32(&in);
+    ptr_info[n_ptr].parse = parse_array_uint8_terminated;
+    ptr_info[n_ptr].dest = (void **)&out->txt2;
+    ptr_info[n_ptr].nelements = txt2__array__nelements;
+    n_ptr++;
+    ptr_info[n_ptr].offset = in - start;
+    ptr_info[n_ptr].parse = parse_array_uint8_terminated;
+    ptr_info[n_ptr].dest = (void **)&out->txt3;
+    txt3__array__nelements = out->txt2_len;
+    ptr_info[n_ptr].nelements = txt3__array__nelements;
+    n_ptr++;
+    in += txt3__saved_size;
+    out->n = consume_uint32(&in);
+    out->txt4_len = consume_uint16(&in);
+    verify(sizeof(out->txt4) == 0);
+    memcpy(out->txt4, in, txt4__nelements);
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
+    ((char *) (out->txt4))[txt4__nelements] = 0;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+    in += txt4__nelements;
+    end += txt4__nelements;
+    end += 1;
+
+    assert(in <= message_end);
+
+    for (i = 0; i < n_ptr; i++) {
+        if (ptr_info[i].offset == 0) {
+            *ptr_info[i].dest = NULL;
+        } else {
+            /* Align to 32 bit */
+            end = (uint8_t *)SPICE_ALIGN((uintptr_t)end, 4);
+            *ptr_info[i].dest = (void *)end;
+            end = ptr_info[i].parse(message_start, message_end, end, &ptr_info[i]);
+            if (SPICE_UNLIKELY(end == NULL)) {
+                goto error;
+            }
+        }
+    }
+
+    assert(end <= data + mem_size);
+
+    *size = end - data;
+    *free_message = (message_destructor_t) free;
+    return data;
+
+   error:
+    free(data);
+    return NULL;
+}
+
 static uint8_t * parse_TestChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, SPICE_GNUC_UNUSED int minor, size_t *size_out, message_destructor_t *free_message)
 {
-    static parse_msg_func_t funcs1[5] =  {
+    static parse_msg_func_t funcs1[6] =  {
         parse_msg_main_ShortDataSubMarshall,
         parse_msg_main_ArrayMessage,
         parse_msg_main_Zeroes,
         parse_msg_main_channels_list,
-        parse_msg_main_LenMessage
+        parse_msg_main_LenMessage,
+        parse_msg_main_ZeroLen1
     };
-    if (message_type >= 1 && message_type < 6) {
+    if (message_type >= 1 && message_type < 7) {
         return funcs1[message_type-1](message_start, message_end, size_out, free_message);
     }
     return NULL;
 }
 
-spice_parse_channel_func_t spice_get_server_channel_parser(uint32_t channel, unsigned int *max_message_type)
+spice_parse_channel_func_t spice_get_server_channel_parser_test(uint32_t channel, unsigned int *max_message_type)
 {
     static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[2] =  {
         { NULL, 0 },
-        { parse_TestChannel_msg, 5}
+        { parse_TestChannel_msg, 6}
     };
     if (channel < 2) {
         if (max_message_type != NULL) {
@@ -536,10 +725,10 @@ spice_parse_channel_func_t spice_get_server_channel_parser(uint32_t channel, uns
     return NULL;
 }
 
-uint8_t * spice_parse_msg(uint8_t *message_start, uint8_t *message_end, uint32_t channel, uint16_t message_type, SPICE_GNUC_UNUSED int minor, size_t *size_out, message_destructor_t *free_message)
+uint8_t * spice_parse_msg_test(uint8_t *message_start, uint8_t *message_end, uint32_t channel, uint16_t message_type, SPICE_GNUC_UNUSED int minor, size_t *size_out, message_destructor_t *free_message)
 {
     spice_parse_channel_func_t func;
-    func = spice_get_server_channel_parser(channel, NULL);
+    func = spice_get_server_channel_parser_test(channel, NULL);
     if (func != NULL) {
         return func(message_start, message_end, message_type, minor, size_out, free_message);
     }

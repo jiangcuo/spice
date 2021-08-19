@@ -18,55 +18,53 @@
 #ifndef INPUTS_CHANNEL_CLIENT_H_
 #define INPUTS_CHANNEL_CLIENT_H_
 
-#include <glib-object.h>
-
 #include "red-channel-client.h"
 #include "inputs-channel.h"
 
-G_BEGIN_DECLS
+#include "push-visibility.h"
 
-#define TYPE_INPUTS_CHANNEL_CLIENT inputs_channel_client_get_type()
-
-#define INPUTS_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_INPUTS_CHANNEL_CLIENT, InputsChannelClient))
-#define INPUTS_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_INPUTS_CHANNEL_CLIENT, InputsChannelClientClass))
-#define IS_INPUTS_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_INPUTS_CHANNEL_CLIENT))
-#define IS_INPUTS_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_INPUTS_CHANNEL_CLIENT))
-#define INPUTS_CHANNEL_CLIENT_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_INPUTS_CHANNEL_CLIENT, InputsChannelClientClass))
-
-typedef struct InputsChannelClient InputsChannelClient;
-typedef struct InputsChannelClientClass InputsChannelClientClass;
-typedef struct InputsChannelClientPrivate InputsChannelClientPrivate;
-
-struct InputsChannelClient
+class InputsChannelClient final: public RedChannelClient
 {
-    RedChannelClient parent;
+public:
+    virtual bool init() override;
 
-    InputsChannelClientPrivate *priv;
+private:
+    using RedChannelClient::RedChannelClient;
+
+    InputsChannel* get_channel()
+    {
+        return static_cast<InputsChannel*>(RedChannelClient::get_channel());
+    }
+    virtual bool handle_message(uint16_t type, uint32_t size, void *message) override;
+    virtual uint8_t *alloc_recv_buf(uint16_t type, uint32_t size) override;
+    virtual void release_recv_buf(uint16_t type, uint32_t size, uint8_t *msg) override;
+    virtual void on_disconnect() override;
+    virtual void send_item(RedPipeItem *base) override;
+    virtual bool handle_migrate_data(uint32_t size, void *message) override;
+    virtual void migrate() override;
+    virtual void handle_migrate_flush_mark() override;
+    void send_migrate_data(SpiceMarshaller *m, RedPipeItem *item);
+    void on_mouse_motion();
+    void handle_migrate_data(uint16_t motion_count);
+    void pipe_add_init();
+
+    enum {
+        // approximate max receive message size
+        // The largest message from client is "key_scancode" which contains
+        // key pressed or released. 2K is more then enough.
+        RECEIVE_BUF_SIZE = 2048
+    };
+
+    uint8_t recv_buf[RECEIVE_BUF_SIZE];
+    uint16_t motion_count;
 };
 
-struct InputsChannelClientClass
-{
-    RedChannelClientClass parent_class;
-};
-
-GType inputs_channel_client_get_type(void) G_GNUC_CONST;
-
-RedChannelClient* inputs_channel_client_create(RedChannel *channel,
+InputsChannelClient* inputs_channel_client_create(RedChannel *channel,
                                                RedClient *client,
                                                RedStream *stream,
                                                RedChannelCapabilities *caps);
 
-void inputs_channel_client_on_mouse_motion(InputsChannelClient* self);
-void inputs_channel_client_send_migrate_data(RedChannelClient *rcc,
-                                             SpiceMarshaller *m, RedPipeItem *item);
-void inputs_channel_client_handle_migrate_data(InputsChannelClient *icc, uint16_t motion_count);
-
-G_END_DECLS
+#include "pop-visibility.h"
 
 enum {
     RED_PIPE_ITEM_INPUTS_INIT = RED_PIPE_ITEM_TYPE_CHANNEL_BASE,

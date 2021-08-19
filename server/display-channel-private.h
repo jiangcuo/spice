@@ -78,6 +78,8 @@ struct _Drawable {
 
 struct DisplayChannelPrivate
 {
+    SPICE_CXX_GLIB_ALLOCATOR
+
     DisplayChannel *pub;
 
     QXLInstance *qxl;
@@ -134,13 +136,8 @@ struct DisplayChannelPrivate
 };
 
 #define FOREACH_DCC(_channel, _data) \
-    GLIST_FOREACH((_channel ? red_channel_get_clients(RED_CHANNEL(_channel)) : NULL), \
+    GLIST_FOREACH((_channel ? _channel->get_clients() : NULL), \
                   DisplayChannelClient, _data)
-
-typedef struct RedMonitorsConfigItem {
-    RedPipeItem base;
-    MonitorsConfig *monitors_config;
-} RedMonitorsConfigItem;
 
 enum {
     RED_PIPE_ITEM_TYPE_DRAW = RED_PIPE_ITEM_TYPE_COMMON_LAST,
@@ -161,6 +158,12 @@ enum {
     RED_PIPE_ITEM_TYPE_GL_DRAW,
 };
 
+struct RedMonitorsConfigItem: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_MONITORS_CONFIG> {
+    RedMonitorsConfigItem(MonitorsConfig *monitors_config);
+    ~RedMonitorsConfigItem();
+    MonitorsConfig *monitors_config;
+};
+
 void drawable_unref(Drawable *drawable);
 
 MonitorsConfig *monitors_config_ref(MonitorsConfig *config);
@@ -179,10 +182,62 @@ uint32_t display_channel_generate_uid(DisplayChannel *display);
 int display_channel_get_video_stream_id(DisplayChannel *display, VideoStream *stream);
 VideoStream *display_channel_get_nth_video_stream(DisplayChannel *display, gint i);
 
-typedef struct RedSurfaceDestroyItem {
-    RedPipeItem base;
+struct RedSurfaceDestroyItem: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_DESTROY_SURFACE> {
+    RedSurfaceDestroyItem(uint32_t surface_id);
     SpiceMsgSurfaceDestroy surface_destroy;
-} RedSurfaceDestroyItem;
+};
+
+struct RedSurfaceCreateItem: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_CREATE_SURFACE> {
+    RedSurfaceCreateItem(uint32_t surface_id,
+                         uint32_t width,
+                         uint32_t height,
+                         uint32_t format,
+                         uint32_t flags);
+    SpiceMsgSurfaceCreate surface_create;
+};
+
+struct RedGlScanoutUnixItem: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_GL_SCANOUT> {
+};
+
+struct RedGlDrawItem: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_GL_DRAW> {
+    SpiceMsgDisplayGlDraw draw;
+};
+
+struct RedImageItem final: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_IMAGE> {
+    SpicePoint pos;
+    int width;
+    int height;
+    int stride;
+    int top_down;
+    int surface_id;
+    int image_format;
+    uint32_t image_flags;
+    int can_lossy;
+    uint8_t data[0];
+};
+
+struct RedDrawablePipeItem: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_DRAW> {
+    RedDrawablePipeItem(DisplayChannelClient *dcc, Drawable *drawable);
+    ~RedDrawablePipeItem();
+    Drawable *const drawable;
+    DisplayChannelClient *const dcc;
+};
+
+/* This item is used to send a full quality image (lossless) of the area where the stream was.
+ * This to avoid the artifacts due to the lossy compression. */
+struct RedUpgradeItem: public RedPipeItemNum<RED_PIPE_ITEM_TYPE_UPGRADE> {
+    RedUpgradeItem(Drawable *drawable);
+    ~RedUpgradeItem();
+    Drawable *const drawable;
+    red::glib_unique_ptr<SpiceClipRects> rects;
+};
+
+struct RedStreamActivateReportItem:
+    public RedPipeItemNum<RED_PIPE_ITEM_TYPE_STREAM_ACTIVATE_REPORT>
+{
+    uint32_t stream_id;
+    uint32_t report_id;
+};
 
 static inline int is_equal_path(SpicePath *path1, SpicePath *path2)
 {

@@ -1013,7 +1013,7 @@ Bidirectional Audio
 <dd>
 <p>
 Spice supports audio playback and recording. Playback is compressed
-using the CELT algorithm
+using the OPUS algorithm
 </p>
 </dd>
 <dt class="hdlist1">
@@ -1845,7 +1845,7 @@ can then be mounted and browsed in traditional applications thanks to
 </div>
 </div>
 <div class="sect1">
-<h2 id="_gl_acceleration_virgl">GL acceleration (virgl)</h2>
+<h2 id="virgl">GL acceleration (virgl)</h2>
 <div class="sectionbody">
 <div class="paragraph"><p>OpenGL acceleration is currently local only (it has to go through a Unix socket)
 and it needs guest support. It&#8217;s currently limited to recent linux
@@ -1907,6 +1907,41 @@ by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
 <pre><tt>client$ remote-viewer spice<span style="color: #990000">+</span>unix<span style="color: #990000">:</span>///run/user<span style="color: #990000">/</span><span style="color: #993399">1000</span>/spice<span style="color: #990000">.</span>sock</tt></pre></div></div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="gvtg">Intel&#8217;s GVTg</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Intel GVTg allows you to share your host GPU with the guest so that it can
+accelerate graphic and media operations.</p></div>
+<div class="sect2">
+<h3 id="_configuration_10">Configuration</h3>
+<div class="paragraph"><p>To configure your host and the vGPU device, follow
+<a href="https://www.kraxel.org/blog/2018/04/vgpu-display-support-finally-merged-upstream/">this blog post</a></p></div>
+<div class="paragraph"><p>For spice configuration you have two main options:</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+Use locally, connect and configure spice similar to  <a href="#virgl">virGL</a> spice configuration
+(set vfio display=on)
+</p>
+</li>
+<li>
+<p>
+Use remotley, connect and configure spice similar to <a href="#videostreaming">spice-streaming-agent</a>
+(set vfio display=off)
+</p>
+<div class="ulist"><ul>
+<li>
+<p>
+For remote connection you may want to accelerate your video encoding using the configured
+Intel&#8217;s vGPU, check for Gstreamer&#8217;s Intel accelerated codec options.
+</p>
+</li>
+</ul></div>
+</li>
+</ol></div>
 </div>
 </div>
 </div>
@@ -2293,7 +2328,7 @@ Client is referring to a system running the Spice client (the recommended one is
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2020-02-27 11:26:12 GMT
+ 2021-04-17 07:49:29 BST
 </div>
 </div>
 </body>

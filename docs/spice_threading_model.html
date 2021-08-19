@@ -771,7 +771,7 @@ to DisplayChannel/CursorChannel.</p></div>
 <code>SpiceCoreInterface</code> to handle events. As the events will be handled from a
 thread based on the core interface you have to use the correct core. Each
 channel has an associated core interface which can be retrieved using
-<code>red_channel_get_core_interface</code>. There&#8217;s also a main core interface you can get
+<code>RedChannel::get_core_interface</code>. There&#8217;s also a main core interface you can get
 using <code>reds_get_core_interface</code>. <code>reds_core_timer_*</code> and <code>reds_core_watch_*</code>
 functions use the main core interface.
 Even though multiple channel types run in the main thread and so could use
@@ -803,8 +803,8 @@ same RedClient are automatically disconnected.</p></div>
 <div class="paragraph"><p>Who owns RedClient? RedClient is released when the MainChannelClient attached
 to it is disconnected. In this case a request is scheduled in the main thread
 (even if MainChannelClient runs on the main thread too) and
-red_client_disconnect is called which calls red_client_destroy which uses
-g_object_unref to free the object.</p></div>
+reds_client_disconnect is called which calls RedClient::destroy which uses
+RedClient::unref to free the object.</p></div>
 <div class="paragraph"><p>Where is the MainChannelClient freed? On disconnection like other channel
 clients, currently before RedClient which will have a dangling pointer.</p></div>
 </div>
@@ -814,7 +814,7 @@ clients, currently before RedClient which will have a dangling pointer.</p></div
 <div id="footer">
 <div id="footer-text">
 Last updated
- 2020-02-27 11:26:12 GMT
+ 2021-04-17 07:49:29 BST
 </div>
 </div>
 </body>

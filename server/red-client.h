@@ -19,44 +19,78 @@
 #ifndef RED_CLIENT_H_
 #define RED_CLIENT_H_
 
-#include <glib-object.h>
-
 #include "main-channel-client.h"
+#include "safe-list.hpp"
 
-G_BEGIN_DECLS
-
-SPICE_DECLARE_TYPE(RedClient, red_client, CLIENT);
-#define RED_TYPE_CLIENT red_client_get_type()
+#include "push-visibility.h"
 
 RedClient *red_client_new(RedsState *reds, int migrated);
 
-/*
- * disconnects all the client's channels (should be called from the client's thread)
- */
-void red_client_destroy(RedClient *client);
+class RedClient final
+{
+public:
+    SPICE_CXX_GLIB_ALLOCATOR
 
-gboolean red_client_add_channel(RedClient *client, RedChannelClient *rcc, GError **error);
-void red_client_remove_channel(RedChannelClient *rcc);
+    RedClient(RedsState *reds, bool migrated);
+protected:
+    ~RedClient();
 
-MainChannelClient *red_client_get_main(RedClient *client);
+public:
+    void ref() { g_atomic_int_inc(&_ref); }
+    void unref() { if (g_atomic_int_dec_and_test(&_ref)) delete this; }
 
-/* called when the migration handshake results in seamless migration (dst side).
- * By default we assume semi-seamless */
-void red_client_set_migration_seamless(RedClient *client);
-void red_client_semi_seamless_migrate_complete(RedClient *client); /* dst side */
-gboolean red_client_seamless_migration_done_for_channel(RedClient *client);
-/* TRUE if the migration is seamless and there are still channels that wait from migration data.
- * Or, during semi-seamless migration, and the main channel still waits for MIGRATE_END
- * from the client.
- * Note: Call it only from the main thread */
-int red_client_during_migrate_at_target(RedClient *client);
+    /*
+     * disconnects all the client's channels (should be called from the client's thread)
+     */
+    void destroy();
 
-void red_client_migrate(RedClient *client);
+    gboolean add_channel(RedChannelClient *rcc, char **error);
+    static void remove_channel(RedChannelClient *rcc);
 
-gboolean red_client_is_disconnecting(RedClient *client);
-void red_client_set_disconnecting(RedClient *client);
-RedsState* red_client_get_server(RedClient *client);
+    MainChannelClient *get_main();
 
-G_END_DECLS
+    /* called when the migration handshake results in seamless migration (dst side).
+     * By default we assume semi-seamless */
+    void set_migration_seamless();
+    void semi_seamless_migrate_complete(); /* dst side */
+    gboolean seamless_migration_done_for_channel();
+    /* TRUE if the migration is seamless and there are still channels that wait from migration data.
+     * Or, during semi-seamless migration, and the main channel still waits for MIGRATE_END
+     * from the client.
+     * Note: Call it only from the main thread */
+    int during_migrate_at_target();
+
+    void migrate();
+
+    gboolean is_disconnecting();
+    void set_disconnecting();
+    RedsState* get_server();
+
+private:
+    RedChannelClient *get_channel(int type, int id);
+
+    RedsState *const reds;
+    red::safe_list<red::shared_ptr<RedChannelClient>> channels;
+    red::shared_ptr<MainChannelClient> mcc;
+    pthread_mutex_t lock; // different channels can be in different threads
+
+    pthread_t thread_id;
+
+    int disconnecting;
+    /* Note that while semi-seamless migration is conducted by the main thread, seamless migration
+     * involves all channels, and thus the related variables can be accessed from different
+     * threads */
+    /* if seamless=TRUE, migration_target is turned off when all
+     * the clients received their migration data. Otherwise (semi-seamless),
+     * it is turned off, when red_client_semi_seamless_migrate_complete
+     * is called */
+    int during_target_migrate;
+    int seamless_migrate;
+    int num_migrated_channels; /* for seamless - number of channels that wait for migrate data*/
+
+    gint _ref = 1;
+};
+
+#include "pop-visibility.h"
 
 #endif /* RED_CLIENT_H_ */

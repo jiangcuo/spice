@@ -13,7 +13,7 @@ AC_PREREQ([2.57])
 #
 dnl TODO see server/spice-char.h TODO comment for API breakage
 m4_define([SPICE_CURRENT], [15])
-m4_define([SPICE_REVISION], [0])
+m4_define([SPICE_REVISION], [1])
 m4_define([SPICE_AGE], [14])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
@@ -30,7 +30,6 @@ SPICE_SERVER_VERSION=`printf "0x%02x%02x%02x" $major $minor $micro`
 AC_SUBST(SPICE_SERVER_VERSION)
 
 AC_CONFIG_MACRO_DIR([m4])
-m4_include([subprojects/spice-common/m4/spice-deps.m4])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR(.)
 
@@ -48,6 +47,13 @@ LT_INIT([disable-static])
 AM_PROG_CC_C_O
 AC_C_BIGENDIAN
 PKG_PROG_PKG_CONFIG
+
+AC_PROG_CXX
+AC_LANG_PUSH([C++])
+m4_ifndef([AX_CXX_COMPILE_STDCXX_11], [m4_fatal([Missing AX_CXX_COMPILE_STDCXX_11, install autoconf-archive])])
+AX_CXX_COMPILE_STDCXX_11
+AX_APPEND_COMPILE_FLAGS([-fno-exceptions -fno-check-new])
+AC_LANG_POP([C++])
 
 AC_CHECK_HEADERS([sys/time.h execinfo.h linux/sockios.h pthread_np.h])
 AC_CHECK_DECL([TCP_KEEPIDLE], [have_tcp_keepidle="yes"],,
@@ -85,7 +91,6 @@ AM_CONDITIONAL([OS_WIN32],[test "$os_win32" = "yes"])
 dnl =========================================================================
 dnl Check optional features
 SPICE_CHECK_SMARTCARD
-SPICE_EXTRA_CHECKS
 
 AC_ARG_ENABLE(gstreamer,
               AS_HELP_STRING([--enable-gstreamer=@<:@auto/0.10/1.0/yes/no@:>@],
@@ -137,6 +142,13 @@ if test "x$have_gstreamer_0_10" = "xyes" || test "x$have_gstreamer_1_0" = "xyes"
     AC_SUBST(ORC_LIBS)
 fi
 
+AC_ARG_ENABLE([tests],
+  AS_HELP_STRING([--enable-tests],
+                 [Enable tests @<:@default=yes@:>@]),
+  [],
+  enable_tests="yes")
+AM_CONDITIONAL(ENABLE_TESTS, test "x$enable_tests" = "xyes")
+
 dnl Check for the presence of Valgrind and do the plumbing to allow
 dnl the running of "make check-valgrind".
 AX_VALGRIND_DFLT(memcheck, on)
@@ -148,18 +160,12 @@ AX_VALGRIND_CHECK
 
 SPICE_CHECK_LZ4
 SPICE_CHECK_SASL
-SPICE_CHECK_INSTRUMENTATION
 AM_CONDITIONAL(HAVE_SASL, test "x$have_sasl" = "xyes")
 
 dnl =========================================================================
 dnl Check deps
-AC_CONFIG_SUBDIRS([subprojects/spice-common])
-COMMON_CFLAGS='-I ${top_srcdir}/subprojects/spice-common/ -I ${top_builddir}/subprojects/spice-common/'
-COMMON_CFLAGS="$COMMON_CFLAGS -DG_LOG_DOMAIN=\\\"Spice\\\""
-AC_SUBST(COMMON_CFLAGS)
-
-SPICE_COMMON_DIR='${top_builddir}/subprojects/spice-common'
-AC_SUBST(SPICE_COMMON_DIR)
+m4_define([SPICE_PROTOCOL_MIN_VER],[0.14.3])
+m4_include([subprojects/spice-common/m4/common.m4])
 
 AC_CHECK_LIBM
 AC_SUBST(LIBM)
@@ -178,19 +184,12 @@ AS_IF([test x"$have_smartcard" = "xyes"], [
     AS_VAR_APPEND([SPICE_REQUIRES], [" libcacard >= 2.5.1"])
 ])
 
-SPICE_PROTOCOL_MIN_VER=0.14.0
-PKG_CHECK_MODULES([SPICE_PROTOCOL], [spice-protocol >= $SPICE_PROTOCOL_MIN_VER])
-AC_SUBST([SPICE_PROTOCOL_MIN_VER])
-
 GLIB2_REQUIRED=2.38
 GLIB2_ENCODED_VERSION="GLIB_VERSION_2_38"
-PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= $GLIB2_REQUIRED gio-2.0 >= $GLIB2_REQUIRED])
+PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= $GLIB2_REQUIRED])
 GLIB2_CFLAGS="$GLIB2_CFLAGS -DGLIB_VERSION_MIN_REQUIRED=$GLIB2_ENCODED_VERSION \
-  -DGLIB_VERSION_MAX_ALLOWED=$GLIB2_ENCODED_VERSION"
-AS_VAR_APPEND([SPICE_REQUIRES], [" glib-2.0 >= $GLIB2_REQUIRED gio-2.0 >= $GLIB2_REQUIRED"])
-
-PKG_CHECK_MODULES([GOBJECT2], [gobject-2.0 >= $GLIB2_REQUIRED])
-AS_VAR_APPEND([SPICE_REQUIRES], [" gobject-2.0 >= $GLIB2_REQUIRED"])
+  -DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_60"
+AS_VAR_APPEND([SPICE_REQUIRES], [" glib-2.0 >= $GLIB2_REQUIRED"])
 
 #used only by tests
 AS_IF([test "x$os_win32" != "xyes"],
@@ -201,8 +200,6 @@ PKG_CHECK_MODULES(PIXMAN, pixman-1 >= $PIXMAN_REQUIRED)
 AC_SUBST(PIXMAN_CFLAGS)
 AC_SUBST(PIXMAN_LIBS)
 AS_VAR_APPEND([SPICE_REQUIRES], [" pixman-1 >= $PIXMAN_REQUIRED"])
-
-SPICE_CHECK_CELT051
 
 PKG_CHECK_MODULES(SSL, openssl >= 1.0.0)
 AC_SUBST(SSL_CFLAGS)
@@ -263,7 +260,9 @@ AS_IF([test "$enable_statistics" = "yes"],
 dnl ===========================================================================
 dnl check compiler flags
 
+AC_LANG_PUSH([C++])
 SPICE_COMPILE_WARNINGS
+AC_LANG_POP([C++])
 LIBVIRT_LINKER_RELRO
 LIBVIRT_LINKER_NO_INDIRECT
 
@@ -325,6 +324,7 @@ AC_MSG_NOTICE([
 
         prefix:                   ${prefix}
         C compiler:               ${CC}
+        C++ compiler:             ${CXX}
 
         LZ4 support:              ${have_lz4}
         Smartcard:                ${have_smartcard}

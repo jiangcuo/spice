@@ -144,14 +144,14 @@ static void timer_remove(SpiceTimer *timer_base)
 
 static GIOCondition spice_event_to_giocondition(int event_mask)
 {
-    GIOCondition condition = 0;
+    int condition = 0;
 
     if (event_mask & SPICE_WATCH_EVENT_READ)
         condition |= G_IO_IN;
     if (event_mask & SPICE_WATCH_EVENT_WRITE)
         condition |= G_IO_OUT;
 
-    return condition;
+    return (GIOCondition) condition;
 }
 
 static int giocondition_to_spice_event(GIOCondition condition)
@@ -298,7 +298,7 @@ static SpiceWatch *watch_add(const SpiceCoreInterfaceInternal *iface,
     watch->spice_base.funcs = &glib_core_funcs;
     watch->fd = fd;
 
-    g_source_set_callback(&watch->source, (GSourceFunc)(void*)(SpiceWatchFunc) func, opaque, NULL);
+    g_source_set_callback(&watch->source, (GSourceFunc)(void*) func, opaque, NULL);
 
     g_source_attach(&watch->source, iface->main_context);
 

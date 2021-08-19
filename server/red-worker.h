@@ -17,14 +17,16 @@
 
 /* This header should contains internal details between RedQxl and
  * RedWorker.
- * Should be included only by red-worker.c, red-qxl.c and
- * red-replay-qxl.c (which uses message values).
+ * Should be included only by red-worker.cpp, red-qxl.cpp and
+ * red-replay-qxl.cpp (which uses message values).
  */
 
 #ifndef RED_WORKER_H_
 #define RED_WORKER_H_
 
 #include "red-channel.h"
+
+SPICE_BEGIN_DECLS
 
 typedef struct RedWorker RedWorker;
 
@@ -131,6 +133,7 @@ typedef struct RedWorkerMessageDelMemslot {
 } RedWorkerMessageDelMemslot;
 
 typedef struct RedWorkerMessageDestroySurfaces {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageDestroySurfaces;
 
 typedef struct RedWorkerMessageDestroySurfacesAsync {
@@ -159,18 +162,23 @@ typedef struct RedWorkerMessageCreatePrimarySurface {
 } RedWorkerMessageCreatePrimarySurface;
 
 typedef struct RedWorkerMessageResetImageCache {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageResetImageCache;
 
 typedef struct RedWorkerMessageResetCursor {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageResetCursor;
 
 typedef struct RedWorkerMessageWakeup {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageWakeup;
 
 typedef struct RedWorkerMessageOom {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageOom;
 
 typedef struct RedWorkerMessageStart {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageStart;
 
 typedef struct RedWorkerMessageFlushSurfacesAsync {
@@ -178,6 +186,7 @@ typedef struct RedWorkerMessageFlushSurfacesAsync {
 } RedWorkerMessageFlushSurfacesAsync;
 
 typedef struct RedWorkerMessageStop {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageStop;
 
 /* this command is sync, so it's ok to pass a pointer */
@@ -222,12 +231,15 @@ typedef struct RedWorkerMessageMonitorsConfigAsync {
 } RedWorkerMessageMonitorsConfigAsync;
 
 typedef struct RedWorkerMessageDriverUnload {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageDriverUnload;
 
 typedef struct RedWorkerMessageGlScanout {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageGlScanout;
 
 typedef struct RedWorkerMessageClose {
+    uint8_t dummy_empty_field[0]; // C/C++ compatibility
 } RedWorkerMessageClose;
 
 typedef struct RedWorkerMessageGlDraw {
@@ -240,5 +252,7 @@ enum {
 };
 
 void red_qxl_clear_pending(QXLState *qxl_state, int pending);
+
+SPICE_END_DECLS
 
 #endif /* RED_WORKER_H_ */

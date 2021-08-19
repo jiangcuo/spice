@@ -50,10 +50,10 @@
 
 /*
     For each output pixel type the following macros are defined:
-    OUT_PIXEL                      - the output pixel type
-    COPY_PIXEL(p, out)              - assigns the pixel to the place pointed by out and increases
-                                      out. Used in RLE. Need special handling because in alpha we
-                                      copy only the pad byte.
+    OUT_PIXEL                     - the output pixel type
+    COPY_PIXEL(p, out)            - assigns the pixel to the place pointed by out and increases
+                                    out. Used in RLE. Need special handling because in alpha we
+                                    copy only the pad byte.
     COPY_REF_PIXEL(ref, out)      - copies the pixel pointed by ref to the pixel pointed by out.
                                     Increases ref and out.
     COPY_COMP_PIXEL(encoder, out) - copies pixel from the compressed buffer to the decompressed
@@ -222,16 +222,17 @@
 static size_t FNAME(decompress)(Encoder *encoder, OUT_PIXEL *out_buf, int size)
 {
     OUT_PIXEL    *op = out_buf;
-    OUT_PIXEL    *op_limit = out_buf + size;
-    uint32_t ctrl = decode(encoder);
+    OUT_PIXEL    *const op_limit = out_buf + size;
 
     for (;;) {
-        const OUT_PIXEL *ref = op;
-        uint32_t len = ctrl >> 5;
-        uint32_t ofs = (ctrl & 31) << 8; // 5 MSb of distance
+        uint32_t ctrl = decode(encoder);
 
         if (ctrl >= MAX_COPY) { // reference (dictionary/RLE)
             /* retrieving the reference and the match length */
+
+            const OUT_PIXEL *ref = op;
+            uint32_t len = ctrl >> 5;
+            uint32_t ofs = (ctrl & 31) << 8; // 5 MSb of distance
 
             uint8_t code;
             len--;
@@ -280,34 +281,30 @@ static size_t FNAME(decompress)(Encoder *encoder, OUT_PIXEL *out_buf, int size)
                                           //       because the number of pixel copied is larger
                                           //       then one...
                 /* optimize copy for a run */
-                OUT_PIXEL b = *ref;
+                const OUT_PIXEL b = *ref;
                 for (; len; --len) {
                     COPY_PIXEL(b, op);
-                    spice_assert(op <= op_limit);
+                    spice_extra_assert(op <= op_limit);
                 }
             } else {
                 for (; len; --len) {
                     COPY_REF_PIXEL(ref, op);
-                    spice_assert(op <= op_limit);
+                    spice_extra_assert(op <= op_limit);
                 }
             }
         } else { // copy
             ctrl++; // copy count is biased by 1
             spice_assert(op + CAST_PLT_DISTANCE(ctrl) <= op_limit);
-            COPY_COMP_PIXEL(encoder, op);
 
-            spice_assert(op <= op_limit);
-
-            for (--ctrl; ctrl; ctrl--) {
+            do {
                 COPY_COMP_PIXEL(encoder, op);
-                spice_assert(op <= op_limit);
-            }
+                spice_extra_assert(op <= op_limit);
+            } while(--ctrl);
         }
 
         if (LZ_UNEXPECT_CONDITIONAL(op >= op_limit)) {
             break;
         }
-        ctrl = decode(encoder);
     }
 
     return (op - out_buf);

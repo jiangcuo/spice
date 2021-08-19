@@ -17,6 +17,8 @@ BUILT_SOURCES = $(CLIENT_MARSHALLERS) $(SERVER_MARSHALLERS)
 
 noinst_LTLIBRARIES = libspice-common.la libspice-common-server.la libspice-common-client.la
 libspice_common_la_SOURCES =		\
+	agent.c				\
+	agent.h				\
 	backtrace.c			\
 	backtrace.h			\
 	canvas_utils.c			\
@@ -87,6 +89,10 @@ libspice_common_client_la_SOURCES =		\
 	ssl_verify.c				\
 	ssl_verify.h				\
 	$(CLIENT_MARSHALLERS)			\
+	$(NULL)
+
+libspice_common_client_la_LIBADD =		\
+	$(GIO2_LIBS)				\
 	$(NULL)
 
 libspice_common_server_la_SOURCES =		\

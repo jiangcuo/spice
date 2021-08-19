@@ -1,10 +1,12 @@
 #
 # project definition
 #
-project('spice', 'c',
+project('spice', 'c', 'cpp',
         version : run_command('build-aux/git-version-gen', meson.source_root() + '/.tarball-version', check : true).stdout().strip(),
         license : 'LGPLv2.1',
-        meson_version : '>= 0.48')
+        meson_version : '>= 0.48',
+        default_options : ['buildtype=debugoptimized',
+                           'warning_level=2'])
 
 message('Updating submodules')
 run_command('build-aux/meson/check-spice-common', check : true)
@@ -28,7 +30,7 @@ run_command('build-aux/meson/check-spice-common', check : true)
 #
 #
 spice_server_current = 15
-spice_server_revision = 0
+spice_server_revision = 1
 spice_server_age = 14
 spice_server_so_version = '@0@.@1@.@2@'.format(spice_server_current - spice_server_age,
                                                spice_server_age,
@@ -38,25 +40,29 @@ message('libspice.so version: ' + spice_server_so_version)
 # some global vars
 spice_server_global_cflags = ['-DSPICE_SERVER_INTERNAL',
                               '-DG_LOG_DOMAIN="Spice"',
-                              #'-Werror',
-                              '-Wall',
-                              '-Wextra',
                               '-Wno-sign-compare',
                               '-Wno-unused-parameter']
 
 compiler = meson.get_compiler('c')
+cxx_compiler = meson.get_compiler('cpp')
 spice_server_config_data = configuration_data()
 spice_server_include = [include_directories('.')]
-spice_server_deps = []
+spice_server_deps = [dependency('threads')]
 spice_server_link_args = []
 spice_server_requires = ''
+spice_protocol_version='0.14.3'
 
 #
 # Spice common subproject
 #
-spice_common = subproject('spice-common', default_options : 'generate-code=server')
+spice_common = subproject('spice-common',
+                          default_options : [
+                            'generate-code=server',
+                            'spice-protocol-version=@0@'.format(spice_protocol_version),
+                          ])
 spice_server_config_data.merge_from(spice_common.get_variable('spice_common_config_data'))
 spice_server_deps += spice_common.get_variable('spice_common_server_dep')
+spice_protocol_version = spice_common.get_variable('spice_protocol_version')
 
 #
 # check for system headers
@@ -80,16 +86,11 @@ endif
 #
 # check for mandatory dependencies
 #
-spice_protocol_version='0.14.0'
-
 glib_version = '2.38'
 glib_version_info = '>= @0@'.format(glib_version)
 pixman_version = '>= 0.17.7'
 
-deps = {'spice-protocol' : '>= @0@'.format(spice_protocol_version),
-        'glib-2.0'       : glib_version_info,
-        'gio-2.0'        : glib_version_info,
-        'gobject-2.0'    : glib_version_info,
+deps = {'glib-2.0'       : glib_version_info,
         'pixman-1'       : pixman_version,
         'openssl'        : '>= 1.0.0'}
 
@@ -103,18 +104,19 @@ foreach dep : ['libjpeg', 'zlib']
 endforeach
 
 if host_machine.system() != 'windows'
-  foreach dep : ['librt', 'libm']
+  foreach dep : ['rt', 'm']
     spice_server_deps += compiler.find_library(dep)
   endforeach
 else
-  spice_server_deps += compiler.find_library('ws2_32')
+  foreach dep : ['ws2_32', 'shlwapi']
+    spice_server_deps += compiler.find_library(dep)
+  endforeach
 endif
 
 #
 # Non-mandatory/optional dependencies
 #
-optional_deps = {'celt051' : '>= 0.5.1.1',
-                 'opus'    : '>= 0.9.14'}
+optional_deps = {'opus' : '>= 0.9.14'}
 foreach dep, version : optional_deps
   d = dependency(dep, required : get_option(dep), version : version)
   if d.found()
@@ -188,6 +190,20 @@ spice_server_global_cflags += ['-DGLIB_VERSION_MIN_REQUIRED=@0@'.format(glib_enc
 add_project_arguments(compiler.get_supported_arguments(spice_server_global_cflags),
                       language : 'c')
 
+spice_server_global_cxxflags = spice_server_global_cflags
+spice_server_global_cxxflags += [
+  '-fno-exceptions',
+  '-Wno-suggest-final-methods',
+  '-Wno-suggest-final-types',
+  '-Wno-array-bounds',
+  '-Wno-narrowing',
+  '-Wno-missing-field-initializers',
+  '-Wno-deprecated-declarations',
+  '-Wshadow',
+]
+add_project_arguments(cxx_compiler.get_supported_arguments(spice_server_global_cxxflags),
+                      language : 'cpp')
+
 #
 # Subdirectories
 #
@@ -213,21 +229,4 @@ endif
 configure_file(output : 'config.h',
                configuration : spice_server_config_data)
 
-#
-# write spice-server.pc
-#
-spice_server_pc = configuration_data()
-spice_server_pc.set('prefix', get_option('prefix'))
-spice_server_pc.set('exec_prefix', '${prefix}')
-spice_server_pc.set('libdir', join_paths('${exec_prefix}', get_option('libdir')))
-spice_server_pc.set('includedir', join_paths('${prefix}', get_option('includedir')))
-spice_server_pc.set('VERSION', meson.project_version())
-spice_server_pc.set('SPICE_PROTOCOL_MIN_VER', spice_protocol_version)
-spice_server_requires += 'glib-2.0 @0@ gio-2.0 @0@ gobject-2.0 @0@ pixman-1 @1@ openssl'.format(glib_version_info, pixman_version)
-spice_server_pc.set('SPICE_REQUIRES', spice_server_requires)
-spice_server_pc.set('SPICE_NONPKGCONFIG_LIBS', '-pthread -lm -lrt')
-
-configure_file(input : 'spice-server.pc.in',
-               output : 'spice-server.pc',
-               install_dir : join_paths(get_option('libdir'), 'pkgconfig'),
-               configuration : spice_server_pc)
+run_target('doxy', command : './doxygen.sh')

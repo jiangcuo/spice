@@ -17,6 +17,11 @@
 */
 #include <config.h>
 
+#ifdef _WIN32
+/* Avoid conflicting types for INT32 */
+#define QGLOBAL_H
+#endif
+
 #include <stdio.h>
 #include <inttypes.h>
 #include <jerror.h>
@@ -206,7 +211,7 @@ static MJpegVideoBuffer* create_mjpeg_video_buffer(void)
     MJpegVideoBuffer *buffer = g_new0(MJpegVideoBuffer, 1);
     buffer->base.free = mjpeg_video_buffer_free;
     buffer->maxsize = MJPEG_INITIAL_BUFFER_SIZE;
-    buffer->base.data = g_try_malloc(buffer->maxsize);
+    buffer->base.data = (uint8_t*) g_try_malloc(buffer->maxsize);
     if (!buffer->base.data) {
         g_free(buffer);
         buffer = NULL;
@@ -286,7 +291,7 @@ static boolean empty_mem_output_buffer(j_compress_ptr cinfo)
 
   /* Try to allocate new buffer with double size */
   nextsize = dest->bufsize * 2;
-  nextbuffer = g_try_realloc(dest->buffer, nextsize);
+  nextbuffer = (uint8_t*) g_try_realloc(dest->buffer, nextsize);
 
   if (nextbuffer == NULL)
     ERREXIT1(cinfo, JERR_OUT_OF_MEMORY, 10);
@@ -363,10 +368,10 @@ static uint32_t get_max_fps(uint64_t frame_size, uint64_t bytes_per_sec)
     return frame_size ? bytes_per_sec / frame_size : MJPEG_MAX_FPS;
 }
 
-static inline void mjpeg_encoder_reset_quality(MJpegEncoder *encoder,
-                                               int quality_id,
-                                               uint32_t fps,
-                                               uint64_t frame_enc_size)
+static void mjpeg_encoder_reset_quality(MJpegEncoder *encoder,
+                                        int quality_id,
+                                        uint32_t fps,
+                                        uint64_t frame_enc_size)
 {
     MJpegEncoderRateControl *rate_control = &encoder->rate_control;
     double fps_ratio;
@@ -619,8 +624,8 @@ static void mjpeg_encoder_adjust_params_to_bit_rate(MJpegEncoder *encoder)
 
     spice_debug("cur-fps=%u new-fps=%u (new/old=%.2f) |"
                 "bit-rate=%.2f (Mbps) latency=%u (ms) quality=%d |"
-                " new-size-avg %"G_GUINT64_FORMAT" ,"
-                " base-size %"G_GUINT64_FORMAT", (new/old=%.2f) ",
+                " new-size-avg %" G_GUINT64_FORMAT " ,"
+                " base-size %" G_GUINT64_FORMAT ", (new/old=%.2f) ",
                 rate_control->fps, new_fps, ((double)new_fps)/rate_control->fps,
                 ((double)rate_control->byte_rate*8)/1024/1024,
                 latency,
@@ -682,8 +687,8 @@ static void mjpeg_encoder_adjust_fps(MJpegEncoder *encoder, uint64_t now)
 
         avg_fps = ((double)rate_control->adjusted_fps_num_frames * MSEC_PER_SEC) /
                   adjusted_fps_time_passed;
-        spice_debug("#frames-adjust=%"G_GUINT64_FORMAT
-                    " #adjust-time=%"G_GUINT64_FORMAT" avg-fps=%.2f",
+        spice_debug("#frames-adjust=%" G_GUINT64_FORMAT
+                    " #adjust-time=%" G_GUINT64_FORMAT " avg-fps=%.2f",
                     rate_control->adjusted_fps_num_frames, adjusted_fps_time_passed, avg_fps);
         spice_debug("defined=%u old-adjusted=%.2f", rate_control->fps, rate_control->adjusted_fps);
         fps_ratio = avg_fps / rate_control->fps;
@@ -717,11 +722,12 @@ static void mjpeg_encoder_adjust_fps(MJpegEncoder *encoder, uint64_t now)
  *  MJPEG_ENCODER_FRAME_ENCODE_DONE : frame encoding started. Continue with
  *                                    mjpeg_encoder_encode_scanline.
  */
-static int mjpeg_encoder_start_frame(MJpegEncoder *encoder,
-                                     SpiceBitmapFmt format,
-                                     const SpiceRect *src,
-                                     MJpegVideoBuffer *buffer,
-                                     uint32_t frame_mm_time)
+static VideoEncodeResults
+mjpeg_encoder_start_frame(MJpegEncoder *encoder,
+                          SpiceBitmapFmt format,
+                          const SpiceRect *src,
+                          MJpegVideoBuffer *buffer,
+                          uint32_t frame_mm_time)
 {
     uint32_t quality;
 
@@ -797,7 +803,7 @@ static int mjpeg_encoder_start_frame(MJpegEncoder *encoder,
             return VIDEO_ENCODER_FRAME_UNSUPPORTED;
         }
         if (encoder->row_size < stride) {
-            encoder->row = g_realloc(encoder->row, stride);
+            encoder->row = (uint8_t*) g_realloc(encoder->row, stride);
             encoder->row_size = stride;
         }
     }
@@ -936,12 +942,13 @@ static bool encode_frame(MJpegEncoder *encoder, const SpiceRect *src,
     return TRUE;
 }
 
-static int mjpeg_encoder_encode_frame(VideoEncoder *video_encoder,
-                                      uint32_t frame_mm_time,
-                                      const SpiceBitmap *bitmap,
-                                      const SpiceRect *src, int top_down,
-                                      gpointer bitmap_opaque,
-                                      VideoBuffer **outbuf)
+static VideoEncodeResults
+mjpeg_encoder_encode_frame(VideoEncoder *video_encoder,
+                           uint32_t frame_mm_time,
+                           const SpiceBitmap *bitmap,
+                           const SpiceRect *src, int top_down,
+                           gpointer bitmap_opaque,
+                           VideoBuffer **outbuf)
 {
     MJpegEncoder *encoder = SPICE_CONTAINEROF(video_encoder, MJpegEncoder, base);
     MJpegVideoBuffer *buffer = create_mjpeg_video_buffer();
@@ -949,8 +956,8 @@ static int mjpeg_encoder_encode_frame(VideoEncoder *video_encoder,
         return VIDEO_ENCODER_FRAME_UNSUPPORTED;
     }
 
-    int ret = mjpeg_encoder_start_frame(encoder, bitmap->format, src,
-                                        buffer, frame_mm_time);
+    VideoEncodeResults ret = mjpeg_encoder_start_frame(encoder, (SpiceBitmapFmt) bitmap->format,
+                                                       src, buffer, frame_mm_time);
     if (ret == VIDEO_ENCODER_FRAME_ENCODE_DONE) {
         if (encode_frame(encoder, src, bitmap, top_down)) {
             buffer->base.size = mjpeg_encoder_end_frame(encoder);
@@ -1018,9 +1025,8 @@ static void mjpeg_encoder_decrease_bit_rate(MJpegEncoder *encoder)
         if (now - rate_control->warmup_start_time < MJPEG_WARMUP_TIME) {
             spice_debug("during warmup. ignoring");
             return;
-        } else {
-            rate_control->warmup_start_time = 0;
         }
+        rate_control->warmup_start_time = 0;
     }
 
     if (bit_rate_info->num_enc_frames > MJPEG_BIT_RATE_EVAL_MIN_NUM_FRAMES ||

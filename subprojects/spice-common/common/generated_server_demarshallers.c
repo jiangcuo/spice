@@ -594,7 +594,7 @@ static uint8_t * parse_MainChannel_msgc(uint8_t *message_start, uint8_t *message
         parse_SpiceMsgData,
         parse_msgc_disconnecting
     };
-    static parse_msg_func_t funcs2[11] =  {
+    static parse_msg_func_t funcs2[12] =  {
         parse_msgc_main_client_info,
         parse_SpiceMsgEmpty,
         parse_SpiceMsgEmpty,
@@ -605,11 +605,12 @@ static uint8_t * parse_MainChannel_msgc(uint8_t *message_start, uint8_t *message
         parse_msgc_main_agent_token,
         parse_SpiceMsgEmpty,
         parse_msgc_main_migrate_dst_do_seamless,
-        parse_SpiceMsgEmpty
+        parse_SpiceMsgEmpty,
+        parse_SpiceMsgData
     };
     if (message_type >= 1 && message_type < 7) {
         return funcs1[message_type-1](message_start, message_end, size_out, free_message);
-    } else if (message_type >= 101 && message_type < 112) {
+    } else if (message_type >= 101 && message_type < 113) {
         return funcs2[message_type-101](message_start, message_end, size_out, free_message);
     }
     return NULL;
@@ -1443,7 +1444,7 @@ static uint8_t * parse_TunnelChannel_msgc(uint8_t *message_start, uint8_t *messa
 
 #ifdef USE_SMARTCARD
 
-static uint8_t * parse_msgc_smartcard_header(uint8_t *message_start, uint8_t *message_end, size_t *size, message_destructor_t *free_message)
+static uint8_t * parse_msgc_smartcard_data(uint8_t *message_start, uint8_t *message_end, size_t *size, message_destructor_t *free_message)
 {
     SPICE_GNUC_UNUSED uint8_t *pos;
     uint8_t *start = message_start;
@@ -1517,7 +1518,7 @@ static uint8_t * parse_SmartcardChannel_msgc(uint8_t *message_start, uint8_t *me
         parse_msgc_disconnecting
     };
     static parse_msg_func_t funcs2[1] =  {
-        parse_msgc_smartcard_header
+        parse_msgc_smartcard_data
     };
     if (message_type >= 1 && message_type < 7) {
         return funcs1[message_type-1](message_start, message_end, size_out, free_message);
@@ -1736,7 +1737,7 @@ spice_parse_channel_func_t spice_get_client_channel_parser(uint32_t channel, uns
 {
     static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[12] =  {
         { NULL, 0 },
-        { parse_MainChannel_msgc, 111},
+        { parse_MainChannel_msgc, 112},
         { parse_DisplayChannel_msgc, 105},
         { parse_InputsChannel_msgc, 114},
         { parse_CursorChannel_msgc, 6},

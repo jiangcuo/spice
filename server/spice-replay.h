@@ -26,13 +26,17 @@
 #include <stdio.h>
 #include "spice-core.h"
 
+SPICE_BEGIN_DECLS
+
 typedef struct SpiceReplay SpiceReplay;
 
 /* reads until encountering a cmd, processing any recorded messages (io) on the
  * way */
-QXLCommandExt*  spice_replay_next_cmd(SpiceReplay *replay, QXLWorker *worker);
+QXLCommandExt*  spice_replay_next_cmd(SpiceReplay *replay, QXLInstance *instance);
 void            spice_replay_free_cmd(SpiceReplay *replay, QXLCommandExt *cmd);
 void            spice_replay_free(SpiceReplay *replay);
 SpiceReplay *   spice_replay_new(FILE *file, int nsurfaces);
+
+SPICE_END_DECLS
 
 #endif /* SPICE_REPLAY_H_ */

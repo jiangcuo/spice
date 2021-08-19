@@ -21,6 +21,8 @@
 #include <spice.h>
 #include "basic-event-loop.h"
 
+SPICE_BEGIN_DECLS
+
 /*
  * simple queue for commands.
  * each command can have up to two parameters (grow as needed)
@@ -100,7 +102,6 @@ struct Test {
     SpiceServer *server;
 
     QXLInstance qxl_instance;
-    QXLWorker *qxl_worker;
 
     uint8_t primary_surface[MAX_HEIGHT * MAX_WIDTH * 4];
     int primary_height;
@@ -141,5 +142,7 @@ uint32_t test_get_width(void);
 uint32_t test_get_height(void);
 
 void spice_test_config_parse_args(int argc, char **argv);
+
+SPICE_END_DECLS
 
 #endif /* __TEST_DISPLAY_BASE_H__ */

@@ -19,45 +19,44 @@
 #ifndef CURSOR_CHANNEL_CLIENT_H_
 #define CURSOR_CHANNEL_CLIENT_H_
 
-#include <glib-object.h>
-
 #include "cache-item.h"
 #include "red-common.h"
 #include "red-channel-client.h"
 #include "red-stream.h"
 #include "cursor-channel.h"
+#include "utils.hpp"
 
-G_BEGIN_DECLS
+#include "push-visibility.h"
 
-#define TYPE_CURSOR_CHANNEL_CLIENT cursor_channel_client_get_type()
+struct CursorChannelClientPrivate;
 
-#define CURSOR_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_CURSOR_CHANNEL_CLIENT, CursorChannelClient))
-#define CURSOR_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_CURSOR_CHANNEL_CLIENT, CursorChannelClientClass))
-#define IS_CURSOR_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_CURSOR_CHANNEL_CLIENT))
-#define IS_CURSOR_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_CURSOR_CHANNEL_CLIENT))
-#define CURSOR_CHANNEL_CLIENT_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_CURSOR_CHANNEL_CLIENT, CursorChannelClientClass))
-
-typedef struct CursorChannelClient CursorChannelClient;
-typedef struct CursorChannelClientClass CursorChannelClientClass;
-typedef struct CursorChannelClientPrivate CursorChannelClientPrivate;
-
-struct CursorChannelClient {
-    CommonGraphicsChannelClient parent;
-
-    CursorChannelClientPrivate *priv;
-};
-
-struct CursorChannelClientClass
+class CursorChannelClient final: public CommonGraphicsChannelClient
 {
-    RedChannelClientClass parent_class;
-};
+public:
+    CursorChannelClient(RedChannel *channel,
+                        RedClient *client,
+                        RedStream *stream,
+                        RedChannelCapabilities *caps);
+    void reset_cursor_cache();
+    RedCacheItem* cache_find(uint64_t id);
+    int cache_add(uint64_t id, size_t size);
+    CursorChannel* get_channel()
+    {
+        return static_cast<CursorChannel*>(CommonGraphicsChannelClient::get_channel());
+    }
 
-GType cursor_channel_client_get_type(void) G_GNUC_CONST;
+protected:
+    virtual void on_disconnect() override;
+    void send_item(RedPipeItem *pipe_item) override;
+    /**
+     * Migrate a client channel from a CursorChannel.
+     * This is the equivalent of RedChannel client migrate callback.
+     */
+    virtual void migrate() override;
+
+public:
+    red::unique_link<CursorChannelClientPrivate> priv;
+};
 
 CursorChannelClient* cursor_channel_client_new(CursorChannel *cursor,
                                                RedClient *client,
@@ -65,22 +64,12 @@ CursorChannelClient* cursor_channel_client_new(CursorChannel *cursor,
                                                int mig_target,
                                                RedChannelCapabilities *caps);
 
-void cursor_channel_client_reset_cursor_cache(RedChannelClient *rcc);
-RedCacheItem* cursor_channel_client_cache_find(CursorChannelClient *ccc, uint64_t id);
-int cursor_channel_client_cache_add(CursorChannelClient *ccc, uint64_t id, size_t size);
-
 enum {
     RED_PIPE_ITEM_TYPE_CURSOR = RED_PIPE_ITEM_TYPE_COMMON_LAST,
     RED_PIPE_ITEM_TYPE_CURSOR_INIT,
     RED_PIPE_ITEM_TYPE_INVAL_CURSOR_CACHE,
 };
 
-/**
- * Migrate a client channel from a CursorChannel.
- * This is the equivalent of RedChannel client migrate callback.
- */
-void                 cursor_channel_client_migrate(RedChannelClient *client);
-
-G_END_DECLS
+#include "pop-visibility.h"
 
 #endif /* CURSOR_CHANNEL_CLIENT_H_ */

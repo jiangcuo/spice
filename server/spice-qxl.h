@@ -24,6 +24,8 @@
 
 #include "spice-core.h"
 
+SPICE_BEGIN_DECLS
+
 #ifndef SPICE_CAPABILITIES_SIZE
 #define SPICE_CAPABILITIES_SIZE (sizeof(((QXLRom*)0)->client_capabilities))
 #endif
@@ -40,30 +42,6 @@ typedef struct QXLState QXLState;
 typedef struct QXLWorker QXLWorker;
 typedef struct QXLDevMemSlot QXLDevMemSlot;
 typedef struct QXLDevSurfaceCreate QXLDevSurfaceCreate;
-
-struct QXLWorker {
-    uint32_t minor_version;
-    uint32_t major_version;
-    /* These calls are deprecated. Please use the spice_qxl_* calls instead */
-    void (*wakeup)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
-    void (*oom)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
-    void (*start)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
-    void (*stop)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
-    void (*update_area)(QXLWorker *qxl_worker, uint32_t surface_id,
-                       struct QXLRect *area, struct QXLRect *dirty_rects,
-                       uint32_t num_dirty_rects, uint32_t clear_dirty_region) SPICE_GNUC_DEPRECATED;
-    void (*add_memslot)(QXLWorker *worker, QXLDevMemSlot *slot) SPICE_GNUC_DEPRECATED;
-    void (*del_memslot)(QXLWorker *worker, uint32_t slot_group_id, uint32_t slot_id) SPICE_GNUC_DEPRECATED;
-    void (*reset_memslots)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
-    void (*destroy_surfaces)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
-    void (*destroy_primary_surface)(QXLWorker *worker, uint32_t surface_id) SPICE_GNUC_DEPRECATED;
-    void (*create_primary_surface)(QXLWorker *worker, uint32_t surface_id,
-                                   QXLDevSurfaceCreate *surface) SPICE_GNUC_DEPRECATED;
-    void (*reset_image_cache)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
-    void (*reset_cursor)(QXLWorker *worker) SPICE_GNUC_DEPRECATED;
-    void (*destroy_surface_wait)(QXLWorker *worker, uint32_t surface_id) SPICE_GNUC_DEPRECATED;
-    void (*loadvm_commands)(QXLWorker *worker, struct QXLCommandExt *ext, uint32_t count) SPICE_GNUC_DEPRECATED;
-};
 
 void spice_qxl_wakeup(QXLInstance *instance);
 void spice_qxl_oom(QXLInstance *instance);
@@ -209,7 +187,10 @@ struct QXLDevSurfaceCreate {
 struct QXLInterface {
     SpiceBaseInterface base;
 
-    void (*attache_worker)(QXLInstance *qin, QXLWorker *qxl_worker);
+    union {
+        void (*attached_worker)(QXLInstance *qin);
+        void (*attache_worker)(QXLInstance *qin, QXLWorker *qxl_worker) SPICE_GNUC_DEPRECATED;
+    };
     void (*set_compression_level)(QXLInstance *qin, int level);
     void (*set_mm_time)(QXLInstance *qin, uint32_t mm_time) SPICE_GNUC_DEPRECATED;
 
@@ -252,5 +233,7 @@ struct QXLInstance {
     int                id;
     QXLState           *st;
 };
+
+SPICE_END_DECLS
 
 #endif /* SPICE_QXL_H_ */

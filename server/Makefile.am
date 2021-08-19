@@ -1,25 +1,34 @@
 NULL =
-SUBDIRS = . tests
+SUBDIRS = .
+
+if ENABLE_TESTS
+SUBDIRS += tests
 
 check-valgrind:
 	$(MAKE) -C tests check-valgrind
+endif
 
 AM_CPPFLAGS =					\
 	-DSPICE_SERVER_INTERNAL			\
-	$(COMMON_CFLAGS)			\
+	$(SPICE_COMMON_CFLAGS)			\
 	$(GLIB2_CFLAGS)				\
-	$(GOBJECT2_CFLAGS)			\
 	$(LZ4_CFLAGS)				\
 	$(PIXMAN_CFLAGS)			\
 	$(SASL_CFLAGS)				\
 	$(SMARTCARD_CFLAGS)			\
 	$(GSTREAMER_0_10_CFLAGS)		\
 	$(GSTREAMER_1_0_CFLAGS)			\
-	$(SPICE_PROTOCOL_CFLAGS)		\
 	$(SSL_CFLAGS)				\
 	$(VISIBILITY_HIDDEN_CFLAGS)		\
-	$(WARN_CFLAGS)				\
 	$(ORC_CFLAGS)				\
+	$(NULL)
+
+AM_CFLAGS =					\
+	$(WARN_CFLAGS)				\
+	$(NULL)
+
+AM_CXXFLAGS =					\
+	$(WARN_CXXFLAGS)			\
 	$(NULL)
 
 noinst_LTLIBRARIES = libserver.la
@@ -42,7 +51,6 @@ libserver_la_LIBADD =							\
 	$(SPICE_COMMON_DIR)/common/libspice-common.la			\
 	$(SPICE_COMMON_DIR)/common/libspice-common-server.la		\
 	$(GLIB2_LIBS)							\
-	$(GOBJECT2_LIBS)						\
 	$(JPEG_LIBS)							\
 	$(LZ4_LIBS)							\
 	$(LIBRT)							\
@@ -78,21 +86,23 @@ libserver_la_SOURCES =				\
 	agent-msg-filter.c			\
 	agent-msg-filter.h			\
 	cache-item.h				\
-	char-device.c				\
+	char-device.cpp				\
 	char-device.h				\
-	common-graphics-channel.c		\
+	common-graphics-channel.cpp		\
 	common-graphics-channel.h		\
-	cursor-channel.c			\
-	cursor-channel-client.c			\
+	cursor-channel.cpp			\
+	cursor-channel-client.cpp		\
 	cursor-channel-client.h			\
 	cursor-channel.h			\
-	dcc.c					\
+	utils.hpp				\
+	safe-list.hpp				\
+	dcc.cpp					\
 	dcc.h					\
 	dcc-private.h				\
-	dcc-send.c				\
-	dispatcher.c				\
+	dcc-send.cpp				\
+	dispatcher.cpp				\
 	dispatcher.h				\
-	display-channel.c			\
+	display-channel.cpp			\
 	display-channel.h			\
 	display-channel-private.h		\
 	display-limits.h			\
@@ -102,21 +112,21 @@ libserver_la_SOURCES =				\
 	glz-encoder-dict.h			\
 	glz-encoder.h				\
 	glz-encoder-priv.h			\
-	image-cache.c				\
+	image-cache.cpp				\
 	image-cache.h				\
-	image-encoders.c			\
+	image-encoders.cpp			\
 	image-encoders.h			\
-	inputs-channel.c			\
-	inputs-channel-client.c			\
+	inputs-channel.cpp			\
+	inputs-channel-client.cpp		\
 	inputs-channel-client.h			\
 	inputs-channel.h			\
 	jpeg-encoder.c				\
 	jpeg-encoder.h				\
-	main-channel.c				\
-	main-channel-client.c			\
+	main-channel.cpp			\
+	main-channel-client.cpp			\
 	main-channel-client.h			\
 	main-channel.h				\
-	main-dispatcher.c			\
+	main-dispatcher.cpp			\
 	main-dispatcher.h			\
 	memslot.c				\
 	memslot.h				\
@@ -124,54 +134,57 @@ libserver_la_SOURCES =				\
 	mjpeg-encoder.c				\
 	net-utils.c				\
 	net-utils.h				\
-	pixmap-cache.c				\
+	pixmap-cache.cpp			\
 	pixmap-cache.h				\
-	red-channel.c				\
+	pop-visibility.h			\
+	push-visibility.h			\
+	red-channel.cpp				\
 	red-channel-capabilities.c		\
 	red-channel-capabilities.h		\
-	red-channel-client.c			\
+	red-channel-client.cpp			\
 	red-channel-client.h			\
 	red-channel.h				\
-	red-client.c				\
+	red-client.cpp				\
 	red-client.h				\
 	red-common.h				\
-	red-parse-qxl.c				\
+	red-parse-qxl.cpp			\
 	red-parse-qxl.h				\
-	red-pipe-item.c				\
+	red-pipe-item.cpp			\
 	red-pipe-item.h				\
-	red-qxl.c				\
+	red-qxl.cpp				\
 	red-qxl.h				\
 	red-record-qxl.c			\
 	red-record-qxl.h			\
-	red-replay-qxl.c			\
-	reds.c					\
+	red-replay-qxl.cpp			\
+	reds.cpp				\
 	reds.h					\
 	reds-private.h				\
-	red-stream.c				\
+	red-stream.cpp				\
 	red-stream.h				\
-	red-worker.c				\
+	red-worker.cpp				\
 	red-worker.h				\
-	sound.c					\
+	sound.cpp				\
 	sound.h					\
 	spice-bitmap-utils.c			\
 	spice-bitmap-utils.h			\
-	spicevmc.c				\
+	spicevmc.cpp				\
+	spice-wrapped.h				\
 	stat-file.c				\
 	stat-file.h				\
 	stat.h					\
-	stream-channel.c			\
+	stream-channel.cpp			\
 	stream-channel.h			\
 	sys-socket.h				\
 	sys-socket.c				\
-	red-stream-device.c			\
+	red-stream-device.cpp			\
 	red-stream-device.h			\
 	sw-canvas.c				\
-	tree.c					\
+	tree.cpp				\
 	tree.h					\
 	utils.c					\
 	utils.h					\
 	video-encoder.h				\
-	video-stream.c				\
+	video-stream.cpp			\
 	video-stream.h				\
 	websocket.c				\
 	websocket.h				\
@@ -188,9 +201,9 @@ endif
 
 if HAVE_SMARTCARD
 libserver_la_SOURCES +=			\
-	smartcard.c			\
+	smartcard.cpp			\
 	smartcard.h			\
-	smartcard-channel-client.c	\
+	smartcard-channel-client.cpp	\
 	smartcard-channel-client.h	\
 	$(NULL)
 endif
@@ -203,6 +216,9 @@ endif
 
 libspice_server_la_LIBADD = libserver.la
 libspice_server_la_SOURCES =
+## see https://www.gnu.org/software/automake/manual/html_node/Libtool-Convenience-Libraries.html
+## ("Libtool Convenience Libraries")
+nodist_EXTRA_libspice_server_la_SOURCES = dummy.cpp
 
 spice-server-enums.c: spice-server.h spice-server-enums.c.tmpl
 	$(AM_V_GEN)glib-mkenums --template $(srcdir)/spice-server-enums.c.tmpl $< > $@
@@ -213,7 +229,7 @@ spice-server-enums.h: spice-server.h spice-server-enums.h.tmpl
 EXTRA_DIST =					\
 	meson.build				\
 	spice-bitmap-utils.tmpl.c		\
-	cache-item.tmpl.c			\
+	cache-item.tmpl.cpp			\
 	glz-encode-match.tmpl.c			\
 	glz-encode.tmpl.c			\
 	spice-server.syms			\

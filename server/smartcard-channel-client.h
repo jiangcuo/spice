@@ -18,48 +18,37 @@
 #ifndef SMARTCARD_CHANNEL_CLIENT_H_
 #define SMARTCARD_CHANNEL_CLIENT_H_
 
-#include <glib-object.h>
-
 #include "smartcard.h"
+#include "utils.hpp"
 
-G_BEGIN_DECLS
+#include "push-visibility.h"
 
-#define TYPE_SMARTCARD_CHANNEL_CLIENT smart_card_channel_client_get_type()
+struct SmartCardChannelClientPrivate;
 
-#define SMARTCARD_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_SMARTCARD_CHANNEL_CLIENT, SmartCardChannelClient))
-#define SMARTCARD_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_SMARTCARD_CHANNEL_CLIENT, SmartCardChannelClientClass))
-#define IS_SMARTCARD_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_SMARTCARD_CHANNEL_CLIENT))
-#define IS_SMARTCARD_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_SMARTCARD_CHANNEL_CLIENT))
-#define SMARTCARD_CHANNEL_CLIENT_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_SMARTCARD_CHANNEL_CLIENT, SmartCardChannelClientClass))
-
-typedef struct SmartCardChannelClient SmartCardChannelClient;
-typedef struct SmartCardChannelClientClass SmartCardChannelClientClass;
-typedef struct SmartCardChannelClientPrivate SmartCardChannelClientPrivate;
-
-struct SmartCardChannelClient
+class SmartCardChannelClient final: public RedChannelClient
 {
-    RedChannelClient parent;
+protected:
+    ~SmartCardChannelClient();
+public:
+    red::unique_link<SmartCardChannelClientPrivate> priv;
+    SmartCardChannelClient(RedChannel *channel,
+                           RedClient *client,
+                           RedStream *stream,
+                           RedChannelCapabilities *caps);
 
-    SmartCardChannelClientPrivate *priv;
+private:
+    virtual uint8_t *alloc_recv_buf(uint16_t type, uint32_t size) override;
+    virtual void release_recv_buf(uint16_t type, uint32_t size, uint8_t *msg) override;
+    virtual void on_disconnect() override;
+    virtual bool handle_message(uint16_t type, uint32_t size, void *message) override;
+    virtual void send_item(RedPipeItem *item) override;
+    virtual bool handle_migrate_data(uint32_t size, void *message) override;
+    virtual void handle_migrate_flush_mark() override;
 };
-
-struct SmartCardChannelClientClass
-{
-    RedChannelClientClass parent_class;
-};
-
-GType smart_card_channel_client_get_type(void) G_GNUC_CONST;
 
 SmartCardChannelClient* smartcard_channel_client_create(RedChannel *channel,
                                                         RedClient *client, RedStream *stream,
                                                         RedChannelCapabilities *caps);
-
-bool smartcard_channel_client_handle_migrate_flush_mark(RedChannelClient *rcc);
 
 void smartcard_channel_client_send_data(RedChannelClient *rcc,
                                         SpiceMarshaller *m,
@@ -70,20 +59,12 @@ void smartcard_channel_client_send_error(RedChannelClient *rcc,
                                          SpiceMarshaller *m,
                                          RedPipeItem *item);
 
-bool smartcard_channel_client_handle_message(RedChannelClient *rcc,
-                                             uint16_t type,
-                                             uint32_t size,
-                                             void *msg);
-
-bool smartcard_channel_client_handle_migrate_data(RedChannelClient *rcc,
-                                                  uint32_t size,
-                                                  void *message);
-
 void smartcard_channel_client_set_char_device(SmartCardChannelClient *scc,
                                               RedCharDeviceSmartcard *device);
 
-RedCharDeviceSmartcard* smartcard_channel_client_get_char_device(SmartCardChannelClient *scc);
+red::shared_ptr<RedCharDeviceSmartcard>
+smartcard_channel_client_get_char_device(SmartCardChannelClient *scc);
 
-G_END_DECLS
+#include "pop-visibility.h"
 
 #endif /* SMARTCARD_CHANNEL_CLIENT_H_ */

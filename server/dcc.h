@@ -19,46 +19,47 @@
 #ifndef DCC_H_
 #define DCC_H_
 
-#include <glib-object.h>
-
 #include "image-encoders.h"
 #include "image-cache.h"
 #include "pixmap-cache.h"
 #include "display-limits.h"
 #include "common-graphics-channel.h"
+#include "utils.hpp"
 
-G_BEGIN_DECLS
+#include "push-visibility.h"
 
-#define TYPE_DISPLAY_CHANNEL_CLIENT display_channel_client_get_type()
+struct DisplayChannel;
+struct DisplayChannelClientPrivate;
 
-#define DISPLAY_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_DISPLAY_CHANNEL_CLIENT, DisplayChannelClient))
-#define DISPLAY_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_DISPLAY_CHANNEL_CLIENT, DisplayChannelClientClass))
-#define IS_DISPLAY_CHANNEL_CLIENT(obj) \
-    (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_DISPLAY_CHANNEL_CLIENT))
-#define IS_DISPLAY_CHANNEL_CLIENT_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_DISPLAY_CHANNEL_CLIENT))
-#define DISPLAY_CHANNEL_CLIENT_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_DISPLAY_CHANNEL_CLIENT, DisplayChannelClientClass))
+class DisplayChannelClient final: public CommonGraphicsChannelClient
+{
+protected:
+    ~DisplayChannelClient();
+public:
+    DisplayChannelClient(DisplayChannel *display,
+                         RedClient *client, RedStream *stream,
+                         RedChannelCapabilities *caps,
+                         uint32_t id,
+                         SpiceImageCompression image_compression,
+                         spice_wan_compression_t jpeg_state,
+                         spice_wan_compression_t zlib_glz_state);
+    virtual void disconnect() override;
 
-typedef struct DisplayChannelClient DisplayChannelClient;
-typedef struct DisplayChannelClientClass DisplayChannelClientClass;
-typedef struct DisplayChannelClientPrivate DisplayChannelClientPrivate;
+protected:
+    virtual bool handle_message(uint16_t type, uint32_t size, void *message) override;
+    virtual bool config_socket() override;
+    virtual void on_disconnect() override;
+    virtual void send_item(RedPipeItem *item) override;
+    virtual bool handle_migrate_data(uint32_t size, void *message) override;
+    virtual void migrate() override;
+    virtual void handle_migrate_flush_mark() override;
+    virtual bool handle_migrate_data_get_serial(uint32_t size, void *message, uint64_t &serial) override;
 
-struct DisplayChannelClient {
-    CommonGraphicsChannelClient parent;
+public:
+    red::unique_link<DisplayChannelClientPrivate> priv;
 
     int is_low_bandwidth;
-
-    DisplayChannelClientPrivate *priv;
 };
-
-struct DisplayChannelClientClass {
-    CommonGraphicsChannelClientClass parent_class;
-};
-
-GType display_channel_client_get_type(void) G_GNUC_CONST;
 
 #define PALETTE_CACHE_HASH_SHIFT 8
 #define PALETTE_CACHE_HASH_SIZE (1 << PALETTE_CACHE_HASH_SHIFT)
@@ -77,9 +78,9 @@ GType display_channel_client_get_type(void) G_GNUC_CONST;
 
 #define MAX_PIPE_SIZE 50
 
-typedef struct DisplayChannel DisplayChannel;
-typedef struct VideoStream VideoStream;
-typedef struct VideoStreamAgent VideoStreamAgent;
+struct DisplayChannel;
+struct VideoStream;
+struct VideoStreamAgent;
 
 typedef struct WaitForChannels {
     SpiceMsgWaitForChannels header;
@@ -93,41 +94,7 @@ typedef struct FreeList {
     WaitForChannels wait;
 } FreeList;
 
-#define DCC_TO_DC(dcc) ((DisplayChannel*)red_channel_client_get_channel((RedChannelClient*)dcc))
-
-typedef struct RedSurfaceCreateItem {
-    RedPipeItem base;
-    SpiceMsgSurfaceCreate surface_create;
-} RedSurfaceCreateItem;
-
-typedef struct RedGlScanoutUnixItem {
-    RedPipeItem base;
-} RedGlScanoutUnixItem;
-
-typedef struct RedGlDrawItem {
-    RedPipeItem base;
-    SpiceMsgDisplayGlDraw draw;
-} RedGlDrawItem;
-
-typedef struct RedImageItem {
-    RedPipeItem base;
-    SpicePoint pos;
-    int width;
-    int height;
-    int stride;
-    int top_down;
-    int surface_id;
-    int image_format;
-    uint32_t image_flags;
-    int can_lossy;
-    uint8_t data[0];
-} RedImageItem;
-
-typedef struct RedDrawablePipeItem {
-    RedPipeItem base;
-    Drawable *drawable;
-    DisplayChannelClient *dcc;
-} RedDrawablePipeItem;
+#define DCC_TO_DC(dcc) ((DisplayChannel*) dcc->get_channel())
 
 DisplayChannelClient*      dcc_new                                   (DisplayChannel *display,
                                                                       RedClient *client,
@@ -138,9 +105,6 @@ DisplayChannelClient*      dcc_new                                   (DisplayCha
                                                                       spice_wan_compression_t jpeg_state,
                                                                       spice_wan_compression_t zlib_glz_state);
 void                       dcc_start                                 (DisplayChannelClient *dcc);
-bool                       dcc_handle_message                        (RedChannelClient *rcc,
-                                                                      uint16_t type,
-                                                                      uint32_t size, void *msg);
 bool                       dcc_handle_migrate_data                   (DisplayChannelClient *dcc,
                                                                       uint32_t size, void *message);
 void                       dcc_push_monitors_config                  (DisplayChannelClient *dcc);
@@ -154,11 +118,6 @@ void                       dcc_create_surface                        (DisplayCha
                                                                       int surface_id);
 void                       dcc_push_surface_image                    (DisplayChannelClient *dcc,
                                                                       int surface_id);
-RedImageItem *             dcc_add_surface_area_image                (DisplayChannelClient *dcc,
-                                                                      int surface_id,
-                                                                      SpiceRect *area,
-                                                                      GList *pipe_item_pos,
-                                                                      int can_lossy);
 void                       dcc_palette_cache_reset                   (DisplayChannelClient *dcc);
 void                       dcc_palette_cache_palette                 (DisplayChannelClient *dcc,
                                                                       SpicePalette *palette,
@@ -172,23 +131,22 @@ void                       dcc_append_drawable                       (DisplayCha
 void                       dcc_add_drawable_after                    (DisplayChannelClient *dcc,
                                                                       Drawable *drawable,
                                                                       RedPipeItem *pos);
-void                       dcc_send_item                             (RedChannelClient *dcc,
-                                                                      RedPipeItem *item);
 bool                       dcc_clear_surface_drawables_from_pipe     (DisplayChannelClient *dcc,
                                                                       int surface_id,
                                                                       int wait_if_used);
 bool                       dcc_drawable_is_in_pipe                   (DisplayChannelClient *dcc,
                                                                       Drawable *drawable);
-RedPipeItem *              dcc_gl_scanout_item_new                   (RedChannelClient *rcc,
-                                                                      void *data, int num);
-RedPipeItem *              dcc_gl_draw_item_new                      (RedChannelClient *rcc,
-                                                                      void *data, int num);
 
 int                        dcc_compress_image                        (DisplayChannelClient *dcc,
                                                                       SpiceImage *dest, SpiceBitmap *src, Drawable *drawable,
                                                                       int can_lossy,
                                                                       compress_send_data_t* o_comp_data);
 
+void dcc_add_surface_area_image(DisplayChannelClient *dcc, int surface_id,
+                                SpiceRect *area, RedChannelClient::Pipe::iterator pipe_item_pos,
+                                int can_lossy);
+RedPipeItemPtr dcc_gl_scanout_item_new(RedChannelClient *rcc, void *data, int num);
+RedPipeItemPtr dcc_gl_draw_item_new(RedChannelClient *rcc, void *data, int num);
 VideoStreamAgent *dcc_get_video_stream_agent(DisplayChannelClient *dcc, int stream_id);
 ImageEncoders *dcc_get_encoders(DisplayChannelClient *dcc);
 spice_wan_compression_t    dcc_get_jpeg_state                        (DisplayChannelClient *dcc);
@@ -199,7 +157,8 @@ uint64_t dcc_get_max_stream_bit_rate(DisplayChannelClient *dcc);
 void dcc_set_max_stream_bit_rate(DisplayChannelClient *dcc, uint64_t rate);
 gboolean dcc_is_low_bandwidth(DisplayChannelClient *dcc);
 GArray *dcc_get_preferred_video_codecs_for_encoding(DisplayChannelClient *dcc);
+void dcc_video_codecs_update(DisplayChannelClient *dcc);
 
-G_END_DECLS
+#include "pop-visibility.h"
 
 #endif /* DCC_H_ */

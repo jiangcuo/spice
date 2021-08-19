@@ -229,7 +229,7 @@ def write_validate_struct_function(writer, struct):
         writer.statement("return 0")
 
     writer.newline()
-    writer.error_check("start >= message_end")
+    writer.error_check("offset >= (uintptr_t) (message_end - message_start)")
 
     writer.newline()
     write_validate_container(writer, None, struct, "start", scope, True, True, False)
@@ -283,7 +283,7 @@ def write_validate_pointer_item(writer, container, item, scope, parent_scope, st
             else:
                 write_validate_array_item(writer, container, array_item, scope, parent_scope, start,
                                           True, want_mem_size=need_mem_size, want_extra_size=False)
-                writer.error_check("%s + %s > (uintptr_t) (message_end - message_start)" % (v, array_item.nw_size()))
+                writer.error_check("%s > (uintptr_t) (message_end - message_start - %s)" % (array_item.nw_size(), v))
 
             if want_extra_size:
                 if item.member and item.member.has_attr("chunk"):
@@ -317,15 +317,8 @@ def write_validate_array_item(writer, container, item, scope, parent_scope, star
     array = item.type
     if item.member:
         array.check_valid(item.member)
-    is_byte_size = False
     element_type = array.element_type
-    if array.is_bytes_length():
-        nelements = "%s__nbytes" %(item.prefix)
-        real_nelements = "%s__nelements" %(item.prefix)
-        if not parent_scope.variable_defined(real_nelements):
-            parent_scope.variable_def("uint64_t", real_nelements)
-    else:
-        nelements = "%s__nelements" %(item.prefix)
+    nelements = "%s__nelements" %(item.prefix)
     if not parent_scope.variable_defined(nelements):
         parent_scope.variable_def("uint64_t", nelements)
 
@@ -355,11 +348,6 @@ def write_validate_array_item(writer, container, item, scope, parent_scope, star
             writer.assign(nelements, "(((uint64_t) %s + 7U) / 8U ) * %s" % (width_v, rows_v))
         else:
             writer.assign(nelements, "((%sU * (uint64_t) %s + 7U) / 8U ) * %s" % (bpp, width_v, rows_v))
-    elif array.is_bytes_length():
-        is_byte_size = True
-        v = write_read_primitive(writer, start, container, array.size[1], scope)
-        writer.assign(nelements, v)
-        writer.assign(real_nelements, 0)
     elif array.is_cstring_length():
         writer.todo("cstring array size type not handled yet")
     else:
@@ -370,10 +358,6 @@ def write_validate_array_item(writer, container, item, scope, parent_scope, star
     nw_size = item.nw_size()
     mem_size = item.mem_size()
     extra_size = item.extra_size()
-
-    if is_byte_size and want_nw_size:
-        writer.assign(nw_size, nelements)
-        want_nw_size = False
 
     if element_type.is_fixed_nw_size() and want_nw_size:
         element_size = element_type.get_fixed_nw_size()
@@ -396,10 +380,14 @@ def write_validate_array_item(writer, container, item, scope, parent_scope, star
             writer.assign(extra_size, "sizeof(SpiceChunks) + sizeof(SpiceChunk)")
             want_extra_size = False
 
-    if element_type.is_fixed_sizeof() and want_mem_size and not is_byte_size:
+    if element_type.is_fixed_sizeof() and want_mem_size:
         # TODO: Overflow check the multiplication
         if array.has_attr("ptr_array"):
             writer.assign(mem_size, "sizeof(void *) + SPICE_ALIGN(%s * %s, 4)" % (element_type.sizeof(), nelements))
+        elif array.has_attr('zero_terminated'):
+            # don't use +1 here to avoid possible integer overflow or suboptimizations
+            writer.assign(mem_size, "%s * %s + %s" % (element_type.sizeof(), nelements, element_type.sizeof()))
+            writer.assign(mem_size, "SPICE_ALIGN(%s, 4)" % mem_size);
         else:
             writer.assign(mem_size, "%s * %s" % (element_type.sizeof(), nelements))
         want_mem_size = False
@@ -413,9 +401,6 @@ def write_validate_array_item(writer, container, item, scope, parent_scope, star
 
     start2 = codegen.increment_identifier(start)
     scope.variable_def("uint8_t *", "%s = %s" % (start2, item.get_position()))
-    if is_byte_size:
-        start2_end = "%s_array_end" % start2
-        scope.variable_def("uint8_t *", start2_end)
 
     element_item = ItemInfo(element_type, "%s__element" % item.prefix, start2)
 
@@ -441,13 +426,8 @@ def write_validate_array_item(writer, container, item, scope, parent_scope, star
         want_element_nw_size = True
         start_increment = element_nw_size
 
-    if is_byte_size:
-        writer.assign(start2_end, "%s + %s" % (start2, nelements))
-
-    with writer.index(no_block = is_byte_size) as index:
-        with writer.while_loop("%s < %s" % (start2, start2_end) ) if is_byte_size else writer.for_loop(index, nelements) as scope:
-            if is_byte_size:
-                writer.increment(real_nelements, 1)
+    with writer.index() as index:
+        with writer.for_loop(index, nelements) as scope:
             write_validate_item(writer, container, element_item, scope, parent_scope, start2,
                                 want_element_nw_size, want_mem_size, want_extra_size)
 
@@ -462,9 +442,6 @@ def write_validate_array_item(writer, container, item, scope, parent_scope, star
                 writer.increment(extra_size, element_extra_size)
 
             writer.increment(start2, start_increment)
-    if is_byte_size:
-        writer.error_check("%s != %s" % (start2, start2_end))
-        write_write_primitive(writer, start, container, array.size[1], real_nelements)
 
 def write_validate_struct_item(writer, container, item, scope, parent_scope, start,
                                want_nw_size, want_mem_size, want_extra_size):
@@ -699,8 +676,6 @@ def read_array_len(writer, prefix, array, dest, scope, is_ptr):
             writer.assign(nelements, "(((uint64_t) %s + 7U) / 8U ) * %s" % (width_v, rows_v))
         else:
             writer.assign(nelements, "((%sU * (uint64_t) %s + 7U) / 8U ) * %s" % (bpp, width_v, rows_v))
-    elif array.is_bytes_length():
-        writer.assign(nelements, dest.get_ref(array.size[2]))
     else:
         raise NotImplementedError("TODO array size type not handled yet")
     return nelements
@@ -753,7 +728,10 @@ def write_switch_parser(writer, container, switch, dest, scope):
 
 def write_parse_ptr_function(writer, target_type):
     if target_type.is_array():
-        parse_function = "parse_array_%s" % target_type.element_type.primitive_type()
+        if target_type.has_attr("zero_terminated"):
+            parse_function = "parse_array_%s_terminated" % target_type.element_type.primitive_type()
+        else:
+            parse_function = "parse_array_%s" % target_type.element_type.primitive_type()
     else:
         parse_function = "parse_struct_%s" % target_type.c_type()
     if writer.is_generated("parser", parse_function):
@@ -801,8 +779,6 @@ def write_parse_ptr_function(writer, target_type):
     return parse_function
 
 def write_array_parser(writer, member, nelements, array, dest, scope):
-    is_byte_size = array.is_bytes_length()
-
     element_type = array.element_type
     if member:
         array_start = dest.get_ref(member.name)
@@ -818,10 +794,28 @@ def write_array_parser(writer, member, nelements, array, dest, scope):
         if array.has_attr("ptr_array"):
             raise Exception("Attribute ptr_array not supported for arrays of int8/uint8")
         writer.statement("memcpy(%s, in, %s)" % (array_start, nelements))
+        if array.has_attr("zero_terminated"):
+            indentation = writer.indentation
+            writer.indentation = 0;
+            writer.writeln("#if defined(__GNUC__)")
+            writer.writeln("#pragma GCC diagnostic push")
+            writer.writeln("#pragma GCC diagnostic ignored \"-Wstringop-overflow\"")
+            writer.writeln("#endif")
+            writer.indentation = indentation;
+            writer.assign("((char *) (%s))[%s]" % (array_start, nelements), 0)
+            writer.indentation = 0;
+            writer.writeln("#if defined(__GNUC__)")
+            writer.writeln("#pragma GCC diagnostic pop")
+            writer.writeln("#endif")
+            writer.indentation = indentation;
         writer.increment("in", nelements)
         if at_end:
             writer.increment("end", nelements)
+            if array.has_attr("zero_terminated"):
+                writer.increment("end", 1)
     else:
+        if array.has_attr("zero_terminated"):
+            raise Exception("Attribute zero_terminated specified for wrong array")
         with writer.index() as index:
             if member:
                 array_pos = "%s[%s]" % (array_start, index)

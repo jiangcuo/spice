@@ -43,7 +43,6 @@
 static SpiceCoreInterface *core;
 static SpiceServer *server;
 static SpiceReplay *replay;
-static QXLWorker *qxl_worker = NULL;
 static gboolean started = FALSE;
 static QXLInstance display_sin;
 static gint slow = 0;
@@ -74,7 +73,7 @@ static QXLDevMemSlot slot = {
 .qxl_ram_size = ~0,
 };
 
-static void attach_worker(QXLInstance *qin, QXLWorker *_qxl_worker)
+static void attached_worker(QXLInstance *qin)
 {
     static int count = 0;
     if (++count > 1) {
@@ -82,7 +81,6 @@ static void attach_worker(QXLInstance *qin, QXLWorker *_qxl_worker)
         return;
     }
     g_debug("%s\n", __func__);
-    qxl_worker = _qxl_worker;
     spice_qxl_add_memslot(qin, &slot);
     spice_server_vm_start(server);
 }
@@ -112,7 +110,7 @@ static gboolean fill_queue_idle(gpointer user_data)
 
     while ((g_async_queue_length(display_queue) +
             g_async_queue_length(cursor_queue)) < 50) {
-        QXLCommandExt *cmd = spice_replay_next_cmd(replay, qxl_worker);
+        QXLCommandExt *cmd = spice_replay_next_cmd(replay, &display_sin);
         if (!cmd) {
             g_async_queue_push(display_queue, GINT_TO_POINTER(-1));
             g_async_queue_push(cursor_queue, GINT_TO_POINTER(-1));
@@ -173,7 +171,7 @@ static int get_command_from(QXLInstance *qin, QXLCommandExt *ext, GAsyncQueue *q
         return FALSE;
     }
 
-    cmd = g_async_queue_try_pop(queue);
+    cmd = (QXLCommandExt*) g_async_queue_try_pop(queue);
     if (GPOINTER_TO_INT(cmd) == -1) {
         g_main_loop_quit(loop);
         return FALSE;
@@ -252,8 +250,9 @@ static QXLInterface display_sif = {
         .major_version = SPICE_INTERFACE_QXL_MAJOR,
         .minor_version = SPICE_INTERFACE_QXL_MINOR
     },
-    .attache_worker = attach_worker,
+    .attached_worker = attached_worker,
     .set_compression_level = set_compression_level,
+    .set_mm_time = NULL,
     .get_init_info = get_init_info,
     .get_command = get_display_command,
     .req_cmd_notification = req_display_notification,
@@ -291,7 +290,7 @@ static gboolean start_client(gchar *cmd, GError **error)
 
 static gboolean progress_timer(gpointer user_data)
 {
-    FILE *fd = user_data;
+    FILE *fd = (FILE*) user_data;
     /* it seems somehow thread safe, move to worker thread? */
     double pos = (double)ftell(fd);
 
@@ -302,7 +301,7 @@ static gboolean progress_timer(gpointer user_data)
 static void free_queue(GAsyncQueue *queue)
 {
     for (;;) {
-        QXLCommandExt *cmd = g_async_queue_try_pop(queue);
+        QXLCommandExt *cmd = (QXLCommandExt*) g_async_queue_try_pop(queue);
         if (cmd == GINT_TO_POINTER(-1)) {
             continue;
         }
@@ -426,7 +425,7 @@ int main(int argc, char **argv)
     core->channel_event = replay_channel_event;
 
     server = spice_server_new();
-    spice_server_set_image_compression(server, compression);
+    spice_server_set_image_compression(server, (SpiceImageCompression) compression);
     spice_server_set_streaming_video(server, streaming);
 
     if (codecs != NULL) {

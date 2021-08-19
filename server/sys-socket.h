@@ -32,6 +32,10 @@
 #else
 #  include <winsock2.h>
 #  include <windows.h>
+#  include <spice/macros.h>
+
+SPICE_BEGIN_DECLS
+
 typedef int socklen_t;
 
 // this definition is ABI compatible with WSABUF
@@ -44,7 +48,7 @@ void socket_win32_set_errno(void);
 
 static inline ssize_t socket_read(int sock, void *buf, size_t count)
 {
-    ssize_t res = recv(sock, buf, count, 0);
+    ssize_t res = recv(sock, (char *) buf, count, 0);
     if (res < 0) {
         socket_win32_set_errno();
     }
@@ -53,7 +57,7 @@ static inline ssize_t socket_read(int sock, void *buf, size_t count)
 
 static inline ssize_t socket_write(int sock, const void *buf, size_t count)
 {
-    ssize_t res = send(sock, buf, count, 0);
+    ssize_t res = send(sock, (const char *) buf, count, 0);
     if (res < 0) {
         socket_win32_set_errno();
     }
@@ -78,7 +82,7 @@ static inline ssize_t socket_writev(int sock, const struct iovec *iov, int n_iov
 static inline int
 socket_getsockopt(int sock, int lvl, int type, void *value, socklen_t *len)
 {
-    int res = getsockopt(sock, lvl, type, value, len);
+    int res = getsockopt(sock, lvl, type, (char *) value, len);
     if (res < 0) {
         socket_win32_set_errno();
     }
@@ -90,7 +94,7 @@ socket_getsockopt(int sock, int lvl, int type, void *value, socklen_t *len)
 static inline int
 socket_setsockopt(int sock, int lvl, int type, const void *value, socklen_t len)
 {
-    int res = setsockopt(sock, lvl, type, value, len);
+    int res = setsockopt(sock, lvl, type, (const char*) value, len);
     if (res < 0) {
         socket_win32_set_errno();
     }
@@ -137,6 +141,13 @@ socket_accept(int sock, struct sockaddr *addr, int *addrlen)
 
 int socket_newpair(int type, int protocol, int sv[2]);
 #define socketpair(family, type, protocol, sv) socket_newpair(type, protocol, sv)
+
+SPICE_END_DECLS
+
+#endif
+
+#if defined(SO_NOSIGPIPE) && defined(__APPLE__)
+#define MSG_NOSIGNAL 0
 #endif
 
 #endif // RED_SYS_SOCKET_H_

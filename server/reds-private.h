@@ -27,6 +27,7 @@
 #include "inputs-channel.h"
 #include "stat-file.h"
 #include "red-record-qxl.h"
+#include "safe-list.hpp"
 
 #define MIGRATE_TIMEOUT (MSEC_PER_SEC * 10)
 #define MM_TIME_DELTA 400 /*ms*/
@@ -54,7 +55,6 @@ typedef struct RedsMigPendingLink {
 } RedsMigPendingLink;
 
 typedef struct RedsMigTargetClient {
-    RedsState *reds;
     RedClient *client;
     GList *pending_links;
 } RedsMigTargetClient;
@@ -74,22 +74,25 @@ typedef struct RedCharDeviceVDIPort RedCharDeviceVDIPort;
 typedef struct RedServerConfig RedServerConfig;
 
 struct RedsState {
+    SPICE_CXX_GLIB_ALLOCATOR
+
     RedServerConfig *config;
     int listen_socket;
     int secure_listen_socket;
     SpiceWatch *listen_watch;
     SpiceWatch *secure_listen_watch;
-    RedCharDeviceVDIPort *agent_dev;
+    red::shared_ptr<RedCharDeviceVDIPort> agent_dev;
     int pending_mouse_event;
     bool pending_device_display_info_message;
-    GList *clients;
-    MainChannel *main_channel;
-    InputsChannel *inputs_channel;
+    red::safe_list<RedClient*> clients;
+    red::shared_ptr<MainChannel> main_channel;
+    red::shared_ptr<InputsChannel> inputs_channel;
 
     int mig_wait_connect; /* src waits for clients to establish connection to dest
                              (before migration starts) */
     int mig_wait_disconnect; /* src waits for clients to disconnect (after migration completes) */
-    GList *mig_wait_disconnect_clients;/* List of RedsMigWaitDisconnectClient. Holds the clients
+    std::forward_list<RedClient*, red::Mallocator<RedClient*>>
+        mig_wait_disconnect_clients;/* List of RedsMigWaitDisconnectClient. Holds the clients
                                          which the src waits for their disconnection */
 
 
@@ -101,7 +104,7 @@ struct RedsState {
                                     between the 2 servers */
     GList *mig_target_clients;
 
-    GList *channels;
+    red::safe_list<red::shared_ptr<RedChannel>> channels;
     SpiceMouseMode mouse_mode;
     int is_client_mouse_allowed;
     int dispatcher_allows_client_mouse;
@@ -109,7 +112,7 @@ struct RedsState {
     SpiceTimer *mig_timer;
 
     int vm_running;
-    GList *char_devices; /* list of SpiceCharDeviceState */
+    red::safe_list<red::shared_ptr<RedCharDevice>> char_devices;
     int seamless_migration_enabled; /* command line arg */
 
     SSL_CTX *ctx;
@@ -131,12 +134,12 @@ struct RedsState {
     SpiceMigrateInstance *migration_interface;
 
     SpiceCoreInterfaceInternal core;
-    GList *qxl_instances;
-    MainDispatcher *main_dispatcher;
+    red::safe_list<QXLInstance*> qxl_instances; // XXX owning
+    red::shared_ptr<MainDispatcher> main_dispatcher;
     RedRecord *record;
 };
 
 #define FOREACH_QXL_INSTANCE(_reds, _qxl) \
-    GLIST_FOREACH(_reds->qxl_instances, QXLInstance, _qxl)
+    for (auto _qxl: _reds->qxl_instances)
 
 #endif /* REDS_PRIVATE_H_ */

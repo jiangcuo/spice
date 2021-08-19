@@ -274,7 +274,7 @@ static void spice_marshall_msgc_record_start_mark(SPICE_GNUC_UNUSED SpiceMarshal
 }
 
 #ifdef USE_SMARTCARD
-static void spice_marshall_msgc_smartcard_header(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED VSCMsgHeader *msg)
+static void spice_marshall_msgc_smartcard_data(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED VSCMsgHeader *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
     VSCMsgHeader *src;
@@ -312,7 +312,7 @@ static void spice_marshall_msgc_port_event(SPICE_GNUC_UNUSED SpiceMarshaller *m,
 
 SpiceMessageMarshallers * spice_message_marshallers_get(void)
 {
-    static SpiceMessageMarshallers marshallers = {NULL};
+    static SpiceMessageMarshallers marshallers = {0};
 
     marshallers.msg_SpiceMsgCompressedData = spice_marshall_SpiceMsgCompressedData;
     marshallers.msg_SpiceMsgData = spice_marshall_SpiceMsgData;
@@ -342,7 +342,7 @@ SpiceMessageMarshallers * spice_message_marshallers_get(void)
     marshallers.msgc_record_mode = spice_marshall_msgc_record_mode;
     marshallers.msgc_record_start_mark = spice_marshall_msgc_record_start_mark;
 #ifdef USE_SMARTCARD
-    marshallers.msgc_smartcard_header = spice_marshall_msgc_smartcard_header;
+    marshallers.msgc_smartcard_data = spice_marshall_msgc_smartcard_data;
 #endif /* USE_SMARTCARD */
 
     return &marshallers;

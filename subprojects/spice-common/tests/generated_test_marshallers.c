@@ -103,3 +103,46 @@ void spice_marshall_msg_main_LenMessage(SPICE_GNUC_UNUSED SpiceMarshaller *m, SP
     /* Remaining data must be appended manually */
 }
 
+SPICE_GNUC_UNUSED static void spice_marshall_array_uint8(SpiceMarshaller *m, uint8_t *ptr, unsigned count)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    uint32_t i;
+
+    for (i = 0; i < count; i++) {
+        spice_marshaller_add_uint8(m, *ptr++);
+    }
+}
+
+void spice_marshall_msg_main_ZeroLen1(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgMainZeroLen1 *msg, SpiceMarshaller **txt2_out)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    SpiceMsgMainZeroLen1 *src;
+    uint8_t *txt1__element;
+    uint32_t i;
+    uint8_t *txt3__element;
+    uint8_t *txt4__element;
+    *txt2_out = NULL;
+    src = (SpiceMsgMainZeroLen1 *)msg;
+
+    txt1__element = src->txt1;
+    for (i = 0; i < 4; i++) {
+        spice_marshaller_add_uint8(m, *txt1__element);
+        txt1__element++;
+    }
+    spice_marshaller_add_uint8(m, src->sep1);
+    spice_marshaller_add_uint32(m, src->txt2_len);
+    *txt2_out = spice_marshaller_get_ptr_submarshaller(m);
+    txt3__element = src->txt3;
+    for (i = 0; i < src->txt2_len; i++) {
+        spice_marshaller_add_uint8(m, *txt3__element);
+        txt3__element++;
+    }
+    spice_marshaller_add_uint32(m, src->n);
+    spice_marshaller_add_uint16(m, src->txt4_len);
+    txt4__element = src->txt4;
+    for (i = 0; i < src->txt4_len; i++) {
+        spice_marshaller_add_uint8(m, *txt4__element);
+        txt4__element++;
+    }
+}
+

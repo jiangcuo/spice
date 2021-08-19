@@ -32,37 +32,26 @@
 #include "dcc.h"
 #include "image-encoders.h"
 #include "common-graphics-channel.h"
+#include "utils.hpp"
 
-G_BEGIN_DECLS
+#include "push-visibility.h"
 
-#define TYPE_DISPLAY_CHANNEL display_channel_get_type()
+struct DisplayChannelPrivate;
 
-#define DISPLAY_CHANNEL(obj) \
-    (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_DISPLAY_CHANNEL, DisplayChannel))
-#define DISPLAY_CHANNEL_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_DISPLAY_CHANNEL, DisplayChannelClass))
-#define IS_DISPLAY_CHANNEL(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_DISPLAY_CHANNEL))
-#define IS_DISPLAY_CHANNEL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_DISPLAY_CHANNEL))
-#define DISPLAY_CHANNEL_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_DISPLAY_CHANNEL, DisplayChannelClass))
-
-typedef struct DisplayChannel DisplayChannel;
-typedef struct DisplayChannelClass DisplayChannelClass;
-typedef struct DisplayChannelPrivate DisplayChannelPrivate;
-
-struct DisplayChannel
+struct DisplayChannel final: public CommonGraphicsChannel
 {
-    CommonGraphicsChannel parent;
-
-    DisplayChannelPrivate *priv;
+    DisplayChannel(RedsState *reds,
+                   QXLInstance *qxl,
+                   SpiceCoreInterfaceInternal *core,
+                   Dispatcher *dispatcher,
+                   int migrate, int stream_video,
+                   GArray *video_codecs,
+                   uint32_t n_surfaces);
+    ~DisplayChannel();
+    void on_connect(RedClient *client, RedStream *stream, int migration,
+                    RedChannelCapabilities *caps) override;
+    red::unique_link<DisplayChannelPrivate> priv;
 };
-
-struct DisplayChannelClass
-{
-    CommonGraphicsChannelClass parent_class;
-};
-
-GType display_channel_get_type(void) G_GNUC_CONST;
 
 typedef struct DependItem {
     Drawable *drawable;
@@ -96,14 +85,12 @@ struct Drawable {
     DisplayChannel *display;
 };
 
-DisplayChannel*            display_channel_new                       (RedsState *reds,
-                                                                      QXLInstance *qxl,
-                                                                      const SpiceCoreInterfaceInternal *core,
-                                                                      Dispatcher *dispatcher,
-                                                                      int migrate,
-                                                                      int stream_video,
-                                                                      GArray *video_codecs,
-                                                                      uint32_t n_surfaces);
+red::shared_ptr<DisplayChannel>
+display_channel_new(RedsState *reds, QXLInstance *qxl,
+                    SpiceCoreInterfaceInternal *core, Dispatcher *dispatcher,
+                    int migrate, int stream_video,
+                    GArray *video_codecs,
+                    uint32_t n_surfaces);
 void                       display_channel_create_surface            (DisplayChannel *display, uint32_t surface_id,
                                                                       uint32_t width, uint32_t height,
                                                                       int32_t stride, uint32_t format, void *line_0,
@@ -140,14 +127,12 @@ void                       display_channel_process_draw              (DisplayCha
 void                       display_channel_process_surface_cmd       (DisplayChannel *display,
                                                                       RedSurfaceCmd *surface_cmd,
                                                                       int loadvm);
-void                       display_channel_update_compression        (DisplayChannel *display,
-                                                                      DisplayChannelClient *dcc);
 void                       display_channel_gl_scanout                (DisplayChannel *display);
 void                       display_channel_gl_draw                   (DisplayChannel *display,
                                                                       SpiceMsgDisplayGlDraw *draw);
 void                       display_channel_gl_draw_done              (DisplayChannel *display);
 
-void display_channel_update_monitors_config(DisplayChannel *display, QXLMonitorsConfig *config,
+void display_channel_update_monitors_config(DisplayChannel *display, const QXLMonitorsConfig *config,
                                             uint16_t count, uint16_t max_allowed);
 void display_channel_set_monitors_config_to_primary(DisplayChannel *display);
 void display_channel_push_monitors_config(DisplayChannel *display);
@@ -162,6 +147,6 @@ void display_channel_update_qxl_running(DisplayChannel *display, bool running);
 void display_channel_set_image_compression(DisplayChannel *display,
                                            SpiceImageCompression image_compression);
 
-G_END_DECLS
+#include "pop-visibility.h"
 
 #endif /* DISPLAY_CHANNEL_H_ */

@@ -874,7 +874,7 @@ SPICE_FIXED28_4 y<br /></p></div>
 <p>
 Protocol Magic number UINT8[4]
 </p>
-<div class="paragraph"><p>SPICE_MAGIC = { 0x52, 0x45, 0x44,  0x51}</p></div>
+<div class="paragraph"><p>SPICE_MAGIC = { 0x52, 0x45, 0x44,  0x51} // "REDQ"</p></div>
 </li>
 <li>
 <p>
@@ -898,8 +898,8 @@ Current Protocol version
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>SPICE_VERSION_MAJOR <span style="color: #990000">=</span> <span style="color: #993399">1</span>
-SPICE_VERSION_MINOR <span style="color: #990000">=</span> <span style="color: #993399">0</span></tt></pre></div></div>
+<pre><tt>SPICE_VERSION_MAJOR <span style="color: #990000">=</span> <span style="color: #993399">2</span>
+SPICE_VERSION_MINOR <span style="color: #990000">=</span> <span style="color: #993399">2</span></tt></pre></div></div>
 </li>
 </ol></div>
 </li>
@@ -915,7 +915,8 @@ compatibilities and channels compatibilities. Common compatibilities stands for
 compatibilities shared by all channels, and  channels compatibilities stands
 for channel specific compatibilities. Splitting the vector into two types
 allows us to add channel compatibilities independently. Each compatibility is
-expressed using one or more bits in the compatibilities vector.</p></div>
+expressed using one or more bits in the compatibilities vector.
+For example capability 0 will be the low bit of the first (index 0) UINT32.</p></div>
 </li>
 <li>
 <p>
@@ -931,7 +932,12 @@ SPICE_CHANNEL_DISPLAY   <span style="color: #990000">=</span> <span style="color
 SPICE_CHANNEL_INPUTS    <span style="color: #990000">=</span> <span style="color: #993399">3</span>
 SPICE_CHANNEL_CURSOR    <span style="color: #990000">=</span> <span style="color: #993399">4</span>
 SPICE_CHANNEL_PLAYBACK  <span style="color: #990000">=</span> <span style="color: #993399">5</span>
-SPICE_CHANNEL_RECORD    <span style="color: #990000">=</span> <span style="color: #993399">6</span></tt></pre></div></div>
+SPICE_CHANNEL_RECORD    <span style="color: #990000">=</span> <span style="color: #993399">6</span>
+SPICE_CHANNEL_TUNNEL    <span style="color: #990000">=</span> <span style="color: #993399">7</span> <span style="font-style: italic"><span style="color: #9A1900">// obsolete</span></span>
+SPICE_CHANNEL_SMARTCARD <span style="color: #990000">=</span> <span style="color: #993399">8</span>
+SPICE_CHANNEL_USBREDIR  <span style="color: #990000">=</span> <span style="color: #993399">9</span>
+SPICE_CHANNEL_PORT              <span style="color: #990000">=</span> <span style="color: #993399">10</span>
+SPICE_CHANNEL_WEBDAV    <span style="color: #990000">=</span> <span style="color: #993399">11</span></tt></pre></div></div>
 </li>
 <li>
 <p>
@@ -1058,7 +1064,7 @@ field will be equal to the allocated session id.</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT8 channel_type</p></td>
-<td align="left" valign="top"><p class="table">one of RED_CHANNEL_?</p></td>
+<td align="left" valign="top"><p class="table">one of SPICE_CHANNEL_?</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT8 channel_id</p></td>
@@ -1257,8 +1263,8 @@ Common messages and messaging naming convention
 </p>
 <div class="paragraph"><p>Messages types and message body structures  are prefixed according to the
 source of the message. The prefixes for messages sent from the server to the
-client are RED for types and Red for structures. For messages sent from the
-client the prefixes are REDC and Redc.</p></div>
+client are SPICE_MSG for types and SpiceMsg for structures. For messages sent from the
+client the prefixes are SPICE_MSGC and SpiceMsgc.</p></div>
 </li>
 <li>
 <p>
@@ -1405,7 +1411,7 @@ cellspacing="0" cellpadding="4">
 </li>
 <li>
 <p>
-SPICE_MSGC_PONG, RedPong
+SPICE_MSGC_PONG, SpiceMsgPing
 </p>
 <div class="tableblock">
 <table rules="all"
@@ -1481,7 +1487,7 @@ cellspacing="0" cellpadding="4">
 <tbody>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 flags</p></td>
-<td align="left" valign="top"><p class="table">combination of red migration flags.</p></td>
+<td align="left" valign="top"><p class="table">combination of SPICE migration flags.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1610,7 +1616,7 @@ cellspacing="0" cellpadding="4">
 </li>
 <li>
 <p>
-SPICE_MSGC_DISCONNECTING, RedcDisconnect
+SPICE_MSGC_DISCONNECTING, SpiceMsgDisconnect
 </p>
 <div class="tableblock">
 <table rules="all"
@@ -1662,15 +1668,15 @@ cellspacing="0" cellpadding="4">
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 severity</p></td>
-<td align="left" valign="top"><p class="table">one of RED_NOTIFY_SEVERITY_?</p></td>
+<td align="left" valign="top"><p class="table">one of SPICE_NOTIFY_SEVERITY_?</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 visibility</p></td>
-<td align="left" valign="top"><p class="table">one of  RED_NOTIFY_VISIBILITY_?</p></td>
+<td align="left" valign="top"><p class="table">one of  SPICE_NOTIFY_VISIBILITY_?</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 what</p></td>
-<td align="left" valign="top"><p class="table">one of SPICE_LINK_ERR_?, RED_WARN_? Or RED_INFO_?, depending on severity.</p></td>
+<td align="left" valign="top"><p class="table">one of SPICE_LINK_ERR_?, SPICE_WARN_? Or SPICE_INFO_?, depending on severity.</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 message_len</p></td>
@@ -1961,7 +1967,7 @@ cellspacing="0" cellpadding="4">
 <td align="left" valign="top"><p class="table">number of channels in this list</p></td>
 </tr>
 <tr>
-<td align="left" valign="top"><p class="table">RedChanneID[] channels</p></td>
+<td align="left" valign="top"><p class="table">SpiceChannelId[] channels</p></td>
 <td align="left" valign="top"><p class="table">vector of “num_of_channels” channel ids</p></td>
 </tr>
 </tbody>
@@ -1970,7 +1976,7 @@ cellspacing="0" cellpadding="4">
 </li>
 <li>
 <p>
-RedChanneID
+SpiceChannelId
 </p>
 <div class="tableblock">
 <table rules="all"
@@ -2382,20 +2388,20 @@ Mouse messages
 </p>
 <div class="paragraph"><p>spice support two modes of mouse operation: client mouse and server mouse (for
 more information see <a href="#mouse_modes">mouse modes</a>). in  server mouse mode the
-client sends mouse motion message (i.e., redc_inputs_mouse_motion), and in
-client mouse mode it sends position message (i.e., redc_inputs_mouse_position).
+client sends mouse motion message (i.e., msgc_inputs_mouse_motion), and in
+client mouse mode it sends position message (i.e., msgc_inputs_mouse_position).
 position message holds the position of the client mouse on the display and the
-id of the display channel, which is derived from redlinkmess.channel_id. in
+id of the display channel, which is derived from SpiceLinkMess.channel_id. in
 order to prevent flood of mouse motion/position events, the server sends
 red_inputs_mouse_motion_ack message on every red_motion_ack_bunch messages it
 receive. this mechanism allows the client to keep track on  the server&#8217;s
 messages consumption rate  and to change the event pushing policy according to
-it. mouse button events are sent to the server using redc_inputs_mouse_press
-and redc_inputs_mouse_release messages.</p></div>
+it. mouse button events are sent to the server using msgc_inputs_mouse_press
+and msgc_inputs_mouse_release messages.</p></div>
 <div class="olist loweralpha"><ol class="loweralpha">
 <li>
 <p>
-Red Button ID
+Spice Button ID
 </p>
 <div class="listingblock">
 <div class="content"><!-- Generator: GNU source-highlight
@@ -2507,8 +2513,8 @@ cellspacing="0" cellpadding="4">
 <col width="50%" />
 <tbody>
 <tr>
-<td align="left" valign="top"><p class="table">UINT32 button_id</p></td>
-<td align="left" valign="top"><p class="table">one of REDC_MOUSE_?BUTTON</p></td>
+<td align="left" valign="top"><p class="table">UINT32 button</p></td>
+<td align="left" valign="top"><p class="table">one of SPICE_MOUSE_?BUTTON</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32  buttons_state</p></td>
@@ -2532,8 +2538,8 @@ cellspacing="0" cellpadding="4">
 <col width="50%" />
 <tbody>
 <tr>
-<td align="left" valign="top"><p class="table">UINT32 button_id</p></td>
-<td align="left" valign="top"><p class="table">one of REDC_MOUSE_?BUTTON</p></td>
+<td align="left" valign="top"><p class="table">UINT32 button</p></td>
+<td align="left" valign="top"><p class="table">one of SPICE_MOUSE_?BUTTON</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32  buttons_state</p></td>
@@ -4147,11 +4153,11 @@ Resource type
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>RED_RES_TYPE_IMAGE <span style="color: #990000">=</span> <span style="color: #993399">1</span></tt></pre></div></div>
+<pre><tt>SPICE_RES_TYPE_PIXMAP <span style="color: #990000">=</span> <span style="color: #993399">1</span></tt></pre></div></div>
 </li>
 <li>
 <p>
-RedResourceID
+SpiceResourceID
 </p>
 <div class="tableblock">
 <table rules="all"
@@ -4163,7 +4169,7 @@ cellspacing="0" cellpadding="4">
 <tbody>
 <tr>
 <td align="left" valign="top"><p class="table">UINT8 type</p></td>
-<td align="left" valign="top"><p class="table">type of the resource, one of RED_RES_TYPE_?</p></td>
+<td align="left" valign="top"><p class="table">type of the resource, one of SPICE_RES_TYPE_?</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT64 id</p></td>
@@ -4175,7 +4181,7 @@ cellspacing="0" cellpadding="4">
 </li>
 <li>
 <p>
-RedResourceList
+SpiceResourceList
 </p>
 <div class="tableblock">
 <table rules="all"
@@ -4190,7 +4196,7 @@ cellspacing="0" cellpadding="4">
 <td align="left" valign="top"><p class="table">number of items in resources</p></td>
 </tr>
 <tr>
-<td align="left" valign="top"><p class="table">RedResourceID[] resources</p></td>
+<td align="left" valign="top"><p class="table">SpiceResourceID[] resources</p></td>
 <td align="left" valign="top"><p class="table">list of  resources id</p></td>
 </tr>
 </tbody>
@@ -4199,7 +4205,7 @@ cellspacing="0" cellpadding="4">
 </li>
 <li>
 <p>
-SPICE_MSG_DISPLAY_INVAL_LIST, RedResourceList
+SPICE_MSG_DISPLAY_INVAL_LIST, SpiceResourceList
 </p>
 <div class="tableblock">
 <table rules="all"
@@ -4210,7 +4216,7 @@ cellspacing="0" cellpadding="4">
 <col width="50%" />
 <tbody>
 <tr>
-<td align="left" valign="top"><p class="table">RedResourceList</p></td>
+<td align="left" valign="top"><p class="table">SpiceResourceList</p></td>
 <td align="left" valign="top"><p class="table">list of resources to remove from cache</p></td>
 </tr>
 </tbody>
@@ -4392,7 +4398,7 @@ cellspacing="0" cellpadding="4">
 <tbody>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 flags</p></td>
-<td align="left" valign="top"><p class="table">any valid combination of  RED_CURSOR_?</p></td>
+<td align="left" valign="top"><p class="table">any valid combination of  SPICE_CURSOR_FLAGS_?</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">SpiceCursorHeader header</p></td>
@@ -4674,22 +4680,23 @@ Audio format
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>RED_PLAYBACK_FMT_S16                    <span style="color: #990000">=</span> <span style="color: #993399">1</span> <span style="font-style: italic"><span style="color: #9A1900">/* each channel sample is a 16 bit</span></span>
+<pre><tt>SPICE_AUDIO_FMT_S16                     <span style="color: #990000">=</span> <span style="color: #993399">1</span> <span style="font-style: italic"><span style="color: #9A1900">/* each channel sample is a 16 bit</span></span>
 <span style="font-style: italic"><span style="color: #9A1900">signed integer */</span></span></tt></pre></div></div>
 </li>
 <li>
 <p>
 Playback data mode
 </p>
-<div class="paragraph"><p>Two types of data mode are available: (1) raw PCM data and (2) compressed data
-in CELT 0_5_1 format.</p></div>
+<div class="paragraph"><p>Two types of data mode are available: (1) raw PCM data, (2) compressed data
+in CELT 0_5_1 format (obsolete) and (3) compressed data in OPUS format.</p></div>
 <div class="listingblock">
 <div class="content"><!-- Generator: GNU source-highlight
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>RED_PLAYBACK_DATA_MODE_RAW              <span style="color: #990000">=</span> <span style="color: #993399">1</span>
-RED_PLAYBACK_DATA_MODE_CELT_0_5_1       <span style="color: #990000">=</span> <span style="color: #993399">2</span></tt></pre></div></div>
+<pre><tt>SPICE_AUDIO_DATA_MODE_RAW               <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+SPICE_AUDIO_DATA_MODE_CELT_0_5_1        <span style="color: #990000">=</span> <span style="color: #993399">2</span>
+SPICE_AUDIO_DATA_MODE_OPUS              <span style="color: #990000">=</span> <span style="color: #993399">3</span></tt></pre></div></div>
 </li>
 <li>
 <p>
@@ -4700,9 +4707,12 @@ Playback channel capabilities
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>SPICE_PLAYBACK_CAP_CELT_0_5_1           <span style="color: #990000">=</span> <span style="color: #993399">0</span></tt></pre></div></div>
-<div class="paragraph"><p>Spice client needs to declare support of CELT_5_1 in channel capabilities in
-order to allow the server to send playback packets in CELT_0_5_1 format.</p></div>
+<pre><tt>SPICE_PLAYBACK_CAP_CELT_0_5_1           <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+SPICE_PLAYBACK_CAP_VOLUME               <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+SPICE_PLAYBACK_CAP_LATENCY              <span style="color: #990000">=</span> <span style="color: #993399">2</span>
+SPICE_PLAYBACK_CAP_OPUS                 <span style="color: #990000">=</span> <span style="color: #993399">3</span></tt></pre></div></div>
+<div class="paragraph"><p>Spice client needs to declare support of OPUS in channel capabilities in
+order to allow the server to send playback packets in OPUS format.</p></div>
 </li>
 <li>
 <p>
@@ -4722,7 +4732,7 @@ cellspacing="0" cellpadding="4">
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 mode</p></td>
-<td align="left" valign="top"><p class="table">one of RED_PLAYBACK_DATA_MODE_?</p></td>
+<td align="left" valign="top"><p class="table">one of SPICE_AUDIO_DATA_MODE_?</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT8[] data</p></td>
@@ -4750,7 +4760,7 @@ cellspacing="0" cellpadding="4">
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 format</p></td>
-<td align="left" valign="top"><p class="table">one of RED_PLAYBACK_FMT_?</p></td>
+<td align="left" valign="top"><p class="table">one of SPICE_AUDIO_FMT_?</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 frequency</p></td>
@@ -4845,22 +4855,22 @@ Audio format
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>RED_RECORD_FMT_S16                      <span style="color: #990000">=</span> <span style="color: #993399">1</span> <span style="font-style: italic"><span style="color: #9A1900">/* each channel sample is a 16 bit</span></span>
-<span style="font-style: italic"><span style="color: #9A1900">signed integer */</span></span></tt></pre></div></div>
+<pre><tt>SPICE_AUDIO_FMT_S16                     <span style="color: #990000">=</span> <span style="color: #993399">1</span> <span style="font-style: italic"><span style="color: #9A1900">/* each channel sample is a 16 bit signed integer */</span></span></tt></pre></div></div>
 </li>
 <li>
 <p>
 Record data mode
 </p>
 <div class="paragraph"><p>Two types of data mode are available: (1) raw PCM data (2) compressed data   in
-CELT 0.5.1 format.</p></div>
+CELT 0.5.1 format (obsolete) (3) compressed data in OPUS format.</p></div>
 <div class="listingblock">
 <div class="content"><!-- Generator: GNU source-highlight
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>RED_RECORD_DATA_MODE_RAW                <span style="color: #990000">=</span> <span style="color: #993399">1</span>
-RED_RECORD_DATA_MODE_CELT_0_5_1         <span style="color: #990000">=</span> <span style="color: #993399">2</span></tt></pre></div></div>
+<pre><tt>SPICE_AUDIO_DATA_MODE_RAW               <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+SPICE_AUDIO_DATA_MODE_CELT_0_5_1        <span style="color: #990000">=</span> <span style="color: #993399">2</span>
+SPICE_AUDIO_DATA_MODE_OPUS              <span style="color: #990000">=</span> <span style="color: #993399">3</span></tt></pre></div></div>
 </li>
 <li>
 <p>
@@ -4871,9 +4881,11 @@ Record channel capabilities
 by Lorenzo Bettini
 http://www.lorenzobettini.it
 http://www.gnu.org/software/src-highlite -->
-<pre><tt>SPICE_PLAYBACK_CAP_CELT_0_5_1           <span style="color: #990000">=</span> <span style="color: #993399">0</span></tt></pre></div></div>
-<div class="paragraph"><p>Spice server needs to declare support of CELT_5_1 in channel capabilities in
-order to allow the client to send recorded packets in CELT_0_5_1 format.</p></div>
+<pre><tt>SPICE_RECORD_CAP_CELT_0_5_1             <span style="color: #990000">=</span> <span style="color: #993399">0</span>
+SPICE_RECORD_CAP_VOLUME                 <span style="color: #990000">=</span> <span style="color: #993399">1</span>
+SPICE_RECORD_CAP_OPUS                   <span style="color: #990000">=</span> <span style="color: #993399">2</span></tt></pre></div></div>
+<div class="paragraph"><p>Spice server needs to declare support of OPUS in channel capabilities in
+order to allow the client to send recorded packets in OPUS format.</p></div>
 </li>
 <li>
 <p>
@@ -4893,7 +4905,7 @@ cellspacing="0" cellpadding="4">
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT32 mode</p></td>
-<td align="left" valign="top"><p class="table">one of RED_RECORD_DATA_MODE_?</p></td>
+<td align="left" valign="top"><p class="table">one of SPICE_AUDIO_DATA_MODE_?</p></td>
 </tr>
 <tr>
 <td align="left" valign="top"><p class="table">UINT8[] data</p></td>
@@ -4990,7 +5002,7 @@ SPICE_MSG_RECORD_STOP, VOID
 <div id="footer-text">
 Version v1.0<br />
 Last updated
- 2020-02-27 11:26:12 GMT
+ 2021-04-17 07:49:29 BST
 </div>
 </div>
 </body>

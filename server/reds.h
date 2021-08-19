@@ -25,11 +25,13 @@
 #include <common/messages.h>
 
 #include "char-device.h"
-#include "spice.h"
+#include "spice-wrapped.h"
 #include "red-channel.h"
 #include "video-encoder.h"
 #include "main-dispatcher.h"
 #include "migration-protocol.h"
+
+SPICE_BEGIN_DECLS
 
 static inline QXLInterface * qxl_get_interface(QXLInstance *qxl)
 {
@@ -115,8 +117,20 @@ SpiceWatch *reds_core_watch_add(RedsState *reds,
                                 int fd, int event_mask,
                                 SpiceWatchFunc func,
                                 void *opaque);
-SpiceTimer *reds_core_timer_add(RedsState *reds,
-                                SpiceTimerFunc func,
-                                void *opaque);
+SpiceTimer *
+reds_core_timer_add_internal(RedsState *reds,
+                             SpiceTimerFunc func,
+                             void *opaque);
+
+SPICE_END_DECLS
+
+#ifdef __cplusplus
+template <typename T>
+inline SpiceTimer *
+reds_core_timer_add(RedsState *reds, void (*func)(T*), T *opaque)
+{
+    return reds_core_timer_add_internal(reds, (SpiceTimerFunc) func, opaque);
+}
+#endif
 
 #endif /* REDS_H_ */

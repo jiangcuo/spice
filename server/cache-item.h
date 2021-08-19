@@ -23,17 +23,10 @@
 
 #include "red-pipe-item.h"
 
-typedef struct RedCacheItem RedCacheItem;
-
 struct RedCacheItem {
-    union {
-        RedPipeItem pipe_data;
-        struct {
-            RingItem lru_link;
-            RedCacheItem *next;
-            size_t size;
-        } cache_data;
-    } u;
+    RingItem lru_link;
+    RedCacheItem *next;
+    size_t size;
     uint64_t id;
 };
 

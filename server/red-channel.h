@@ -24,219 +24,184 @@
 
 #include <pthread.h>
 #include <limits.h>
-#include <glib-object.h>
-#include <common/ring.h>
 #include <common/marshaller.h>
 #include <common/demarshallers.h>
 
-#include "spice.h"
+#include "spice-wrapped.h"
 #include "red-common.h"
 #include "red-stream.h"
 #include "stat.h"
 #include "red-pipe-item.h"
 #include "red-channel-capabilities.h"
+#include "utils.hpp"
 
-G_BEGIN_DECLS
-
-SPICE_DECLARE_TYPE(RedChannel, red_channel, CHANNEL);
-#define RED_TYPE_CHANNEL red_channel_get_type()
-
-typedef struct RedChannelClient RedChannelClient;
-typedef struct RedClient RedClient;
-typedef struct MainChannelClient MainChannelClient;
-
-typedef bool (*channel_handle_message_proc)(RedChannelClient *rcc, uint16_t type,
-                                            uint32_t size, void *msg);
-typedef void (*channel_send_pipe_item_proc)(RedChannelClient *rcc, RedPipeItem *item);
-
-typedef bool (*channel_handle_migrate_flush_mark_proc)(RedChannelClient *base);
-typedef bool (*channel_handle_migrate_data_proc)(RedChannelClient *base,
-                                                 uint32_t size, void *message);
-typedef uint64_t (*channel_handle_migrate_data_get_serial_proc)(RedChannelClient *base,
-                                            uint32_t size, void *message);
-
-
-typedef void (*channel_client_connect_proc)(RedChannel *channel, RedClient *client, RedStream *stream,
-                                            int migration, RedChannelCapabilities *caps);
-typedef void (*channel_client_disconnect_proc)(RedChannelClient *base);
-typedef void (*channel_client_migrate_proc)(RedChannelClient *base);
-
+#include "push-visibility.h"
+class RedChannel;
+struct RedChannelPrivate;
+struct RedChannelClient;
+struct RedClient;
+struct MainChannelClient;
+struct Dispatcher;
 
 static inline gboolean test_capability(const uint32_t *caps, int num_caps, uint32_t cap)
 {
     return VD_AGENT_HAS_CAPABILITY(caps, num_caps, cap);
 }
 
-struct RedChannel
-{
-    GObject parent;
-
-    RedChannelPrivate *priv;
-};
-
-struct RedChannelClass
-{
-    GObjectClass parent_class;
-
-    /* subclasses must implement handle_message() and optionally parser().
-     * If parser() is implemented, then handle_message() will get passed the
-     * parsed message as its 'msg' argument, otherwise it will be passed
-     * the raw data. In both cases, the 'size' argument is the length of 'msg'
-     * in bytes
-     */
-    spice_parse_channel_func_t parser;
-    channel_handle_message_proc handle_message;
-
-    // TODO: add ASSERTS for thread_id  in client and channel calls
-    /*
-     * callbacks that are triggered from channel client stream events.
-     * They are called from the thread that listen to the stream events.
-     */
-    channel_send_pipe_item_proc send_item;
-    channel_handle_migrate_flush_mark_proc handle_migrate_flush_mark;
-    channel_handle_migrate_data_proc handle_migrate_data;
-    channel_handle_migrate_data_get_serial_proc handle_migrate_data_get_serial;
-
-    /*
-     * callbacks that are triggered from client events.
-     * They should be called from the thread that handles the RedClient
-     */
-    channel_client_connect_proc connect;
-    channel_client_disconnect_proc disconnect;
-    channel_client_migrate_proc migrate;
-};
-
 #define FOREACH_CLIENT(_channel, _data) \
-    GLIST_FOREACH((_channel ? red_channel_get_clients(RED_CHANNEL(_channel)) : NULL), \
-                  RedChannelClient, _data)
+    GLIST_FOREACH(_channel->get_clients(), RedChannelClient, _data)
 
 /* Red Channel interface */
 
-const char *red_channel_get_name(RedChannel *channel);
+struct RedChannel: public red::shared_ptr_counted
+{
+    typedef enum {
+        FlagNone = 0,
+        MigrateNeedFlush = SPICE_MIGRATE_NEED_FLUSH,
+        MigrateNeedDataTransfer = SPICE_MIGRATE_NEED_DATA_TRANSFER,
+        HandleAcks = 8,
+        MigrateAll = MigrateNeedFlush|MigrateNeedDataTransfer,
+    } CreationFlags;
 
-void red_channel_add_client(RedChannel *channel, RedChannelClient *rcc);
-void red_channel_remove_client(RedChannel *channel, RedChannelClient *rcc);
+    RedChannel(RedsState *reds, uint32_t type, uint32_t id, CreationFlags flags=FlagNone,
+               SpiceCoreInterfaceInternal *core=nullptr, Dispatcher *dispatcher=nullptr);
+    virtual ~RedChannel();
 
-void red_channel_init_stat_node(RedChannel *channel, const RedStatNode *parent, const char *name);
+    uint32_t id() const;
+    uint32_t type() const;
+    uint32_t migration_flags() const;
+    bool handle_acks() const;
 
-// caps are freed when the channel is destroyed
-void red_channel_set_common_cap(RedChannel *channel, uint32_t cap);
-void red_channel_set_cap(RedChannel *channel, uint32_t cap);
+    virtual void on_connect(RedClient *client, RedStream *stream, int migration,
+                            RedChannelCapabilities *caps) = 0;
 
-int red_channel_is_connected(RedChannel *channel);
+    uint8_t *parse(uint8_t *message, size_t message_size,
+                   uint16_t message_type,
+                   size_t *size_out, message_destructor_t *free_message) const;
 
-/* seamless migration is supported for only one client. This routine
- * checks if the only channel client associated with channel is
- * waiting for migration data */
-bool red_channel_is_waiting_for_migrate_data(RedChannel *channel);
+    const char *get_name() const;
 
-/*
- * the disconnect callback is called from the channel's thread,
- * i.e., for display channels - red worker thread, for all the other - from the main thread.
- * RedClient is managed from the main thread. red_channel_client_destroy can be called only
- * from red_client_destroy.
- */
+    void add_client(RedChannelClient *rcc);
+    void remove_client(RedChannelClient *rcc);
 
-void red_channel_destroy(RedChannel *channel);
+    void init_stat_node(const RedStatNode *parent, const char *name);
 
-/* return true if all the channel clients support the cap */
-bool red_channel_test_remote_cap(RedChannel *channel, uint32_t cap);
+    // caps are freed when the channel is destroyed
+    void set_common_cap(uint32_t cap);
+    void set_cap(uint32_t cap);
 
-// helper to push a new item to all channels
-typedef RedPipeItem *(*new_pipe_item_t)(RedChannelClient *rcc, void *data, int num);
-int red_channel_pipes_new_add(RedChannel *channel, new_pipe_item_t creator, void *data);
+    int is_connected();
 
-void red_channel_pipes_add_type(RedChannel *channel, int pipe_item_type);
+    /* seamless migration is supported for only one client. This routine
+     * checks if the only channel client associated with channel is
+     * waiting for migration data */
+    bool is_waiting_for_migrate_data();
 
-void red_channel_pipes_add_empty_msg(RedChannel *channel, int msg_type);
+    /*
+     * the disconnect callback is called from the channel's thread,
+     * i.e., for display channels - red worker thread, for all the other - from the main thread.
+     * RedChannel::destroy can be called only from channel thread.
+     */
 
-/* Add an item to all the clients connected.
- * The same item is shared between all clients.
- * Function will take ownership of the item.
- */
-void red_channel_pipes_add(RedChannel *channel, RedPipeItem *item);
+    void destroy();
 
-/* return TRUE if all of the connected clients to this channel are blocked */
-bool red_channel_all_blocked(RedChannel *channel);
+    /* return true if all the channel clients support the cap */
+    bool test_remote_cap(uint32_t cap);
 
-// TODO: unstaticed for display/cursor channels. they do some specific pushes not through
-// adding elements or on events. but not sure if this is actually required (only result
-// should be that they ""try"" a little harder, but if the event system is correct it
-// should not make any difference.
-void red_channel_push(RedChannel *channel);
-// Again, used in various places outside of event handler context (or in other event handler
-// contexts):
-//  flush_display_commands/flush_cursor_commands
-//  display_channel_wait_for_init
-//  red_wait_outgoing_item
-//  red_wait_pipe_item_sent
-//  handle_channel_events - this is the only one that was used before, and was in red-channel.c
-void red_channel_receive(RedChannel *channel);
-// For red_worker
-void red_channel_send(RedChannel *channel);
-// For red_worker
-void red_channel_disconnect(RedChannel *channel);
-void red_channel_connect(RedChannel *channel, RedClient *client,
-                         RedStream *stream, int migration,
-                         RedChannelCapabilities *caps);
+    // helper to push a new item to all channels
+    typedef RedPipeItemPtr (*new_pipe_item_t)(RedChannelClient *rcc, void *data, int num);
+    int pipes_new_add(new_pipe_item_t creator, void *data);
 
-/* return the sum of all the rcc pipe size */
-uint32_t red_channel_max_pipe_size(RedChannel *channel);
-/* return the max size of all the rcc pipe */
-uint32_t red_channel_sum_pipes_size(RedChannel *channel);
+    void pipes_add_type(int pipe_item_type);
 
-GList *red_channel_get_clients(RedChannel *channel);
-guint red_channel_get_n_clients(RedChannel *channel);
-struct RedsState* red_channel_get_server(RedChannel *channel);
-SpiceCoreInterfaceInternal* red_channel_get_core_interface(RedChannel *channel);
+    void pipes_add_empty_msg(int msg_type);
 
-/* channel callback function */
-void red_channel_send_item(RedChannel *self, RedChannelClient *rcc, RedPipeItem *item);
-void red_channel_reset_thread_id(RedChannel *self);
-const RedStatNode *red_channel_get_stat_node(RedChannel *channel);
+    /* Add an item to all the clients connected.
+     * The same item is shared between all clients.
+     * Function will take ownership of the item.
+     */
+    void pipes_add(RedPipeItemPtr&& item);
 
-const RedChannelCapabilities* red_channel_get_local_capabilities(RedChannel *self);
+    /* return TRUE if all of the connected clients to this channel are blocked */
+    bool all_blocked();
 
-/*
- * blocking functions.
- *
- * timeout is in nano sec. -1 for no timeout.
- *
- * This method tries for up to @timeout nanoseconds to send all the
- * items which are currently queued. If the timeout elapses,
- * the RedChannelClient which are too slow (those which still have pending
- * items) will be disconnected.
- *
- * Return: TRUE if waiting succeeded. FALSE if timeout expired.
- */
+    // TODO: unstaticed for display/cursor channels. they do some specific pushes not through
+    // adding elements or on events. but not sure if this is actually required (only result
+    // should be that they ""try"" a little harder, but if the event system is correct it
+    // should not make any difference.
+    void push();
+    // Again, used in various places outside of event handler context (or in other event handler
+    // contexts):
+    //  flush_display_commands/flush_cursor_commands
+    //  display_channel_wait_for_init
+    //  red_wait_outgoing_item
+    //  red_wait_pipe_item_sent
+    //  handle_channel_events - this is the only one that was used before, and was in red-channel.c
+    void receive();
+    // For red_worker
+    void send();
+    // For red_worker
+    void disconnect();
+    void connect(RedClient *client, RedStream *stream, int migration,
+                 RedChannelCapabilities *caps);
 
-bool red_channel_wait_all_sent(RedChannel *channel,
-                               int64_t timeout);
+    /* return the sum of all the rcc pipe size */
+    uint32_t max_pipe_size();
+    /* return the max size of all the rcc pipe */
+    uint32_t sum_pipes_size();
 
-/* wrappers for client callbacks */
-void red_channel_migrate_client(RedChannel *channel, RedChannelClient *rcc);
-void red_channel_disconnect_client(RedChannel *channel, RedChannelClient *rcc);
+    GList *get_clients();
+    guint get_n_clients();
+    struct RedsState* get_server();
+    SpiceCoreInterfaceInternal* get_core_interface();
+
+    /* channel callback function */
+    void reset_thread_id();
+    const RedStatNode *get_stat_node();
+
+    const RedChannelCapabilities* get_local_capabilities();
+
+    /*
+     * blocking functions.
+     *
+     * timeout is in nano sec. -1 for no timeout.
+     *
+     * This method tries for up to @timeout nanoseconds to send all the
+     * items which are currently queued. If the timeout elapses,
+     * the RedChannelClient which are too slow (those which still have pending
+     * items) will be disconnected.
+     *
+     * Return: TRUE if waiting succeeded. FALSE if timeout expired.
+     */
+
+    bool wait_all_sent(int64_t timeout);
+
+    /* wrappers for client callbacks */
+    void migrate_client(RedChannelClient *rcc);
+    void disconnect_client(RedChannelClient *rcc);
+
+    red::unique_link<RedChannelPrivate> priv;
+};
+
+inline RedChannel::CreationFlags operator|(RedChannel::CreationFlags a, RedChannel::CreationFlags b)
+{
+    return (RedChannel::CreationFlags) ((int)a|(int)b);
+}
 
 #define CHANNEL_BLOCKED_SLEEP_DURATION 10000 //micro
 
 #define red_channel_log_generic(log_cb, channel, format, ...)                            \
     do {                                                                                 \
-        uint32_t id_;                                                                    \
-        RedChannel *channel_ = (channel);                                                \
-        g_object_get(channel_, "id", &id_, NULL);                                        \
-        log_cb("%s:%u (%p): " format, red_channel_get_name(channel_),                    \
-                        id_, channel_, ## __VA_ARGS__);                                  \
+        auto channel_ = (channel);                                                       \
+        uint32_t id_ = channel_->id();                                                   \
+        log_cb("%s:%u (%p): " format, channel_->get_name(),                              \
+                        id_, &*channel_, ## __VA_ARGS__);                                \
     } while (0)
 
-#define red_channel_warning(channel, format, ...)                                        \
-        red_channel_log_generic(g_warning, channel, format, ## __VA_ARGS__);
+#define red_channel_warning(...) red_channel_log_generic(g_warning, __VA_ARGS__)
+#define red_channel_message(...) red_channel_log_generic(g_message, __VA_ARGS__)
+#define red_channel_debug(...) red_channel_log_generic(g_debug, __VA_ARGS__)
 
-#define red_channel_message(channel, format, ...)                                        \
-        red_channel_log_generic(g_message, channel, format, ## __VA_ARGS__);
-
-#define red_channel_debug(channel, format, ...)                                          \
-        red_channel_log_generic(g_debug, channel, format, ## __VA_ARGS__);
-
-G_END_DECLS
+#include "pop-visibility.h"
 
 #endif /* RED_CHANNEL_H_ */

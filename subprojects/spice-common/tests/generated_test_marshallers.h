@@ -30,6 +30,7 @@ void spice_marshall_msg_main_ArrayMessage(SpiceMarshaller *m, SpiceMsgMainArrayM
 void spice_marshall_msg_main_Zeroes(SpiceMarshaller *m, SpiceMsgMainZeroes *msg);
 void spice_marshall_msg_main_channels_list(SpiceMarshaller *m, SpiceMsgChannels *msg);
 void spice_marshall_msg_main_LenMessage(SpiceMarshaller *m, SpiceMsgMainLenMessage *msg);
+void spice_marshall_msg_main_ZeroLen1(SpiceMarshaller *m, SpiceMsgMainZeroLen1 *msg, SpiceMarshaller **txt2_out);
 
 SPICE_END_DECLS
 

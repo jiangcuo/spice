@@ -23,27 +23,34 @@
 #include "red-parse-qxl.h"
 #include "dispatcher.h"
 
-G_BEGIN_DECLS
+#include "push-visibility.h"
+
+struct RedCursorPipeItem;
 
 /**
  * This type it's a RedChannel class which implement cursor (mouse)
  * movements.
- * A pointer to CursorChannel can be converted to a RedChannel.
  */
-typedef struct CursorChannel CursorChannel;
-typedef struct CursorChannelClass CursorChannelClass;
+struct CursorChannel final: public CommonGraphicsChannel
+{
+    CursorChannel(RedsState *reds, uint32_t id,
+                  SpiceCoreInterfaceInternal *core=nullptr, Dispatcher *dispatcher=nullptr);
+    ~CursorChannel();
+    void reset();
+    void do_init();
+    void process_cmd(RedCursorCmd *cursor_cmd);
+    void set_mouse_mode(uint32_t mode);
+    void on_connect(RedClient *client, RedStream *stream, int migration,
+                    RedChannelCapabilities *caps) override;
 
-#define TYPE_CURSOR_CHANNEL cursor_channel_get_type()
+    red::shared_ptr<RedCursorPipeItem> item;
+    bool cursor_visible = true;
+    SpicePoint16 cursor_position;
+    uint16_t cursor_trail_length;
+    uint16_t cursor_trail_frequency;
+    uint32_t mouse_mode = SPICE_MOUSE_MODE_SERVER;
+};
 
-#define CURSOR_CHANNEL(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), TYPE_CURSOR_CHANNEL, CursorChannel))
-#define CURSOR_CHANNEL_CLASS(klass) \
-    (G_TYPE_CHECK_CLASS_CAST((klass), TYPE_CURSOR_CHANNEL, CursorChannelClass))
-#define IS_CURSOR_CHANNEL(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), TYPE_CURSOR_CHANNEL))
-#define IS_CURSOR_CHANNEL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), TYPE_CURSOR_CHANNEL))
-#define CURSOR_CHANNEL_GET_CLASS(obj) \
-    (G_TYPE_INSTANCE_GET_CLASS((obj), TYPE_CURSOR_CHANNEL, CursorChannelClass))
-
-GType cursor_channel_get_type(void) G_GNUC_CONST;
 
 /**
  * Create CursorChannel.
@@ -51,15 +58,10 @@ GType cursor_channel_get_type(void) G_GNUC_CONST;
  * the function accepts a dispatcher parameter to allows some
  * operations to be executed in the channel thread.
  */
-CursorChannel* cursor_channel_new(RedsState *server, int id,
-                                  const SpiceCoreInterfaceInternal *core,
-                                  Dispatcher *dispatcher);
+red::shared_ptr<CursorChannel> cursor_channel_new(RedsState *server, int id,
+                                                  SpiceCoreInterfaceInternal *core,
+                                                  Dispatcher *dispatcher);
 
-void                 cursor_channel_reset       (CursorChannel *cursor);
-void                 cursor_channel_do_init     (CursorChannel *cursor);
-void                 cursor_channel_process_cmd (CursorChannel *cursor, RedCursorCmd *cursor_cmd);
-void                 cursor_channel_set_mouse_mode(CursorChannel *cursor, uint32_t mode);
-
-G_END_DECLS
+#include "pop-visibility.h"
 
 #endif /* CURSOR_CHANNEL_H_ */

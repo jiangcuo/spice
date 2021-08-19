@@ -90,8 +90,8 @@ build_triplet = @build@
 host_triplet = @host@
 TESTS = test_logging$(EXEEXT) test_marshallers$(EXEEXT) \
 	test_ssl_verify$(EXEEXT) $(am__EXEEXT_1) test_region$(EXEEXT) \
-	test_dummy_recorder$(EXEEXT)
-noinst_PROGRAMS = $(am__EXEEXT_2)
+	test_dummy_recorder$(EXEEXT) test_utils$(EXEEXT)
+noinst_PROGRAMS = $(am__EXEEXT_2) helper_fuzzer_demarshallers$(EXEEXT)
 @HAVE_GDK_PIXBUF_TRUE@am__append_1 = test_quic
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -110,21 +110,35 @@ CONFIG_CLEAN_VPATH_FILES =
 @HAVE_GDK_PIXBUF_TRUE@am__EXEEXT_1 = test_quic$(EXEEXT)
 am__EXEEXT_2 = test_logging$(EXEEXT) test_marshallers$(EXEEXT) \
 	test_ssl_verify$(EXEEXT) $(am__EXEEXT_1) test_region$(EXEEXT) \
-	test_dummy_recorder$(EXEEXT)
+	test_dummy_recorder$(EXEEXT) test_utils$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 am__objects_1 =
-am_test_dummy_recorder_OBJECTS =  \
-	test_dummy_recorder-test-dummy-recorder.$(OBJEXT) \
+am_helper_fuzzer_demarshallers_OBJECTS = helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.$(OBJEXT) \
+	helper_fuzzer_demarshallers-generated_test_demarshallers.$(OBJEXT) \
 	$(am__objects_1)
-test_dummy_recorder_OBJECTS = $(am_test_dummy_recorder_OBJECTS)
+helper_fuzzer_demarshallers_OBJECTS =  \
+	$(am_helper_fuzzer_demarshallers_OBJECTS)
 am__DEPENDENCIES_1 =
-test_dummy_recorder_DEPENDENCIES =  \
+helper_fuzzer_demarshallers_DEPENDENCIES =  \
 	$(top_builddir)/common/libspice-common.la \
+	$(top_builddir)/common/libspice-common-server.la \
+	$(top_builddir)/common/libspice-common-client.la \
 	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+helper_fuzzer_demarshallers_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_test_dummy_recorder_OBJECTS =  \
+	test_dummy_recorder-test-dummy-recorder.$(OBJEXT) \
+	$(am__objects_1)
+test_dummy_recorder_OBJECTS = $(am_test_dummy_recorder_OBJECTS)
+test_dummy_recorder_DEPENDENCIES =  \
+	$(top_builddir)/common/libspice-common.la \
+	$(am__DEPENDENCIES_1)
 test_dummy_recorder_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(test_dummy_recorder_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
@@ -181,6 +195,14 @@ test_ssl_verify_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(test_ssl_verify_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
+am_test_utils_OBJECTS = test_utils-test-utils.$(OBJEXT) \
+	$(am__objects_1)
+test_utils_OBJECTS = $(am_test_utils_OBJECTS)
+test_utils_DEPENDENCIES = $(top_builddir)/common/libspice-common.la \
+	$(am__DEPENDENCIES_1)
+test_utils_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_utils_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -196,7 +218,8 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade =  \
+am__depfiles_remade = ./$(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Po \
+	./$(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Po \
 	./$(DEPDIR)/test_dummy_recorder-test-dummy-recorder.Po \
 	./$(DEPDIR)/test_logging-test-logging.Po \
 	./$(DEPDIR)/test_marshallers-generated_test_demarshallers.Po \
@@ -204,7 +227,8 @@ am__depfiles_remade =  \
 	./$(DEPDIR)/test_marshallers-test-marshallers.Po \
 	./$(DEPDIR)/test_quic-test-quic.Po \
 	./$(DEPDIR)/test_region-test-region.Po \
-	./$(DEPDIR)/test_ssl_verify-test-ssl-verify.Po
+	./$(DEPDIR)/test_ssl_verify-test-ssl-verify.Po \
+	./$(DEPDIR)/test_utils-test-utils.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -224,12 +248,16 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(test_dummy_recorder_SOURCES) $(test_logging_SOURCES) \
+SOURCES = $(helper_fuzzer_demarshallers_SOURCES) \
+	$(test_dummy_recorder_SOURCES) $(test_logging_SOURCES) \
 	$(test_marshallers_SOURCES) $(test_quic_SOURCES) \
-	$(test_region_SOURCES) $(test_ssl_verify_SOURCES)
-DIST_SOURCES = $(test_dummy_recorder_SOURCES) $(test_logging_SOURCES) \
+	$(test_region_SOURCES) $(test_ssl_verify_SOURCES) \
+	$(test_utils_SOURCES)
+DIST_SOURCES = $(helper_fuzzer_demarshallers_SOURCES) \
+	$(test_dummy_recorder_SOURCES) $(test_logging_SOURCES) \
 	$(test_marshallers_SOURCES) $(am__test_quic_SOURCES_DIST) \
-	$(test_region_SOURCES) $(test_ssl_verify_SOURCES)
+	$(test_region_SOURCES) $(test_ssl_verify_SOURCES) \
+	$(test_utils_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -475,8 +503,6 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
-CELT051_CFLAGS = @CELT051_CFLAGS@
-CELT051_LIBS = @CELT051_LIBS@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -494,6 +520,8 @@ EXEEXT = @EXEEXT@
 FGREP = @FGREP@
 GDK_PIXBUF_CFLAGS = @GDK_PIXBUF_CFLAGS@
 GDK_PIXBUF_LIBS = @GDK_PIXBUF_LIBS@
+GIO2_CFLAGS = @GIO2_CFLAGS@
+GIO2_LIBS = @GIO2_LIBS@
 GLIB2_CFLAGS = @GLIB2_CFLAGS@
 GLIB2_LIBS = @GLIB2_LIBS@
 GREP = @GREP@
@@ -688,6 +716,36 @@ test_dummy_recorder_LDADD = \
 	$(top_builddir)/common/libspice-common.la	\
 	$(NULL)
 
+test_utils_SOURCES = \
+	test-utils.c			\
+	$(NULL)
+
+test_utils_CFLAGS = \
+	-I$(top_srcdir)			\
+	$(GLIB2_CFLAGS)			\
+	$(NULL)
+
+test_utils_LDADD = \
+	$(top_builddir)/common/libspice-common.la	\
+	$(NULL)
+
+helper_fuzzer_demarshallers_SOURCES = \
+	helper-fuzzer-demarshallers.c	\
+	generated_test_demarshallers.c	\
+	$(NULL)
+
+helper_fuzzer_demarshallers_CFLAGS = \
+	-I$(top_srcdir)			\
+	$(GLIB2_CFLAGS)			\
+	$(PROTOCOL_CFLAGS)		\
+	$(NULL)
+
+helper_fuzzer_demarshallers_LDADD = \
+	$(top_builddir)/common/libspice-common.la	        \
+	$(top_builddir)/common/libspice-common-server.la	\
+	$(top_builddir)/common/libspice-common-client.la	\
+	$(NULL)
+
 
 # Avoid need for python(pyparsing) by end users
 TEST_MARSHALLERS = \
@@ -695,6 +753,7 @@ TEST_MARSHALLERS = \
 	generated_test_marshallers.h		\
 	generated_test_demarshallers.c		\
 	generated_test_enums.h			\
+	generated_test_messages.h		\
 	$(NULL)
 
 BUILT_SOURCES = $(TEST_MARSHALLERS)
@@ -776,6 +835,10 @@ clean-noinstPROGRAMS:
 	echo " rm -f" $$list; \
 	rm -f $$list
 
+helper_fuzzer_demarshallers$(EXEEXT): $(helper_fuzzer_demarshallers_OBJECTS) $(helper_fuzzer_demarshallers_DEPENDENCIES) $(EXTRA_helper_fuzzer_demarshallers_DEPENDENCIES) 
+	@rm -f helper_fuzzer_demarshallers$(EXEEXT)
+	$(AM_V_CCLD)$(helper_fuzzer_demarshallers_LINK) $(helper_fuzzer_demarshallers_OBJECTS) $(helper_fuzzer_demarshallers_LDADD) $(LIBS)
+
 test_dummy_recorder$(EXEEXT): $(test_dummy_recorder_OBJECTS) $(test_dummy_recorder_DEPENDENCIES) $(EXTRA_test_dummy_recorder_DEPENDENCIES) 
 	@rm -f test_dummy_recorder$(EXEEXT)
 	$(AM_V_CCLD)$(test_dummy_recorder_LINK) $(test_dummy_recorder_OBJECTS) $(test_dummy_recorder_LDADD) $(LIBS)
@@ -800,12 +863,18 @@ test_ssl_verify$(EXEEXT): $(test_ssl_verify_OBJECTS) $(test_ssl_verify_DEPENDENC
 	@rm -f test_ssl_verify$(EXEEXT)
 	$(AM_V_CCLD)$(test_ssl_verify_LINK) $(test_ssl_verify_OBJECTS) $(test_ssl_verify_LDADD) $(LIBS)
 
+test_utils$(EXEEXT): $(test_utils_OBJECTS) $(test_utils_DEPENDENCIES) $(EXTRA_test_utils_DEPENDENCIES) 
+	@rm -f test_utils$(EXEEXT)
+	$(AM_V_CCLD)$(test_utils_LINK) $(test_utils_OBJECTS) $(test_utils_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_dummy_recorder-test-dummy-recorder.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_logging-test-logging.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_marshallers-generated_test_demarshallers.Po@am__quote@ # am--include-marker
@@ -814,6 +883,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_quic-test-quic.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_region-test-region.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_ssl_verify-test-ssl-verify.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_utils-test-utils.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -844,6 +914,34 @@ am--depfiles: $(am__depfiles_remade)
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.o: helper-fuzzer-demarshallers.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) -MT helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.o -MD -MP -MF $(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Tpo -c -o helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.o `test -f 'helper-fuzzer-demarshallers.c' || echo '$(srcdir)/'`helper-fuzzer-demarshallers.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Tpo $(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='helper-fuzzer-demarshallers.c' object='helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) -c -o helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.o `test -f 'helper-fuzzer-demarshallers.c' || echo '$(srcdir)/'`helper-fuzzer-demarshallers.c
+
+helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.obj: helper-fuzzer-demarshallers.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) -MT helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.obj -MD -MP -MF $(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Tpo -c -o helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.obj `if test -f 'helper-fuzzer-demarshallers.c'; then $(CYGPATH_W) 'helper-fuzzer-demarshallers.c'; else $(CYGPATH_W) '$(srcdir)/helper-fuzzer-demarshallers.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Tpo $(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='helper-fuzzer-demarshallers.c' object='helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) -c -o helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.obj `if test -f 'helper-fuzzer-demarshallers.c'; then $(CYGPATH_W) 'helper-fuzzer-demarshallers.c'; else $(CYGPATH_W) '$(srcdir)/helper-fuzzer-demarshallers.c'; fi`
+
+helper_fuzzer_demarshallers-generated_test_demarshallers.o: generated_test_demarshallers.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) -MT helper_fuzzer_demarshallers-generated_test_demarshallers.o -MD -MP -MF $(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Tpo -c -o helper_fuzzer_demarshallers-generated_test_demarshallers.o `test -f 'generated_test_demarshallers.c' || echo '$(srcdir)/'`generated_test_demarshallers.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Tpo $(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='generated_test_demarshallers.c' object='helper_fuzzer_demarshallers-generated_test_demarshallers.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) -c -o helper_fuzzer_demarshallers-generated_test_demarshallers.o `test -f 'generated_test_demarshallers.c' || echo '$(srcdir)/'`generated_test_demarshallers.c
+
+helper_fuzzer_demarshallers-generated_test_demarshallers.obj: generated_test_demarshallers.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) -MT helper_fuzzer_demarshallers-generated_test_demarshallers.obj -MD -MP -MF $(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Tpo -c -o helper_fuzzer_demarshallers-generated_test_demarshallers.obj `if test -f 'generated_test_demarshallers.c'; then $(CYGPATH_W) 'generated_test_demarshallers.c'; else $(CYGPATH_W) '$(srcdir)/generated_test_demarshallers.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Tpo $(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='generated_test_demarshallers.c' object='helper_fuzzer_demarshallers-generated_test_demarshallers.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(helper_fuzzer_demarshallers_CFLAGS) $(CFLAGS) -c -o helper_fuzzer_demarshallers-generated_test_demarshallers.obj `if test -f 'generated_test_demarshallers.c'; then $(CYGPATH_W) 'generated_test_demarshallers.c'; else $(CYGPATH_W) '$(srcdir)/generated_test_demarshallers.c'; fi`
 
 test_dummy_recorder-test-dummy-recorder.o: test-dummy-recorder.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_dummy_recorder_CFLAGS) $(CFLAGS) -MT test_dummy_recorder-test-dummy-recorder.o -MD -MP -MF $(DEPDIR)/test_dummy_recorder-test-dummy-recorder.Tpo -c -o test_dummy_recorder-test-dummy-recorder.o `test -f 'test-dummy-recorder.c' || echo '$(srcdir)/'`test-dummy-recorder.c
@@ -956,6 +1054,20 @@ test_ssl_verify-test-ssl-verify.obj: test-ssl-verify.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-ssl-verify.c' object='test_ssl_verify-test-ssl-verify.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_ssl_verify_CFLAGS) $(CFLAGS) -c -o test_ssl_verify-test-ssl-verify.obj `if test -f 'test-ssl-verify.c'; then $(CYGPATH_W) 'test-ssl-verify.c'; else $(CYGPATH_W) '$(srcdir)/test-ssl-verify.c'; fi`
+
+test_utils-test-utils.o: test-utils.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_utils_CFLAGS) $(CFLAGS) -MT test_utils-test-utils.o -MD -MP -MF $(DEPDIR)/test_utils-test-utils.Tpo -c -o test_utils-test-utils.o `test -f 'test-utils.c' || echo '$(srcdir)/'`test-utils.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_utils-test-utils.Tpo $(DEPDIR)/test_utils-test-utils.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-utils.c' object='test_utils-test-utils.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_utils_CFLAGS) $(CFLAGS) -c -o test_utils-test-utils.o `test -f 'test-utils.c' || echo '$(srcdir)/'`test-utils.c
+
+test_utils-test-utils.obj: test-utils.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_utils_CFLAGS) $(CFLAGS) -MT test_utils-test-utils.obj -MD -MP -MF $(DEPDIR)/test_utils-test-utils.Tpo -c -o test_utils-test-utils.obj `if test -f 'test-utils.c'; then $(CYGPATH_W) 'test-utils.c'; else $(CYGPATH_W) '$(srcdir)/test-utils.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_utils-test-utils.Tpo $(DEPDIR)/test_utils-test-utils.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test-utils.c' object='test_utils-test-utils.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_utils_CFLAGS) $(CFLAGS) -c -o test_utils-test-utils.obj `if test -f 'test-utils.c'; then $(CYGPATH_W) 'test-utils.c'; else $(CYGPATH_W) '$(srcdir)/test-utils.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1198,6 +1310,13 @@ test_dummy_recorder.log: test_dummy_recorder$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_utils.log: test_utils$(EXEEXT)
+	@p='test_utils$(EXEEXT)'; \
+	b='test_utils'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 .test.log:
 	@p='$<'; \
 	$(am__set_b); \
@@ -1293,7 +1412,9 @@ clean-am: clean-generic clean-libtool clean-noinstPROGRAMS \
 	mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/test_dummy_recorder-test-dummy-recorder.Po
+		-rm -f ./$(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Po
+	-rm -f ./$(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Po
+	-rm -f ./$(DEPDIR)/test_dummy_recorder-test-dummy-recorder.Po
 	-rm -f ./$(DEPDIR)/test_logging-test-logging.Po
 	-rm -f ./$(DEPDIR)/test_marshallers-generated_test_demarshallers.Po
 	-rm -f ./$(DEPDIR)/test_marshallers-generated_test_marshallers.Po
@@ -1301,6 +1422,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/test_quic-test-quic.Po
 	-rm -f ./$(DEPDIR)/test_region-test-region.Po
 	-rm -f ./$(DEPDIR)/test_ssl_verify-test-ssl-verify.Po
+	-rm -f ./$(DEPDIR)/test_utils-test-utils.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -1346,7 +1468,9 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/test_dummy_recorder-test-dummy-recorder.Po
+		-rm -f ./$(DEPDIR)/helper_fuzzer_demarshallers-generated_test_demarshallers.Po
+	-rm -f ./$(DEPDIR)/helper_fuzzer_demarshallers-helper-fuzzer-demarshallers.Po
+	-rm -f ./$(DEPDIR)/test_dummy_recorder-test-dummy-recorder.Po
 	-rm -f ./$(DEPDIR)/test_logging-test-logging.Po
 	-rm -f ./$(DEPDIR)/test_marshallers-generated_test_demarshallers.Po
 	-rm -f ./$(DEPDIR)/test_marshallers-generated_test_marshallers.Po
@@ -1354,6 +1478,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/test_quic-test-quic.Po
 	-rm -f ./$(DEPDIR)/test_region-test-region.Po
 	-rm -f ./$(DEPDIR)/test_ssl_verify-test-ssl-verify.Po
+	-rm -f ./$(DEPDIR)/test_utils-test-utils.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -1395,13 +1520,18 @@ uninstall-am:
 # Note despite being autogenerated these are not part of CLEANFILES, they are
 # actually a part of EXTRA_DIST, to avoid the need for pyparser by end users
 generated_test_marshallers.c: $(srcdir)/test-marshallers.proto $(MARSHALLERS_DEPS)
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers --server --include test-marshallers.h $< $@ >/dev/null
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --suffix=_test \
+	--generate-marshallers --server --include test-marshallers.h $< $@ >/dev/null
 generated_test_marshallers.h: $(srcdir)/test-marshallers.proto $(MARSHALLERS_DEPS)
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-marshallers --server --include test-marshallers.h -H $< $@ >/dev/null
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --suffix=_test \
+	--generate-marshallers --server --include test-marshallers.h -H $< $@ >/dev/null
 generated_test_demarshallers.c: $(srcdir)/test-marshallers.proto $(MARSHALLERS_DEPS)
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --generate-demarshallers --client --include test-marshallers.h $< $@ >/dev/null
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --suffix=_test \
+	--generate-demarshallers --client --include test-marshallers.h \
+	--generated-declaration-file generated_test_messages.h $< $@ >/dev/null
 generated_test_enums.h: $(srcdir)/test-marshallers.proto $(MARSHALLERS_DEPS)
-	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py -e $< $@ >/dev/null
+	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --suffix=_test \
+	-e $< $@ >/dev/null
 
 -include $(top_srcdir)/git.mk
 

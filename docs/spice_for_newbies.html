@@ -1421,8 +1421,7 @@ client machine settings. This is implemented by a client command to the guest ag
 <p>
 2-way Audio and Lip-sync
 </p>
-<div class="paragraph"><p>Spice supports audio playback and recording. Playback is compressed using the CELT
-<span class="footnote"><br />[<a href="http://www.celt-codec.org/">The CELT ultra-low delay audio codec</a>]<br /></span> algorithm.
+<div class="paragraph"><p>Spice supports audio playback and recording. Playback is compressed using the OPUS algorithm.
 Lip-sync between video and audio is achieved by time-stamping the video frames in the QXL device and
 injecting them in the client side, synchronized with the audio, which is independent.</p></div>
 </li>
@@ -1466,7 +1465,7 @@ directions between the client and the guest.</p></div>
 <div id="footer-text">
 Version v1.0<br />
 Last updated
- 2020-02-27 11:26:12 GMT
+ 2021-04-17 07:49:29 BST
 </div>
 </div>
 </body>

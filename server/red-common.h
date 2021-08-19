@@ -29,11 +29,10 @@
 #include <common/lz_common.h>
 #include <common/marshaller.h>
 #include <common/messages.h>
-#include <common/ring.h>
 #include <common/draw.h>
 #include <common/verify.h>
 
-#include "spice.h"
+#include "spice-wrapped.h"
 #include "utils.h"
 #include "sys-socket.h"
 
@@ -50,12 +49,28 @@ void red_watch_remove(SpiceWatch *watch);
 
 typedef struct SpiceCoreInterfaceInternal SpiceCoreInterfaceInternal;
 
+extern const SpiceCoreInterfaceInternal event_loop_core;
+extern const SpiceCoreInterfaceInternal core_interface_adapter;
+
+SPICE_END_DECLS
+
 struct SpiceCoreInterfaceInternal {
     SpiceTimer *(*timer_add)(const SpiceCoreInterfaceInternal *iface, SpiceTimerFunc func, void *opaque);
 
     SpiceWatch *(*watch_add)(const SpiceCoreInterfaceInternal *iface, int fd, int event_mask, SpiceWatchFunc func, void *opaque);
 
     void (*channel_event)(const SpiceCoreInterfaceInternal *iface, int event, SpiceChannelEventInfo *info);
+
+#ifdef __cplusplus
+    template <typename T>
+    inline SpiceTimer *timer_new(void (*func)(T*), T *opaque) const
+    { return this->timer_add(this, (SpiceTimerFunc) func, opaque); }
+
+    template <typename T>
+    inline SpiceWatch *watch_new(int fd, int event_mask, void (*func)(int,int,T*), T* opaque) const
+    { return this->watch_add(this, fd, event_mask, (SpiceWatchFunc) func, opaque); }
+#endif
+
 
     /* This structure is an adapter that allows us to use the same API to
      * implement the core interface in a couple different ways. The first
@@ -72,9 +87,6 @@ struct SpiceCoreInterfaceInternal {
         SpiceCoreInterface *public_interface;
     };
 };
-
-extern const SpiceCoreInterfaceInternal event_loop_core;
-extern const SpiceCoreInterfaceInternal core_interface_adapter;
 
 typedef struct RedsState RedsState;
 
@@ -100,35 +112,24 @@ typedef struct GListIter {
 #define GLIST_FOREACH_REVERSED(_list, _type, _data) \
     GLIST_FOREACH_GENERIC(_list, G_PASTE(_iter_, __LINE__), _type, _data, prev)
 
-/* Helper to declare a GObject type
- *
- * @ModuleObjName     type identifier like MyObject
- * @module_obj_name   method prefix like my_object (no need to add the
- *                    underscore)
- * @OBJ_NAME          macro common part like MY_OBJECT
+/* This macro allows to use GLib for a class hierarchy allocation.
+ * The aims are:
+ * - do not depend on C++ runtime, just C;
+ * - do not throw memory exception from a C library;
+ * - zero out the structure like GOject did, we are not still
+ *   initializing automatically all members;
+ * - do not allow to allocate array of this type, do not mix fine
+ *   with reference counting and inheritance.
  */
-#define SPICE_DECLARE_TYPE(ModuleObjName, module_obj_name, OBJ_NAME) \
-    typedef struct ModuleObjName ModuleObjName; \
-    typedef struct ModuleObjName ## Class ModuleObjName ## Class; \
-    typedef struct ModuleObjName ## Private ModuleObjName ## Private; \
-    GType module_obj_name ## _get_type(void) G_GNUC_CONST; \
-    static inline SPICE_GNUC_UNUSED ModuleObjName *G_PASTE(RED_,OBJ_NAME)(void *obj) \
-    { return G_TYPE_CHECK_INSTANCE_CAST(obj, \
-             module_obj_name ## _get_type(), ModuleObjName); } \
-    static inline SPICE_GNUC_UNUSED \
-    ModuleObjName ## Class *G_PASTE(G_PASTE(RED_,OBJ_NAME),_CLASS)(void *klass) \
-    { return G_TYPE_CHECK_CLASS_CAST(klass, \
-             module_obj_name ## _get_type(), ModuleObjName ## Class); } \
-    static inline SPICE_GNUC_UNUSED gboolean G_PASTE(RED_IS_,OBJ_NAME)(void *obj) \
-    { return G_TYPE_CHECK_INSTANCE_TYPE(obj, module_obj_name ## _get_type()); } \
-    static inline SPICE_GNUC_UNUSED \
-    gboolean G_PASTE(G_PASTE(RED_IS_,OBJ_NAME),_CLASS)(void *klass) \
-    { return G_TYPE_CHECK_CLASS_TYPE((klass), module_obj_name ## _get_type()); } \
-    static inline SPICE_GNUC_UNUSED \
-    ModuleObjName ## Class *G_PASTE(G_PASTE(RED_,OBJ_NAME),_GET_CLASS)(void *obj) \
-    { return G_TYPE_INSTANCE_GET_CLASS(obj, \
-             module_obj_name ## _get_type(), ModuleObjName ## Class); }
+#define SPICE_CXX_GLIB_ALLOCATOR \
+    void *operator new(size_t size) { return g_malloc0(size); } \
+    void operator delete(void *p) { g_free(p); } \
+    void* operator new[](size_t count);
 
-SPICE_END_DECLS
+// XXX todo remove, just for easy portability
+#define XXX_CAST(from, to, name) \
+static inline to* name(from *p) { \
+    return p ? static_cast<to*>(p) : nullptr; \
+}
 
 #endif /* RED_COMMON_H_ */

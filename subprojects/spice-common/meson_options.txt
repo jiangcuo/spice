@@ -10,12 +10,6 @@ option('extra-checks',
     yield : true,
     description : 'Enable extra checks on code')
 
-option('celt051',
-    type : 'feature',
-    value : 'disabled',
-    yield : true,
-    description: 'Enable celt051 audio codec')
-
 option('opus',
     type : 'feature',
     yield : true,
@@ -45,7 +39,7 @@ option('manual',
 
 option('generate-code',
     type : 'combo',
-    choices : ['all', 'server', 'client'],
+    choices : ['all', 'server', 'client', 'none'],
     description : 'Which code should be built')
 
 option('tests',
@@ -53,3 +47,8 @@ option('tests',
     value : true,
     yield : true,
     description : 'Enable SPICE tests')
+
+option('spice-protocol-version',
+    type : 'string',
+    value : '0.1', # not existing low number version
+    description : 'Minimal requested SPICE protocol version')

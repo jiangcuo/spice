@@ -35,6 +35,35 @@
 #include "net-utils.h"
 #include "sys-socket.h"
 
+#if !defined(TCP_KEEPIDLE) && defined(TCP_KEEPALIVE) && defined(__APPLE__)
+#define TCP_KEEPIDLE TCP_KEEPALIVE
+#endif
+
+#if defined(EOPNOTSUPP) && EOPNOTSUPP != ENOTSUP
+#define NOTSUP_ERROR(err) ((err) == ENOTSUP || (err) == EOPNOTSUPP)
+#else
+#define NOTSUP_ERROR(err) ((err) == ENOTSUP)
+#endif
+
+static inline bool
+darwin_einval_on_unix_socket(int fd, int err)
+{
+#if defined(__APPLE__)
+    if (err == EINVAL) {
+        union {
+            struct sockaddr sa;
+            char buf[1024];
+        } addr;
+        socklen_t len = sizeof(addr);
+
+        if (getsockname(fd, &addr.sa, &len) == 0 && addr.sa.sa_family == AF_UNIX) {
+            return true;
+        }
+    }
+#endif
+    return false;
+}
+
 /**
  * red_socket_set_keepalive:
  * @fd: a socket file descriptor
@@ -47,7 +76,7 @@ bool red_socket_set_keepalive(int fd, bool enable, int timeout)
     int keepalive = !!enable;
 
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive)) == -1) {
-        if (errno != ENOTSUP) {
+        if (!NOTSUP_ERROR(errno) && !darwin_einval_on_unix_socket(fd, errno)) {
             g_warning("setsockopt for keepalive failed, %s", strerror(errno));
             return false;
         }
@@ -57,9 +86,9 @@ bool red_socket_set_keepalive(int fd, bool enable, int timeout)
         return true;
     }
 
-#ifdef HAVE_TCP_KEEPIDLE
+#ifdef TCP_KEEPIDLE
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &timeout, sizeof(timeout)) == -1) {
-        if (errno != ENOTSUP) {
+        if (!NOTSUP_ERROR(errno) && !darwin_einval_on_unix_socket(fd, errno)) {
             g_warning("setsockopt for keepalive timeout failed, %s", strerror(errno));
             return false;
         }
@@ -82,7 +111,8 @@ bool red_socket_set_no_delay(int fd, bool no_delay)
 
     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
                    &optval, sizeof(optval)) != 0) {
-        if (errno != ENOTSUP && errno != ENOPROTOOPT) {
+        if (!NOTSUP_ERROR(errno) && errno != ENOPROTOOPT &&
+            !darwin_einval_on_unix_socket(fd, errno)) {
             spice_warning("setsockopt failed, %s", strerror(errno));
             return false;
         }
@@ -149,4 +179,16 @@ int red_socket_get_no_delay(int fd)
     }
 
     return delay_val;
+}
+
+/**
+ * red_socket_set_nosigpipe
+ * @fd: a socket file descriptor
+ */
+void red_socket_set_nosigpipe(int fd, bool enable)
+{
+#if defined(SO_NOSIGPIPE) && defined(__APPLE__)
+    int val = !!enable;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, (const void *) &val, sizeof(val));
+#endif
 }

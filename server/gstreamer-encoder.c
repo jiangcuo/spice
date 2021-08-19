@@ -828,7 +828,7 @@ static void set_appsrc_caps(SpiceGstEncoder *encoder)
 
 static GstBusSyncReply handle_pipeline_message(GstBus *bus, GstMessage *msg, gpointer video_encoder)
 {
-    SpiceGstEncoder *encoder = video_encoder;
+    SpiceGstEncoder *encoder = (SpiceGstEncoder*) video_encoder;
 
     if (GST_MESSAGE_TYPE(msg) == GST_MESSAGE_ERROR) {
         GError *err = NULL;
@@ -1011,10 +1011,10 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
     }
 
     /* Figure out which parameter controls the GStreamer encoder's bitrate */
-    GObjectClass *class = G_OBJECT_GET_CLASS(encoder->gstenc);
-    encoder->gstenc_bitrate_param = g_object_class_find_property(class, "bitrate");
+    GObjectClass *klass = G_OBJECT_GET_CLASS(encoder->gstenc);
+    encoder->gstenc_bitrate_param = g_object_class_find_property(klass, "bitrate");
     if (encoder->gstenc_bitrate_param == NULL) {
-        encoder->gstenc_bitrate_param = g_object_class_find_property(class, "target-bitrate");
+        encoder->gstenc_bitrate_param = g_object_class_find_property(klass, "target-bitrate");
     }
     if (encoder->gstenc_bitrate_param) {
         encoder->gstenc_bitrate_is_dynamic = (encoder->gstenc_bitrate_param->flags & GST_PARAM_MUTABLE_PLAYING);
@@ -1085,7 +1085,7 @@ static void set_gstenc_bitrate(SpiceGstEncoder *encoder)
         spice_warning("the %s property has an unsupported type %" G_GSIZE_FORMAT,
                       prop, param->value_type);
     }
-    spice_debug("setting the GStreamer %s to %"G_GUINT64_FORMAT, prop, gst_bit_rate);
+    spice_debug("setting the GStreamer %s to %" G_GUINT64_FORMAT, prop, gst_bit_rate);
 }
 
 /* A helper for spice_gst_encoder_encode_frame() */
@@ -1173,7 +1173,7 @@ static BitmapWrapper *bitmap_wrapper_new(SpiceGstEncoder *encoder, gpointer bitm
 
 static void bitmap_wrapper_unref(gpointer data)
 {
-    BitmapWrapper *wrapper = data;
+    BitmapWrapper *wrapper = (BitmapWrapper*) data;
     if (g_atomic_int_dec_and_test(&wrapper->refs)) {
         g_async_queue_push(wrapper->encoder->unused_bitmap_opaques, wrapper->opaque);
         g_free(wrapper);
@@ -1347,10 +1347,11 @@ static void unmap_and_release_memory(GstMapInfo *map, GstBuffer *buffer)
 }
 
 /* A helper for spice_gst_encoder_encode_frame() */
-static int push_raw_frame(SpiceGstEncoder *encoder,
-                          const SpiceBitmap *bitmap,
-                          const SpiceRect *src, int top_down,
-                          gpointer bitmap_opaque)
+static VideoEncodeResults
+push_raw_frame(SpiceGstEncoder *encoder,
+               const SpiceBitmap *bitmap,
+               const SpiceRect *src, int top_down,
+               gpointer bitmap_opaque)
 {
     uint32_t height = src->bottom - src->top;
     // GStreamer require the stream to be 4 bytes aligned
@@ -1427,8 +1428,8 @@ static int push_raw_frame(SpiceGstEncoder *encoder,
 }
 
 /* A helper for spice_gst_encoder_encode_frame() */
-static int pull_compressed_buffer(SpiceGstEncoder *encoder,
-                                  VideoBuffer **outbuf)
+static VideoEncodeResults
+pull_compressed_buffer(SpiceGstEncoder *encoder, VideoBuffer **outbuf)
 {
     pthread_mutex_lock(&encoder->outbuf_mutex);
     while (!encoder->outbuf) {
@@ -1465,12 +1466,13 @@ static void spice_gst_encoder_destroy(VideoEncoder *video_encoder)
     g_free(encoder);
 }
 
-static int spice_gst_encoder_encode_frame(VideoEncoder *video_encoder,
-                                          uint32_t frame_mm_time,
-                                          const SpiceBitmap *bitmap,
-                                          const SpiceRect *src, int top_down,
-                                          gpointer bitmap_opaque,
-                                          VideoBuffer **outbuf)
+static VideoEncodeResults
+spice_gst_encoder_encode_frame(VideoEncoder *video_encoder,
+                               uint32_t frame_mm_time,
+                               const SpiceBitmap *bitmap,
+                               const SpiceRect *src, int top_down,
+                               gpointer bitmap_opaque,
+                               VideoBuffer **outbuf)
 {
     SpiceGstEncoder *encoder = (SpiceGstEncoder*)video_encoder;
     g_return_val_if_fail(outbuf != NULL, VIDEO_ENCODER_FRAME_UNSUPPORTED);
@@ -1486,13 +1488,13 @@ static int spice_gst_encoder_encode_frame(VideoEncoder *video_encoder,
         spice_debug("video format change: width %d -> %d, height %d -> %d, format %d -> %d",
                     encoder->width, width, encoder->height, height,
                     encoder->spice_format, bitmap->format);
-        encoder->format = map_format(bitmap->format);
+        encoder->format = map_format((SpiceBitmapFmt) bitmap->format);
         if (encoder->format == GSTREAMER_FORMAT_INVALID) {
             spice_warning("unable to map format type %d", bitmap->format);
             encoder->errors = 4;
             return VIDEO_ENCODER_FRAME_UNSUPPORTED;
         }
-        encoder->spice_format = bitmap->format;
+        encoder->spice_format = (SpiceBitmapFmt) bitmap->format;
         encoder->width = width;
         encoder->height = height;
         if (encoder->bit_rate == 0) {
@@ -1532,7 +1534,7 @@ static int spice_gst_encoder_encode_frame(VideoEncoder *video_encoder,
     }
 
     uint64_t start = spice_get_monotonic_time_ns();
-    int rc = push_raw_frame(encoder, bitmap, src, top_down, bitmap_opaque);
+    VideoEncodeResults rc = push_raw_frame(encoder, bitmap, src, top_down, bitmap_opaque);
     if (rc == VIDEO_ENCODER_FRAME_ENCODE_DONE) {
         rc = pull_compressed_buffer(encoder, outbuf);
         if (rc != VIDEO_ENCODER_FRAME_ENCODE_DONE) {
