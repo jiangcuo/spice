@@ -1,3 +1,18 @@
+spice (0.15.0-1) unstable; urgency=medium
+
+  * new upstream release 0.15.0
+  * removed patches included upstream
+  * use meson+ninja build-system
+  * removed the wrongly implemented automated tests
+    the meson build system run the same tests now too.
+    (Closes: #973803)
+  * bump debhelper-compat to 13
+  * use ${DEB_TARGET_MULTIARCH} in .install files
+  * update paths in d/copyright for spice-common
+  * removed trailing whitespaces from this file (d/changelog)
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Fri, 01 Oct 2021 01:17:04 +0300
+
 spice (0.14.3-2.1) unstable; urgency=medium
 
   * Non-maintainer upload.
