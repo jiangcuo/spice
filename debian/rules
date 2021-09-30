@@ -1,18 +1,28 @@
 #!/usr/bin/make -f
 
+include /usr/share/dpkg/architecture.mk
+builddir = obj-${DEB_TARGET_MULTIARCH}
+buildopts = --buildsystem=meson+ninja --builddir=${builddir}
+
 build-arch build-indep build clean install-indep install-arch install binary-arch binary-indep binary: %:
-	dh $@
+	dh $@ ${buildopts}
 
-override_dh_auto_configure:
-# set GSTREAMER and GLIB2 _LIBS to smaller list
-# to avoid linking with useless libraries
-	GSTREAMER_1_0_LIBS="-lgstapp-1.0 -lgstreamer-1.0" \
-	GLIB2_LIBS="-lgio-2.0 -lgobject-2.0 -lglib-2.0" \
-	dh_auto_configure -- --disable-silent-rules \
-	 --enable-smartcard \
-	 --with-gstreamer=1.0 \
-	 --with-sasl \
-	 --enable-lz4 \
+# dh build insists on running autoreconf because ./configure has the same
+# timestamp as ./configure.ac.  We do not use autoconf, there is no need
+# to (re-)run configure at all.
+override_dh_update_autotools_config:
+override_dh_autoreconf:
 
-# remove Requires.private and Libs.private defs from .pc file -- we're not building static libs
-	sed -E -i '/^(Libs|Requires)\.private:/D' spice-server.pc
+execute_after_dh_auto_install:
+# XXX hack alert: remove Requires.private and Libs.private defs from .pc file
+# these are needed for static build and we're not providing static libs
+	sed -E -i \
+	 -e '/^(Libs|Requires)\.private:/D' \
+	 debian/tmp/usr/lib/${DEB_TARGET_MULTIARCH}/pkgconfig/spice-server.pc
+
+# the test-listen test uses dconf which insists on creating a cache dir in $HOME
+# set $HOME to a sane value
+# the test is disabled in debian/patches/
+#override_dh_auto_test:
+#	HOME=${PWD}/${builddir} \
+#		dh_auto_test ${buildopts}
