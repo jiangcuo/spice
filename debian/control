@@ -6,11 +6,6 @@ Uploaders: Michael Tokarev <mjt@tls.msk.ru>
 Build-Depends:
  debhelper-compat (= 13),
  meson, ninja-build,
- gstreamer1.0-libav,
- gstreamer1.0-plugins-base,
- gstreamer1.0-plugins-good,
- gstreamer1.0-plugins-ugly,
- gstreamer1.0-tools,
  libcacard-dev,
  libglib2.0-dev (>= 2.38),
  libgstreamer-plugins-base1.0-dev,
