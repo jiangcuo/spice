@@ -1,1 +1,1 @@
-usr/lib/*/lib*.so.*
+usr/lib/${DEB_TARGET_MULTIARCH}/libspice-server.so.*
