@@ -1,4 +1,5 @@
 libspice-server.so.1 libspice-server1 #MINVER#
+* Build-Depends-Package: libspice-server-dev
  SPICE_SERVER_0.10.0@SPICE_SERVER_0.10.0 0.10.0
  SPICE_SERVER_0.10.1@SPICE_SERVER_0.10.1 0.10.1
  SPICE_SERVER_0.10.2@SPICE_SERVER_0.10.2 0.11.0
