@@ -1,3 +1,10 @@
+spice (0.15.0-3) unstable; urgency=medium
+
+  * patch from upstream to fix ftbfs (Closes: #1005451):
+    build-Correctly-check-for-Python-modules.patch
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Mon, 14 Mar 2022 11:00:39 +0300
+
 spice (0.15.0-2) unstable; urgency=medium
 
   * switch from $DEB_TARGET_MULTIARCH to $DEB_HOST_MULTIARCH
