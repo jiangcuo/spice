@@ -1,3 +1,10 @@
+spice (0.15.0-4) unstable; urgency=medium
+
+  * test-leaks-fix-the-test-with-OpenSSL3.patch:
+    patch from upstream to fix FTBFS with OpenSSL3
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Sat, 14 May 2022 22:46:12 +0300
+
 spice (0.15.0-3) unstable; urgency=medium
 
   * patch from upstream to fix ftbfs (Closes: #1005451):
