@@ -31,95 +31,95 @@
 #pragma warning(disable:4018)
 #endif
 
-static void spice_marshall_msgc_ack_sync(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcAckSync *msg)
+static void spice_marshall_msgc_ack_sync(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcAckSync *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcAckSync *src;
-    src = (SpiceMsgcAckSync *)msg;
+    const SpiceMsgcAckSync *src;
+    src = (const SpiceMsgcAckSync *)msg;
 
     spice_marshaller_add_uint32(m, src->generation);
 }
 
-static void spice_marshall_SpiceMsgEmpty(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgEmpty *msg)
+static void spice_marshall_SpiceMsgEmpty(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgEmpty *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
 }
 
-static void spice_marshall_msgc_pong(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgPing *msg)
+static void spice_marshall_msgc_pong(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgPing *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgPing *src;
-    src = (SpiceMsgPing *)msg;
+    const SpiceMsgPing *src;
+    src = (const SpiceMsgPing *)msg;
 
     spice_marshaller_add_uint32(m, src->id);
     spice_marshaller_add_uint64(m, src->timestamp);
 }
 
-static void spice_marshall_SpiceMsgData(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgData *msg)
+static void spice_marshall_SpiceMsgData(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgData *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
 }
 
-static void spice_marshall_msgc_disconnecting(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgDisconnect *msg)
+static void spice_marshall_msgc_disconnecting(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgDisconnect *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgDisconnect *src;
-    src = (SpiceMsgDisconnect *)msg;
+    const SpiceMsgDisconnect *src;
+    src = (const SpiceMsgDisconnect *)msg;
 
     spice_marshaller_add_uint64(m, src->time_stamp);
     spice_marshaller_add_uint32(m, src->reason);
 }
 
-static void spice_marshall_msgc_main_client_info(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcClientInfo *msg)
+static void spice_marshall_msgc_main_client_info(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcClientInfo *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcClientInfo *src;
-    src = (SpiceMsgcClientInfo *)msg;
+    const SpiceMsgcClientInfo *src;
+    src = (const SpiceMsgcClientInfo *)msg;
 
     spice_marshaller_add_uint64(m, src->cache_size);
 }
 
-static void spice_marshall_msgc_main_mouse_mode_request(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcMainMouseModeRequest *msg)
+static void spice_marshall_msgc_main_mouse_mode_request(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcMainMouseModeRequest *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcMainMouseModeRequest *src;
-    src = (SpiceMsgcMainMouseModeRequest *)msg;
+    const SpiceMsgcMainMouseModeRequest *src;
+    src = (const SpiceMsgcMainMouseModeRequest *)msg;
 
     spice_marshaller_add_uint16(m, src->mode);
 }
 
-static void spice_marshall_msgc_main_agent_start(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgMainAgentTokens *msg)
+static void spice_marshall_msgc_main_agent_start(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgMainAgentTokens *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgMainAgentTokens *src;
-    src = (SpiceMsgMainAgentTokens *)msg;
+    const SpiceMsgMainAgentTokens *src;
+    src = (const SpiceMsgMainAgentTokens *)msg;
 
     spice_marshaller_add_uint32(m, src->num_tokens);
 }
 
-static void spice_marshall_msgc_main_agent_token(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgMainAgentTokens *msg)
+static void spice_marshall_msgc_main_agent_token(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgMainAgentTokens *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgMainAgentTokens *src;
-    src = (SpiceMsgMainAgentTokens *)msg;
+    const SpiceMsgMainAgentTokens *src;
+    src = (const SpiceMsgMainAgentTokens *)msg;
 
     spice_marshaller_add_uint32(m, src->num_tokens);
 }
 
-static void spice_marshall_msgc_main_migrate_dst_do_seamless(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcMainMigrateDstDoSeamless *msg)
+static void spice_marshall_msgc_main_migrate_dst_do_seamless(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcMainMigrateDstDoSeamless *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcMainMigrateDstDoSeamless *src;
-    src = (SpiceMsgcMainMigrateDstDoSeamless *)msg;
+    const SpiceMsgcMainMigrateDstDoSeamless *src;
+    src = (const SpiceMsgcMainMigrateDstDoSeamless *)msg;
 
     spice_marshaller_add_uint32(m, src->src_version);
 }
 
-static void spice_marshall_msgc_display_init(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcDisplayInit *msg)
+static void spice_marshall_msgc_display_init(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcDisplayInit *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcDisplayInit *src;
-    src = (SpiceMsgcDisplayInit *)msg;
+    const SpiceMsgcDisplayInit *src;
+    src = (const SpiceMsgcDisplayInit *)msg;
 
     spice_marshaller_add_uint8(m, src->pixmap_cache_id);
     spice_marshaller_add_int64(m, src->pixmap_cache_size);
@@ -127,11 +127,11 @@ static void spice_marshall_msgc_display_init(SPICE_GNUC_UNUSED SpiceMarshaller *
     spice_marshaller_add_int32(m, src->glz_dictionary_window_size);
 }
 
-static void spice_marshall_msgc_display_stream_report(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcDisplayStreamReport *msg)
+static void spice_marshall_msgc_display_stream_report(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcDisplayStreamReport *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcDisplayStreamReport *src;
-    src = (SpiceMsgcDisplayStreamReport *)msg;
+    const SpiceMsgcDisplayStreamReport *src;
+    src = (const SpiceMsgcDisplayStreamReport *)msg;
 
     spice_marshaller_add_uint32(m, src->stream_id);
     spice_marshaller_add_uint32(m, src->unique_id);
@@ -143,27 +143,27 @@ static void spice_marshall_msgc_display_stream_report(SPICE_GNUC_UNUSED SpiceMar
     spice_marshaller_add_uint32(m, src->audio_delay);
 }
 
-static void spice_marshall_msgc_display_preferred_compression(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcDisplayPreferredCompression *msg)
+static void spice_marshall_msgc_display_preferred_compression(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcDisplayPreferredCompression *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcDisplayPreferredCompression *src;
-    src = (SpiceMsgcDisplayPreferredCompression *)msg;
+    const SpiceMsgcDisplayPreferredCompression *src;
+    src = (const SpiceMsgcDisplayPreferredCompression *)msg;
 
     spice_marshaller_add_uint8(m, src->image_compression);
 }
 
-static void spice_marshall_msgc_display_gl_draw_done(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcDisplayGlDrawDone *msg)
+static void spice_marshall_msgc_display_gl_draw_done(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcDisplayGlDrawDone *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
 }
 
-static void spice_marshall_msgc_display_preferred_video_codec_type(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcDisplayPreferredVideoCodecType *msg)
+static void spice_marshall_msgc_display_preferred_video_codec_type(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcDisplayPreferredVideoCodecType *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcDisplayPreferredVideoCodecType *src;
-    uint8_t *codecs__element;
+    const SpiceMsgcDisplayPreferredVideoCodecType *src;
+    const uint8_t *  codecs__element;
     uint32_t i;
-    src = (SpiceMsgcDisplayPreferredVideoCodecType *)msg;
+    src = (const SpiceMsgcDisplayPreferredVideoCodecType *)msg;
 
     spice_marshaller_add_uint8(m, src->num_of_codecs);
     codecs__element = src->codecs;
@@ -173,49 +173,49 @@ static void spice_marshall_msgc_display_preferred_video_codec_type(SPICE_GNUC_UN
     }
 }
 
-static void spice_marshall_msgc_inputs_key_down(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcKeyDown *msg)
+static void spice_marshall_msgc_inputs_key_down(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcKeyDown *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcKeyDown *src;
-    src = (SpiceMsgcKeyDown *)msg;
+    const SpiceMsgcKeyDown *src;
+    src = (const SpiceMsgcKeyDown *)msg;
 
     spice_marshaller_add_uint32(m, src->code);
 }
 
-static void spice_marshall_msgc_inputs_key_up(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcKeyUp *msg)
+static void spice_marshall_msgc_inputs_key_up(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcKeyUp *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcKeyUp *src;
-    src = (SpiceMsgcKeyUp *)msg;
+    const SpiceMsgcKeyUp *src;
+    src = (const SpiceMsgcKeyUp *)msg;
 
     spice_marshaller_add_uint32(m, src->code);
 }
 
-static void spice_marshall_msgc_inputs_key_modifiers(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcKeyModifiers *msg)
+static void spice_marshall_msgc_inputs_key_modifiers(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcKeyModifiers *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcKeyModifiers *src;
-    src = (SpiceMsgcKeyModifiers *)msg;
+    const SpiceMsgcKeyModifiers *src;
+    src = (const SpiceMsgcKeyModifiers *)msg;
 
     spice_marshaller_add_uint16(m, src->modifiers);
 }
 
-static void spice_marshall_msgc_inputs_mouse_motion(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcMouseMotion *msg)
+static void spice_marshall_msgc_inputs_mouse_motion(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcMouseMotion *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcMouseMotion *src;
-    src = (SpiceMsgcMouseMotion *)msg;
+    const SpiceMsgcMouseMotion *src;
+    src = (const SpiceMsgcMouseMotion *)msg;
 
     spice_marshaller_add_int32(m, src->dx);
     spice_marshaller_add_int32(m, src->dy);
     spice_marshaller_add_uint16(m, src->buttons_state);
 }
 
-static void spice_marshall_msgc_inputs_mouse_position(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcMousePosition *msg)
+static void spice_marshall_msgc_inputs_mouse_position(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcMousePosition *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcMousePosition *src;
-    src = (SpiceMsgcMousePosition *)msg;
+    const SpiceMsgcMousePosition *src;
+    src = (const SpiceMsgcMousePosition *)msg;
 
     spice_marshaller_add_uint32(m, src->x);
     spice_marshaller_add_uint32(m, src->y);
@@ -223,62 +223,62 @@ static void spice_marshall_msgc_inputs_mouse_position(SPICE_GNUC_UNUSED SpiceMar
     spice_marshaller_add_uint8(m, src->display_id);
 }
 
-static void spice_marshall_msgc_inputs_mouse_press(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcMousePress *msg)
+static void spice_marshall_msgc_inputs_mouse_press(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcMousePress *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcMousePress *src;
-    src = (SpiceMsgcMousePress *)msg;
+    const SpiceMsgcMousePress *src;
+    src = (const SpiceMsgcMousePress *)msg;
 
     spice_marshaller_add_uint8(m, src->button);
     spice_marshaller_add_uint16(m, src->buttons_state);
 }
 
-static void spice_marshall_msgc_inputs_mouse_release(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcMouseRelease *msg)
+static void spice_marshall_msgc_inputs_mouse_release(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcMouseRelease *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcMouseRelease *src;
-    src = (SpiceMsgcMouseRelease *)msg;
+    const SpiceMsgcMouseRelease *src;
+    src = (const SpiceMsgcMouseRelease *)msg;
 
     spice_marshaller_add_uint8(m, src->button);
     spice_marshaller_add_uint16(m, src->buttons_state);
 }
 
-static void spice_marshall_msgc_record_data(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgPlaybackPacket *msg)
+static void spice_marshall_msgc_record_data(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgPlaybackPacket *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgPlaybackPacket *src;
-    src = (SpiceMsgPlaybackPacket *)msg;
+    const SpiceMsgPlaybackPacket *src;
+    src = (const SpiceMsgPlaybackPacket *)msg;
 
     spice_marshaller_add_uint32(m, src->time);
     /* Don't marshall @nomarshal data */
 }
 
-static void spice_marshall_msgc_record_mode(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgPlaybackMode *msg)
+static void spice_marshall_msgc_record_mode(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgPlaybackMode *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgPlaybackMode *src;
-    src = (SpiceMsgPlaybackMode *)msg;
+    const SpiceMsgPlaybackMode *src;
+    src = (const SpiceMsgPlaybackMode *)msg;
 
     spice_marshaller_add_uint32(m, src->time);
     spice_marshaller_add_uint16(m, src->mode);
     /* Remaining data must be appended manually */
 }
 
-static void spice_marshall_msgc_record_start_mark(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcRecordStartMark *msg)
+static void spice_marshall_msgc_record_start_mark(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcRecordStartMark *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcRecordStartMark *src;
-    src = (SpiceMsgcRecordStartMark *)msg;
+    const SpiceMsgcRecordStartMark *src;
+    src = (const SpiceMsgcRecordStartMark *)msg;
 
     spice_marshaller_add_uint32(m, src->time);
 }
 
 #ifdef USE_SMARTCARD
-static void spice_marshall_msgc_smartcard_data(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED VSCMsgHeader *msg)
+static void spice_marshall_msgc_smartcard_data(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const VSCMsgHeader *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    VSCMsgHeader *src;
-    src = (VSCMsgHeader *)msg;
+    const VSCMsgHeader *src;
+    src = (const VSCMsgHeader *)msg;
 
     spice_marshaller_add_uint32(m, src->type);
     spice_marshaller_add_uint32(m, src->reader_id);
@@ -287,11 +287,11 @@ static void spice_marshall_msgc_smartcard_data(SPICE_GNUC_UNUSED SpiceMarshaller
 }
 
 #endif /* USE_SMARTCARD */
-static void spice_marshall_SpiceMsgCompressedData(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgCompressedData *msg)
+static void spice_marshall_SpiceMsgCompressedData(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgCompressedData *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgCompressedData *src;
-    src = (SpiceMsgCompressedData *)msg;
+    const SpiceMsgCompressedData *src;
+    src = (const SpiceMsgCompressedData *)msg;
 
     spice_marshaller_add_uint8(m, src->type);
     if (src->type == SPICE_DATA_COMPRESSION_TYPE_NONE) {
@@ -301,11 +301,11 @@ static void spice_marshall_SpiceMsgCompressedData(SPICE_GNUC_UNUSED SpiceMarshal
     /* Remaining data must be appended manually */
 }
 
-static void spice_marshall_msgc_port_event(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgcPortEvent *msg)
+static void spice_marshall_msgc_port_event(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgcPortEvent *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgcPortEvent *src;
-    src = (SpiceMsgcPortEvent *)msg;
+    const SpiceMsgcPortEvent *src;
+    src = (const SpiceMsgcPortEvent *)msg;
 
     spice_marshaller_add_uint8(m, src->event);
 }

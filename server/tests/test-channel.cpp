@@ -74,7 +74,7 @@ RedTestChannel::on_connect(RedClient *client, RedStream *stream,
 uint8_t *
 RedTestChannelClient::alloc_recv_buf(uint16_t type, uint32_t size)
 {
-    return (uint8_t*) g_malloc(size);
+    return static_cast<uint8_t *>(g_malloc(size));
 }
 
 void
@@ -87,8 +87,8 @@ RedTestChannelClient::release_recv_buf(uint16_t type, uint32_t size, uint8_t *ms
 /*
  * Main test part
  */
-typedef SpiceWatch *watch_add_t(const SpiceCoreInterfaceInternal *iface,
-                                int fd, int event_mask, SpiceWatchFunc func, void *opaque);
+using watch_add_t = SpiceWatch *(const SpiceCoreInterfaceInternal *iface,
+                                 int fd, int event_mask, SpiceWatchFunc func, void *opaque);
 static watch_add_t *old_watch_add = nullptr;
 static SpiceWatchFunc old_watch_func = nullptr;
 
@@ -129,7 +129,7 @@ static void send_ack_sync(int socket, uint32_t generation)
     msg.len = GUINT32_TO_LE(sizeof(generation));
     msg.generation = GUINT32_TO_LE(generation);
 
-    g_assert_cmpint(socket_write(socket, &msg.type, 10), ==, 10);
+    g_assert_cmpint(socket_write(socket, reinterpret_cast<uint8_t *>(&msg) + 2, 10), ==, 10);
 }
 
 static SpiceTimer *waked_up_timer;
@@ -137,7 +137,7 @@ static SpiceTimer *waked_up_timer;
 // timer waiting we get data again
 static void timer_wakeup(void *opaque)
 {
-    auto core = (SpiceCoreInterface*) opaque;
+    auto core = static_cast<SpiceCoreInterface *>(opaque);
 
     // check we are receiving data again
     size_t got_data = 0;
@@ -159,7 +159,7 @@ static void timer_wakeup(void *opaque)
 // if we arrive here it means we didn't receive too many watch events
 static void timeout_watch_count(void *opaque)
 {
-    auto core = (SpiceCoreInterface*) opaque;
+    auto core = static_cast<SpiceCoreInterface *>(opaque);
 
     // get all pending data
     alarm(1);
@@ -220,7 +220,7 @@ static void channel_loop()
     memset(&caps, 0, sizeof(caps));
     uint32_t common_caps = 1 << SPICE_COMMON_CAP_MINI_HEADER;
     caps.num_common_caps = 1;
-    caps.common_caps = (uint32_t*) spice_memdup(&common_caps, sizeof(common_caps));
+    caps.common_caps = static_cast<uint32_t *>(spice_memdup(&common_caps, sizeof(common_caps)));
 
     RedClient *client = red_client_new(server, FALSE);
     g_assert_nonnull(client);

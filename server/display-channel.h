@@ -37,6 +37,7 @@
 #include "push-visibility.h"
 
 struct DisplayChannelPrivate;
+struct RedSurface;
 
 struct DisplayChannel final: public CommonGraphicsChannel
 {
@@ -53,10 +54,10 @@ struct DisplayChannel final: public CommonGraphicsChannel
     red::unique_link<DisplayChannelPrivate> priv;
 };
 
-typedef struct DependItem {
+struct DependItem {
     Drawable *drawable;
     RingItem ring_item;
-} DependItem;
+};
 
 struct Drawable {
     uint32_t refs;
@@ -64,7 +65,7 @@ struct Drawable {
     RingItem list_link;
     DrawItem tree_item;
     GList *pipes;
-    RedDrawable *red_drawable;
+    red::shared_ptr<RedDrawable> red_drawable;
 
     GlzImageRetention glz_retention;
 
@@ -76,10 +77,12 @@ struct Drawable {
     VideoStream *stream;
     int streamable;
     BitmapGradualType copy_bitmap_graduality;
-    DependItem depend_items[3];
+    std::array<DependItem, 3> depend_items;
 
-    int surface_id;
-    int surface_deps[3];
+    /* destination surface. This pointer is not NULL. A reference is hold */
+    RedSurface *surface;
+    /* dependency surfaces. They can be NULL. A reference is hold. */
+    std::array<RedSurface *, 3> surface_deps;
 
     uint32_t process_commands_generation;
     DisplayChannel *display;
@@ -91,10 +94,11 @@ display_channel_new(RedsState *reds, QXLInstance *qxl,
                     int migrate, int stream_video,
                     GArray *video_codecs,
                     uint32_t n_surfaces);
-void                       display_channel_create_surface            (DisplayChannel *display, uint32_t surface_id,
-                                                                      uint32_t width, uint32_t height,
-                                                                      int32_t stride, uint32_t format, void *line_0,
-                                                                      int data_is_valid, int send_client);
+void display_channel_surface_id_unref(DisplayChannel *display, uint32_t surface_id);
+RedSurface *display_channel_create_surface(DisplayChannel *display, uint32_t surface_id,
+                                           uint32_t width, uint32_t height,
+                                           int32_t stride, uint32_t format, void *line_0,
+                                           int data_is_valid, int send_client);
 void                       display_channel_draw                      (DisplayChannel *display,
                                                                       const SpiceRect *area,
                                                                       int surface_id);
@@ -112,8 +116,6 @@ void                       display_channel_set_video_codecs          (DisplayCha
 int                        display_channel_get_streams_timeout       (DisplayChannel *display);
 void                       display_channel_compress_stats_print      (DisplayChannel *display);
 void                       display_channel_compress_stats_reset      (DisplayChannel *display);
-void                       display_channel_surface_unref             (DisplayChannel *display,
-                                                                      uint32_t surface_id);
 bool                       display_channel_wait_for_migrate_data     (DisplayChannel *display);
 void                       display_channel_flush_all_surfaces        (DisplayChannel *display);
 void                       display_channel_free_glz_drawables_to_free(DisplayChannel *display);
@@ -121,24 +123,23 @@ void                       display_channel_free_glz_drawables        (DisplayCha
 void                       display_channel_destroy_surface_wait      (DisplayChannel *display,
                                                                       uint32_t surface_id);
 void                       display_channel_destroy_surfaces          (DisplayChannel *display);
-void                       display_channel_process_draw              (DisplayChannel *display,
-                                                                      RedDrawable *red_drawable,
-                                                                      uint32_t process_commands_generation);
-void                       display_channel_process_surface_cmd       (DisplayChannel *display,
-                                                                      RedSurfaceCmd *surface_cmd,
-                                                                      int loadvm);
 void                       display_channel_gl_scanout                (DisplayChannel *display);
 void                       display_channel_gl_draw                   (DisplayChannel *display,
                                                                       SpiceMsgDisplayGlDraw *draw);
 void                       display_channel_gl_draw_done              (DisplayChannel *display);
 
+void display_channel_process_draw(DisplayChannel *display,
+                                  red::shared_ptr<RedDrawable> &&red_drawable,
+                                  uint32_t process_commands_generation);
+void display_channel_process_surface_cmd(DisplayChannel *display,
+                                         red::shared_ptr<const RedSurfaceCmd> &&surface_cmd,
+                                         bool loadvm);
 void display_channel_update_monitors_config(DisplayChannel *display, const QXLMonitorsConfig *config,
                                             uint16_t count, uint16_t max_allowed);
 void display_channel_set_monitors_config_to_primary(DisplayChannel *display);
 void display_channel_push_monitors_config(DisplayChannel *display);
 
-gboolean display_channel_validate_surface(DisplayChannel *display, uint32_t surface_id);
-gboolean display_channel_surface_has_canvas(DisplayChannel *display, uint32_t surface_id);
+RedSurface *display_channel_validate_surface(DisplayChannel *display, uint32_t surface_id);
 void display_channel_reset_image_cache(DisplayChannel *self);
 
 void display_channel_debug_oom(DisplayChannel *display, const char *msg);

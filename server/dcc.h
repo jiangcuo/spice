@@ -19,6 +19,8 @@
 #ifndef DCC_H_
 #define DCC_H_
 
+#include <array>
+
 #include "image-encoders.h"
 #include "image-cache.h"
 #include "pixmap-cache.h"
@@ -46,7 +48,7 @@ public:
     virtual void disconnect() override;
 
 protected:
-    virtual bool handle_message(uint16_t type, uint32_t size, void *message) override;
+    virtual bool handle_message(uint16_t type, uint32_t size, void *msg) override;
     virtual bool config_socket() override;
     virtual void on_disconnect() override;
     virtual void send_item(RedPipeItem *item) override;
@@ -81,18 +83,19 @@ public:
 struct DisplayChannel;
 struct VideoStream;
 struct VideoStreamAgent;
+struct RedSurface;
 
-typedef struct WaitForChannels {
+struct WaitForChannels {
     SpiceMsgWaitForChannels header;
-    SpiceWaitForChannel buf[MAX_CACHE_CLIENTS];
-} WaitForChannels;
+    std::array<SpiceWaitForChannel, MAX_CACHE_CLIENTS> buf;
+};
 
-typedef struct FreeList {
+struct FreeList {
     int res_size;
     SpiceResourceList *res;
     uint64_t sync[MAX_CACHE_CLIENTS];
     WaitForChannels wait;
-} FreeList;
+};
 
 #define DCC_TO_DC(dcc) ((DisplayChannel*) dcc->get_channel())
 
@@ -114,10 +117,6 @@ void                       dcc_video_stream_agent_clip               (DisplayCha
                                                                       VideoStreamAgent *agent);
 void                       dcc_create_stream                         (DisplayChannelClient *dcc,
                                                                       VideoStream *stream);
-void                       dcc_create_surface                        (DisplayChannelClient *dcc,
-                                                                      int surface_id);
-void                       dcc_push_surface_image                    (DisplayChannelClient *dcc,
-                                                                      int surface_id);
 void                       dcc_palette_cache_reset                   (DisplayChannelClient *dcc);
 void                       dcc_palette_cache_palette                 (DisplayChannelClient *dcc,
                                                                       SpicePalette *palette,
@@ -131,9 +130,6 @@ void                       dcc_append_drawable                       (DisplayCha
 void                       dcc_add_drawable_after                    (DisplayChannelClient *dcc,
                                                                       Drawable *drawable,
                                                                       RedPipeItem *pos);
-bool                       dcc_clear_surface_drawables_from_pipe     (DisplayChannelClient *dcc,
-                                                                      int surface_id,
-                                                                      int wait_if_used);
 bool                       dcc_drawable_is_in_pipe                   (DisplayChannelClient *dcc,
                                                                       Drawable *drawable);
 
@@ -142,7 +138,11 @@ int                        dcc_compress_image                        (DisplayCha
                                                                       int can_lossy,
                                                                       compress_send_data_t* o_comp_data);
 
-void dcc_add_surface_area_image(DisplayChannelClient *dcc, int surface_id,
+void dcc_create_surface(DisplayChannelClient *dcc, struct RedSurface *surface);
+void dcc_push_surface_image(DisplayChannelClient *dcc, struct RedSurface *surface);
+bool dcc_clear_surface_drawables_from_pipe(DisplayChannelClient *dcc,
+                                           RedSurface *surface, bool wait_if_used);
+void dcc_add_surface_area_image(DisplayChannelClient *dcc, RedSurface *surface,
                                 SpiceRect *area, RedChannelClient::Pipe::iterator pipe_item_pos,
                                 int can_lossy);
 RedPipeItemPtr dcc_gl_scanout_item_new(RedChannelClient *rcc, void *data, int num);

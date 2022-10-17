@@ -25,10 +25,12 @@ AM_CPPFLAGS =					\
 
 AM_CFLAGS =					\
 	$(WARN_CFLAGS)				\
+	$(PTHREAD_CFLAGS)			\
 	$(NULL)
 
 AM_CXXFLAGS =					\
 	$(WARN_CXXFLAGS)			\
+	$(PTHREAD_CXXFLAGS)			\
 	$(NULL)
 
 noinst_LTLIBRARIES = libserver.la
@@ -62,6 +64,7 @@ libserver_la_LIBADD =							\
 	$(Z_LIBS)							\
 	$(SPICE_NONPKGCONFIG_LIBS)					\
 	$(ORC_LIBS)							\
+	$(PTHREAD_LIBS)							\
 	$(NULL)
 
 libspice_serverincludedir = $(includedir)/spice-server
@@ -107,6 +110,7 @@ libserver_la_SOURCES =				\
 	display-channel-private.h		\
 	display-limits.h			\
 	event-loop.c				\
+	glib-compat.h				\
 	glz-encoder.c				\
 	glz-encoder-dict.c			\
 	glz-encoder-dict.h			\
@@ -153,7 +157,7 @@ libserver_la_SOURCES =				\
 	red-pipe-item.h				\
 	red-qxl.cpp				\
 	red-qxl.h				\
-	red-record-qxl.c			\
+	red-record-qxl.cpp			\
 	red-record-qxl.h			\
 	red-replay-qxl.cpp			\
 	reds.cpp				\

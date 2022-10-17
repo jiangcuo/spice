@@ -17,9 +17,10 @@
 */
 #include <config.h>
 
+#include <cerrno>
+#include <climits>
+
 #include <fcntl.h>
-#include <errno.h>
-#include <limits.h>
 #include <sys/types.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -31,6 +32,7 @@
 #include <common/generated_server_marshallers.h>
 #include <common/snd_codec.h>
 
+#include "glib-compat.h"
 #include "spice-wrapped.h"
 #include "red-common.h"
 #include "main-channel.h"
@@ -67,10 +69,10 @@ enum PlaybackCommand {
 #define SND_PLAYBACK_PCM_MASK (1 << SND_PLAYBACK_PCM)
 #define SND_PLAYBACK_LATENCY_MASK ( 1 << SND_PLAYBACK_LATENCY)
 
-struct SndChannelClient;
+class SndChannelClient;
 struct SndChannel;
-struct PlaybackChannelClient;
-struct RecordChannelClient;
+class PlaybackChannelClient;
+class RecordChannelClient;
 struct AudioFrame;
 struct AudioFrameContainer;
 
@@ -151,7 +153,7 @@ public:
     AudioFrame *free_frames = nullptr;
     AudioFrame *in_progress = nullptr;   /* Frame being sent to the client */
     AudioFrame *pending_frame = nullptr; /* Next frame to send to the client */
-    uint32_t mode = SPICE_AUDIO_DATA_MODE_RAW;
+    SpiceAudioDataMode mode = SPICE_AUDIO_DATA_MODE_RAW;
     uint32_t latency = 0;
     SndCodec codec = nullptr;
     uint8_t  encode_buf[SND_CODEC_MAX_COMPRESSED_BYTES];
@@ -210,7 +212,7 @@ public:
     uint32_t samples[RECORD_SAMPLES_SIZE];
     uint32_t write_pos = 0;
     uint32_t read_pos = 0;
-    uint32_t mode = SPICE_AUDIO_DATA_MODE_RAW;
+    SpiceAudioDataMode mode = SPICE_AUDIO_DATA_MODE_RAW;
     uint32_t mode_time = 0;
     uint32_t start_time = 0;
     SndCodec codec = nullptr;
@@ -234,7 +236,7 @@ static SndChannelClient *snd_channel_get_client(SndChannel *channel)
         return nullptr;
     }
 
-    return (SndChannelClient*) clients->data;
+    return static_cast<SndChannelClient *>(clients->data);
 }
 
 static RedsState* snd_channel_get_server(SndChannelClient *client)
@@ -276,7 +278,7 @@ static bool snd_record_handle_write(RecordChannelClient *record_client, size_t s
         return false;
     }
 
-    packet = (SpiceMsgcRecordPacket *)message;
+    packet = static_cast<SpiceMsgcRecordPacket *>(message);
 
     if (record_client->mode == SPICE_AUDIO_DATA_MODE_RAW) {
         data = packet->data;
@@ -309,21 +311,23 @@ static bool snd_record_handle_write(RecordChannelClient *record_client, size_t s
     return true;
 }
 
-static
-const char* spice_audio_data_mode_to_string(gint mode)
+static const char*
+spice_audio_data_mode_to_string(SpiceAudioDataMode mode)
 {
+    switch (mode) {
+    case SPICE_AUDIO_DATA_MODE_INVALID:
+        return "invalid";
+    case SPICE_AUDIO_DATA_MODE_RAW:
+        return "raw";
     G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-    static const char * const str[] = {
-        [ SPICE_AUDIO_DATA_MODE_INVALID ] = "invalid",
-        [ SPICE_AUDIO_DATA_MODE_RAW ] = "raw",
-        [ SPICE_AUDIO_DATA_MODE_CELT_0_5_1 ] = "celt",
-        [ SPICE_AUDIO_DATA_MODE_OPUS ] = "opus",
-    };
+    case SPICE_AUDIO_DATA_MODE_CELT_0_5_1:
+        return "celt";
     G_GNUC_END_IGNORE_DEPRECATIONS
-    if (mode >= 0 && mode < G_N_ELEMENTS(str)) {
-        return str[mode];
+    case SPICE_AUDIO_DATA_MODE_OPUS:
+        return "opus";
+    case SPICE_AUDIO_DATA_MODE_ENUM_END:
+        break;
     }
-
     return "unknown audio codec";
 }
 
@@ -335,26 +339,26 @@ bool RecordChannelClient::handle_message(uint16_t type, uint32_t size, void *mes
     case SPICE_MSGC_RECORD_DATA:
         return snd_record_handle_write(this, size, message);
     case SPICE_MSGC_RECORD_MODE: {
-        auto msg_mode = (SpiceMsgcRecordMode *)message;
+        auto msg_mode = static_cast<SpiceMsgcRecordMode *>(message);
         SndChannel *channel = get_channel();
         mode_time = msg_mode->time;
-        if (msg_mode->mode != SPICE_AUDIO_DATA_MODE_RAW) {
-            if (snd_codec_is_capable((SpiceAudioDataMode) msg_mode->mode, channel->frequency)) {
-                if (snd_codec_create(&codec, (SpiceAudioDataMode) msg_mode->mode,
+        auto new_mode = static_cast<SpiceAudioDataMode>(msg_mode->mode);
+        if (new_mode != SPICE_AUDIO_DATA_MODE_RAW) {
+            if (snd_codec_is_capable(new_mode, channel->frequency)) {
+                if (snd_codec_create(&codec, new_mode,
                                      channel->frequency, SND_CODEC_DECODE) == SND_CODEC_OK) {
-                    mode = msg_mode->mode;
+                    mode = new_mode;
                 } else {
                     red_channel_warning(channel, "create decoder failed");
                     return false;
                 }
-            }
-            else {
+            } else {
                 red_channel_warning(channel, "unsupported mode %d", mode);
                 return false;
             }
+        } else {
+            mode = new_mode;
         }
-        else
-            mode = msg_mode->mode;
 
         spice_debug("record client %p using mode %s", this,
                     spice_audio_data_mode_to_string(mode));
@@ -362,7 +366,7 @@ bool RecordChannelClient::handle_message(uint16_t type, uint32_t size, void *mes
     }
 
     case SPICE_MSGC_RECORD_START_MARK: {
-        auto mark = (SpiceMsgcRecordStartMark *)message;
+        auto mark = static_cast<SpiceMsgcRecordStartMark *>(message);
         start_time = mark->time;
         break;
     }
@@ -404,8 +408,8 @@ static bool snd_send_volume(SndChannelClient *client, uint32_t cap, int msg)
         return false;
     }
 
-    vol = (SpiceMsgAudioVolume*) alloca(sizeof (SpiceMsgAudioVolume) +
-                 st->volume_nchannels * sizeof (uint16_t));
+    vol = static_cast<SpiceMsgAudioVolume *>(
+        alloca(sizeof(SpiceMsgAudioVolume) + st->volume_nchannels * sizeof(uint16_t)));
     rcc->init_send_data(msg);
     vol->nchannels = st->volume_nchannels;
     for (c = 0; c < st->volume_nchannels; ++c) {
@@ -577,17 +581,17 @@ static bool snd_playback_send_write(PlaybackChannelClient *playback_client)
     spice_marshall_msg_playback_data(m, &msg);
 
     if (playback_client->mode == SPICE_AUDIO_DATA_MODE_RAW) {
-        spice_marshaller_add_by_ref_full(m, (uint8_t *)frame->samples,
-                                         snd_codec_frame_size(playback_client->codec) *
-                                         sizeof(frame->samples[0]),
-                                         PlaybackChannelClient::on_message_marshalled,
-                                         playback_client);
+        spice_marshaller_add_by_ref_full(
+            m, reinterpret_cast<uint8_t *>(frame->samples),
+            snd_codec_frame_size(playback_client->codec) * sizeof(frame->samples[0]),
+            PlaybackChannelClient::on_message_marshalled, playback_client);
     }
     else {
         int n = sizeof(playback_client->encode_buf);
-        if (snd_codec_encode(playback_client->codec, (uint8_t *) frame->samples,
-                                    snd_codec_frame_size(playback_client->codec) * sizeof(frame->samples[0]),
-                                    playback_client->encode_buf, &n) != SND_CODEC_OK) {
+        if (snd_codec_encode(playback_client->codec, reinterpret_cast<uint8_t *>(frame->samples),
+                             snd_codec_frame_size(playback_client->codec) *
+                                 sizeof(frame->samples[0]),
+                             playback_client->encode_buf, &n) != SND_CODEC_OK) {
             red_channel_warning(rcc->get_channel(), "encode failed");
             rcc->disconnect();
             return false;
@@ -761,7 +765,7 @@ SndChannelClient::alloc_recv_buf(uint16_t type, uint32_t size)
 {
     // If message is too big allocate one, this should never happen
     if (size > sizeof(receive_buf)) {
-        return (uint8_t*) g_malloc(size);
+        return static_cast<uint8_t *>(g_malloc(size));
     }
     return receive_buf;
 }
@@ -790,7 +794,7 @@ static void snd_channel_set_volume(SndChannel *channel,
 
     st->volume_nchannels = nchannels;
     g_free(st->volume);
-    st->volume = (uint16_t*) g_memdup(volume, sizeof(uint16_t) * nchannels);
+    st->volume = static_cast<uint16_t *>(g_memdup2(volume, sizeof(uint16_t) * nchannels));
 
     if (!client || nchannels == 0)
         return;
@@ -882,11 +886,12 @@ SPICE_GNUC_VISIBLE void spice_server_playback_stop(SpicePlaybackInstance *sin)
 }
 
 SPICE_GNUC_VISIBLE void spice_server_playback_get_buffer(SpicePlaybackInstance *sin,
-                                                         uint32_t **frame, uint32_t *num_samples)
+                                                         uint32_t **samples,
+                                                         uint32_t *num_samples)
 {
     SndChannelClient *client = snd_channel_get_client(sin->st);
 
-    *frame = nullptr;
+    *samples = nullptr;
     *num_samples = 0;
     if (!client) {
         return;
@@ -901,7 +906,7 @@ SPICE_GNUC_VISIBLE void spice_server_playback_get_buffer(SpicePlaybackInstance *
         ++playback_client->frames->refs;
     }
 
-    *frame = playback_client->free_frames->samples;
+    *samples = playback_client->free_frames->samples;
     playback_client->free_frames = playback_client->free_frames->next;
     *num_samples = snd_codec_frame_size(playback_client->codec);
 }
@@ -941,7 +946,7 @@ void snd_set_playback_latency(RedClient *client, uint32_t latency)
     GList *l;
 
     for (l = snd_channels; l != nullptr; l = l->next) {
-        auto now = (SndChannel*) l->data;
+        auto now = static_cast<SndChannel *>(l->data);
         SndChannelClient *scc = snd_channel_get_client(now);
         if (now->type() == SPICE_CHANNEL_PLAYBACK && scc &&
             scc->get_client() == client) {
@@ -959,8 +964,8 @@ void snd_set_playback_latency(RedClient *client, uint32_t latency)
     }
 }
 
-static int snd_desired_audio_mode(bool playback_compression, int frequency,
-                                  bool client_can_opus)
+static SpiceAudioDataMode
+snd_desired_audio_mode(bool playback_compression, int frequency, bool client_can_opus)
 {
     if (!playback_compression)
         return SPICE_AUDIO_DATA_MODE_RAW;
@@ -973,11 +978,9 @@ static int snd_desired_audio_mode(bool playback_compression, int frequency,
 
 PlaybackChannelClient::~PlaybackChannelClient()
 {
-    int i;
-
     // free frames, unref them
-    for (i = 0; i < NUM_AUDIO_FRAMES; ++i) {
-        frames->items[i].client = nullptr;
+    for (auto& item : frames->items) {
+        item.client = nullptr;
     }
     if (--frames->refs == 0) {
         g_free(frames);
@@ -1002,10 +1005,11 @@ PlaybackChannelClient::PlaybackChannelClient(PlaybackChannel *channel,
     bool client_can_opus = test_remote_cap(SPICE_PLAYBACK_CAP_OPUS);
     bool playback_compression =
         reds_config_get_playback_compression(channel->get_server());
-    int desired_mode = snd_desired_audio_mode(playback_compression, channel->frequency, client_can_opus);
+    auto desired_mode =
+        snd_desired_audio_mode(playback_compression, channel->frequency, client_can_opus);
     if (desired_mode != SPICE_AUDIO_DATA_MODE_RAW) {
-        if (snd_codec_create(&codec, (SpiceAudioDataMode) desired_mode, channel->frequency,
-                             SND_CODEC_ENCODE) == SND_CODEC_OK) {
+        if (snd_codec_create(&codec, static_cast<SpiceAudioDataMode>(desired_mode),
+                             channel->frequency, SND_CODEC_ENCODE) == SND_CODEC_OK) {
             mode = desired_mode;
         } else {
             red_channel_warning(channel, "create encoder failed");
@@ -1277,13 +1281,13 @@ void snd_set_playback_compression(bool on)
     GList *l;
 
     for (l = snd_channels; l != nullptr; l = l->next) {
-        auto now = (SndChannel*) l->data;
+        auto now = static_cast<SndChannel *>(l->data);
         SndChannelClient *client = snd_channel_get_client(now);
         if (now->type() == SPICE_CHANNEL_PLAYBACK && client) {
             PlaybackChannelClient* playback = PLAYBACK_CHANNEL_CLIENT(client);
             RedChannelClient *rcc = playback;
             bool client_can_opus = rcc->test_remote_cap(SPICE_PLAYBACK_CAP_OPUS);
-            int desired_mode = snd_desired_audio_mode(on, now->frequency, client_can_opus);
+            auto desired_mode = snd_desired_audio_mode(on, now->frequency, client_can_opus);
             if (playback->mode != desired_mode) {
                 playback->mode = desired_mode;
                 snd_set_command(client, SND_PLAYBACK_MODE_MASK);
@@ -1296,12 +1300,10 @@ void snd_set_playback_compression(bool on)
 
 static void snd_playback_alloc_frames(PlaybackChannelClient *playback)
 {
-    int i;
-
     playback->frames = g_new0(AudioFrameContainer, 1);
     playback->frames->refs = 1;
-    for (i = 0; i < NUM_AUDIO_FRAMES; ++i) {
-        playback->frames->items[i].container = playback->frames;
-        snd_playback_free_frame(playback, &playback->frames->items[i]);
+    for (auto& item : playback->frames->items) {
+        item.container = playback->frames;
+        snd_playback_free_frame(playback, &item);
     }
 }

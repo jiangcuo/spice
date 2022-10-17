@@ -13,7 +13,7 @@ AC_PREREQ([2.57])
 #
 dnl TODO see server/spice-char.h TODO comment for API breakage
 m4_define([SPICE_CURRENT], [15])
-m4_define([SPICE_REVISION], [1])
+m4_define([SPICE_REVISION], [2])
 m4_define([SPICE_AGE], [14])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
@@ -32,6 +32,8 @@ AC_SUBST(SPICE_SERVER_VERSION)
 AC_CONFIG_MACRO_DIR([m4])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR(.)
+
+AX_PTHREAD
 
 AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip subdir-objects foreign])
 AM_MAINTAINER_MODE

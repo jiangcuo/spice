@@ -35,17 +35,17 @@ DisplayChannel::~DisplayChannel()
         for (drawable = priv->free_drawables; drawable; drawable = drawable->u.next) {
             ++count;
         }
-        spice_assert(count == NUM_DRAWABLES);
+        spice_assert(count == priv->drawables.size());
 
         count = 0;
         for (stream = priv->free_streams; stream; stream = stream->next) {
             ++count;
         }
-        spice_assert(count == NUM_STREAMS);
+        spice_assert(count == priv->streams_buf.size());
         spice_assert(ring_is_empty(&priv->streams));
 
-        for (count = 0; count < NUM_SURFACES; ++count) {
-            spice_assert(priv->surfaces[count].context.canvas == nullptr);
+        for (const auto &surface : priv->surfaces) {
+            spice_assert(!surface);
         }
     }
 
@@ -56,6 +56,8 @@ DisplayChannel::~DisplayChannel()
 static void drawable_draw(DisplayChannel *display, Drawable *drawable);
 static Drawable *display_channel_drawable_try_new(DisplayChannel *display,
                                                   uint32_t process_commands_generation);
+static void display_channel_surface_draw(DisplayChannel *display, RedSurface *surface,
+                                         const SpiceRect *area);
 
 uint32_t display_channel_generate_uid(DisplayChannel *display)
 {
@@ -74,17 +76,17 @@ void display_channel_compress_stats_reset(DisplayChannel *display)
     image_encoder_shared_stat_reset(&display->priv->encoder_shared_data);
 }
 
-void display_channel_compress_stats_print(DisplayChannel *display_channel)
+void display_channel_compress_stats_print(DisplayChannel *display)
 {
 #ifdef COMPRESS_STAT
     uint32_t id;
 
-    spice_return_if_fail(display_channel);
+    spice_return_if_fail(display);
 
-    id = display_channel->id();
+    id = display->id();
 
     spice_info("==> Compression stats for display %u", id);
-    image_encoder_shared_stat_print(&display_channel->priv->encoder_shared_data);
+    image_encoder_shared_stat_print(&display->priv->encoder_shared_data);
 #endif
 }
 
@@ -124,7 +126,7 @@ static MonitorsConfig* monitors_config_new(const QXLHead *heads, ssize_t nheads,
 {
     MonitorsConfig *mc;
 
-    mc = (MonitorsConfig*) g_malloc(sizeof(MonitorsConfig) + nheads * sizeof(QXLHead));
+    mc = static_cast<MonitorsConfig *>(g_malloc(sizeof(MonitorsConfig) + nheads * sizeof(QXLHead)));
     mc->refs = 1;
     mc->count = nheads;
     mc->max_allowed = max;
@@ -222,12 +224,11 @@ static void stop_streams(DisplayChannel *display)
     }
 
     display->priv->next_item_trace = 0;
-    memset(display->priv->items_trace, 0, sizeof(display->priv->items_trace));
+    display->priv->items_trace = {};
 }
 
-void display_channel_surface_unref(DisplayChannel *display, uint32_t surface_id)
+static void display_channel_surface_unref(DisplayChannel *display, RedSurface *surface)
 {
-    RedSurface *surface = &display->priv->surfaces[surface_id];
     DisplayChannelClient *dcc;
 
     if (--surface->refs != 0) {
@@ -235,35 +236,29 @@ void display_channel_surface_unref(DisplayChannel *display, uint32_t surface_id)
     }
 
     // only primary surface streams are supported
-    if (is_primary_surface(display, surface_id)) {
+    if (is_primary_surface(display, surface)) {
         stop_streams(display);
     }
     spice_assert(surface->context.canvas);
 
     surface->context.canvas->ops->destroy(surface->context.canvas);
-    if (surface->create_cmd != nullptr) {
-        red_surface_cmd_unref(surface->create_cmd);
-        surface->create_cmd = nullptr;
-    }
-    if (surface->destroy_cmd != nullptr) {
-        red_surface_cmd_unref(surface->destroy_cmd);
-        surface->destroy_cmd = nullptr;
-    }
+    surface->context.canvas = nullptr;
+    surface->create_cmd.reset();
+    surface->destroy_cmd.reset();
 
     region_destroy(&surface->draw_dirty_region);
-    surface->context.canvas = nullptr;
     FOREACH_DCC(display, dcc) {
-        dcc_destroy_surface(dcc, surface_id);
+        dcc_destroy_surface(dcc, surface->id);
     }
 
     spice_warn_if_fail(ring_is_empty(&surface->depend_on_me));
+    delete surface;
 }
 
-/* TODO: perhaps rename to "ready" or "realized" ? */
-gboolean display_channel_surface_has_canvas(DisplayChannel *display,
-                                            uint32_t surface_id)
+void display_channel_surface_id_unref(DisplayChannel *display, uint32_t surface_id)
 {
-    return display->priv->surfaces[surface_id].context.canvas != nullptr;
+    display_channel_surface_unref(display, display->priv->surfaces[surface_id]);
+    display->priv->surfaces[surface_id] = nullptr;
 }
 
 static void streams_update_visible_region(DisplayChannel *display, Drawable *drawable)
@@ -276,7 +271,7 @@ static void streams_update_visible_region(DisplayChannel *display, Drawable *dra
         return;
     }
 
-    if (!is_primary_surface(display, drawable->surface_id)) {
+    if (!is_primary_surface(display, drawable->surface)) {
         return;
     }
 
@@ -324,7 +319,7 @@ static void pipes_add_drawable_after(DisplayChannel *display,
     int num_other_linked = 0;
 
     for (GList *l = pos_after->pipes; l != nullptr; l = l->next) {
-        dpi_pos_after = (RedDrawablePipeItem*) l->data;
+        dpi_pos_after = static_cast<RedDrawablePipeItem *>(l->data);
 
         num_other_linked++;
         dcc_add_drawable_after(dpi_pos_after->dcc, drawable, dpi_pos_after);
@@ -339,7 +334,7 @@ static void pipes_add_drawable_after(DisplayChannel *display,
         FOREACH_DCC(display, dcc) {
             int sent = 0;
             for (GList *l = pos_after->pipes; l != nullptr; l = l->next) {
-                dpi_pos_after = (RedDrawablePipeItem*) l->data;
+                dpi_pos_after = static_cast<RedDrawablePipeItem *>(l->data);
                 if (dpi_pos_after->dcc == dcc) {
                     sent = 1;
                     break;
@@ -357,9 +352,8 @@ static void current_add_drawable(DisplayChannel *display,
                                  Drawable *drawable, RingItem *pos)
 {
     RedSurface *surface;
-    uint32_t surface_id = drawable->surface_id;
 
-    surface = &display->priv->surfaces[surface_id];
+    surface = drawable->surface;
     ring_add_after(&drawable->tree_item.base.siblings_link, pos);
     ring_add(&display->priv->current_list, &drawable->list_link);
     ring_add(&surface->current_list, &drawable->surface_list_link);
@@ -443,9 +437,9 @@ static void current_remove(DisplayChannel *display, TreeItem *item)
     }
 }
 
-static void current_remove_all(DisplayChannel *display, int surface_id)
+static void current_remove_all(DisplayChannel *display, RedSurface *surface)
 {
-    Ring *ring = &display->priv->surfaces[surface_id].current;
+    Ring *ring = &surface->current;
     RingItem *ring_item;
 
     while ((ring_item = ring_get_head(ring))) {
@@ -520,7 +514,7 @@ static bool current_add_equal(DisplayChannel *display, DrawItem *item, TreeItem 
             dpi_item = g_list_first(other_drawable->pipes);
             /* dpi contains a sublist of dcc's, ordered the same */
             FOREACH_DCC(display, dcc) {
-                if (dpi_item && dcc == ((RedDrawablePipeItem *) dpi_item->data)->dcc) {
+                if (dpi_item && dcc == (static_cast<RedDrawablePipeItem *>(dpi_item->data))->dcc) {
                     dpi_item = dpi_item->next;
                 } else {
                     dcc_prepend_drawable(dcc, drawable);
@@ -753,7 +747,7 @@ static void exclude_region(DisplayChannel *display, Ring *ring, RingItem *ring_i
                     /* the caller wanted to stop at this item, but this item
                      * has been removed, so we set @last to the next item */
                     SPICE_VERIFY(SPICE_OFFSETOF(TreeItem, siblings_link) == 0);
-                    *last = (TreeItem *)ring_next(ring, ring_item);
+                    *last = reinterpret_cast<TreeItem *>(ring_next(ring, ring_item));
                 }
             } else if (now->type == TREE_ITEM_TYPE_CONTAINER) {
                 /* if this sibling is a container type, descend into the
@@ -780,7 +774,7 @@ static void exclude_region(DisplayChannel *display, Ring *ring, RingItem *ring_i
         SPICE_VERIFY(SPICE_OFFSETOF(TreeItem, siblings_link) == 0);
         /* if this is the last item to check, or if the current ring is
          * completed, don't go any further */
-        while ((last && *last == (TreeItem *)ring_item) ||
+        while ((last && *last == reinterpret_cast<TreeItem *>(ring_item)) ||
                !(ring_item = ring_next(ring, ring_item))) {
             /* we're currently iterating the top ring, so we're done */
             if (ring == top_ring) {
@@ -805,7 +799,7 @@ static bool current_add_with_shadow(DisplayChannel *display, Ring *ring, Drawabl
     ++display->priv->add_with_shadow_count;
 #endif
 
-    RedDrawable *red_drawable = item->red_drawable;
+    RedDrawable *red_drawable = item->red_drawable.get();
     SpicePoint delta = {
         .x = red_drawable->u.copy_bits.src_pos.x - red_drawable->bbox.left,
         .y = red_drawable->u.copy_bits.src_pos.y - red_drawable->bbox.top
@@ -820,7 +814,7 @@ static bool current_add_with_shadow(DisplayChannel *display, Ring *ring, Drawabl
     // for now putting them on root.
 
     // only primary surface streams are supported
-    if (is_primary_surface(display, item->surface_id)) {
+    if (is_primary_surface(display, item->surface)) {
         video_stream_detach_behind(display, &shadow->base.rgn, nullptr);
     }
 
@@ -841,7 +835,7 @@ static bool current_add_with_shadow(DisplayChannel *display, Ring *ring, Drawabl
         region_destroy(&exclude_rgn);
         streams_update_visible_region(display, item);
     } else {
-        if (is_primary_surface(display, item->surface_id)) {
+        if (is_primary_surface(display, item->surface)) {
             video_stream_detach_behind(display, &item->tree_item.base.rgn, item);
         }
     }
@@ -1038,7 +1032,7 @@ static bool current_add(DisplayChannel *display, Ring *ring, Drawable *drawable)
          * video_stream_detach_behind
          */
         current_add_drawable(display, drawable, ring);
-        if (is_primary_surface(display, drawable->surface_id)) {
+        if (is_primary_surface(display, drawable->surface)) {
             video_stream_detach_behind(display, &drawable->tree_item.base.rgn, drawable);
         }
     }
@@ -1049,14 +1043,14 @@ static bool current_add(DisplayChannel *display, Ring *ring, Drawable *drawable)
 
 static bool drawable_can_stream(DisplayChannel *display, Drawable *drawable)
 {
-    RedDrawable *red_drawable = drawable->red_drawable;
+    RedDrawable *red_drawable = drawable->red_drawable.get();
     SpiceImage *image;
 
     if (display->priv->stream_video == SPICE_STREAM_VIDEO_OFF) {
         return FALSE;
     }
 
-    if (!is_primary_surface(display, drawable->surface_id)) {
+    if (!is_primary_surface(display, drawable->surface)) {
         return FALSE;
     }
 
@@ -1114,25 +1108,23 @@ static void display_channel_print_stats(DisplayChannel *display)
 
 static void drawable_ref_surface_deps(DisplayChannel *display, Drawable *drawable)
 {
-    int x;
-    int surface_id;
-    RedSurface *surface;
-
-    for (x = 0; x < 3; ++x) {
-        surface_id = drawable->surface_deps[x];
+    for (int x = 0; x < 3; ++x) {
+        const int surface_id = drawable->red_drawable->surface_deps[x];
         if (surface_id == -1) {
+            drawable->surface_deps[x] = nullptr;
             continue;
         }
-        surface = &display->priv->surfaces[surface_id];
+
+        RedSurface *surface = display->priv->surfaces[surface_id];
         surface->refs++;
+        drawable->surface_deps[x] = surface;
     }
 }
 
-static void surface_read_bits(DisplayChannel *display, int surface_id,
+static void surface_read_bits(DisplayChannel *display, RedSurface *surface,
                               const SpiceRect *area, uint8_t *dest, int dest_stride)
 {
     SpiceCanvas *canvas;
-    RedSurface *surface = &display->priv->surfaces[surface_id];
 
     canvas = surface->context.canvas;
     canvas->ops->read_bits(canvas, dest, dest_stride, area);
@@ -1140,7 +1132,7 @@ static void surface_read_bits(DisplayChannel *display, int surface_id,
 
 static void handle_self_bitmap(DisplayChannel *display, Drawable *drawable)
 {
-    RedDrawable *red_drawable = drawable->red_drawable;
+    RedDrawable *red_drawable = drawable->red_drawable.get();
     SpiceImage *image;
     int32_t width;
     int32_t height;
@@ -1150,7 +1142,7 @@ static void handle_self_bitmap(DisplayChannel *display, Drawable *drawable)
     int bpp;
     int all_set;
 
-    surface = &display->priv->surfaces[drawable->surface_id];
+    surface = drawable->surface;
 
     bpp = SPICE_SURFACE_FMT_DEPTH(surface->context.format) / 8;
     width = red_drawable->self_bitmap_area.right - red_drawable->self_bitmap_area.left;
@@ -1169,17 +1161,18 @@ static void handle_self_bitmap(DisplayChannel *display, Drawable *drawable)
     image->descriptor.height = image->u.bitmap.y = height;
     image->u.bitmap.palette = nullptr;
 
-    dest = (uint8_t *)spice_malloc_n(height, dest_stride);
+    dest = static_cast<uint8_t *>(spice_malloc_n(height, dest_stride));
     image->u.bitmap.data = spice_chunks_new_linear(dest, height * dest_stride);
     image->u.bitmap.data->flags |= SPICE_CHUNKS_FLAGS_FREE;
 
-    display_channel_draw(display, &red_drawable->self_bitmap_area, drawable->surface_id);
-    surface_read_bits(display, drawable->surface_id,
+    display_channel_surface_draw(display, drawable->surface,
+                                 &red_drawable->self_bitmap_area);
+    surface_read_bits(display, drawable->surface,
         &red_drawable->self_bitmap_area, dest, dest_stride);
 
     /* For 32bit non-primary surfaces we need to keep any non-zero
        high bytes as the surface may be used as source to an alpha_blend */
-    if (!is_primary_surface(display, drawable->surface_id) &&
+    if (!is_primary_surface(display, drawable->surface) &&
         image->u.bitmap.format == SPICE_BITMAP_FMT_32BIT &&
         rgb32_data_has_alpha(width, height, dest_stride, dest, &all_set)) {
         if (all_set) {
@@ -1192,17 +1185,13 @@ static void handle_self_bitmap(DisplayChannel *display, Drawable *drawable)
     red_drawable->self_bitmap_image = image;
 }
 
-static void surface_add_reverse_dependency(DisplayChannel *display, int surface_id,
-                                             DependItem *depend_item, Drawable *drawable)
+static void surface_add_reverse_dependency(DisplayChannel *display, RedSurface *surface,
+                                           DependItem *depend_item, Drawable *drawable)
 {
-    RedSurface *surface;
-
-    if (surface_id == -1) {
+    if (!surface) {
         depend_item->drawable = nullptr;
         return;
     }
-
-    surface = &display->priv->surfaces[surface_id];
 
     depend_item->drawable = drawable;
     ring_add(&surface->depend_on_me, &depend_item->ring_item);
@@ -1215,11 +1204,11 @@ static bool handle_surface_deps(DisplayChannel *display, Drawable *drawable)
     for (x = 0; x < 3; ++x) {
         // surface self dependency is handled by shadows in "current", or by
         // handle_self_bitmap
-        if (drawable->surface_deps[x] != drawable->surface_id) {
+        if (drawable->surface_deps[x] != drawable->surface) {
             surface_add_reverse_dependency(display, drawable->surface_deps[x],
                                       &drawable->depend_items[x], drawable);
 
-            if (drawable->surface_deps[x] == 0) {
+            if (drawable->surface_deps[x] && drawable->surface_deps[x]->id == 0) {
                 QRegion depend_region;
                 region_init(&depend_region);
                 region_add(&depend_region, &drawable->red_drawable->surfaces_rects[x]);
@@ -1231,33 +1220,31 @@ static bool handle_surface_deps(DisplayChannel *display, Drawable *drawable)
     return TRUE;
 }
 
-static void draw_depend_on_me(DisplayChannel *display, uint32_t surface_id)
+static void draw_depend_on_me(DisplayChannel *display, RedSurface *surface)
 {
-    RedSurface *surface;
     RingItem *ring_item;
-
-    surface = &display->priv->surfaces[surface_id];
 
     while ((ring_item = ring_get_tail(&surface->depend_on_me))) {
         Drawable *drawable;
         DependItem *depended_item = SPICE_CONTAINEROF(ring_item, DependItem, ring_item);
         drawable = depended_item->drawable;
-        display_channel_draw(display, &drawable->red_drawable->bbox, drawable->surface_id);
+        display_channel_surface_draw(display, drawable->surface,
+                                     &drawable->red_drawable->bbox);
     }
 }
 
 static bool validate_drawable_bbox(DisplayChannel *display, RedDrawable *drawable)
 {
         DrawContext *context;
-        uint32_t surface_id = drawable->surface_id;
 
         /* surface_id must be validated before calling into
          * validate_drawable_bbox
          */
-        if (!display_channel_validate_surface(display, drawable->surface_id)) {
+        RedSurface *surface = display_channel_validate_surface(display, drawable->surface_id);
+        if (!surface) {
             return FALSE;
         }
-        context = &display->priv->surfaces[surface_id].context;
+        context = &surface->context;
 
         if (drawable->bbox.top < 0)
                 return FALSE;
@@ -1283,21 +1270,19 @@ static bool validate_drawable_bbox(DisplayChannel *display, RedDrawable *drawabl
  * @return initialized Drawable or NULL on failure
  */
 static Drawable *display_channel_get_drawable(DisplayChannel *display, uint8_t effect,
-                                              RedDrawable *red_drawable,
+                                              red::shared_ptr<RedDrawable> &&red_drawable,
                                               uint32_t process_commands_generation)
 {
     Drawable *drawable;
-    int x;
 
     /* Validate all surface ids before updating counters
      * to avoid invalid updates if we find an invalid id.
      */
-    if (!validate_drawable_bbox(display, red_drawable)) {
+    if (!validate_drawable_bbox(display, red_drawable.get())) {
         return nullptr;
     }
-    for (x = 0; x < 3; ++x) {
-        if (red_drawable->surface_deps[x] != -1
-            && !display_channel_validate_surface(display, red_drawable->surface_deps[x])) {
+    for (const auto surface_id : red_drawable->surface_deps) {
+        if (surface_id != -1 && !display_channel_validate_surface(display, surface_id)) {
             return nullptr;
         }
     }
@@ -1308,12 +1293,12 @@ static Drawable *display_channel_get_drawable(DisplayChannel *display, uint8_t e
     }
 
     drawable->tree_item.effect = effect;
-    drawable->red_drawable = red_drawable_ref(red_drawable);
 
-    drawable->surface_id = red_drawable->surface_id;
-    display->priv->surfaces[drawable->surface_id].refs++;
+    drawable->surface = display->priv->surfaces[red_drawable->surface_id];
+    drawable->surface->refs++;
 
-    memcpy(drawable->surface_deps, red_drawable->surface_deps, sizeof(drawable->surface_deps));
+    drawable->red_drawable = red_drawable;
+
     /*
         surface->refs is affected by a drawable (that is
         dependent on the surface) as long as the drawable is alive.
@@ -1331,8 +1316,7 @@ static Drawable *display_channel_get_drawable(DisplayChannel *display, uint8_t e
  */
 static void display_channel_add_drawable(DisplayChannel *display, Drawable *drawable)
 {
-    int surface_id = drawable->surface_id;
-    RedDrawable *red_drawable = drawable->red_drawable;
+    RedDrawable *red_drawable = drawable->red_drawable.get();
 
     red_drawable->mm_time = reds_get_mm_time();
 
@@ -1355,13 +1339,13 @@ static void display_channel_add_drawable(DisplayChannel *display, Drawable *draw
         handle_self_bitmap(display, drawable);
     }
 
-    draw_depend_on_me(display, surface_id);
+    draw_depend_on_me(display, drawable->surface);
 
     if (!handle_surface_deps(display, drawable)) {
         return;
     }
 
-    Ring *ring = &display->priv->surfaces[surface_id].current;
+    Ring *ring = &drawable->surface->current;
     int add_to_pipe;
     if (has_shadow(red_drawable)) {
         add_to_pipe = current_add_with_shadow(display, ring, drawable);
@@ -1379,11 +1363,12 @@ static void display_channel_add_drawable(DisplayChannel *display, Drawable *draw
 #endif
 }
 
-void display_channel_process_draw(DisplayChannel *display, RedDrawable *red_drawable,
+void display_channel_process_draw(DisplayChannel *display,
+                                  red::shared_ptr<RedDrawable> &&red_drawable,
                                   uint32_t process_commands_generation)
 {
     Drawable *drawable =
-        display_channel_get_drawable(display, red_drawable->effect, red_drawable,
+        display_channel_get_drawable(display, red_drawable->effect, std::move(red_drawable),
                                      process_commands_generation);
 
     if (!drawable) {
@@ -1409,7 +1394,7 @@ bool display_channel_wait_for_migrate_data(DisplayChannel *display)
     spice_debug("trace");
     spice_warn_if_fail(g_list_length(clients) == 1);
 
-    rcc = (RedChannelClient*) g_list_nth_data(clients, 0);
+    rcc = static_cast<RedChannelClient *>(g_list_nth_data(clients, 0));
 
     red::shared_ptr<RedChannelClient> hold_rcc(rcc);
     for (;;) {
@@ -1434,11 +1419,9 @@ bool display_channel_wait_for_migrate_data(DisplayChannel *display)
 
 void display_channel_flush_all_surfaces(DisplayChannel *display)
 {
-    int x;
-
-    for (x = 0; x < NUM_SURFACES; ++x) {
-        if (display->priv->surfaces[x].context.canvas) {
-            display_channel_current_flush(display, x);
+    for (const auto& surface : display->priv->surfaces) {
+        if (surface) {
+            display_channel_current_flush(display, surface);
         }
     }
 }
@@ -1487,12 +1470,12 @@ static bool free_one_drawable(DisplayChannel *display, int force_glz_free)
     return TRUE;
 }
 
-void display_channel_current_flush(DisplayChannel *display, int surface_id)
+void display_channel_current_flush(DisplayChannel *display, RedSurface *surface)
 {
-    while (!ring_is_empty(&display->priv->surfaces[surface_id].current_list)) {
+    while (!ring_is_empty(&surface->current_list)) {
         free_one_drawable(display, FALSE);
     }
-    current_remove_all(display, surface_id);
+    current_remove_all(display, surface);
 }
 
 void display_channel_free_some(DisplayChannel *display)
@@ -1525,32 +1508,35 @@ void display_channel_free_some(DisplayChannel *display)
 
 static Drawable* drawable_try_new(DisplayChannel *display)
 {
-    Drawable *drawable;
-
     if (!display->priv->free_drawables)
         return nullptr;
 
-    drawable = &display->priv->free_drawables->u.drawable;
+    void *buf = display->priv->free_drawables->u.raw_drawable;
     display->priv->free_drawables = display->priv->free_drawables->u.next;
     display->priv->drawable_count++;
 
-    return drawable;
+    memset(buf, 0, sizeof(display->priv->free_drawables->u.raw_drawable));
+    return new(buf) Drawable();
 }
 
 static void drawable_free(DisplayChannel *display, Drawable *drawable)
 {
-    ((_Drawable *)drawable)->u.next = display->priv->free_drawables;
-    display->priv->free_drawables = (_Drawable *)drawable;
+    drawable->~Drawable();
+    reinterpret_cast<_Drawable *>(drawable)->u.next = display->priv->free_drawables;
+    display->priv->free_drawables = reinterpret_cast<_Drawable *>(drawable);
+    display->priv->drawable_count--;
 }
 
+// initialize Drawable memory pool
 static void drawables_init(DisplayChannel *display)
 {
-    int i;
+    _Drawable *curr = nullptr;
 
-    display->priv->free_drawables = nullptr;
-    for (i = 0; i < NUM_DRAWABLES; i++) {
-        drawable_free(display, &display->priv->drawables[i].u.drawable);
+    for (auto& drawable : display->priv->drawables) {
+        drawable.u.next = curr;
+        curr = &drawable;
     }
+    display->priv->free_drawables = curr;
 }
 
 /**
@@ -1568,7 +1554,6 @@ static Drawable *display_channel_drawable_try_new(DisplayChannel *display,
             return nullptr;
     }
 
-    memset(drawable, 0, sizeof(Drawable));
     /* Pointer to the display from which the drawable is allocated.  This
      * pointer is safe to be retained as DisplayChannel lifespan is bigger than
      * all drawables.  */
@@ -1598,11 +1583,10 @@ static void depended_item_remove(DependItem *item)
 static void drawable_remove_dependencies(Drawable *drawable)
 {
     int x;
-    int surface_id;
 
     for (x = 0; x < 3; ++x) {
-        surface_id = drawable->surface_deps[x];
-        if (surface_id != -1 && drawable->depend_items[x].drawable) {
+        RedSurface* surface = drawable->surface_deps[x];
+        if (surface && drawable->depend_items[x].drawable) {
             depended_item_remove(&drawable->depend_items[x]);
         }
     }
@@ -1610,15 +1594,11 @@ static void drawable_remove_dependencies(Drawable *drawable)
 
 static void drawable_unref_surface_deps(DisplayChannel *display, Drawable *drawable)
 {
-    int x;
-    int surface_id;
-
-    for (x = 0; x < 3; ++x) {
-        surface_id = drawable->surface_deps[x];
-        if (surface_id == -1) {
+    for (const auto surface : drawable->surface_deps) {
+        if (surface == nullptr) {
             continue;
         }
-        display_channel_surface_unref(display, surface_id);
+        display_channel_surface_unref(display, surface);
     }
 }
 
@@ -1639,27 +1619,23 @@ void drawable_unref(Drawable *drawable)
 
     drawable_remove_dependencies(drawable);
     drawable_unref_surface_deps(display, drawable);
-    display_channel_surface_unref(display, drawable->surface_id);
+    display_channel_surface_unref(display, drawable->surface);
 
     glz_retention_detach_drawables(&drawable->glz_retention);
 
-    if (drawable->red_drawable) {
-        red_drawable_unref(drawable->red_drawable);
-    }
     drawable_free(display, drawable);
-    display->priv->drawable_count--;
 }
 
 static void drawable_deps_draw(DisplayChannel *display, Drawable *drawable)
 {
     int x;
-    int surface_id;
 
     for (x = 0; x < 3; ++x) {
-        surface_id = drawable->surface_deps[x];
-        if (surface_id != -1 && drawable->depend_items[x].drawable) {
+        RedSurface *surface = drawable->surface_deps[x];
+        if (surface && drawable->depend_items[x].drawable) {
             depended_item_remove(&drawable->depend_items[x]);
-            display_channel_draw(display, &drawable->red_drawable->surfaces_rects[x], surface_id);
+            display_channel_surface_draw(display, surface,
+                                         &drawable->red_drawable->surfaces_rects[x]);
         }
     }
 }
@@ -1672,7 +1648,7 @@ static void drawable_draw(DisplayChannel *display, Drawable *drawable)
 
     drawable_deps_draw(display, drawable);
 
-    surface = &display->priv->surfaces[drawable->surface_id];
+    surface = drawable->surface;
     canvas = surface->context.canvas;
     spice_return_if_fail(canvas);
 
@@ -1808,7 +1784,7 @@ static void surface_update_dest(RedSurface *surface, const SpiceRect *area)
 {
     SpiceCanvas *canvas = surface->context.canvas;
     int stride = surface->context.stride;
-    auto line_0 = (uint8_t*) surface->context.line_0;
+    auto line_0 = static_cast<uint8_t *>(surface->context.line_0);
 
     if (surface->context.canvas_draws_on_surface)
         return;
@@ -1881,10 +1857,9 @@ static Drawable* current_find_intersects_rect(Ring *current, RingItem *from,
  * than 'last' (exclusive).
  * FIXME: merge with display_channel_draw()?
  */
-void display_channel_draw_until(DisplayChannel *display, const SpiceRect *area, int surface_id,
-                               Drawable *last)
+void display_channel_draw_until(DisplayChannel *display, const SpiceRect *area, RedSurface *surface,
+                                Drawable *last)
 {
-    RedSurface *surface;
     Drawable *surface_last = nullptr;
     Ring *ring;
     RingItem *ring_item;
@@ -1893,15 +1868,13 @@ void display_channel_draw_until(DisplayChannel *display, const SpiceRect *area, 
     spice_return_if_fail(last);
     spice_return_if_fail(ring_item_is_linked(&last->list_link));
 
-    surface = &display->priv->surfaces[surface_id];
-
-    if (surface_id != last->surface_id) {
+    if (surface != last->surface) {
         // find the nearest older drawable from the appropriate surface
         ring = &display->priv->current_list;
         ring_item = &last->list_link;
         while ((ring_item = ring_next(ring, ring_item))) {
             now = SPICE_CONTAINEROF(ring_item, Drawable, list_link);
-            if (now->surface_id == surface_id) {
+            if (now->surface == surface) {
                 surface_last = now;
                 break;
             }
@@ -1928,14 +1901,21 @@ void display_channel_draw_until(DisplayChannel *display, const SpiceRect *area, 
 void display_channel_draw(DisplayChannel *display, const SpiceRect *area, int surface_id)
 {
     RedSurface *surface;
-    Drawable *last;
 
-    spice_return_if_fail(surface_id >= 0 && surface_id < NUM_SURFACES);
+    spice_return_if_fail(surface_id >= 0 && surface_id < display->priv->surfaces.size());
     spice_return_if_fail(area);
     spice_return_if_fail(area->left >= 0 && area->top >= 0 &&
                          area->left < area->right && area->top < area->bottom);
 
-    surface = &display->priv->surfaces[surface_id];
+    surface = display->priv->surfaces[surface_id];
+
+    display_channel_surface_draw(display, surface, area);
+}
+
+static void display_channel_surface_draw(DisplayChannel *display, RedSurface *surface,
+                                         const SpiceRect *area)
+{
+    Drawable *last;
 
     last = current_find_intersects_rect(&surface->current_list, nullptr, area);
     if (last)
@@ -1965,18 +1945,17 @@ void display_channel_update(DisplayChannel *display,
                             QXLRect **qxl_dirty_rects, uint32_t *num_dirty_rects)
 {
     SpiceRect rect;
-    RedSurface *surface;
 
     // Check that the request is valid, the surface_id comes directly from the guest
-    if (!display_channel_validate_surface(display, surface_id)) {
+    RedSurface *surface = display_channel_validate_surface(display, surface_id);
+    if (!surface) {
         // just return, display_channel_validate_surface already logged a warning
         return;
     }
 
     red_get_rect_ptr(&rect, area);
-    display_channel_draw(display, &rect, surface_id);
+    display_channel_surface_draw(display, surface, &rect);
 
-    surface = &display->priv->surfaces[surface_id];
     if (*qxl_dirty_rects == nullptr) {
         *num_dirty_rects = pixman_region32_n_rects(&surface->draw_dirty_region);
         *qxl_dirty_rects = g_new0(QXLRect, *num_dirty_rects);
@@ -1987,60 +1966,58 @@ void display_channel_update(DisplayChannel *display,
         region_clear(&surface->draw_dirty_region);
 }
 
-static void clear_surface_drawables_from_pipes(DisplayChannel *display, int surface_id,
+static void clear_surface_drawables_from_pipes(DisplayChannel *display, RedSurface *surface,
                                                int wait_if_used)
 {
     DisplayChannelClient *dcc;
 
     FOREACH_DCC(display, dcc) {
-        if (!dcc_clear_surface_drawables_from_pipe(dcc, surface_id, wait_if_used)) {
+        if (!dcc_clear_surface_drawables_from_pipe(dcc, surface, wait_if_used)) {
             dcc->disconnect();
         }
     }
 }
 
 /* TODO: cleanup/refactor destroy functions */
-static void display_channel_destroy_surface(DisplayChannel *display, uint32_t surface_id)
+static void display_channel_destroy_surface(DisplayChannel *display, RedSurface *surface)
 {
-    draw_depend_on_me(display, surface_id);
+    draw_depend_on_me(display, surface);
     /* note that draw_depend_on_me must be called before current_remove_all.
        otherwise "current" will hold items that other drawables may depend on, and then
        current_remove_all will remove them from the pipe. */
-    current_remove_all(display, surface_id);
-    clear_surface_drawables_from_pipes(display, surface_id, FALSE);
-    display_channel_surface_unref(display, surface_id);
+    current_remove_all(display, surface);
+    clear_surface_drawables_from_pipes(display, surface, false);
+    display_channel_surface_unref(display, surface);
 }
 
 void display_channel_destroy_surface_wait(DisplayChannel *display, uint32_t surface_id)
 {
-    if (!display_channel_validate_surface(display, surface_id))
+    RedSurface *surface = display_channel_validate_surface(display, surface_id);
+    if (!surface) {
         return;
-    if (!display->priv->surfaces[surface_id].context.canvas)
-        return;
+    }
 
-    draw_depend_on_me(display, surface_id);
+    draw_depend_on_me(display, surface);
     /* note that draw_depend_on_me must be called before current_remove_all.
        otherwise "current" will hold items that other drawables may depend on, and then
        current_remove_all will remove them from the pipe. */
-    current_remove_all(display, surface_id);
-    clear_surface_drawables_from_pipes(display, surface_id, TRUE);
+    current_remove_all(display, surface);
+    clear_surface_drawables_from_pipes(display, surface, true);
 }
 
 /* called upon device reset */
 /* TODO: split me*/
 void display_channel_destroy_surfaces(DisplayChannel *display)
 {
-    int i;
-
     spice_debug("trace");
     //to handle better
-    for (i = 0; i < NUM_SURFACES; ++i) {
-        if (display->priv->surfaces[i].context.canvas) {
-            display_channel_destroy_surface_wait(display, i);
-            if (display->priv->surfaces[i].context.canvas) {
-                display_channel_surface_unref(display, i);
+    for (auto& surface : display->priv->surfaces) {
+        if (surface) {
+            display_channel_destroy_surface_wait(display, surface->id);
+            if (surface) {
+                display_channel_surface_unref(display, surface);
+                surface = nullptr;
             }
-            spice_assert(!display->priv->surfaces[i].context.canvas);
         }
     }
     spice_warn_if_fail(ring_is_empty(&display->priv->streams));
@@ -2053,14 +2030,15 @@ void display_channel_destroy_surfaces(DisplayChannel *display)
     display_channel_free_glz_drawables(display);
 }
 
-static void send_create_surface(DisplayChannel *display, int surface_id, int image_ready)
+static void send_create_surface(DisplayChannel *display, RedSurface *surface, int image_ready)
 {
     DisplayChannelClient *dcc;
 
     FOREACH_DCC(display, dcc) {
-        dcc_create_surface(dcc, surface_id);
-        if (image_ready)
-            dcc_push_surface_image(dcc, surface_id);
+        dcc_create_surface(dcc, surface);
+        if (image_ready) {
+            dcc_push_surface_image(dcc, surface);
+        }
     }
 }
 
@@ -2071,9 +2049,10 @@ create_canvas_for_surface(DisplayChannel *display, RedSurface *surface, uint32_t
 
     switch (renderer) {
     case RED_RENDERER_SW:
-        canvas = canvas_create_for_data(surface->context.width, surface->context.height, surface->context.format,
-                                        (uint8_t*) surface->context.line_0, surface->context.stride,
-                                        &display->priv->image_cache.base,
+        canvas = canvas_create_for_data(surface->context.width, surface->context.height,
+                                        surface->context.format,
+                                        static_cast<uint8_t *>(surface->context.line_0),
+                                        surface->context.stride, &display->priv->image_cache.base,
                                         &display->priv->image_surfaces, nullptr, nullptr, nullptr);
         surface->context.top_down = TRUE;
         surface->context.canvas_draws_on_surface = TRUE;
@@ -2085,13 +2064,14 @@ create_canvas_for_surface(DisplayChannel *display, RedSurface *surface, uint32_t
     return nullptr;
 }
 
-void display_channel_create_surface(DisplayChannel *display, uint32_t surface_id, uint32_t width,
-                                    uint32_t height, int32_t stride, uint32_t format,
-                                    void *line_0, int data_is_valid, int send_client)
+RedSurface*
+display_channel_create_surface(DisplayChannel *display, uint32_t surface_id, uint32_t width,
+                               uint32_t height, int32_t stride, uint32_t format,
+                               void *line_0, int data_is_valid, int send_client)
 {
-    RedSurface *surface = &display->priv->surfaces[surface_id];
+    RedSurface *surface = new RedSurface;
 
-    spice_warn_if_fail(!surface->context.canvas);
+    spice_warn_if_fail(!display->priv->surfaces[surface_id]);
 
     surface->context.canvas_draws_on_surface = FALSE;
     surface->context.width = width;
@@ -2100,19 +2080,16 @@ void display_channel_create_surface(DisplayChannel *display, uint32_t surface_id
     surface->context.stride = stride;
     surface->context.line_0 = line_0;
     if (!data_is_valid) {
-        auto data = (char*) line_0;
+        auto data = static_cast<char *>(line_0);
         if (stride < 0) {
             data -= abs(stride) * (height - 1);
         }
         memset(data, 0, height*abs(stride));
     }
-    g_warn_if_fail(surface->create_cmd == nullptr);
-    g_warn_if_fail(surface->destroy_cmd == nullptr);
-    ring_init(&surface->current);
-    ring_init(&surface->current_list);
-    ring_init(&surface->depend_on_me);
-    region_init(&surface->draw_dirty_region);
+    g_warn_if_fail(!surface->create_cmd);
+    g_warn_if_fail(!surface->destroy_cmd);
     surface->refs = 1;
+    surface->id = surface_id;
 
     if (display->priv->renderer == RED_RENDERER_INVALID) {
         int i;
@@ -2130,9 +2107,26 @@ void display_channel_create_surface(DisplayChannel *display, uint32_t surface_id
         surface->context.canvas = create_canvas_for_surface(display, surface, display->priv->renderer);
     }
 
-    spice_return_if_fail(surface->context.canvas);
-    if (send_client)
-        send_create_surface(display, surface_id, data_is_valid);
+    if (!surface->context.canvas) {
+        delete surface;
+        return nullptr;
+    }
+
+    // finish initialization
+    ring_init(&surface->current);
+    ring_init(&surface->current_list);
+    ring_init(&surface->depend_on_me);
+    region_init(&surface->draw_dirty_region);
+
+    if (display->priv->surfaces[surface_id]) {
+        display_channel_surface_unref(display, display->priv->surfaces[surface_id]);
+    }
+    display->priv->surfaces[surface_id] = surface;
+
+    if (send_client) {
+        send_create_surface(display, surface, data_is_valid);
+    }
+    return surface;
 }
 
 void DisplayChannelClient::handle_migrate_flush_mark()
@@ -2147,7 +2141,8 @@ bool DisplayChannelClient::handle_migrate_data_get_serial(uint32_t size, void *m
 {
     SpiceMigrateDataDisplay *migrate_data;
 
-    migrate_data = (SpiceMigrateDataDisplay *)((uint8_t *)message + sizeof(SpiceMigrateDataHeader));
+    migrate_data = reinterpret_cast<SpiceMigrateDataDisplay *>(static_cast<uint8_t *>(message) +
+                                                               sizeof(SpiceMigrateDataHeader));
 
     serial = migrate_data->message_serial;
     return true;
@@ -2158,9 +2153,9 @@ static SpiceCanvas *image_surfaces_get(SpiceImageSurfaces *surfaces, uint32_t su
     DisplayChannelPrivate *p = SPICE_CONTAINEROF(surfaces, DisplayChannelPrivate, image_surfaces);
     DisplayChannel *display = p->pub;
 
-    spice_return_val_if_fail(display_channel_validate_surface(display, surface_id), NULL);
+    auto surface = display_channel_validate_surface(display, surface_id);
 
-    return p->surfaces[surface_id].context.canvas;
+    return surface ? surface->context.canvas : nullptr;
 }
 
 red::shared_ptr<DisplayChannel>
@@ -2195,7 +2190,7 @@ DisplayChannel::DisplayChannel(RedsState *reds,
         image_surfaces_get,
     };
 
-    priv->n_surfaces = MIN(n_surfaces, NUM_SURFACES);
+    priv->n_surfaces = MIN(n_surfaces, priv->surfaces.size());
     priv->qxl = qxl;
 
     /* must be manually allocated here since g_type_class_add_private() only
@@ -2238,8 +2233,8 @@ DisplayChannel::DisplayChannel(RedsState *reds,
 }
 
 void display_channel_process_surface_cmd(DisplayChannel *display,
-                                         RedSurfaceCmd *surface_cmd,
-                                         int loadvm)
+                                         red::shared_ptr<const RedSurfaceCmd> &&surface_cmd,
+                                         bool loadvm)
 {
     uint32_t surface_id;
     RedSurface *surface;
@@ -2250,7 +2245,7 @@ void display_channel_process_surface_cmd(DisplayChannel *display,
         return;
     }
 
-    surface = &display->priv->surfaces[surface_id];
+    surface = display->priv->surfaces[surface_id];
 
     switch (surface_cmd->type) {
     case QXL_SURFACE_CMD_CREATE: {
@@ -2259,7 +2254,7 @@ void display_channel_process_surface_cmd(DisplayChannel *display,
         int32_t stride = create->stride;
         int reloaded_surface = loadvm || (surface_cmd->flags & QXL_SURF_FLAG_KEEP_DATA);
 
-        if (surface->refs) {
+        if (surface) {
             spice_warning("avoiding creating a surface twice");
             break;
         }
@@ -2267,23 +2262,26 @@ void display_channel_process_surface_cmd(DisplayChannel *display,
         if (stride < 0) {
             /* No need to worry about overflow here, command should already be validated
              * when it is read, specifically red_get_surface_cmd */
-            data -= (int32_t)(stride * (height - 1));
+            data -= static_cast<int32_t>(stride * (height - 1));
         }
-        display_channel_create_surface(display, surface_id, create->width,
-                                       height, stride, create->format, data,
-                                       reloaded_surface,
-                                       // reloaded surfaces will be sent on demand
-                                       !reloaded_surface);
-        surface->create_cmd = red_surface_cmd_ref(surface_cmd);
+        surface = display_channel_create_surface(display, surface_id, create->width,
+                                                 height, stride, create->format, data,
+                                                 reloaded_surface,
+                                                 // reloaded surfaces will be sent on demand
+                                                 !reloaded_surface);
+        if (surface) {
+            surface->create_cmd = surface_cmd;
+        }
         break;
     }
     case QXL_SURFACE_CMD_DESTROY:
-        if (!surface->refs) {
+        if (!surface) {
             spice_warning("avoiding destroying a surface twice");
             break;
         }
-        surface->destroy_cmd = red_surface_cmd_ref(surface_cmd);
-        display_channel_destroy_surface(display, surface_id);
+        surface->destroy_cmd = surface_cmd;
+        display_channel_destroy_surface(display, surface);
+        display->priv->surfaces[surface_id] = nullptr;
         break;
     default:
         spice_warn_if_reached();
@@ -2338,7 +2336,7 @@ void display_channel_gl_draw_done(DisplayChannel *display)
 
 int display_channel_get_video_stream_id(DisplayChannel *display, VideoStream *stream)
 {
-    return (int)(stream - display->priv->streams_buf);
+    return static_cast<int>(stream - display->priv->streams_buf.data());
 }
 
 VideoStream *display_channel_get_nth_video_stream(DisplayChannel *display, gint i)
@@ -2346,19 +2344,19 @@ VideoStream *display_channel_get_nth_video_stream(DisplayChannel *display, gint 
     return &display->priv->streams_buf[i];
 }
 
-gboolean display_channel_validate_surface(DisplayChannel *display, uint32_t surface_id)
+RedSurface *display_channel_validate_surface(DisplayChannel *display, uint32_t surface_id)
 {
     if SPICE_UNLIKELY(surface_id >= display->priv->n_surfaces) {
         spice_warning("invalid surface_id %u", surface_id);
-        return FALSE;
+        return nullptr;
     }
-    if (!display->priv->surfaces[surface_id].context.canvas) {
-        spice_warning("canvas address is %p for %d (and is NULL)",
-                   &(display->priv->surfaces[surface_id].context.canvas), surface_id);
-        spice_warning("failed on %d", surface_id);
-        return FALSE;
+
+    RedSurface *surface = display->priv->surfaces[surface_id];
+    if (!surface) {
+        spice_warning("surface %d is NULL", surface_id);
+        return nullptr;
     }
-    return TRUE;
+    return surface;
 }
 
 void display_channel_push_monitors_config(DisplayChannel *display)
@@ -2386,17 +2384,19 @@ void display_channel_update_monitors_config(DisplayChannel *display,
 
 void display_channel_set_monitors_config_to_primary(DisplayChannel *display)
 {
-    DrawContext *context = &display->priv->surfaces[0].context;
-    QXLHead head = { 0, };
-    uint16_t old_max = 1;
+    RedSurface *surface = display_channel_validate_surface(display, 0);
 
-    spice_return_if_fail(display->priv->surfaces[0].context.canvas);
+    spice_return_if_fail(surface);
+
+    DrawContext *context = &surface->context;
+    uint16_t old_max = 1;
 
     if (display->priv->monitors_config) {
         old_max = display->priv->monitors_config->max_allowed;
         monitors_config_unref(display->priv->monitors_config);
     }
 
+    QXLHead head = { 0, };
     head.width = context->width;
     head.height = context->height;
     display->priv->monitors_config = monitors_config_new(&head, 1, old_max);
@@ -2419,10 +2419,9 @@ void display_channel_debug_oom(DisplayChannel *display, const char *msg)
 
 static void guest_set_client_capabilities(DisplayChannel *display)
 {
-    int i;
     RedChannelClient *rcc;
     uint8_t caps[SPICE_CAPABILITIES_SIZE] = { 0 };
-    int caps_available[] = {
+    const int caps_available[] = {
         SPICE_DISPLAY_CAP_SIZED_STREAM,
         SPICE_DISPLAY_CAP_MONITORS_CONFIG,
         SPICE_DISPLAY_CAP_COMPOSITE,
@@ -2446,13 +2445,14 @@ static void guest_set_client_capabilities(DisplayChannel *display)
         red_qxl_set_client_capabilities(display->priv->qxl, FALSE, caps);
     } else {
         // Take least common denominator
-        for (i = 0 ; i < SPICE_N_ELEMENTS(caps_available); ++i) {
-            SET_CAP(caps, caps_available[i]);
+        for (const auto cap : caps_available) {
+            SET_CAP(caps, cap);
         }
         FOREACH_CLIENT(display, rcc) {
-            for (i = 0 ; i < SPICE_N_ELEMENTS(caps_available); ++i) {
-                if (!rcc->test_remote_cap(caps_available[i]))
-                    CLEAR_CAP(caps, caps_available[i]);
+            for (const auto cap : caps_available) {
+                if (!rcc->test_remote_cap(cap)) {
+                    CLEAR_CAP(caps, cap);
+                }
             }
         }
         red_qxl_set_client_capabilities(display->priv->qxl, TRUE, caps);

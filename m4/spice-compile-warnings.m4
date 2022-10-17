@@ -10,12 +10,7 @@ AC_DEFUN([SPICE_COMPILE_WARNINGS],[
     AC_ARG_ENABLE([werror],
                   AS_HELP_STRING([--enable-werror], [Use -Werror (if supported)]),
                   [set_werror="$enableval"],
-                  [if test -d $srcdir/.git; then
-                     is_git_version=true
-                     set_werror=yes
-                   else
-                     set_werror=no
-                   fi])
+                  [set_werror=no])
 
     # List of warnings that are not relevant / wanted
 
@@ -162,6 +157,7 @@ AC_DEFUN([SPICE_COMPILE_WARNINGS],[
 
     # -Wno-array-bounds to avoid checks for array with 0 size
     gl_WARN_ADD([-Wno-array-bounds])
+    gl_WARN_ADD([-Wno-stringop-overflow])
 
     # -Wno-narrowing to allow cast from -1 to unsigned (used in some initialization)
     gl_WARN_ADD([-Wno-narrowing])

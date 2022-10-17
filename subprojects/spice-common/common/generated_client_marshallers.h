@@ -26,36 +26,36 @@
 SPICE_BEGIN_DECLS
 
 typedef struct {
-    void (*msgc_ack_sync)(SpiceMarshaller *m, SpiceMsgcAckSync *msg);
-    void (*msg_SpiceMsgEmpty)(SpiceMarshaller *m, SpiceMsgEmpty *msg);
-    void (*msgc_pong)(SpiceMarshaller *m, SpiceMsgPing *msg);
-    void (*msg_SpiceMsgData)(SpiceMarshaller *m, SpiceMsgData *msg);
-    void (*msgc_disconnecting)(SpiceMarshaller *m, SpiceMsgDisconnect *msg);
-    void (*msgc_main_client_info)(SpiceMarshaller *m, SpiceMsgcClientInfo *msg);
-    void (*msgc_main_mouse_mode_request)(SpiceMarshaller *m, SpiceMsgcMainMouseModeRequest *msg);
-    void (*msgc_main_agent_start)(SpiceMarshaller *m, SpiceMsgMainAgentTokens *msg);
-    void (*msgc_main_agent_token)(SpiceMarshaller *m, SpiceMsgMainAgentTokens *msg);
-    void (*msgc_main_migrate_dst_do_seamless)(SpiceMarshaller *m, SpiceMsgcMainMigrateDstDoSeamless *msg);
-    void (*msgc_display_init)(SpiceMarshaller *m, SpiceMsgcDisplayInit *msg);
-    void (*msgc_display_stream_report)(SpiceMarshaller *m, SpiceMsgcDisplayStreamReport *msg);
-    void (*msgc_display_preferred_compression)(SpiceMarshaller *m, SpiceMsgcDisplayPreferredCompression *msg);
-    void (*msgc_display_gl_draw_done)(SpiceMarshaller *m, SpiceMsgcDisplayGlDrawDone *msg);
-    void (*msgc_display_preferred_video_codec_type)(SpiceMarshaller *m, SpiceMsgcDisplayPreferredVideoCodecType *msg);
-    void (*msgc_inputs_key_down)(SpiceMarshaller *m, SpiceMsgcKeyDown *msg);
-    void (*msgc_inputs_key_up)(SpiceMarshaller *m, SpiceMsgcKeyUp *msg);
-    void (*msgc_inputs_key_modifiers)(SpiceMarshaller *m, SpiceMsgcKeyModifiers *msg);
-    void (*msgc_inputs_mouse_motion)(SpiceMarshaller *m, SpiceMsgcMouseMotion *msg);
-    void (*msgc_inputs_mouse_position)(SpiceMarshaller *m, SpiceMsgcMousePosition *msg);
-    void (*msgc_inputs_mouse_press)(SpiceMarshaller *m, SpiceMsgcMousePress *msg);
-    void (*msgc_inputs_mouse_release)(SpiceMarshaller *m, SpiceMsgcMouseRelease *msg);
-    void (*msgc_record_data)(SpiceMarshaller *m, SpiceMsgPlaybackPacket *msg);
-    void (*msgc_record_mode)(SpiceMarshaller *m, SpiceMsgPlaybackMode *msg);
-    void (*msgc_record_start_mark)(SpiceMarshaller *m, SpiceMsgcRecordStartMark *msg);
+    void (*msgc_ack_sync)(SpiceMarshaller *m, const SpiceMsgcAckSync *msg);
+    void (*msg_SpiceMsgEmpty)(SpiceMarshaller *m, const SpiceMsgEmpty *msg);
+    void (*msgc_pong)(SpiceMarshaller *m, const SpiceMsgPing *msg);
+    void (*msg_SpiceMsgData)(SpiceMarshaller *m, const SpiceMsgData *msg);
+    void (*msgc_disconnecting)(SpiceMarshaller *m, const SpiceMsgDisconnect *msg);
+    void (*msgc_main_client_info)(SpiceMarshaller *m, const SpiceMsgcClientInfo *msg);
+    void (*msgc_main_mouse_mode_request)(SpiceMarshaller *m, const SpiceMsgcMainMouseModeRequest *msg);
+    void (*msgc_main_agent_start)(SpiceMarshaller *m, const SpiceMsgMainAgentTokens *msg);
+    void (*msgc_main_agent_token)(SpiceMarshaller *m, const SpiceMsgMainAgentTokens *msg);
+    void (*msgc_main_migrate_dst_do_seamless)(SpiceMarshaller *m, const SpiceMsgcMainMigrateDstDoSeamless *msg);
+    void (*msgc_display_init)(SpiceMarshaller *m, const SpiceMsgcDisplayInit *msg);
+    void (*msgc_display_stream_report)(SpiceMarshaller *m, const SpiceMsgcDisplayStreamReport *msg);
+    void (*msgc_display_preferred_compression)(SpiceMarshaller *m, const SpiceMsgcDisplayPreferredCompression *msg);
+    void (*msgc_display_gl_draw_done)(SpiceMarshaller *m, const SpiceMsgcDisplayGlDrawDone *msg);
+    void (*msgc_display_preferred_video_codec_type)(SpiceMarshaller *m, const SpiceMsgcDisplayPreferredVideoCodecType *msg);
+    void (*msgc_inputs_key_down)(SpiceMarshaller *m, const SpiceMsgcKeyDown *msg);
+    void (*msgc_inputs_key_up)(SpiceMarshaller *m, const SpiceMsgcKeyUp *msg);
+    void (*msgc_inputs_key_modifiers)(SpiceMarshaller *m, const SpiceMsgcKeyModifiers *msg);
+    void (*msgc_inputs_mouse_motion)(SpiceMarshaller *m, const SpiceMsgcMouseMotion *msg);
+    void (*msgc_inputs_mouse_position)(SpiceMarshaller *m, const SpiceMsgcMousePosition *msg);
+    void (*msgc_inputs_mouse_press)(SpiceMarshaller *m, const SpiceMsgcMousePress *msg);
+    void (*msgc_inputs_mouse_release)(SpiceMarshaller *m, const SpiceMsgcMouseRelease *msg);
+    void (*msgc_record_data)(SpiceMarshaller *m, const SpiceMsgPlaybackPacket *msg);
+    void (*msgc_record_mode)(SpiceMarshaller *m, const SpiceMsgPlaybackMode *msg);
+    void (*msgc_record_start_mark)(SpiceMarshaller *m, const SpiceMsgcRecordStartMark *msg);
 #ifdef USE_SMARTCARD
-    void (*msgc_smartcard_data)(SpiceMarshaller *m, VSCMsgHeader *msg);
+    void (*msgc_smartcard_data)(SpiceMarshaller *m, const VSCMsgHeader *msg);
 #endif /* USE_SMARTCARD */
-    void (*msg_SpiceMsgCompressedData)(SpiceMarshaller *m, SpiceMsgCompressedData *msg);
-    void (*msgc_port_event)(SpiceMarshaller *m, SpiceMsgcPortEvent *msg);
+    void (*msg_SpiceMsgCompressedData)(SpiceMarshaller *m, const SpiceMsgCompressedData *msg);
+    void (*msgc_port_event)(SpiceMarshaller *m, const SpiceMsgcPortEvent *msg);
 } SpiceMessageMarshallers;
 
 SpiceMessageMarshallers *spice_message_marshallers_get(void);

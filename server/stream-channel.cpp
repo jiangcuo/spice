@@ -270,7 +270,7 @@ bool StreamChannelClient::handle_message(uint16_t type, uint32_t size, void *msg
         return false;
     case SPICE_MSGC_DISPLAY_PREFERRED_VIDEO_CODEC_TYPE:
         return handle_preferred_video_codec_type(
-            (SpiceMsgcDisplayPreferredVideoCodecType *)msg);
+            static_cast<SpiceMsgcDisplayPreferredVideoCodecType *>(msg));
     default:
         return CommonGraphicsChannelClient::handle_message(type, size, msg);
     }
@@ -302,11 +302,8 @@ stream_channel_get_supported_codecs(StreamChannel *channel, uint8_t *out_codecs)
         SPICE_DISPLAY_CAP_CODEC_H265,
     };
 
-    bool supported[SPICE_N_ELEMENTS(codec2cap)];
-
-    for (codec = 0; codec < SPICE_N_ELEMENTS(codec2cap); ++codec) {
-        supported[codec] = true;
-    }
+    std::array<bool, SPICE_N_ELEMENTS(codec2cap)> supported;
+    supported.fill(true);
 
     FOREACH_CLIENT(channel, rcc) {
         for (codec = 1; codec < SPICE_N_ELEMENTS(codec2cap); ++codec) {
@@ -351,6 +348,9 @@ void StreamChannel::on_connect(RedClient *red_client, RedStream *stream,
         StreamMsgStartStop base;
         uint8_t codecs_buffer[MAX_SUPPORTED_CODECS];
     } start_msg;
+    static_assert(offsetof(StreamMsgStartStop, codecs) ==
+                  offsetof(decltype(start_msg), codecs_buffer),
+                  "Wrong assumption");
     StreamMsgStartStop *const start = &start_msg.base;
 
     spice_return_if_fail(stream != nullptr);
@@ -361,7 +361,7 @@ void StreamChannel::on_connect(RedClient *red_client, RedStream *stream,
     }
 
     // request new stream
-    start->num_codecs = stream_channel_get_supported_codecs(this, start->codecs);
+    start->num_codecs = stream_channel_get_supported_codecs(this, start_msg.codecs_buffer);
     // send in any case, even if list is not changed
     // notify device about changes
     request_new_stream(start);

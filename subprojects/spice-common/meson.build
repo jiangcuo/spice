@@ -2,7 +2,7 @@
 # project definition
 #
 project('spice-common', 'c',
-        meson_version : '>= 0.48.0',
+        meson_version : '>= 0.49.0',
         license : 'LGPLv2.1',
         default_options : ['warning_level=2'])
 
@@ -127,12 +127,12 @@ endforeach
 # Python
 if spice_common_generate_client_code or spice_common_generate_server_code
   py_module = import('python')
-  python = py_module.find_installation()
+  python = py_module.find_installation('python3')
 
   if get_option('python-checks')
     foreach module : ['six', 'pyparsing']
       message('Checking for python module @0@'.format(module))
-      cmd = run_command(python, '-m', module)
+      cmd = run_command(python, '-c', 'import @0@'.format(module))
       if cmd.returncode() != 0
         error('Python module @0@ not found'.format(module))
       endif

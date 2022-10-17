@@ -24,7 +24,7 @@
 #define NUM_TRACE_ITEMS (1 << TRACE_ITEMS_SHIFT)
 #define ITEMS_TRACE_MASK (NUM_TRACE_ITEMS - 1)
 
-typedef struct DrawContext {
+struct DrawContext {
     SpiceCanvas *canvas;
     int canvas_draws_on_surface;
     int top_down;
@@ -33,10 +33,13 @@ typedef struct DrawContext {
     int32_t stride;
     uint32_t format;
     void *line_0;
-} DrawContext;
+};
 
-typedef struct RedSurface {
+struct RedSurface {
+    SPICE_CXX_GLIB_ALLOCATOR
+
     uint32_t refs;
+    uint16_t id;
     /* A Ring representing a hierarchical tree structure. This tree includes
      * DrawItems, Containers, and Shadows. It is used to efficiently determine
      * which drawables overlap, and to exclude regions of drawables that are
@@ -54,24 +57,23 @@ typedef struct RedSurface {
     //fix me - better handling here
     /* 'create_cmd' holds surface data through a pointer to guest memory, it
      * must be valid as long as the surface is valid */
-    RedSurfaceCmd *create_cmd;
+    red::shared_ptr<const RedSurfaceCmd> create_cmd;
     /* QEMU expects the guest data for the command to be valid as long as the
      * surface is valid */
-    RedSurfaceCmd *destroy_cmd;
-} RedSurface;
+    red::shared_ptr<const RedSurfaceCmd> destroy_cmd;
+};
 
-typedef struct MonitorsConfig {
+struct MonitorsConfig {
     int refs;
     int count;
     int max_allowed;
     QXLHead heads[0];
-} MonitorsConfig;
+};
 
 #define NUM_DRAWABLES 1000
-typedef struct _Drawable _Drawable;
 struct _Drawable {
     union {
-        Drawable drawable;
+        alignas(Drawable) char raw_drawable[sizeof(Drawable)];
         _Drawable *next;
     } u;
 };
@@ -100,20 +102,20 @@ struct DisplayChannelPrivate
     Ring current_list;
 
     uint32_t drawable_count;
-    _Drawable drawables[NUM_DRAWABLES];
+    std::array<_Drawable, NUM_DRAWABLES> drawables;
     _Drawable *free_drawables;
 
     int stream_video;
     GArray *video_codecs;
     uint32_t stream_count;
-    VideoStream streams_buf[NUM_STREAMS];
+    std::array<VideoStream, NUM_STREAMS> streams_buf;
     VideoStream *free_streams;
     Ring streams;
-    ItemTrace items_trace[NUM_TRACE_ITEMS];
+    std::array<ItemTrace, NUM_TRACE_ITEMS> items_trace;
     uint32_t next_item_trace;
     uint64_t streams_size_total;
 
-    RedSurface surfaces[NUM_SURFACES];
+    std::array<RedSurface *, NUM_SURFACES> surfaces;
     uint32_t n_surfaces;
     SpiceImageSurfaces image_surfaces;
 
@@ -171,12 +173,12 @@ void monitors_config_unref(MonitorsConfig *config);
 
 void display_channel_draw_until(DisplayChannel *display,
                                 const SpiceRect *area,
-                                int surface_id,
+                                RedSurface *surface,
                                 Drawable *last);
 GArray* display_channel_get_video_codecs(DisplayChannel *display);
 int display_channel_get_stream_video(DisplayChannel *display);
 void display_channel_current_flush(DisplayChannel *display,
-                                   int surface_id);
+                                   RedSurface *surface);
 uint32_t display_channel_generate_uid(DisplayChannel *display);
 
 int display_channel_get_video_stream_id(DisplayChannel *display, VideoStream *stream);
@@ -320,29 +322,19 @@ static inline int is_same_drawable(Drawable *d1, Drawable *d2)
     }
 }
 
-static inline int is_drawable_independent_from_surfaces(Drawable *drawable)
+static inline bool is_drawable_independent_from_surfaces(const Drawable *drawable)
 {
-    int x;
-
-    for (x = 0; x < 3; ++x) {
-        if (drawable->surface_deps[x] != -1) {
-            return FALSE;
-        }
-    }
-    return TRUE;
+    return std::all_of(drawable->surface_deps.begin(), drawable->surface_deps.end(), std::logical_not<RedSurface *>());
 }
 
-static inline int has_shadow(RedDrawable *drawable)
+static inline bool has_shadow(const RedDrawable *drawable)
 {
     return drawable->type == QXL_COPY_BITS;
 }
 
-static inline int is_primary_surface(DisplayChannel *display, uint32_t surface_id)
+static inline bool is_primary_surface(DisplayChannel *display, const RedSurface *surface)
 {
-    if (surface_id == 0) {
-        return TRUE;
-    }
-    return FALSE;
+    return surface->id == 0;
 }
 
 static inline void region_add_clip_rects(QRegion *rgn, SpiceClipRects *data)

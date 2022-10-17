@@ -32,6 +32,7 @@
 #define JPEG_ENCODER_H_
 
 #include <spice/types.h>
+#include <spice/macros.h>
 
 SPICE_BEGIN_DECLS
 
@@ -57,7 +58,7 @@ void jpeg_encoder_destroy(JpegEncoderContext *encoder);
 
 /* returns the total size of the encoded data. Images must be supplied from the
    top line to the bottom */
-int jpeg_encode(JpegEncoderContext *jpeg, int quality, JpegEncoderImageType type,
+int jpeg_encode(JpegEncoderContext *enc, int quality, JpegEncoderImageType type,
                 int width, int height, uint8_t *lines, unsigned int num_lines, int stride,
                 uint8_t *io_ptr, unsigned int num_io_bytes);
 

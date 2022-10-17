@@ -25,12 +25,12 @@
 
 SPICE_BEGIN_DECLS
 
-void spice_marshall_msg_main_ShortDataSubMarshall(SpiceMarshaller *m, SpiceMsgMainShortDataSubMarshall *msg);
-void spice_marshall_msg_main_ArrayMessage(SpiceMarshaller *m, SpiceMsgMainArrayMessage *msg);
-void spice_marshall_msg_main_Zeroes(SpiceMarshaller *m, SpiceMsgMainZeroes *msg);
-void spice_marshall_msg_main_channels_list(SpiceMarshaller *m, SpiceMsgChannels *msg);
-void spice_marshall_msg_main_LenMessage(SpiceMarshaller *m, SpiceMsgMainLenMessage *msg);
-void spice_marshall_msg_main_ZeroLen1(SpiceMarshaller *m, SpiceMsgMainZeroLen1 *msg, SpiceMarshaller **txt2_out);
+void spice_marshall_msg_main_ShortDataSubMarshall(SpiceMarshaller *m, const SpiceMsgMainShortDataSubMarshall *msg);
+void spice_marshall_msg_main_ArrayMessage(SpiceMarshaller *m, const SpiceMsgMainArrayMessage *msg);
+void spice_marshall_msg_main_Zeroes(SpiceMarshaller *m, const SpiceMsgMainZeroes *msg);
+void spice_marshall_msg_main_channels_list(SpiceMarshaller *m, const SpiceMsgChannels *msg);
+void spice_marshall_msg_main_LenMessage(SpiceMarshaller *m, const SpiceMsgMainLenMessage *msg);
+void spice_marshall_msg_main_ZeroLen1(SpiceMarshaller *m, const SpiceMsgMainZeroLen1 *msg, SpiceMarshaller **txt2_out);
 
 SPICE_END_DECLS
 

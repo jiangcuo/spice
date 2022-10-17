@@ -64,8 +64,14 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* Define if you have POSIX threads libraries and header files. */
+#undef HAVE_PTHREAD
+
 /* Define to 1 if you have the <pthread_np.h> header file. */
 #undef HAVE_PTHREAD_NP_H
+
+/* Have PTHREAD_PRIO_INHERIT. */
+#undef HAVE_PTHREAD_PRIO_INHERIT
 
 /* whether Cyrus SASL is available for authentication */
 #undef HAVE_SASL
@@ -120,6 +126,10 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* Define to necessary symbol if this constant uses a non-standard name on
+   your system. */
+#undef PTHREAD_CREATE_JOINABLE
 
 /* Enable SPICE statistics */
 #undef RED_STATISTICS

@@ -4,9 +4,11 @@
 project('spice', 'c', 'cpp',
         version : run_command('build-aux/git-version-gen', meson.source_root() + '/.tarball-version', check : true).stdout().strip(),
         license : 'LGPLv2.1',
-        meson_version : '>= 0.48',
+        meson_version : '>= 0.49',
         default_options : ['buildtype=debugoptimized',
                            'warning_level=2'])
+
+meson.add_dist_script('build-aux/meson-dist', meson.project_version(), meson.source_root())
 
 message('Updating submodules')
 run_command('build-aux/meson/check-spice-common', check : true)
@@ -30,7 +32,7 @@ run_command('build-aux/meson/check-spice-common', check : true)
 #
 #
 spice_server_current = 15
-spice_server_revision = 1
+spice_server_revision = 2
 spice_server_age = 14
 spice_server_so_version = '@0@.@1@.@2@'.format(spice_server_current - spice_server_age,
                                                spice_server_age,
@@ -196,6 +198,7 @@ spice_server_global_cxxflags += [
   '-Wno-suggest-final-methods',
   '-Wno-suggest-final-types',
   '-Wno-array-bounds',
+  '-Wno-stringop-overflow',
   '-Wno-narrowing',
   '-Wno-missing-field-initializers',
   '-Wno-deprecated-declarations',

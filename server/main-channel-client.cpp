@@ -16,7 +16,6 @@
 */
 #include <config.h>
 
-#include <inttypes.h>
 #include <common/generated_server_marshallers.h>
 
 #include "main-channel-client.h"
@@ -370,8 +369,8 @@ void MainChannelClient::handle_pong(SpiceMsgPing *ping, uint32_t size)
             start_connectivity_monitoring(CLIENT_CONNECTIVITY_TIMEOUT);
             break;
         }
-        priv->bitrate_per_sec = (uint64_t)(NET_TEST_BYTES * 8) * 1000000
-            / (roundtrip - priv->latency);
+        priv->bitrate_per_sec =
+            uint64_t{NET_TEST_BYTES * 8} * 1000000 / (roundtrip - priv->latency);
         priv->net_test_stage = NET_TEST_STAGE_COMPLETE;
         red_channel_debug(get_channel(),
                           "net test: latency %f ms, bitrate %" G_GUINT64_FORMAT " bps (%f Mbps)%s",
@@ -667,7 +666,7 @@ static void main_channel_marshall_notify(RedChannelClient *rcc,
     notify.what = SPICE_WARN_GENERAL;
     notify.message_len = strlen(item->msg.get());
     spice_marshall_msg_notify(m, &notify);
-    spice_marshaller_add(m, (uint8_t *)item->msg.get(), notify.message_len + 1);
+    spice_marshaller_add(m, reinterpret_cast<uint8_t *>(item->msg.get()), notify.message_len + 1);
 }
 
 static void main_channel_fill_migrate_dst_info(MainChannel *main_channel,
@@ -677,10 +676,10 @@ static void main_channel_fill_migrate_dst_info(MainChannel *main_channel,
     dst_info->port = mig_dst->port;
     dst_info->sport = mig_dst->sport;
     dst_info->host_size = strlen(mig_dst->host) + 1;
-    dst_info->host_data = (uint8_t *)mig_dst->host;
+    dst_info->host_data = reinterpret_cast<uint8_t *>(mig_dst->host);
     if (mig_dst->cert_subject) {
         dst_info->cert_subject_size = strlen(mig_dst->cert_subject) + 1;
-        dst_info->cert_subject_data = (uint8_t *)mig_dst->cert_subject;
+        dst_info->cert_subject_data = reinterpret_cast<uint8_t *>(mig_dst->cert_subject);
     } else {
         dst_info->cert_subject_size = 0;
         dst_info->cert_subject_data = nullptr;
@@ -734,10 +733,10 @@ static void main_channel_marshall_migrate_switch(SpiceMarshaller *m, MainChannel
     migrate.port = mig_target->port;
     migrate.sport = mig_target->sport;
     migrate.host_size = strlen(mig_target->host) + 1;
-    migrate.host_data = (uint8_t *)mig_target->host;
+    migrate.host_data = reinterpret_cast<uint8_t *>(mig_target->host);
     if (mig_target->cert_subject) {
         migrate.cert_subject_size = strlen(mig_target->cert_subject) + 1;
-        migrate.cert_subject_data = (uint8_t *)mig_target->cert_subject;
+        migrate.cert_subject_data = reinterpret_cast<uint8_t *>(mig_target->cert_subject);
     } else {
         migrate.cert_subject_size = 0;
         migrate.cert_subject_data = nullptr;
@@ -775,7 +774,7 @@ static void main_channel_marshall_registered_channel(RedChannelClient *rcc,
     spice_marshall_msg_main_channels_list(m, channels_info);
 }
 
-void MainChannelClient::send_item(RedPipeItem *base)
+void MainChannelClient::send_item(RedPipeItem *item)
 {
     SpiceMarshaller *m = get_marshaller();
 
@@ -785,72 +784,72 @@ void MainChannelClient::send_item(RedPipeItem *base)
      * it stopped on the src side. */
     if (!priv->init_sent &&
         !priv->seamless_mig_dst &&
-        base->type != RED_PIPE_ITEM_TYPE_MAIN_INIT) {
+        item->type != RED_PIPE_ITEM_TYPE_MAIN_INIT) {
         red_channel_warning(get_channel(),
                             "Init msg for client %p was not sent yet "
                             "(client is probably during semi-seamless migration). Ignoring msg type %d",
-                            get_client(), base->type);
+                            get_client(), item->type);
         return;
     }
-    switch (base->type) {
+    switch (item->type) {
         case RED_PIPE_ITEM_TYPE_MAIN_CHANNELS_LIST:
-            main_channel_marshall_channels(this, m, base);
+            main_channel_marshall_channels(this, m, item);
             priv->initial_channels_list_sent = true;
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_PING:
             main_channel_marshall_ping(this, m,
-                static_cast<RedPingPipeItem*>(base));
+                static_cast<RedPingPipeItem*>(item));
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_MOUSE_MODE:
             main_channel_marshall_mouse_mode(this, m,
-                static_cast<RedMouseModePipeItem*>(base));
+                static_cast<RedMouseModePipeItem*>(item));
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_AGENT_DISCONNECTED:
-            main_channel_marshall_agent_disconnected(this, m, base);
+            main_channel_marshall_agent_disconnected(this, m, item);
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_AGENT_TOKEN:
             main_channel_marshall_tokens(this, m,
-                static_cast<RedTokensPipeItem*>(base));
+                static_cast<RedTokensPipeItem*>(item));
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_AGENT_DATA:
             main_channel_marshall_agent_data(this, m,
-                static_cast<RedAgentDataPipeItem*>(base));
+                static_cast<RedAgentDataPipeItem*>(item));
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_MIGRATE_DATA:
-            main_channel_marshall_migrate_data_item(this, m, base);
+            main_channel_marshall_migrate_data_item(this, m, item);
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_INIT:
             priv->init_sent = TRUE;
             main_channel_marshall_init(this, m,
-                static_cast<RedInitPipeItem*>(base));
+                static_cast<RedInitPipeItem*>(item));
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_NOTIFY:
             main_channel_marshall_notify(this, m,
-                static_cast<RedNotifyPipeItem*>(base));
+                static_cast<RedNotifyPipeItem*>(item));
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_MIGRATE_BEGIN:
-            main_channel_marshall_migrate_begin(m, this, base);
+            main_channel_marshall_migrate_begin(m, this, item);
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_MIGRATE_BEGIN_SEAMLESS:
-            main_channel_marshall_migrate_begin_seamless(m, this, base);
+            main_channel_marshall_migrate_begin_seamless(m, this, item);
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_MULTI_MEDIA_TIME:
             main_channel_marshall_multi_media_time(this, m,
-                static_cast<RedMultiMediaTimePipeItem*>(base));
+                static_cast<RedMultiMediaTimePipeItem*>(item));
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_MIGRATE_SWITCH_HOST:
-            main_channel_marshall_migrate_switch(m, this, base);
+            main_channel_marshall_migrate_switch(m, this, item);
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_NAME:
             init_send_data(SPICE_MSG_MAIN_NAME);
-            spice_marshall_msg_main_name(m, &static_cast<RedNamePipeItem*>(base)->msg);
+            spice_marshall_msg_main_name(m, &static_cast<RedNamePipeItem*>(item)->msg);
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_UUID:
             init_send_data(SPICE_MSG_MAIN_UUID);
-            spice_marshall_msg_main_uuid(m, &static_cast<RedUuidPipeItem*>(base)->msg);
+            spice_marshall_msg_main_uuid(m, &static_cast<RedUuidPipeItem*>(item)->msg);
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_AGENT_CONNECTED_TOKENS:
-            main_channel_marshall_agent_connected(m, this, base);
+            main_channel_marshall_agent_connected(m, this, item);
             break;
         case RED_PIPE_ITEM_TYPE_MAIN_REGISTERED_CHANNEL:
             /* The spice protocol requires that the server receive a ATTACH_CHANNELS
@@ -861,7 +860,7 @@ void MainChannelClient::send_item(RedPipeItem *base)
                 return;
             }
             main_channel_marshall_registered_channel(this, m,
-                static_cast<RedRegisteredChannelPipeItem*>(base));
+                static_cast<RedRegisteredChannelPipeItem*>(item));
             break;
         default:
             break;

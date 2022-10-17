@@ -18,7 +18,7 @@
 #ifndef __TEST_DISPLAY_BASE_H__
 #define __TEST_DISPLAY_BASE_H__
 
-#include <spice.h>
+#include "spice-wrapped.h"
 #include "basic-event-loop.h"
 
 SPICE_BEGIN_DECLS
@@ -131,8 +131,9 @@ struct Test {
     void (*on_client_disconnected)(Test *test);
 };
 
-void test_set_simple_command_list(Test *test, const int *command, int num_commands);
-void test_set_command_list(Test *test, Command *command, int num_commands);
+void test_set_simple_command_list(Test *test,
+                                  const CommandType *simple_commands, int num_commands);
+void test_set_command_list(Test *test, Command *new_commands, int num_commands);
 void test_add_display_interface(Test *test);
 void test_add_agent_interface(SpiceServer *server); // TODO - Test *test
 Test* test_new(SpiceCoreInterface* core);

@@ -19,6 +19,7 @@
 
 #include <common/recorder.h>
 
+#include "glib-compat.h"
 #include "red-stream-device.h"
 
 #include "stream-channel.h"
@@ -80,7 +81,7 @@ StreamDevice::partial_read()
 
     /* read header */
     while (hdr_pos < sizeof(hdr)) {
-        n = read((uint8_t *) &hdr + hdr_pos, sizeof(hdr) - hdr_pos);
+        n = read(reinterpret_cast<uint8_t *>(&hdr) + hdr_pos, sizeof(hdr) - hdr_pos);
         if (n <= 0) {
             return false;
         }
@@ -92,7 +93,7 @@ StreamDevice::partial_read()
         }
     }
 
-    switch ((StreamMsgType) hdr.type) {
+    switch (static_cast<StreamMsgType>(hdr.type)) {
     case STREAM_TYPE_FORMAT:
         if (hdr.size != sizeof(StreamMsgFormat)) {
             handled = handle_msg_invalid("Wrong size for StreamMsgFormat");
@@ -141,7 +142,7 @@ StreamDevice::partial_read()
         // Currently the only message that requires resizing is the cursor shape,
         // which is not expected to be sent so often.
         if (msg_len > sizeof(*msg)) {
-            msg = (StreamDevice::AllMessages*) g_realloc(msg, sizeof(*msg));
+            msg = static_cast<StreamDevice::AllMessages *>(g_realloc(msg, sizeof(*msg)));
             msg_len = sizeof(*msg);
         }
     }
@@ -182,12 +183,12 @@ StreamDevice::handle_msg_invalid(const char *error_msg)
         write_buffer_get_server(total_size, false);
     buf->buf_used = total_size;
 
-    auto const header = (StreamDevHeader *)buf->buf;
+    auto const header = reinterpret_cast<StreamDevHeader *>(buf->buf);
     fill_dev_hdr(header, STREAM_TYPE_NOTIFY_ERROR, msg_size);
 
-    auto const error = (StreamMsgNotifyError *)(header+1);
+    auto const error = reinterpret_cast<StreamMsgNotifyError *>(header + 1);
     error->error_code = GUINT32_TO_LE(0);
-    strcpy((char *) error->msg, error_msg);
+    strcpy(reinterpret_cast<char *>(error->msg), error_msg);
 
     write_buffer_add(buf);
 
@@ -225,7 +226,7 @@ StreamDevice::handle_msg_device_display_info()
     spice_extra_assert(hdr.type == STREAM_TYPE_DEVICE_DISPLAY_INFO);
 
     if (msg_len < hdr.size) {
-        msg = (StreamDevice::AllMessages*) g_realloc(msg, hdr.size);
+        msg = static_cast<StreamDevice::AllMessages *>(g_realloc(msg, hdr.size));
         msg_len = hdr.size;
     }
 
@@ -254,15 +255,15 @@ StreamDevice::handle_msg_device_display_info()
         return true;
     }
 
-    if (display_info_msg->device_address + device_address_len > (uint8_t*) msg + hdr.size) {
+    if (display_info_msg->device_address + device_address_len >
+        reinterpret_cast<uint8_t *>(msg) + hdr.size) {
         g_warning("Malformed DeviceDisplayInfo message, device_address length (%zu) "
                   "goes beyond the end of the message, ignoring.", device_address_len);
         return true;
     }
 
     memcpy(device_display_info.device_address,
-           (char*) display_info_msg->device_address,
-           device_address_len);
+           reinterpret_cast<char *>(display_info_msg->device_address), device_address_len);
 
     // make sure the string is terminated
     device_display_info.device_address[device_address_len - 1] = '\0';
@@ -331,7 +332,7 @@ StreamDevice::handle_msg_data()
                hdr.size, frame_mmtime);
         if (msg_len < hdr.size) {
             g_free(msg);
-            msg = (StreamDevice::AllMessages*) g_malloc(hdr.size);
+            msg = static_cast<StreamDevice::AllMessages *>(g_malloc(hdr.size));
             msg_len = hdr.size;
         }
     }
@@ -377,10 +378,10 @@ get_cursor_type_bits(unsigned int cursor_type)
     }
 }
 
-static RedCursorCmd *
+static red::shared_ptr<const RedCursorCmd>
 stream_msg_cursor_set_to_cursor_cmd(const StreamMsgCursorSet *msg, size_t msg_size)
 {
-    auto cmd = g_new0(RedCursorCmd, 1);
+    auto cmd = red::make_shared<RedCursorCmd>();
     cmd->type = QXL_CURSOR_SET;
     cmd->u.set.position.x = 0; // TODO
     cmd->u.set.position.y = 0; // TODO
@@ -396,27 +397,24 @@ stream_msg_cursor_set_to_cursor_cmd(const StreamMsgCursorSet *msg, size_t msg_si
     /* Limit cursor size to prevent DoS */
     if (cursor->header.width > STREAM_MSG_CURSOR_SET_MAX_WIDTH ||
         cursor->header.height > STREAM_MSG_CURSOR_SET_MAX_HEIGHT) {
-        g_free(cmd);
-        return nullptr;
+        return red::shared_ptr<const RedCursorCmd>();
     }
 
     const unsigned int cursor_bits = get_cursor_type_bits(cursor->header.type);
     if (cursor_bits == 0) {
-        g_free(cmd);
-        return nullptr;
+        return red::shared_ptr<const RedCursorCmd>();
     }
 
     /* Check that enough data has been sent for the cursor.
      * Note that these computations can't overflow due to sizes checks
      * above. */
     size_t size_required = cursor->header.width * cursor->header.height;
-    size_required = SPICE_ALIGN(size_required * cursor_bits, 8) / 8u;
+    size_required = SPICE_ALIGN(size_required * cursor_bits, 8) / 8U;
     if (msg_size < sizeof(StreamMsgCursorSet) + size_required) {
-        g_free(cmd);
-        return nullptr;
+        return red::shared_ptr<const RedCursorCmd>();
     }
     cursor->data_size = size_required;
-    cursor->data = (uint8_t*) g_memdup(msg->data, size_required);
+    cursor->data = static_cast<uint8_t *>(g_memdup2(msg->data, size_required));
     return cmd;
 }
 
@@ -439,7 +437,7 @@ StreamDevice::handle_msg_cursor_set()
 
     // read part of the message till we get all
     if (msg_len < hdr.size) {
-        msg = (StreamDevice::AllMessages*) g_realloc(msg, hdr.size);
+        msg = static_cast<StreamDevice::AllMessages *>(g_realloc(msg, hdr.size));
         msg_len = hdr.size;
     }
     int n = read(msg->buf + msg_pos, hdr.size - msg_pos);
@@ -452,11 +450,11 @@ StreamDevice::handle_msg_cursor_set()
     }
 
     // transform the message to a cursor command and process it
-    RedCursorCmd *cmd = stream_msg_cursor_set_to_cursor_cmd(&msg->cursor_set, msg_pos);
+    auto cmd = stream_msg_cursor_set_to_cursor_cmd(&msg->cursor_set, msg_pos);
     if (!cmd) {
         return handle_msg_invalid(nullptr);
     }
-    cursor_channel->process_cmd(cmd);
+    cursor_channel->process_cmd(std::move(cmd));
 
     return true;
 }
@@ -477,12 +475,12 @@ StreamDevice::handle_msg_cursor_move()
     move->x = GINT32_FROM_LE(move->x);
     move->y = GINT32_FROM_LE(move->y);
 
-    auto cmd = g_new0(RedCursorCmd, 1);
+    auto cmd = red::make_shared<RedCursorCmd>();
     cmd->type = QXL_CURSOR_MOVE;
     cmd->u.position.x = move->x;
     cmd->u.position.y = move->y;
 
-    cursor_channel->process_cmd(cmd);
+    cursor_channel->process_cmd(std::move(cmd));
 
     return true;
 }
@@ -495,7 +493,7 @@ void
 StreamDevice::stream_start(void *opaque, StreamMsgStartStop *start,
                            StreamChannel *stream_channel G_GNUC_UNUSED)
 {
-    auto dev = (StreamDevice *) opaque;
+    auto dev = static_cast<StreamDevice *>(opaque);
 
     if (!dev->opened) {
         return;
@@ -508,7 +506,7 @@ StreamDevice::stream_start(void *opaque, StreamMsgStartStop *start,
         dev->write_buffer_get_server(total_size, false);
     buf->buf_used = total_size;
 
-    auto hdr = (StreamDevHeader *)buf->buf;
+    auto hdr = reinterpret_cast<StreamDevHeader *>(buf->buf);
     fill_dev_hdr(hdr, STREAM_TYPE_START_STOP, msg_size);
 
     memcpy(&hdr[1], start, msg_size);
@@ -520,7 +518,7 @@ void
 StreamDevice::stream_queue_stat(void *opaque, const StreamQueueStat *stats G_GNUC_UNUSED,
                                 StreamChannel *stream_channel G_GNUC_UNUSED)
 {
-    auto dev = (StreamDevice *) opaque;
+    auto dev = static_cast<StreamDevice *>(opaque);
 
     if (!dev->opened) {
         return;
@@ -561,7 +559,7 @@ stream_device_connect(RedsState *reds, SpiceCharDeviceInstance *sin)
 StreamDevice::StreamDevice(RedsState *reds, SpiceCharDeviceInstance *sin):
     RedCharDevice(reds, sin, 0, 0)
 {
-    msg = (StreamDevice::AllMessages*) g_malloc(sizeof(*msg));
+    msg = static_cast<StreamDevice::AllMessages *>(g_malloc(sizeof(*msg)));
     msg_len = sizeof(*msg);
 }
 
@@ -632,10 +630,10 @@ send_capabilities(RedCharDevice *char_dev)
         char_dev->write_buffer_get_server(total_size, false);
     buf->buf_used = total_size;
 
-    auto const hdr = (StreamDevHeader *)buf->buf;
+    auto const hdr = reinterpret_cast<StreamDevHeader *>(buf->buf);
     fill_dev_hdr(hdr, STREAM_TYPE_CAPABILITIES, msg_size);
 
-    auto const caps = (StreamMsgCapabilities *)(hdr+1);
+    auto const caps = reinterpret_cast<StreamMsgCapabilities *>(hdr + 1);
     memset(caps, 0, msg_size);
 
     char_dev->write_buffer_add(buf);

@@ -23,13 +23,21 @@
 
 #include "red-common.h"
 #include "memslot.h"
+#include "utils.hpp"
 
-SPICE_BEGIN_DECLS
+#include "push-visibility.h"
 
-typedef struct RedDrawable {
-    int refs;
-    QXLInstance *qxl;
+template <typename T>
+struct RedQXLResource: public red::simple_ptr_counted<T> {
+    ~RedQXLResource();
+    void set_resource(QXLInstance *qxl, QXLReleaseInfo *info, uint32_t group_id);
+private:
+    QXLInstance *qxl = nullptr;
     QXLReleaseInfoExt release_info_ext;
+};
+
+struct RedDrawable final: public RedQXLResource<RedDrawable> {
+    ~RedDrawable();
     uint32_t surface_id;
     uint8_t effect;
     uint8_t type;
@@ -59,49 +67,41 @@ typedef struct RedDrawable {
         SpiceWhiteness whiteness;
         SpiceComposite composite;
     } u;
-} RedDrawable;
+};
 
-typedef struct RedUpdateCmd {
-    QXLInstance *qxl;
-    QXLReleaseInfoExt release_info_ext;
-    int refs;
+struct RedUpdateCmd final: public RedQXLResource<RedUpdateCmd> {
+    ~RedUpdateCmd();
     SpiceRect area;
     uint32_t update_id;
     uint32_t surface_id;
-} RedUpdateCmd;
+};
 
-typedef struct RedMessage {
-    QXLInstance *qxl;
-    QXLReleaseInfoExt release_info_ext;
-    int refs;
+struct RedMessage final: public RedQXLResource<RedMessage> {
+    ~RedMessage();
     int len;
     uint8_t *data;
-} RedMessage;
+};
 
-typedef struct RedSurfaceCreate {
+struct RedSurfaceCreate {
     uint32_t format;
     uint32_t width;
     uint32_t height;
     int32_t stride;
     uint8_t *data;
-} RedSurfaceCreate;
+};
 
-typedef struct RedSurfaceCmd {
-    QXLInstance *qxl;
-    QXLReleaseInfoExt release_info_ext;
-    int refs;
+struct RedSurfaceCmd final: public RedQXLResource<RedSurfaceCmd> {
+    ~RedSurfaceCmd();
     uint32_t surface_id;
     uint8_t type;
     uint32_t flags;
     union {
         RedSurfaceCreate surface_create;
     } u;
-} RedSurfaceCmd;
+};
 
-typedef struct RedCursorCmd {
-    QXLInstance *qxl;
-    QXLReleaseInfoExt release_info_ext;
-    int refs;
+struct RedCursorCmd final: public RedQXLResource<RedCursorCmd> {
+    ~RedCursorCmd();
     uint8_t type;
     union {
         struct {
@@ -115,39 +115,32 @@ typedef struct RedCursorCmd {
         } trail;
         SpicePoint16 position;
     } u;
-} RedCursorCmd;
+};
 
 void red_get_rect_ptr(SpiceRect *red, const QXLRect *qxl);
 
-RedDrawable *red_drawable_new(QXLInstance *qxl, RedMemSlotInfo *slots,
-                              int group_id, QXLPHYSICAL addr,
-                              uint32_t flags);
-RedDrawable *red_drawable_ref(RedDrawable *drawable);
-void red_drawable_unref(RedDrawable *red_drawable);
+red::shared_ptr<RedDrawable>
+red_drawable_new(QXLInstance *qxl, RedMemSlotInfo *slots,
+                 int group_id, QXLPHYSICAL addr, uint32_t flags);
 
-RedUpdateCmd *red_update_cmd_new(QXLInstance *qxl, RedMemSlotInfo *slots,
-                                 int group_id, QXLPHYSICAL addr);
-RedUpdateCmd *red_update_cmd_ref(RedUpdateCmd *red);
-void red_update_cmd_unref(RedUpdateCmd *red);
+red::shared_ptr<const RedUpdateCmd>
+red_update_cmd_new(QXLInstance *qxl, RedMemSlotInfo *slots,
+                   int group_id, QXLPHYSICAL addr);
 
-RedMessage *red_message_new(QXLInstance *qxl, RedMemSlotInfo *slots,
-                            int group_id, QXLPHYSICAL addr);
-RedMessage *red_message_ref(RedMessage *red);
-void red_message_unref(RedMessage *red);
+red::shared_ptr<const RedMessage>
+red_message_new(QXLInstance *qxl, RedMemSlotInfo *slots,
+                int group_id, QXLPHYSICAL addr);
 
 bool red_validate_surface(uint32_t width, uint32_t height,
                           int32_t stride, uint32_t format);
 
-RedSurfaceCmd *red_surface_cmd_new(QXLInstance *qxl_instance, RedMemSlotInfo *slots,
-                                   int group_id, QXLPHYSICAL addr);
-RedSurfaceCmd *red_surface_cmd_ref(RedSurfaceCmd *cmd);
-void red_surface_cmd_unref(RedSurfaceCmd *cmd);
+red::shared_ptr<const RedSurfaceCmd>
+red_surface_cmd_new(QXLInstance *qxl_instance, RedMemSlotInfo *slots,
+                    int group_id, QXLPHYSICAL addr);
 
-RedCursorCmd *red_cursor_cmd_new(QXLInstance *qxl, RedMemSlotInfo *slots,
-                                 int group_id, QXLPHYSICAL addr);
-RedCursorCmd *red_cursor_cmd_ref(RedCursorCmd *cmd);
-void red_cursor_cmd_unref(RedCursorCmd *cmd);
+red::shared_ptr<const RedCursorCmd>
+red_cursor_cmd_new(QXLInstance *qxl, RedMemSlotInfo *slots, int group_id, QXLPHYSICAL addr);
 
-SPICE_END_DECLS
+#include "pop-visibility.h"
 
 #endif /* RED_PARSE_QXL_H_ */

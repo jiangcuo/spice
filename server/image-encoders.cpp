@@ -67,7 +67,7 @@ struct GlzDrawableInstanceItem {
 struct RedGlzDrawable {
     RingItem link;    // ordered by the time it was encoded
     RingItem drawable_link;
-    RedDrawable *red_drawable;
+    red::shared_ptr<RedDrawable> red_drawable;
     GlzDrawableInstanceItem instances_pool[MAX_GLZ_DRAWABLE_INSTANCES];
     Ring instances;
     uint8_t instances_count;
@@ -234,7 +234,8 @@ static int encoder_usr_more_space(EncoderData *enc_data, uint8_t **io_ptr)
 static int quic_usr_more_space(QuicUsrContext *usr, uint32_t **io_ptr, int rows_completed)
 {
     EncoderData *usr_data = &(SPICE_CONTAINEROF(usr, QuicData, usr)->data);
-    return encoder_usr_more_space(usr_data, (uint8_t **)io_ptr) / sizeof(uint32_t);
+    return encoder_usr_more_space(usr_data, reinterpret_cast<uint8_t **>(io_ptr)) /
+           sizeof(uint32_t);
 }
 
 static int lz_usr_more_space(LzUsrContext *usr, uint8_t **io_ptr)
@@ -387,7 +388,7 @@ static void image_encoders_init_lz(ImageEncoders *enc)
 static void glz_usr_free_image(GlzEncoderUsrContext *usr, GlzUsrImageContext *image)
 {
     GlzData *lz_data = SPICE_CONTAINEROF(usr, GlzData, usr);
-    auto glz_drawable_instance = (GlzDrawableInstanceItem *)image;
+    auto glz_drawable_instance = static_cast<GlzDrawableInstanceItem *>(image);
     ImageEncoders *drawable_enc = glz_drawable_instance->glz_drawable->encoders;
     ImageEncoders *this_enc = SPICE_CONTAINEROF(lz_data, ImageEncoders, glz_data);
     if (this_enc == drawable_enc) {
@@ -524,7 +525,7 @@ static void glz_drawable_instance_item_free(GlzDrawableInstanceItem *instance)
         if (glz_drawable->has_drawable) {
             ring_remove(&glz_drawable->drawable_link);
         }
-        red_drawable_unref(glz_drawable->red_drawable);
+        glz_drawable->red_drawable.reset();
         glz_drawable->encoders->shared_data->glz_drawable_count--;
         if (ring_item_is_linked(&glz_drawable->link)) {
             ring_remove(&glz_drawable->link);
@@ -709,7 +710,7 @@ static GlzSharedDictionary *find_glz_dictionary(RedClient *client, uint8_t dict_
     GlzSharedDictionary *ret = nullptr;
 
     for (l = glz_dictionary_list; l != nullptr; l = l->next) {
-        auto dict = (GlzSharedDictionary *) l->data;
+        auto dict = static_cast<GlzSharedDictionary *>(l->data);
         if ((dict->client == client) && (dict->id == dict_id)) {
             ret = dict;
             break;
@@ -1166,10 +1167,10 @@ static RedGlzDrawable *get_glz_drawable(ImageEncoders *enc, RedDrawable *red_dra
         }
     }
 
-    ret = g_new(RedGlzDrawable, 1);
+    ret = g_new0(RedGlzDrawable, 1);
 
     ret->encoders = enc;
-    ret->red_drawable = red_drawable_ref(red_drawable);
+    ret->red_drawable.reset(red_drawable);
     ret->has_drawable = TRUE;
     ret->instances_count = 0;
     ring_init(&ret->instances);

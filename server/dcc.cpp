@@ -46,9 +46,8 @@ DisplayChannelClient::DisplayChannelClient(DisplayChannel *display,
     // todo: tune quality according to bandwidth
     priv->encoders.jpeg_quality = 85;
 
-    priv->send_data.free_list.res = (SpiceResourceList*)
-        g_malloc(sizeof(SpiceResourceList) +
-                 DISPLAY_FREE_LIST_DEFAULT_SIZE * sizeof(SpiceResourceID));
+    priv->send_data.free_list.res = static_cast<SpiceResourceList *>(g_malloc(
+        sizeof(SpiceResourceList) + DISPLAY_FREE_LIST_DEFAULT_SIZE * sizeof(SpiceResourceID)));
     priv->send_data.free_list.res_size = DISPLAY_FREE_LIST_DEFAULT_SIZE;
 
 
@@ -89,7 +88,7 @@ bool dcc_drawable_is_in_pipe(DisplayChannelClient *dcc, Drawable *drawable)
     GList *l;
 
     for (l = drawable->pipes; l != nullptr; l = l->next) {
-        dpi = (RedDrawablePipeItem *) l->data;
+        dpi = static_cast<RedDrawablePipeItem *>(l->data);
         if (dpi->dcc == dcc) {
             return TRUE;
         }
@@ -99,23 +98,20 @@ bool dcc_drawable_is_in_pipe(DisplayChannelClient *dcc, Drawable *drawable)
 }
 
 /*
- * Return: TRUE if wait_if_used == FALSE, or otherwise, if all of the pipe items that
+ * Return: true if wait_if_used == false, or otherwise, if all of the pipe items that
  * are related to the surface have been cleared (or sent) from the pipe.
  */
-bool dcc_clear_surface_drawables_from_pipe(DisplayChannelClient *dcc, int surface_id,
-                                           int wait_if_used)
+bool dcc_clear_surface_drawables_from_pipe(DisplayChannelClient *dcc, RedSurface *surface,
+                                           bool wait_if_used)
 {
-    int x;
-
     spice_return_val_if_fail(dcc != nullptr, TRUE);
-    /* removing the newest drawables that their destination is surface_id and
+    /* removing the newest drawables that their destination is surface and
        no other drawable depends on them */
 
     auto &pipe = dcc->get_pipe();
     for (auto l = pipe.begin(); l != pipe.end(); ) {
         Drawable *drawable;
         RedDrawablePipeItem *dpi = nullptr;
-        int depend_found = FALSE;
         RedPipeItem *item = l->get();
         auto item_pos = l;
 
@@ -129,29 +125,25 @@ bool dcc_clear_surface_drawables_from_pipe(DisplayChannelClient *dcc, int surfac
             continue;
         }
 
-        if (drawable->surface_id == surface_id) {
+        if (drawable->surface == surface) {
             l = pipe.erase(item_pos);
             continue;
         }
 
-        for (x = 0; x < 3; ++x) {
-            if (drawable->surface_deps[x] == surface_id) {
-                depend_found = TRUE;
-                break;
-            }
-        }
-
+        auto depend_found =
+            std::find(std::begin(drawable->surface_deps), std::end(drawable->surface_deps),
+                      surface) != std::end(drawable->surface_deps);
         if (depend_found) {
-            spice_debug("surface %d dependent item found %p, %p", surface_id, drawable, item);
+            spice_debug("surface %d dependent item found %p, %p", surface->id, drawable, item);
             if (!wait_if_used) {
-                return TRUE;
+                return true;
             }
             return dcc->wait_pipe_item_sent(item_pos, COMMON_CLIENT_TIMEOUT);
         }
     }
 
     if (!wait_if_used) {
-        return TRUE;
+        return true;
     }
 
     /*
@@ -161,10 +153,10 @@ bool dcc_clear_surface_drawables_from_pipe(DisplayChannelClient *dcc, int surfac
     return dcc->wait_outgoing_item(DISPLAY_CLIENT_SHORT_TIMEOUT);
 }
 
-void dcc_create_surface(DisplayChannelClient *dcc, int surface_id)
+void dcc_create_surface(DisplayChannelClient *dcc, RedSurface *surface)
 {
     DisplayChannel *display;
-    RedSurface *surface;
+    uint32_t surface_id = surface->id;
     uint32_t flags;
 
     if (!dcc) {
@@ -172,14 +164,13 @@ void dcc_create_surface(DisplayChannelClient *dcc, int surface_id)
     }
 
     display = DCC_TO_DC(dcc);
-    flags = is_primary_surface(display, surface_id) ? SPICE_SURFACE_FLAGS_PRIMARY : 0;
+    flags = is_primary_surface(display, surface) ? SPICE_SURFACE_FLAGS_PRIMARY : 0;
 
     /* don't send redundant create surface commands to client */
     if (display->get_during_target_migrate() ||
         dcc->priv->surface_client_created[surface_id]) {
         return;
     }
-    surface = &display->priv->surfaces[surface_id];
     auto create = red::make_shared<RedSurfaceCreateItem>(surface_id, surface->context.width,
                                                          surface->context.height,
                                                          surface->context.format, flags);
@@ -189,12 +180,11 @@ void dcc_create_surface(DisplayChannelClient *dcc, int surface_id)
 
 // adding the pipe item after pos. If pos == NULL, adding to head.
 void
-dcc_add_surface_area_image(DisplayChannelClient *dcc, int surface_id,
+dcc_add_surface_area_image(DisplayChannelClient *dcc, RedSurface *surface,
                            SpiceRect *area, RedChannelClient::Pipe::iterator pipe_item_pos,
                            int can_lossy)
 {
     DisplayChannel *display = DCC_TO_DC(dcc);
-    RedSurface *surface = &display->priv->surfaces[surface_id];
     SpiceCanvas *canvas = surface->context.canvas;
     int stride;
     int width;
@@ -211,7 +201,7 @@ dcc_add_surface_area_image(DisplayChannelClient *dcc, int surface_id,
 
     red::shared_ptr<RedImageItem> item(new (height * stride) RedImageItem());
 
-    item->surface_id = surface_id;
+    item->surface_id = surface->id;
     item->image_format =
         spice_bitmap_from_surface_type(surface->context.format);
     item->image_flags = 0;
@@ -227,7 +217,7 @@ dcc_add_surface_area_image(DisplayChannelClient *dcc, int surface_id,
 
     /* For 32bit non-primary surfaces we need to keep any non-zero
        high bytes as the surface may be used as source to an alpha_blend */
-    if (!is_primary_surface(display, surface_id) &&
+    if (!is_primary_surface(display, surface) &&
         item->image_format == SPICE_BITMAP_FMT_32BIT &&
         rgb32_data_has_alpha(item->width, item->height, item->stride, item->data, &all_set)) {
         if (all_set) {
@@ -244,19 +234,15 @@ dcc_add_surface_area_image(DisplayChannelClient *dcc, int surface_id,
     }
 }
 
-void dcc_push_surface_image(DisplayChannelClient *dcc, int surface_id)
+void dcc_push_surface_image(DisplayChannelClient *dcc, RedSurface *surface)
 {
-    DisplayChannel *display;
     SpiceRect area;
-    RedSurface *surface;
 
     if (!dcc) {
         return;
     }
 
-    display = DCC_TO_DC(dcc);
-    surface = &display->priv->surfaces[surface_id];
-    if (!surface->context.canvas) {
+    if (!surface) {
         return;
     }
     area.top = area.left = 0;
@@ -265,35 +251,32 @@ void dcc_push_surface_image(DisplayChannelClient *dcc, int surface_id)
 
     /* not allowing lossy compression because probably, especially if it is a primary surface,
        it combines both "picture-like" areas with areas that are more "artificial"*/
-    dcc_add_surface_area_image(dcc, surface_id, &area, dcc->get_pipe().end(), FALSE);
+    dcc_add_surface_area_image(dcc, surface, &area, dcc->get_pipe().end(), false);
 }
 
 static void add_drawable_surface_images(DisplayChannelClient *dcc, Drawable *drawable)
 {
     DisplayChannel *display = DCC_TO_DC(dcc);
-    int x;
 
-    for (x = 0; x < 3; ++x) {
-        int surface_id;
-
-        surface_id = drawable->surface_deps[x];
-        if (surface_id != -1) {
-            if (dcc->priv->surface_client_created[surface_id]) {
+    for (const auto surface : drawable->surface_deps) {
+        if (surface) {
+            if (dcc->priv->surface_client_created[surface->id]) {
                 continue;
             }
-            dcc_create_surface(dcc, surface_id);
-            display_channel_current_flush(display, surface_id);
-            dcc_push_surface_image(dcc, surface_id);
+            dcc_create_surface(dcc, surface);
+            display_channel_current_flush(display, surface);
+            dcc_push_surface_image(dcc, surface);
         }
     }
 
-    if (dcc->priv->surface_client_created[drawable->surface_id]) {
+    const auto surface = drawable->surface;
+    if (dcc->priv->surface_client_created[surface->id]) {
         return;
     }
 
-    dcc_create_surface(dcc, drawable->surface_id);
-    display_channel_current_flush(display, drawable->surface_id);
-    dcc_push_surface_image(dcc, drawable->surface_id);
+    dcc_create_surface(dcc, surface);
+    display_channel_current_flush(display, surface);
+    dcc_push_surface_image(dcc, surface);
 }
 
 RedDrawablePipeItem::RedDrawablePipeItem(DisplayChannelClient *init_dcc, Drawable *init_drawable):
@@ -339,7 +322,7 @@ static void dcc_init_stream_agents(DisplayChannelClient *dcc)
     int i;
     DisplayChannel *display = DCC_TO_DC(dcc);
 
-    for (i = 0; i < NUM_STREAMS; i++) {
+    for (i = 0; i < dcc->priv->stream_agents.size(); i++) {
         VideoStreamAgent *agent = &dcc->priv->stream_agents[i];
         agent->stream = display_channel_get_nth_video_stream(display, i);
         region_init(&agent->vis_region);
@@ -423,11 +406,12 @@ void dcc_start(DisplayChannelClient *dcc)
 
     red::shared_ptr<DisplayChannelClient> self(dcc);
     dcc->ack_zero_messages_window();
-    if (display->priv->surfaces[0].context.canvas) {
-        display_channel_current_flush(display, 0);
+    auto surface0 = display->priv->surfaces[0];
+    if (surface0) {
+        display_channel_current_flush(display, surface0);
         dcc->pipe_add_type(RED_PIPE_ITEM_TYPE_INVAL_PALETTE_CACHE);
-        dcc_create_surface(dcc, 0);
-        dcc_push_surface_image(dcc, 0);
+        dcc_create_surface(dcc, surface0);
+        dcc_push_surface_image(dcc, surface0);
         dcc_push_monitors_config(dcc);
         dcc->pipe_add_empty_msg(SPICE_MSG_DISPLAY_MARK);
         dcc_create_all_streams(dcc);
@@ -442,15 +426,12 @@ void dcc_start(DisplayChannelClient *dcc)
 
 static void dcc_destroy_stream_agents(DisplayChannelClient *dcc)
 {
-    int i;
-
-    for (i = 0; i < NUM_STREAMS; i++) {
-        VideoStreamAgent *agent = &dcc->priv->stream_agents[i];
-        region_destroy(&agent->vis_region);
-        region_destroy(&agent->clip);
-        if (agent->video_encoder) {
-            agent->video_encoder->destroy(agent->video_encoder);
-            agent->video_encoder = nullptr;
+    for (auto& agent : dcc->priv->stream_agents) {
+        region_destroy(&agent.vis_region);
+        region_destroy(&agent.clip);
+        if (agent.video_encoder) {
+            agent.video_encoder->destroy(agent.video_encoder);
+            agent.video_encoder = nullptr;
         }
     }
 }
@@ -530,7 +511,7 @@ XXX_CAST(RedChannelClient, DisplayChannelClient, DISPLAY_CHANNEL_CLIENT);
 RedPipeItemPtr dcc_gl_draw_item_new(RedChannelClient *rcc, void *data, int num)
 {
     DisplayChannelClient *dcc = DISPLAY_CHANNEL_CLIENT(rcc);
-    auto draw = (const SpiceMsgDisplayGlDraw *) data;
+    auto draw = static_cast<const SpiceMsgDisplayGlDraw *>(data);
 
     if (!red_stream_is_plain_unix(rcc->get_stream()) ||
         !rcc->test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT)) {
@@ -679,7 +660,7 @@ int dcc_compress_image(DisplayChannelClient *dcc,
         break;
     case SPICE_IMAGE_COMPRESSION_GLZ:
         success = image_encoders_compress_glz(&dcc->priv->encoders, dest, src,
-                                              drawable->red_drawable, &drawable->glz_retention,
+                                              drawable->red_drawable.get(), &drawable->glz_retention,
                                               o_comp_data,
                                               display_channel->priv->enable_zlib_glz_wrap);
         if (success) {
@@ -706,7 +687,7 @@ lz_compress:
     }
 
     if (!success) {
-        uint64_t image_size = src->stride * (uint64_t)src->y;
+        uint64_t image_size = src->stride * uint64_t{src->y};
         stat_compress_add(&display_channel->priv->encoder_shared_data.off_stat, start_time, image_size, image_size);
     }
 
@@ -750,9 +731,9 @@ static void dcc_push_release(DisplayChannelClient *dcc, uint8_t type, uint64_t i
     }
 
     if (free_list->res->count == free_list->res_size) {
-        free_list->res = (SpiceResourceList*) g_realloc(free_list->res,
-                                   sizeof(*free_list->res) +
-                                   free_list->res_size * sizeof(SpiceResourceID) * 2);
+        free_list->res = static_cast<SpiceResourceList *>(
+            g_realloc(free_list->res,
+                      sizeof(*free_list->res) + free_list->res_size * sizeof(SpiceResourceID) * 2));
         free_list->res_size *= 2;
     }
     free_list->res->resources[free_list->res->count].type = type;
@@ -804,13 +785,11 @@ bool dcc_pixmap_cache_unlocked_add(DisplayChannelClient *dcc, uint64_t id,
             now = &(*now)->next;
         }
         ring_remove(&tail->lru_link);
-        cache->items--;
         cache->available += tail->size;
         cache->sync[dcc->priv->id] = serial;
         dcc_push_release(dcc, SPICE_RES_TYPE_PIXMAP, tail->id, tail->sync);
         g_free(tail);
     }
-    ++cache->items;
     item->next = cache->hash_table[(key = BITS_CACHE_HASH_KEY(id))];
     cache->hash_table[key] = item;
     ring_item_init(&item->lru_link);
@@ -852,7 +831,7 @@ static bool dcc_handle_stream_report(DisplayChannelClient *dcc,
 {
     VideoStreamAgent *agent;
 
-    if (report->stream_id >= NUM_STREAMS) {
+    if (report->stream_id >= dcc->priv->stream_agents.size()) {
         spice_warning("stream_report: invalid stream id %u",
                       report->stream_id);
         return FALSE;
@@ -905,7 +884,7 @@ static bool dcc_handle_preferred_compression(DisplayChannelClient *dcc,
     case SPICE_IMAGE_COMPRESSION_LZ:
     case SPICE_IMAGE_COMPRESSION_GLZ:
     case SPICE_IMAGE_COMPRESSION_OFF:
-        dcc->priv->image_compression = (SpiceImageCompression) pc->image_compression;
+        dcc->priv->image_compression = static_cast<SpiceImageCompression>(pc->image_compression);
         break;
     default:
         spice_warning("preferred-compression: unsupported image compression setting");
@@ -928,9 +907,9 @@ static gint sort_video_codecs_by_client_preference(gconstpointer a_pointer,
                                                    gconstpointer b_pointer,
                                                    gpointer user_data)
 {
-    auto a = (const RedVideoCodec *) a_pointer;
-    auto b = (const RedVideoCodec *) b_pointer;
-    auto client_pref = (GArray *) user_data;
+    auto a = static_cast<const RedVideoCodec *>(a_pointer);
+    auto b = static_cast<const RedVideoCodec *>(b_pointer);
+    auto client_pref = static_cast<GArray *>(user_data);
 
     return (g_array_index(client_pref, gint, a->type) -
             g_array_index(client_pref, gint, b->type));
@@ -1014,17 +993,17 @@ bool DisplayChannelClient::handle_message(uint16_t type, uint32_t size, void *ms
 {
     switch (type) {
     case SPICE_MSGC_DISPLAY_INIT:
-        return dcc_handle_init(this, (SpiceMsgcDisplayInit *)msg);
+        return dcc_handle_init(this, static_cast<SpiceMsgcDisplayInit *>(msg));
     case SPICE_MSGC_DISPLAY_STREAM_REPORT:
-        return dcc_handle_stream_report(this, (SpiceMsgcDisplayStreamReport *)msg);
+        return dcc_handle_stream_report(this, static_cast<SpiceMsgcDisplayStreamReport *>(msg));
     case SPICE_MSGC_DISPLAY_PREFERRED_COMPRESSION:
-        return dcc_handle_preferred_compression(this,
-            (SpiceMsgcDisplayPreferredCompression *)msg);
+        return dcc_handle_preferred_compression(
+            this, static_cast<SpiceMsgcDisplayPreferredCompression *>(msg));
     case SPICE_MSGC_DISPLAY_GL_DRAW_DONE:
         return dcc_handle_gl_draw_done(this);
     case SPICE_MSGC_DISPLAY_PREFERRED_VIDEO_CODEC_TYPE:
-        return dcc_handle_preferred_video_codec_type(this,
-            (SpiceMsgcDisplayPreferredVideoCodecType *)msg);
+        return dcc_handle_preferred_video_codec_type(
+            this, static_cast<SpiceMsgcDisplayPreferredVideoCodecType *>(msg));
     default:
         return RedChannelClient::handle_message(type, size, msg);
     }
@@ -1097,8 +1076,8 @@ bool DisplayChannelClient::handle_migrate_data(uint32_t size, void *message)
     DisplayChannelClient *dcc = this;
     DisplayChannel *display = DCC_TO_DC(dcc);
     int surfaces_restored = FALSE;
-    auto header = (SpiceMigrateDataHeader *)message;
-    auto migrate_data = (SpiceMigrateDataDisplay *)(header + 1);
+    auto header = static_cast<SpiceMigrateDataHeader *>(message);
+    auto migrate_data = reinterpret_cast<SpiceMigrateDataDisplay *>(header + 1);
     uint8_t *surfaces;
     int i;
 
@@ -1148,10 +1127,12 @@ bool DisplayChannelClient::handle_migrate_data(uint32_t size, void *message)
         }
     }
 
-    surfaces = (uint8_t *)message + migrate_data->surfaces_at_client_ptr;
+    surfaces = static_cast<uint8_t *>(message) + migrate_data->surfaces_at_client_ptr;
     surfaces_restored = display->priv->enable_jpeg ?
-        restore_surfaces_lossy(dcc, (MigrateDisplaySurfacesAtClientLossy *)surfaces) :
-        restore_surfaces_lossless(dcc, (MigrateDisplaySurfacesAtClientLossless*)surfaces);
+        restore_surfaces_lossy(dcc,
+                  reinterpret_cast<MigrateDisplaySurfacesAtClientLossy *>(surfaces)) :
+        restore_surfaces_lossless(dcc,
+                  reinterpret_cast<MigrateDisplaySurfacesAtClientLossless *>(surfaces));
 
     spice_return_val_if_fail(surfaces_restored, FALSE);
 

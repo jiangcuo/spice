@@ -31,7 +31,7 @@
 #pragma warning(disable:4018)
 #endif
 
-SPICE_GNUC_UNUSED static void spice_marshall_array_uint64(SpiceMarshaller *m, uint64_t *ptr, unsigned count)
+SPICE_GNUC_UNUSED static void spice_marshall_array_uint64(SpiceMarshaller *m, const uint64_t *ptr, unsigned count)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
     uint32_t i;
@@ -41,11 +41,11 @@ SPICE_GNUC_UNUSED static void spice_marshall_array_uint64(SpiceMarshaller *m, ui
     }
 }
 
-void spice_marshall_msg_main_ShortDataSubMarshall(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgMainShortDataSubMarshall *msg)
+void spice_marshall_msg_main_ShortDataSubMarshall(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgMainShortDataSubMarshall *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgMainShortDataSubMarshall *src;
-    src = (SpiceMsgMainShortDataSubMarshall *)msg;
+    const SpiceMsgMainShortDataSubMarshall *src;
+    src = (const SpiceMsgMainShortDataSubMarshall *)msg;
 
     spice_marshaller_add_uint8(m, src->dummy_byte);
     spice_marshaller_add_uint32(m, src->data_size);
@@ -55,29 +55,29 @@ void spice_marshall_msg_main_ShortDataSubMarshall(SPICE_GNUC_UNUSED SpiceMarshal
     }
 }
 
-void spice_marshall_msg_main_ArrayMessage(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgMainArrayMessage *msg)
+void spice_marshall_msg_main_ArrayMessage(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgMainArrayMessage *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
 }
 
-void spice_marshall_msg_main_Zeroes(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgMainZeroes *msg)
+void spice_marshall_msg_main_Zeroes(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgMainZeroes *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgMainZeroes *src;
-    src = (SpiceMsgMainZeroes *)msg;
+    const SpiceMsgMainZeroes *src;
+    src = (const SpiceMsgMainZeroes *)msg;
 
     spice_marshaller_add_uint8(m, 0);
     spice_marshaller_add_uint16(m, src->n);
     spice_marshaller_add_uint32(m, 0);
 }
 
-void spice_marshall_msg_main_channels_list(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgChannels *msg)
+void spice_marshall_msg_main_channels_list(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgChannels *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgChannels *src;
-    uint16_t *channels__element;
+    const SpiceMsgChannels *src;
+    const uint16_t *  channels__element;
     uint32_t i;
-    src = (SpiceMsgChannels *)msg;
+    src = (const SpiceMsgChannels *)msg;
 
     spice_marshaller_add_uint32(m, src->num_of_channels);
     channels__element = src->channels;
@@ -87,13 +87,13 @@ void spice_marshall_msg_main_channels_list(SPICE_GNUC_UNUSED SpiceMarshaller *m,
     }
 }
 
-void spice_marshall_msg_main_LenMessage(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgMainLenMessage *msg)
+void spice_marshall_msg_main_LenMessage(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgMainLenMessage *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgMainLenMessage *src;
-    uint32_t *dummy__element;
+    const SpiceMsgMainLenMessage *src;
+    const uint32_t *  dummy__element;
     uint32_t i;
-    src = (SpiceMsgMainLenMessage *)msg;
+    src = (const SpiceMsgMainLenMessage *)msg;
 
     dummy__element = src->dummy;
     for (i = 0; i < 2; i++) {
@@ -103,7 +103,7 @@ void spice_marshall_msg_main_LenMessage(SPICE_GNUC_UNUSED SpiceMarshaller *m, SP
     /* Remaining data must be appended manually */
 }
 
-SPICE_GNUC_UNUSED static void spice_marshall_array_uint8(SpiceMarshaller *m, uint8_t *ptr, unsigned count)
+SPICE_GNUC_UNUSED static void spice_marshall_array_uint8(SpiceMarshaller *m, const uint8_t *ptr, unsigned count)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
     uint32_t i;
@@ -113,16 +113,16 @@ SPICE_GNUC_UNUSED static void spice_marshall_array_uint8(SpiceMarshaller *m, uin
     }
 }
 
-void spice_marshall_msg_main_ZeroLen1(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED SpiceMsgMainZeroLen1 *msg, SpiceMarshaller **txt2_out)
+void spice_marshall_msg_main_ZeroLen1(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgMainZeroLen1 *msg, SpiceMarshaller **txt2_out)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;
-    SpiceMsgMainZeroLen1 *src;
-    uint8_t *txt1__element;
+    const SpiceMsgMainZeroLen1 *src;
+    const uint8_t *  txt1__element;
     uint32_t i;
-    uint8_t *txt3__element;
-    uint8_t *txt4__element;
+    const uint8_t *  txt3__element;
+    const uint8_t *  txt4__element;
     *txt2_out = NULL;
-    src = (SpiceMsgMainZeroLen1 *)msg;
+    src = (const SpiceMsgMainZeroLen1 *)msg;
 
     txt1__element = src->txt1;
     for (i = 0; i < 4; i++) {

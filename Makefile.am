@@ -23,6 +23,8 @@ EXTRA_DIST =					\
 	build-aux/git-version-gen		\
 	build-aux/meson/check-spice-common	\
 	CHANGELOG.md				\
+	doxygen.sh				\
+	doxygen.cfg				\
 	.version				\
 	$(NULL)
 

@@ -59,7 +59,7 @@ create_chunk(size_t prefix, uint32_t size, QXLDataChunk* prev, int fill)
 static void init_meminfo(RedMemSlotInfo *mem_info)
 {
     memslot_info_init(mem_info, 1 /* groups */, 1 /* slots */, 1, 1, 0);
-    memslot_info_add_slot(mem_info, 0, 0, 0 /* delta */, 0 /* start */, ~0ul /* end */, 0 /* generation */);
+    memslot_info_add_slot(mem_info, 0, 0, 0 /* delta */, 0 /* start */, UINTPTR_MAX /* end */, 0 /* generation */);
 }
 
 static void init_qxl_surface(QXLSurfaceCmd *qxl)
@@ -111,16 +111,15 @@ static void test_memslot_invalid_addresses(void)
 static void test_no_issues(void)
 {
     RedMemSlotInfo mem_info;
-    RedSurfaceCmd *cmd;
     QXLSurfaceCmd qxl;
 
     init_meminfo(&mem_info);
     init_qxl_surface(&qxl);
 
     /* try to create a surface with no issues, should succeed */
-    cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
-    g_assert_nonnull(cmd);
-    red_surface_cmd_unref(cmd);
+    auto cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
+    g_assert(cmd);
+    cmd.reset();
 
     deinit_qxl_surface(&qxl);
     memslot_info_destroy(&mem_info);
@@ -129,7 +128,6 @@ static void test_no_issues(void)
 static void test_stride_too_small(void)
 {
     RedMemSlotInfo mem_info;
-    RedSurfaceCmd *cmd;
     QXLSurfaceCmd qxl;
 
     init_meminfo(&mem_info);
@@ -140,8 +138,8 @@ static void test_stride_too_small(void)
      * This can be used to cause buffer overflows so refuse it.
      */
     qxl.u.surface_create.stride = 256;
-    cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
-    g_assert_null(cmd);
+    auto cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
+    g_assert(!cmd);
 
     deinit_qxl_surface(&qxl);
     memslot_info_destroy(&mem_info);
@@ -150,7 +148,6 @@ static void test_stride_too_small(void)
 static void test_too_big_image(void)
 {
     RedMemSlotInfo mem_info;
-    RedSurfaceCmd *cmd;
     QXLSurfaceCmd qxl;
 
     init_meminfo(&mem_info);
@@ -166,8 +163,8 @@ static void test_too_big_image(void)
     qxl.u.surface_create.stride = 0x08000004 * 4;
     qxl.u.surface_create.width = 0x08000004;
     qxl.u.surface_create.height = 0x40000020;
-    cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
-    g_assert_null(cmd);
+    auto cmd = red_surface_cmd_new(NULL, &mem_info, 0, to_physical(&qxl));
+    g_assert(!cmd);
 
     deinit_qxl_surface(&qxl);
     memslot_info_destroy(&mem_info);
@@ -176,7 +173,6 @@ static void test_too_big_image(void)
 static void test_cursor_command(void)
 {
     RedMemSlotInfo mem_info;
-    RedCursorCmd *red_cursor_cmd;
     QXLCursorCmd cursor_cmd;
     QXLCursor *cursor;
 
@@ -194,9 +190,9 @@ static void test_cursor_command(void)
 
     cursor_cmd.u.set.shape = to_physical(cursor);
 
-    red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
-    g_assert_nonnull(red_cursor_cmd);
-    red_cursor_cmd_unref(red_cursor_cmd);
+    auto red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
+    g_assert(red_cursor_cmd);
+    red_cursor_cmd.reset();
     g_free(cursor);
     memslot_info_destroy(&mem_info);
 }
@@ -204,7 +200,6 @@ static void test_cursor_command(void)
 static void test_circular_empty_chunks(void)
 {
     RedMemSlotInfo mem_info;
-    RedCursorCmd *red_cursor_cmd;
     QXLCursorCmd cursor_cmd;
     QXLCursor *cursor;
     QXLDataChunk *chunks[2];
@@ -228,14 +223,14 @@ static void test_circular_empty_chunks(void)
 
     cursor_cmd.u.set.shape = to_physical(cursor);
 
-    red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
-    if (red_cursor_cmd != NULL) {
+    auto red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
+    if (red_cursor_cmd) {
         /* function does not return errors so there should be no data */
         g_assert_cmpuint(red_cursor_cmd->type, ==, QXL_CURSOR_SET);
         g_assert_cmpuint(red_cursor_cmd->u.set.position.x, ==, 0);
         g_assert_cmpuint(red_cursor_cmd->u.set.position.y, ==, 0);
         g_assert_cmpuint(red_cursor_cmd->u.set.shape.data_size, ==, 0);
-        red_cursor_cmd_unref(red_cursor_cmd);
+        red_cursor_cmd.reset();
     }
     g_test_assert_expected_messages();
 
@@ -247,7 +242,6 @@ static void test_circular_empty_chunks(void)
 static void test_circular_small_chunks(void)
 {
     RedMemSlotInfo mem_info;
-    RedCursorCmd *red_cursor_cmd;
     QXLCursorCmd cursor_cmd;
     QXLCursor *cursor;
     QXLDataChunk *chunks[2];
@@ -271,14 +265,14 @@ static void test_circular_small_chunks(void)
 
     cursor_cmd.u.set.shape = to_physical(cursor);
 
-    red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
-    if (red_cursor_cmd != NULL) {
+    auto red_cursor_cmd = red_cursor_cmd_new(NULL, &mem_info, 0, to_physical(&cursor_cmd));
+    if (red_cursor_cmd) {
         /* function does not return errors so there should be no data */
         g_assert_cmpuint(red_cursor_cmd->type, ==, QXL_CURSOR_SET);
         g_assert_cmpuint(red_cursor_cmd->u.set.position.x, ==, 0);
         g_assert_cmpuint(red_cursor_cmd->u.set.position.y, ==, 0);
         g_assert_cmpuint(red_cursor_cmd->u.set.shape.data_size, ==, 0);
-        red_cursor_cmd_unref(red_cursor_cmd);
+        red_cursor_cmd.reset();
     }
     g_test_assert_expected_messages();
 

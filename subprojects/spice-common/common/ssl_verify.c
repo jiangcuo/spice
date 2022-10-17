@@ -72,7 +72,11 @@ static int verify_pubkey(X509* cert, const char *key, size_t key_size)
         goto finish;
     }
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+    ret = EVP_PKEY_eq(orig_pubkey, cert_pubkey);
+#else
     ret = EVP_PKEY_cmp(orig_pubkey, cert_pubkey);
+#endif
 
     if (ret == 1) {
         spice_debug("public keys match");

@@ -15,11 +15,14 @@
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
+
 #include <config.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
+
+#include <cerrno>
+#include <cstring>
+
 #include <pthread.h>
+#include <unistd.h>
 
 #include "red-common.h"
 #include "dispatcher.h"
@@ -78,8 +81,8 @@ struct MainDispatcherClientDisconnectMessage {
 static void main_dispatcher_handle_channel_event(void *opaque,
                                                  void *payload)
 {
-    auto reds = (RedsState*) opaque;
-    auto channel_event = (MainDispatcherChannelEventMessage*) payload;
+    auto reds = static_cast<RedsState *>(opaque);
+    auto channel_event = static_cast<MainDispatcherChannelEventMessage *>(payload);
 
     reds_handle_channel_event(reds, channel_event->event, channel_event->info);
 }
@@ -101,8 +104,8 @@ void MainDispatcher::channel_event(int event, SpiceChannelEventInfo *info)
 static void main_dispatcher_handle_migrate_complete(void *opaque,
                                                     void *payload)
 {
-    auto reds = (RedsState*) opaque;
-    auto mig_complete = (MainDispatcherMigrateSeamlessDstCompleteMessage*) payload;
+    auto reds = static_cast<RedsState *>(opaque);
+    auto mig_complete = static_cast<MainDispatcherMigrateSeamlessDstCompleteMessage *>(payload);
 
     reds_on_client_seamless_migrate_complete(reds, mig_complete->client);
     mig_complete->client->unref();
@@ -111,8 +114,8 @@ static void main_dispatcher_handle_migrate_complete(void *opaque,
 static void main_dispatcher_handle_mm_time_latency(void *opaque,
                                                    void *payload)
 {
-    auto reds = (RedsState*) opaque;
-    auto msg = (MainDispatcherMmTimeLatencyMessage*) payload;
+    auto reds = static_cast<RedsState *>(opaque);
+    auto msg = static_cast<MainDispatcherMmTimeLatencyMessage *>(payload);
     reds_set_client_mm_time_latency(reds, msg->client, msg->latency);
     msg->client->unref();
 }
@@ -120,8 +123,8 @@ static void main_dispatcher_handle_mm_time_latency(void *opaque,
 static void main_dispatcher_handle_client_disconnect(void *opaque,
                                                      void *payload)
 {
-    auto reds = (RedsState*) opaque;
-    auto msg = (MainDispatcherClientDisconnectMessage*) payload;
+    auto reds = static_cast<RedsState *>(opaque);
+    auto msg = static_cast<MainDispatcherClientDisconnectMessage *>(payload);
 
     spice_debug("client=%p", msg->client);
     reds_client_disconnect(reds, msg->client);

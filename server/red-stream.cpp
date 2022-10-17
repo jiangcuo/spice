@@ -17,13 +17,15 @@
 */
 #include <config.h>
 
-#include <errno.h>
-#include <unistd.h>
+#include <cerrno>
+
 #include <fcntl.h>
+#include <unistd.h>
 #ifndef _WIN32
 #include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
+#include <netinet/in.h>
 #else
 #include <ws2tcpip.h>
 #endif
@@ -362,7 +364,7 @@ int red_stream_send_msgfd(RedStream *stream, int fd)
     spice_return_val_if_fail(red_stream_is_plain_unix(stream), -1);
 
     /* set the payload */
-    iov.iov_base = (char*)"@";
+    iov.iov_base = const_cast<char *>("@");
     iov.iov_len = 1;
     msgh.msg_iovlen = 1;
     msgh.msg_iov = &iov;
@@ -453,15 +455,15 @@ static void red_stream_set_socket(RedStream *stream, int socket)
     /* deprecated fields. Filling them for backward compatibility */
     stream->priv->info->llen = sizeof(stream->priv->info->laddr);
     stream->priv->info->plen = sizeof(stream->priv->info->paddr);
-    getsockname(stream->socket, (struct sockaddr*)(&stream->priv->info->laddr), &stream->priv->info->llen);
-    getpeername(stream->socket, (struct sockaddr*)(&stream->priv->info->paddr), &stream->priv->info->plen);
+    getsockname(stream->socket, &stream->priv->info->laddr, &stream->priv->info->llen);
+    getpeername(stream->socket, &stream->priv->info->paddr, &stream->priv->info->plen);
 
     stream->priv->info->flags |= SPICE_CHANNEL_EVENT_FLAG_ADDR_EXT;
     stream->priv->info->llen_ext = sizeof(stream->priv->info->laddr_ext);
     stream->priv->info->plen_ext = sizeof(stream->priv->info->paddr_ext);
-    getsockname(stream->socket, (struct sockaddr*)(&stream->priv->info->laddr_ext),
+    getsockname(stream->socket, reinterpret_cast<struct sockaddr *>(&stream->priv->info->laddr_ext),
                 &stream->priv->info->llen_ext);
-    getpeername(stream->socket, (struct sockaddr*)(&stream->priv->info->paddr_ext),
+    getpeername(stream->socket, reinterpret_cast<struct sockaddr *>(&stream->priv->info->paddr_ext),
                 &stream->priv->info->plen_ext);
 }
 
@@ -481,8 +483,8 @@ RedStream *red_stream_new(RedsState *reds, int socket)
 {
     RedStream *stream;
 
-    stream = (RedStream*) g_malloc0(sizeof(RedStream) + sizeof(RedStreamPrivate));
-    stream->priv = (RedStreamPrivate *)(stream+1);
+    stream = static_cast<RedStream *>(g_malloc0(sizeof(RedStream) + sizeof(RedStreamPrivate)));
+    stream->priv = reinterpret_cast<RedStreamPrivate *>(stream + 1);
     stream->priv->info = g_new0(SpiceChannelEventInfo, 1);
     stream->priv->reds = reds;
     stream->priv->core = reds_get_core_interface(reds);
@@ -752,6 +754,11 @@ static char *addr_to_string(const char *format,
     char host[NI_MAXHOST];
     char serv[NI_MAXSERV];
     int err;
+
+    // makes it work on no-glibc avoiding getnameinfo returning error
+    if (sa->ss_family == AF_UNIX) {
+        return g_strdup("localhost;");
+    }
 
     if ((err = getnameinfo((struct sockaddr *)sa, salen,
                            host, sizeof(host),
@@ -1166,7 +1173,7 @@ static ssize_t stream_websocket_read(RedStream *s, void *buf, size_t size)
     int len;
 
     do {
-        len = websocket_read(s->priv->ws, (uint8_t *) buf, size, &flags);
+        len = websocket_read(s->priv->ws, static_cast<uint8_t *>(buf), size, &flags);
     } while (len == 0 && flags != 0);
     return len;
 }
@@ -1178,7 +1185,7 @@ static ssize_t stream_websocket_write(RedStream *s, const void *buf, size_t size
 
 static ssize_t stream_websocket_writev(RedStream *s, const struct iovec *iov, int iovcnt)
 {
-    return websocket_writev(s->priv->ws, (struct iovec *) iov, iovcnt, WEBSOCKET_BINARY_FINAL);
+    return websocket_writev(s->priv->ws, iov, iovcnt, WEBSOCKET_BINARY_FINAL);
 }
 
 /*
@@ -1193,10 +1200,10 @@ bool red_stream_is_websocket(RedStream *stream, const void *buf, size_t len)
         return false;
     }
 
-    stream->priv->ws = websocket_new(buf, len, stream,
-                                     (websocket_read_cb_t) stream->priv->read,
-                                     (websocket_write_cb_t) stream->priv->write,
-                                     (websocket_writev_cb_t) stream->priv->writev);
+    stream->priv->ws =
+        websocket_new(buf, len, stream, reinterpret_cast<websocket_read_cb_t>(stream->priv->read),
+                      reinterpret_cast<websocket_write_cb_t>(stream->priv->write),
+                      reinterpret_cast<websocket_writev_cb_t>(stream->priv->writev));
     if (stream->priv->ws) {
         stream->priv->read = stream_websocket_read;
         stream->priv->write = stream_websocket_write;

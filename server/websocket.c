@@ -36,6 +36,7 @@
 #include <common/mem.h>
 
 #include "sys-socket.h"
+#include "glib-compat.h"
 #include "websocket.h"
 
 #ifdef _WIN32
@@ -325,7 +326,7 @@ static void relay_data(uint8_t* buf, size_t size, websocket_frame_t *frame)
     }
 }
 
-int websocket_read(RedsWebSocket *ws, uint8_t *buf, size_t size, unsigned *flags)
+int websocket_read(RedsWebSocket *ws, uint8_t *buf, size_t len, unsigned *flags)
 {
     int n = 0;
     int rc;
@@ -341,7 +342,7 @@ int websocket_read(RedsWebSocket *ws, uint8_t *buf, size_t size, unsigned *flags
         return 0;
     }
 
-    while (size > 0) {
+    while (len > 0) {
         // make sure we have a proper frame ready
         if (!frame->frame_ready) {
             rc = ws->raw_read(ws->raw_stream, frame->header + frame->header_pos,
@@ -374,7 +375,7 @@ int websocket_read(RedsWebSocket *ws, uint8_t *buf, size_t size, unsigned *flags
             rc = 0;
             if (frame->expected_len > frame->relayed) {
                 rc = ws->raw_read(ws->raw_stream, buf,
-                                  MIN(size, frame->expected_len - frame->relayed));
+                                  MIN(len, frame->expected_len - frame->relayed));
                 if (rc <= 0) {
                     goto read_error;
                 }
@@ -382,7 +383,7 @@ int websocket_read(RedsWebSocket *ws, uint8_t *buf, size_t size, unsigned *flags
                 relay_data(buf, rc, frame);
                 n += rc;
                 buf += rc;
-                size -= rc;
+                len -= rc;
             }
 
             *flags = frame->type;
@@ -487,7 +488,7 @@ static void constrain_iov(struct iovec *iov, int iovcnt,
         if (iov[i].iov_len > maxlen) {
             /* TODO - This code has never triggered afaik... */
             *iov_out_cnt = ++i;
-            *iov_out = g_memdup(iov, i * sizeof (*iov));
+            *iov_out = g_memdup2(iov, i * sizeof (*iov));
             (*iov_out)[i-1].iov_len = maxlen;
             return;
         }
