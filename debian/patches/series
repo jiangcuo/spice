@@ -1,3 +1,2 @@
 disable-failing-test-listen.patch
 do-not-run-nonexisting-doxygen-sh.patch
-test-leaks-fix-the-test-with-OpenSSL3.patch
