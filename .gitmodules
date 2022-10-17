@@ -1,3 +1,0 @@
-[submodule "spice-common"]
-	path = subprojects/spice-common
-	url = ../spice-common.git

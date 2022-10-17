@@ -1,0 +1,42 @@
+channel TestChannel {
+   message {
+      uint8 dummy_byte; // so structure is not aligned
+      uint32 data_size;
+      uint64 *data[data_size] @marshall;
+   } ShortDataSubMarshall;
+
+   message {
+      int8 name[] @end;
+   } ArrayMessage;
+
+    message {
+        uint8 res1 @zero;
+        uint16 n;
+        uint32 res2 @zero;
+    } Zeroes;
+
+    message {
+        uint32 num_of_channels;
+        uint16 channels[num_of_channels] @end;
+    } @ctype(SpiceMsgChannels) channels_list;
+
+    message {
+        uint32 dummy[2];
+        uint8 data[] @end;
+    } LenMessage;
+
+    message {
+        uint8 txt1[4] @zero_terminated;
+        uint8 sep1;
+        uint32 txt2_len;
+        uint8 *txt2[txt2_len] @zero_terminated;
+        uint8 txt3[txt2_len] @to_ptr @zero_terminated;
+        uint32 n;
+        uint16 txt4_len;
+        uint8 txt4[txt4_len] @end @zero_terminated;
+    } @declare ZeroLen1;
+};
+
+protocol Spice {
+    TestChannel main = 1;
+};
