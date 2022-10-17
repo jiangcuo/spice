@@ -1,3 +1,23 @@
+spice (0.15.1-1) unstable; urgency=medium
+
+  * new upstream release (0.15.1)
+    Closes: LP#1964777
+  * remove patches applied upstream:
+     build-Correctly-check-for-Python-modules.patch
+     test-leaks-fix-the-test-with-OpenSSL3.patch
+  * meson-omit-meson-dist.patch: fix build with meson (it fails right away
+    because build-aux/meson-dist file is not included in the source tarball)
+  * move gstreamer1.0-libav from Recommends: to Suggests: on Ubuntu (MR!5)
+  * d/gbp.conf: create initial gbp config
+  * d/watch:
+     fix url/location
+     include all releases, not just even (02468) ones
+     signature is foo.sig now, not foo.sign
+  * d/upstream/signing-key.asc: key 206D3B352F566F3B0E6572E997D9123DE37A484F
+    Victor Toso de Carvalho <me@victortoso.com>
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Mon, 17 Oct 2022 20:33:40 +0300
+
 spice (0.15.0-4) unstable; urgency=medium
 
   * test-leaks-fix-the-test-with-OpenSSL3.patch:
