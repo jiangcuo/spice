@@ -35,10 +35,11 @@ Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Recommends:
- gstreamer1.0-libav,
+ ${gstreamer-libav:recommends},
  gstreamer1.0-plugins-base,
  gstreamer1.0-plugins-good,
 Suggests:
+ ${gstreamer-libav:suggests},
  gstreamer1.0-plugins-ugly,
 Description: Implements the server side of the SPICE protocol
  The Simple Protocol for Independent Computing Environments (SPICE) is

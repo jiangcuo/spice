@@ -13,6 +13,21 @@ build-arch build-indep build clean install-indep install-arch install binary-arc
 override_dh_update_autotools_config:
 override_dh_autoreconf:
 
+override_dh_gencontrol:
+# gstreamer-libav is in Universe in Ubuntu, can only suggest it,
+# but on Debian it can be Recommended
+	if dpkg-vendor --derives-from Ubuntu; then \
+	    dh_gencontrol -- \
+		-Vgstreamer-libav:recommends= \
+		-Vgstreamer-libav:suggests=gstreamer1.0-libav \
+		; \
+	else \
+	    dh_gencontrol -- \
+		-Vgstreamer-libav:recommends=gstreamer1.0-libav \
+		-Vgstreamer-libav:suggests= \
+		; \
+	fi
+
 execute_after_dh_auto_install:
 # XXX hack alert: remove Requires.private and Libs.private defs from .pc file
 # these are needed for static build and we're not providing static libs
