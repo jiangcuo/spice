@@ -1,0 +1,3 @@
+# this is all false alarms: the source is in *.txt, processed by asciidoc
+spice source: source-is-missing [docs/*.html]
+spice source: very-long-line-length-in-source-file * > * [docs/*.html:*]
