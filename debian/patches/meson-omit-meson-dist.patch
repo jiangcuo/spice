@@ -1,0 +1,21 @@
+From: Michael Tokarev <mjt@tls.msk.ru>
+Subject: meson: omit meson-dist file
+
+Upstream tarball does not have build-aus/meson-dist script
+which is required by meson.build. It is only used to make
+the tarball itself (plus .tarball_version). Just comment
+out the whole line till upstream fixes their mess.
+
+diff --git a/meson.build b/meson.build
+index ef8b41ad..06c6f739 100644
+--- a/meson.build
++++ b/meson.build
+@@ -8,7 +8,7 @@ project('spice', 'c', 'cpp',
+         default_options : ['buildtype=debugoptimized',
+                            'warning_level=2'])
+ 
+-meson.add_dist_script('build-aux/meson-dist', meson.project_version(), meson.source_root())
++#meson.add_dist_script('build-aux/meson-dist', meson.project_version(), meson.source_root())
+ 
+ message('Updating submodules')
+ run_command('build-aux/meson/check-spice-common', check : true)

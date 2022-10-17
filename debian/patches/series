@@ -1,2 +1,3 @@
 disable-failing-test-listen.patch
 do-not-run-nonexisting-doxygen-sh.patch
+meson-omit-meson-dist.patch
