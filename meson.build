@@ -131,15 +131,23 @@ endforeach
 spice_server_has_gstreamer = false
 spice_server_gst_version = get_option('gstreamer')
 if spice_server_gst_version != 'no'
-  gst_deps = ['gstreamer', 'gstreamer-base', 'gstreamer-app', 'gstreamer-video']
+  gstreamer_version = ''
+  gst_deps = ['gstreamer', 'gstreamer-base', 'gstreamer-app', 'gstreamer-video', 'gstreamer-allocators']
   foreach dep : gst_deps
     dep = '@0@-@1@'.format(dep, spice_server_gst_version)
-    spice_server_deps += dependency(dep)
+    dep = dependency(dep)
+    if gstreamer_version == '' or  dep.version().version_compare('< ' + gstreamer_version)
+      gstreamer_version = dep.version()
+    endif
+    spice_server_deps += dep
   endforeach
   spice_server_deps += dependency('orc-0.4')
 
   gst_def = 'HAVE_GSTREAMER_1_0'
   spice_server_config_data.set(gst_def, '1')
+  if compiler.has_header('drm/drm_fourcc.h') and gstreamer_version.version_compare('>= 1.24')
+     spice_server_config_data.set('HAVE_GSTREAMER_DMABUF_ENCODING', '1')
+  endif
   spice_server_has_gstreamer = true
 endif
 
