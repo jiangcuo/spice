@@ -38,6 +38,7 @@
 #include "red-common.h"
 #include "video-encoder.h"
 #include "utils.h"
+#include "common/udev.h"
 
 
 #define SPICE_GST_DEFAULT_FPS 30
@@ -861,6 +862,116 @@ static const gchar* get_gst_codec_name(const SpiceGstEncoder *encoder)
     }
 }
 
+static const char video_codecs[][8] = {
+    { "" },
+    { "mjpeg" },
+    { "vp8" },
+    { "h264" },
+    { "vp9" },
+    { "h265" },
+};
+
+static bool gst_features_lookup(const gchar *feature_name)
+{
+    GstRegistry *registry;
+    GstPluginFeature *feature;
+
+    registry = gst_registry_get();
+    if (!registry) {
+        return false;
+    }
+
+    feature = gst_registry_lookup_feature(registry, feature_name);
+    if (!feature) {
+        return false;
+    }
+
+    gst_object_unref(feature);
+    return true;
+}
+
+static gchar *find_best_hw_plugin(const gchar *codec_name)
+{
+    static const char plugins[][8] = {"msdk", "va", "vaapi"};
+    gchar *feature_name;
+    int i;
+
+    for (i = 0; i < G_N_ELEMENTS(plugins); i++) {
+        feature_name = !codec_name ? g_strconcat(plugins[i], "postproc", NULL) :
+                       g_strconcat(plugins[i], codec_name, "enc", NULL);
+        if (!gst_features_lookup(feature_name)) {
+            g_free(feature_name);
+            feature_name = NULL;
+            continue;
+        }
+        break;
+    }
+    return feature_name;
+}
+
+static gchar *get_hw_gstenc_opts(const gchar *encoder, const gchar *codec_name)
+{
+    gchar *gstenc_opts;
+
+    if (strcmp(codec_name, "mjpeg") == 0) {
+        return g_strdup("");
+    }
+
+    if (g_str_has_prefix(encoder, "msdk")) {
+        if (strcmp(codec_name, "vp9") == 0) {
+            gstenc_opts = g_strdup("async-depth=1 b-frames=0 rate-control=3 target-usage=7");
+        } else {
+            gstenc_opts = g_strdup("async-depth=1 rate-control=3 gop-size=1 tune=16 b-frames=0 target-usage=7 min-qp=15 max-qp=35");
+        }
+    } else if (g_str_has_prefix(encoder, "vaapi")) {
+        if (strcmp(codec_name, "vp9") == 0) {
+            gstenc_opts = g_strdup("tune=3 rate-control=1");
+        } else {
+            gstenc_opts = g_strdup("rate-control=cqp max-bframes=0 min-qp=15 max-qp=35");
+        }
+    } else {
+        if (strcmp(codec_name, "vp9") == 0) {
+            gstenc_opts = g_strdup("min-qp=15 max-qp=35 rate-control=16 ref-frames=0 target-usage=7");
+        } else {
+            gstenc_opts = g_strdup("rate-control=16 b-frames=0 target-usage=7 min-qp=15 max-qp=35");
+        }
+    }
+    return gstenc_opts;
+}
+
+static void try_intel_hw_plugins(const gchar *codec_name, gchar **converter,
+                                 gchar **gstenc_name, gchar **gstenc_opts)
+{
+    gchar *encoder, *vpp;
+
+    if (strcmp(codec_name, "vp8") == 0) {
+        return;
+    }
+
+    encoder = find_best_hw_plugin(codec_name);
+    if (!encoder) {
+        return;
+    }
+    vpp = find_best_hw_plugin(NULL);
+    if (!vpp) {
+        g_free(encoder);
+        return;
+    }
+
+    g_free(*converter);
+    g_free(*gstenc_name);
+    g_free(*gstenc_opts);
+    *gstenc_name = encoder;
+    *gstenc_opts = get_hw_gstenc_opts(encoder, codec_name);
+
+    if (g_str_has_prefix(vpp, "vaapi")) {
+        *converter = g_strconcat(vpp, " ! video/x-raw(memory:VASurface),format=NV12", NULL);
+    } else {
+        *converter = g_strconcat(vpp, " ! video/x-raw(memory:VAMemory),format=NV12", NULL);
+    }
+    g_free(vpp);
+}
+
 /* At this time, only the following formats are supported by x264enc. */
 static const char valid_formats[][10] = {
     { "Y444" },
@@ -900,7 +1011,7 @@ static gchar *get_gst_converter(void)
 
 static gboolean create_pipeline(SpiceGstEncoder *encoder)
 {
-    const gchar* gstenc_name = get_gst_codec_name(encoder);
+    gchar* gstenc_name = g_strdup(get_gst_codec_name(encoder));
     if (!gstenc_name) {
         return FALSE;
     }
@@ -947,8 +1058,16 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
     default:
         /* gstreamer_encoder_new() should have rejected this codec type */
         spice_warning("unsupported codec type %d", encoder->base.codec_type);
+        g_free(gstenc_name);
         g_free(converter);
         return FALSE;
+    }
+
+    const char *codec_name = video_codecs[encoder->base.codec_type];
+    GpuVendor vendor = spice_udev_detect_gpu(INTEL_VENDOR_ID);
+    if (vendor == VENDOR_GPU_DETECTED) {
+        try_intel_hw_plugins(codec_name, &converter, &gstenc_name,
+                             &gstenc_opts);
     }
 
     GError *err = NULL;
@@ -967,6 +1086,7 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
             gst_object_unref(encoder->pipeline);
             encoder->pipeline = NULL;
         }
+        g_free(gstenc_name);
         return FALSE;
     }
     encoder->appsrc = GST_APP_SRC(gst_bin_get_by_name(GST_BIN(encoder->pipeline), "src"));
@@ -1003,6 +1123,7 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
                                   SPICE_GST_VIDEO_PIPELINE_BITRATE |
                                   SPICE_GST_VIDEO_PIPELINE_CAPS);
 
+    g_free(gstenc_name);
     return TRUE;
 }
 
