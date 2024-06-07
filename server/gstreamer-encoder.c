@@ -31,6 +31,7 @@
 #include <gst/app/gstappsink.h>
 #include <gst/video/video.h>
 #ifdef HAVE_GSTREAMER_DMABUF_ENCODING
+#include <gst/video/video-info-dma.h>
 #include <gst/allocators/gstdmabuf.h>
 #endif
 #include <orc/orcprogram.h>
@@ -42,19 +43,31 @@
 #include "video-encoder.h"
 #include "utils.h"
 #include "common/udev.h"
-
+#ifdef HAVE_GSTREAMER_DMABUF_ENCODING
+#include "drm/drm_fourcc.h"
+#endif
+#ifndef DRM_FORMAT_INVALID
+#define DRM_FORMAT_INVALID 0
+#endif
 
 #define SPICE_GST_DEFAULT_FPS 30
 
 typedef struct {
     SpiceBitmapFmt spice_format;
+    uint32_t drm_format;
     uint32_t bpp;
     char format[8];
     GstVideoFormat gst_format;
 } SpiceFormatForGStreamer;
 
+#define __FMT_DESC(spice_format, drm_format, bpp, format, gst_format) \
+    { spice_format, drm_format, bpp, format, gst_format }
+
 #define FMT_DESC(spice_format, bpp, format, gst_format) \
-    { spice_format, bpp, format, gst_format }
+    __FMT_DESC(spice_format, DRM_FORMAT_INVALID, bpp, format, gst_format)
+
+#define DRM_FMT_DESC(drm_format, bpp) \
+    __FMT_DESC(SPICE_BITMAP_FMT_INVALID, drm_format, bpp, "", GST_VIDEO_FORMAT_UNKNOWN)
 
 typedef struct SpiceGstVideoBuffer {
     VideoBuffer base;
@@ -95,6 +108,7 @@ typedef struct SpiceGstEncoder {
     uint32_t height;
     const SpiceFormatForGStreamer *format;
     SpiceBitmapFmt spice_format;
+    uint32_t drm_format;
 
     /* Number of consecutive frame encoding errors. */
     uint32_t errors;
@@ -785,6 +799,49 @@ static const SpiceFormatForGStreamer *map_format(SpiceBitmapFmt format)
 
     return GSTREAMER_FORMAT_INVALID;
 }
+
+#ifdef HAVE_GSTREAMER_DMABUF_ENCODING
+static SpiceFormatForGStreamer drm_format_map[] =  {
+    DRM_FMT_DESC(DRM_FORMAT_INVALID,  0),
+    DRM_FMT_DESC(DRM_FORMAT_XRGB8888, 32),
+    DRM_FMT_DESC(DRM_FORMAT_XBGR8888, 32),
+    DRM_FMT_DESC(DRM_FORMAT_RGBX8888, 32),
+    DRM_FMT_DESC(DRM_FORMAT_BGRX8888, 32),
+    DRM_FMT_DESC(DRM_FORMAT_ARGB8888, 32),
+    DRM_FMT_DESC(DRM_FORMAT_ABGR8888, 32),
+    DRM_FMT_DESC(DRM_FORMAT_RGBA8888, 32),
+    DRM_FMT_DESC(DRM_FORMAT_BGRA8888, 32),
+};
+#define GSTREAMER_DRM_FORMAT_INVALID (&drm_format_map[0])
+
+static const SpiceFormatForGStreamer *map_drm_format(uint32_t fourcc)
+{
+    int i;
+
+    for (i = 0; i < G_N_ELEMENTS(drm_format_map); i++) {
+        if (drm_format_map[i].drm_format == fourcc) {
+            if (drm_format_map[i].gst_format == GST_VIDEO_FORMAT_UNKNOWN) {
+                int format_size = sizeof(drm_format_map[i].format);
+                GstVideoFormat gst_format;
+
+                gst_format = gst_video_dma_drm_fourcc_to_format(fourcc);
+                if (gst_format == GST_VIDEO_FORMAT_UNKNOWN) {
+                    break;
+                }
+
+                drm_format_map[i].gst_format = gst_format;
+                g_strlcpy(drm_format_map[i].format,
+                        gst_video_format_to_string(gst_format),
+                        format_size - 1);
+                drm_format_map[i].format[format_size - 1] = '\0';
+            }
+            return &drm_format_map[i];
+        }
+    }
+
+    return GSTREAMER_DRM_FORMAT_INVALID;
+}
+#endif
 
 static void set_appsrc_caps(SpiceGstEncoder *encoder)
 {
@@ -1565,26 +1622,46 @@ static void spice_gst_encoder_add_frame(SpiceGstEncoder *encoder,
 static VideoEncodeResults
 spice_gst_encoder_configure_pipeline(SpiceGstEncoder *encoder,
                                      uint32_t width, uint32_t height,
-                                     const SpiceBitmap *bitmap,
+                                     SpiceBitmapFmt spice_format,
+                                     uint32_t drm_format,
                                      uint32_t frame_mm_time)
 {
-    SpiceBitmapFmt format = bitmap ? (SpiceBitmapFmt) bitmap->format :
-                            SPICE_BITMAP_FMT_32BIT;
+    const SpiceFormatForGStreamer *format = GSTREAMER_FORMAT_INVALID;
+
+    if (spice_format != SPICE_BITMAP_FMT_INVALID) {
+        format = map_format(spice_format);
+    }
+#ifdef HAVE_GSTREAMER_DMABUF_ENCODING
+    else if (drm_format != DRM_FORMAT_INVALID) {
+        format = map_drm_format(drm_format);
+    }
+#endif
+    if (format == GSTREAMER_FORMAT_INVALID
+#ifdef HAVE_GSTREAMER_DMABUF_ENCODING
+        || format == GSTREAMER_DRM_FORMAT_INVALID
+#endif
+        ) {
+        spice_warning("unable to map format type %d or %u",
+                      spice_format, drm_format);
+        encoder->errors = 4;
+        return VIDEO_ENCODER_FRAME_UNSUPPORTED;
+    }
 
     if (width != encoder->width || height != encoder->height ||
-        encoder->spice_format != format) {
-        spice_debug("video format change: width %d -> %d, height %d -> %d, format %d -> %d",
+        encoder->spice_format != spice_format ||
+        encoder->drm_format != drm_format) {
+        spice_debug("video format change: width %d -> %d, height %d -> %d,"
+                    "spice format %d -> %d, drm format %u -> %u",
                     encoder->width, width, encoder->height, height,
-                    encoder->spice_format, format);
-        encoder->format = map_format(format);
-        if (encoder->format == GSTREAMER_FORMAT_INVALID) {
-            spice_warning("unable to map format type %d", format);
-            encoder->errors = 4;
-            return VIDEO_ENCODER_FRAME_UNSUPPORTED;
-        }
-        encoder->spice_format = format;
+                    encoder->spice_format, spice_format,
+                    encoder->drm_format, drm_format);
+
+        encoder->format = format;
+        encoder->spice_format = spice_format;
+        encoder->drm_format = drm_format;
         encoder->width = width;
         encoder->height = height;
+
         if (encoder->bit_rate == 0) {
             encoder->history[0].mm_time = frame_mm_time;
             encoder->max_bit_rate = get_bit_rate_cap(encoder);
@@ -1644,7 +1721,9 @@ spice_gst_encoder_encode_frame(VideoEncoder *video_encoder,
     uint32_t height = src->bottom - src->top;
 
     rc = spice_gst_encoder_configure_pipeline(encoder, width, height,
-                                              bitmap, frame_mm_time);
+                                              bitmap->format,
+                                              DRM_FORMAT_INVALID,
+                                              frame_mm_time);
     if (rc != VIDEO_ENCODER_FRAME_ENCODE_DONE) {
         return rc;
     }
@@ -1696,7 +1775,9 @@ spice_gst_encoder_encode_dmabuf(VideoEncoder *video_encoder,
     VideoEncodeResults rc;
 
     rc = spice_gst_encoder_configure_pipeline(encoder, dmabuf_data->width,
-                                              dmabuf_data->height, NULL,
+                                              dmabuf_data->height,
+                                              SPICE_BITMAP_FMT_INVALID,
+                                              dmabuf_data->drm_fourcc_format,
                                               frame_mm_time);
     if (rc != VIDEO_ENCODER_FRAME_ENCODE_DONE) {
         return rc;

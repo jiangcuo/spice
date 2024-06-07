@@ -1796,6 +1796,7 @@ static void red_marshall_gl_draw_stream(DisplayChannelClient *dcc,
     }
 
     dmabuf_data->drm_dma_buf_fd = scanout->drm_dma_buf_fd;
+    dmabuf_data->drm_fourcc_format = scanout->drm_fourcc_format;
     dmabuf_data->width = stream->width;
     dmabuf_data->height = stream->height;
     dmabuf_data->stride = stream->stride;
