@@ -3,6 +3,7 @@
 include /usr/share/dpkg/architecture.mk
 builddir = obj-${DEB_HOST_MULTIARCH}
 buildopts = --buildsystem=meson+ninja --builddir=${builddir}
+export PYTHONDONTWRITEBYTECODE=1
 
 build-arch build-indep build clean install-indep install-arch install binary-arch binary-indep binary: %:
 	dh $@ ${buildopts}
