@@ -1,3 +1,23 @@
+spice (0.15.2-1) unstable; urgency=medium
+
+  [ Michael Tokarev ]
+  * new upstream release
+  * d/source/lintian-overrides: add overrides for asciidoc-generated
+    html files in docs/
+  * d/control: add loong64 to Architecture: list (Closes: #1059010)
+  * d/patches/: remove meson-omit-meson-dist.patch
+    (upstream finally included the missing file)
+  * d/patches: remove do-not-run-nonexisting-doxygen-sh.patch
+    (not needed anymore)
+  * d/rules: export PYTHONDONTWRITEBYTECODE=1 (Closes: #1048594)
+  * d/control: s/pkg-config/pkgconf/
+  * d/control: Standards-Version: 4.7.0 (no changes needed)
+
+  [ Debian Janitor ]
+  * Remove constraints unnecessary since buster (oldstable)
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Sun, 16 Jun 2024 17:43:40 +0300
+
 spice (0.15.1-1) unstable; urgency=medium
 
   * new upstream release (0.15.1)
