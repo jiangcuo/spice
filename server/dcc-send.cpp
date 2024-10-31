@@ -2389,6 +2389,10 @@ static void marshall_gl_draw(DisplayChannelClient *dcc,
         spice_marshall_msg_display_gl_draw(m, &p->draw);
     } else if (DCC_TO_DC(dcc)->priv->gl_draw_stream) {
         red_marshall_gl_draw_stream(dcc, m);
+    } else if (dcc->priv->gl_draw_ongoing) {
+        auto display = DCC_TO_DC(dcc);
+        dcc->priv->gl_draw_ongoing = false;
+        display_channel_gl_draw_done(display);
     } else {
         spice_warning("nothing to send to the client");
     }
