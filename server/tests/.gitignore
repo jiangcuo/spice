@@ -7,6 +7,7 @@ libtest-stat4.a
 test-agent-msg-filter
 test-channel
 test-codecs-parsing
+test-dispatcher
 test-display-no-ssl
 test-display-resolution-changes
 test-display-streaming
@@ -18,6 +19,7 @@ test-loop
 test-options
 test-playback
 test-qxl-parsing
+test-set-ticket
 test-stat
 test-stat-file
 test-stream

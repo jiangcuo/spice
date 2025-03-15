@@ -30,6 +30,10 @@ makecheck:
     ../autogen.sh --enable-werror
   - make
   - make -C server check || (cat server/tests/test-suite.log && exit 1)
+  # check if there are not ignored files
+  - >
+    test $(git clean -n | wc -l) = 0 ||
+    (echo 'Found some not ignored files:' >&2; git clean -n; exit 1)
 
 meson-makecheck:
   script:
