@@ -440,8 +440,22 @@ void spice_qxl_gl_scanout(QXLInstance *qxl,
                           uint32_t stride, uint32_t format,
                           int y_0_top)
 {
+    uint32_t offset = 0;
+    spice_qxl_gl_scanout2(qxl, &fd, width, height, &offset, &stride, 1,
+			  format, DRM_FORMAT_MOD_INVALID, y_0_top);
+}
+
+SPICE_GNUC_VISIBLE
+void spice_qxl_gl_scanout2(QXLInstance *qxl,
+			   const int *fd,
+			   uint32_t width, uint32_t height,
+			   const uint32_t *offset, const uint32_t *stride,
+			   uint32_t num_planes, uint32_t format,
+			   uint64_t modifier, int y_0_top)
+{
     RedWorkerMessageGlScanout payload = { /* empty */ };
     spice_return_if_fail(qxl != nullptr);
+    spice_return_if_fail(num_planes <= 4);
 
     QXLState *qxl_state = qxl->st;
 
@@ -451,19 +465,24 @@ void spice_qxl_gl_scanout(QXLInstance *qxl,
     for (int i = 0; i < scanout->num_planes; i++) {
         if (scanout->fd[i] >= 0) {
             close(scanout->fd[i]);
+            scanout->fd[i] = -1;
         }
+	scanout->offset[i] = 0;
+	scanout->stride[i] = 0;
     }
 
-    qxl_state->scanout = (RedGLScanout) {
-        .fd = {fd, -1, -1, -1},
-        .width = width,
-        .height = height,
-        .stride = {stride, 0, 0, 0},
-        .fourcc = format,
-        .num_planes = 1,
-        .flags = y_0_top ? SPICE_GL_SCANOUT_FLAGS_Y0TOP : 0,
-        .modifier = DRM_FORMAT_MOD_INVALID,
-    };
+    scanout->width = width;
+    scanout->height = height;
+    scanout->fourcc = format;
+    scanout->modifier = modifier;
+    scanout->flags = y_0_top ? SPICE_GL_SCANOUT_FLAGS_Y0TOP : 0;
+    scanout->num_planes = num_planes;
+
+    for (int i = 0; i < num_planes; i++) {
+        scanout->fd[i] = fd[i];
+        scanout->offset[i] = offset[i];
+        scanout->stride[i] = stride[i];
+    }
 
     pthread_mutex_unlock(&qxl_state->scanout_mutex);
 
