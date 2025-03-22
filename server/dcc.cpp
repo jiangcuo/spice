@@ -417,8 +417,7 @@ void dcc_start(DisplayChannelClient *dcc)
         dcc_create_all_streams(dcc);
     }
 
-    if (red_stream_is_plain_unix(dcc->get_stream()) &&
-        dcc->test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT)) {
+    if (dcc->is_gl_client()) {
         dcc->pipe_add(dcc_gl_scanout_item_new(dcc, nullptr, 0));
         dcc_push_monitors_config(dcc);
     }

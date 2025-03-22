@@ -2380,19 +2380,41 @@ static void marshall_gl_scanout(DisplayChannelClient *dcc,
 
     RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
     if (scanout != nullptr) {
-        if (scanout->num_planes <= 1) {
-            SpiceMsgDisplayGlScanoutUnix msg;
-            msg.drm_dma_buf_fd = scanout->fd[0];
+        if (dcc->test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT2)) {
+            struct : SpiceMsgDisplayGlScanout2Unix {
+                 SpiceGlPlaneUnix _pad_planes[4];
+            } msg;
+
             msg.width = scanout->width;
             msg.height = scanout->height;
-            msg.stride = scanout->stride[0];
-            msg.drm_fourcc_format = scanout->fourcc;
+            msg.fourcc = scanout->fourcc;
             msg.flags = scanout->flags;
+            msg.modifier = scanout->modifier;
+            msg.num_planes = scanout->num_planes;
 
-            dcc->init_send_data(SPICE_MSG_DISPLAY_GL_SCANOUT_UNIX);
-            spice_marshall_msg_display_gl_scanout_unix(m, &msg);
+            for (int i = 0; i < scanout->num_planes; i++) {
+                msg.planes[i].fd = scanout->fd[i];
+                msg.planes[i].offset = scanout->offset[i];
+                msg.planes[i].stride = scanout->stride[i];
+            }
+
+            dcc->init_send_data(SPICE_MSG_DISPLAY_GL_SCANOUT2_UNIX);
+            spice_marshall_msg_display_gl_scanout2_unix(m, &msg);
         } else {
-            spice_error("gl scanout does not support multi plane");
+            if (scanout->num_planes <= 1) {
+                SpiceMsgDisplayGlScanoutUnix msg;
+                msg.drm_dma_buf_fd = scanout->fd[0];
+                msg.width = scanout->width;
+                msg.height = scanout->height;
+                msg.stride = scanout->stride[0];
+                msg.drm_fourcc_format = scanout->fourcc;
+                msg.flags = scanout->flags;
+
+                dcc->init_send_data(SPICE_MSG_DISPLAY_GL_SCANOUT_UNIX);
+                spice_marshall_msg_display_gl_scanout_unix(m, &msg);
+            } else {
+                spice_warning("gl scanout client does not support multi plane");
+            }
         }
     }
     red_qxl_put_gl_scanout(qxl, scanout);

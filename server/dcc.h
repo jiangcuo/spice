@@ -50,7 +50,8 @@ public:
     bool is_gl_client()
     {
         return red_stream_is_plain_unix(get_stream()) &&
-           test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT);
+            (test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT) ||
+             test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT2));
     }
 
 protected:
