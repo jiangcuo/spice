@@ -441,7 +441,7 @@ static void display_channel_create_stream(DisplayChannel *display,
 bool display_channel_create_gl_draw_stream(DisplayChannel *display)
 {
     QXLInstance* qxl = display->priv->qxl;
-    SpiceMsgDisplayGlScanoutUnix *scanout = red_qxl_get_gl_scanout(qxl);
+    RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
     DisplayChannelClient *dcc;
     VideoStream *stream;
     bool ret = false;
@@ -460,7 +460,7 @@ bool display_channel_create_gl_draw_stream(DisplayChannel *display)
         display_channel_surface_id_unref(display, 0);
     }
     if (!display_channel_create_surface(display, 0, scanout->width,
-                                        scanout->height, scanout->stride,
+                                        scanout->height, scanout->stride[0],
                                         SPICE_SURFACE_FMT_32_xRGB,
                                         nullptr, true, true)) {
         goto err;
@@ -478,7 +478,7 @@ bool display_channel_create_gl_draw_stream(DisplayChannel *display)
     ret = true;
     display_channel_init_stream(display, stream, nullptr, &dest_area);
     stream->top_down = (scanout->flags & SPICE_GL_SCANOUT_FLAGS_Y0TOP) ? 0 : 1;
-    stream->stride = scanout->stride;
+    stream->stride = scanout->stride[0];
     /* This is the upper bound; it should be possible to stream at 60 FPS
      * with a hardware based encoder.
      */
@@ -501,7 +501,7 @@ bool is_new_stream_needed(DisplayChannel *display)
     }
 
     QXLInstance* qxl = display->priv->qxl;
-    SpiceMsgDisplayGlScanoutUnix *scanout = red_qxl_get_gl_scanout(qxl);
+    RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
     uint32_t width, height, top_down;
 
     if (!scanout) {

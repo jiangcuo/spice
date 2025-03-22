@@ -1788,15 +1788,23 @@ static void red_marshall_gl_draw_stream(DisplayChannelClient *dcc,
     }
 
     QXLInstance* qxl = display->priv->qxl;
-    SpiceMsgDisplayGlScanoutUnix *scanout = red_qxl_get_gl_scanout(qxl);
+    RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
     if (!scanout) {
         spice_warning("Cannot access scanout");
         delete dmabuf_data;
         return;
     }
 
-    dmabuf_data->drm_dma_buf_fd = scanout->drm_dma_buf_fd;
-    dmabuf_data->drm_fourcc_format = scanout->drm_fourcc_format;
+    /* TODO: add support for it */
+    if (scanout->num_planes > 1) {
+        spice_warning("Video encoder Does not support multi plane");
+        red_qxl_put_gl_scanout(qxl, scanout);
+        delete dmabuf_data;
+        return;
+    }
+
+    dmabuf_data->drm_dma_buf_fd = scanout->fd[0];
+    dmabuf_data->drm_fourcc_format = scanout->fourcc;
     dmabuf_data->width = stream->width;
     dmabuf_data->height = stream->height;
     dmabuf_data->stride = stream->stride;
@@ -2370,10 +2378,22 @@ static void marshall_gl_scanout(DisplayChannelClient *dcc,
     DisplayChannel *display_channel = DCC_TO_DC(dcc);
     QXLInstance* qxl = display_channel->priv->qxl;
 
-    SpiceMsgDisplayGlScanoutUnix *scanout = red_qxl_get_gl_scanout(qxl);
+    RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
     if (scanout != nullptr) {
-        dcc->init_send_data(SPICE_MSG_DISPLAY_GL_SCANOUT_UNIX);
-        spice_marshall_msg_display_gl_scanout_unix(m, scanout);
+        if (scanout->num_planes <= 1) {
+            SpiceMsgDisplayGlScanoutUnix msg;
+            msg.drm_dma_buf_fd = scanout->fd[0];
+            msg.width = scanout->width;
+            msg.height = scanout->height;
+            msg.stride = scanout->stride[0];
+            msg.drm_fourcc_format = scanout->fourcc;
+            msg.flags = scanout->flags;
+
+            dcc->init_send_data(SPICE_MSG_DISPLAY_GL_SCANOUT_UNIX);
+            spice_marshall_msg_display_gl_scanout_unix(m, &msg);
+        } else {
+            spice_error("gl scanout does not support multi plane");
+        }
     }
     red_qxl_put_gl_scanout(qxl, scanout);
 }
