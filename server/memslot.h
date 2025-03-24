@@ -40,7 +40,6 @@ typedef struct RedMemSlotInfo {
     uint8_t generation_bits;
     uint8_t memslot_id_shift;
     uint8_t memslot_gen_shift;
-    uint8_t internal_groupslot_id;
     uintptr_t memslot_gen_mask;
     uintptr_t memslot_clean_virt_mask;
 } RedMemSlotInfo;
@@ -66,8 +65,7 @@ void *memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t add_size
 void memslot_info_init(RedMemSlotInfo *info,
                        uint32_t num_groups, uint32_t num_slots,
                        uint8_t generation_bits,
-                       uint8_t id_bits,
-                       uint8_t internal_groupslot_id);
+                       uint8_t id_bits);
 void memslot_info_destroy(RedMemSlotInfo *info);
 void memslot_info_add_slot(RedMemSlotInfo *info, uint32_t slot_group_id, uint32_t slot_id,
                            uintptr_t addr_delta, uintptr_t virt_start, uintptr_t virt_end,

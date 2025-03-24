@@ -134,8 +134,7 @@ void *memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t add_size
 void memslot_info_init(RedMemSlotInfo *info,
                        uint32_t num_groups, uint32_t num_slots,
                        uint8_t generation_bits,
-                       uint8_t id_bits,
-                       uint8_t internal_groupslot_id)
+                       uint8_t id_bits)
 {
     uint32_t i;
 
@@ -146,7 +145,6 @@ void memslot_info_init(RedMemSlotInfo *info,
     info->num_memslots = num_slots;
     info->generation_bits = generation_bits;
     info->mem_slot_bits = id_bits;
-    info->internal_groupslot_id = internal_groupslot_id;
 
     info->mem_slots = g_new(MemSlot *, num_groups);
 

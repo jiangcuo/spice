@@ -976,8 +976,7 @@ RedWorker* red_worker_new(QXLInstance *qxl)
                       init_info.num_memslots_groups,
                       init_info.num_memslots,
                       init_info.memslot_gen_bits,
-                      init_info.memslot_id_bits,
-                      init_info.internal_groupslot_id);
+                      init_info.memslot_id_bits);
 
     worker->event_timeout = INF_EVENT_WAIT;
 
