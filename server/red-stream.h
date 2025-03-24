@@ -74,7 +74,7 @@ bool red_stream_is_plain_unix(const RedStream *stream);
 bool red_stream_set_no_delay(RedStream *stream, bool no_delay);
 int red_stream_get_no_delay(RedStream *stream);
 #ifndef _WIN32
-int red_stream_send_msgfd(RedStream *stream, int fd);
+int red_stream_send_msgfds(RedStream *stream, const int *fd, int num_fd);
 #endif
 
 /**

@@ -524,18 +524,23 @@ inline void RedChannelClientPrivate::restore_main_sender()
 void RedChannelClient::msg_sent()
 {
 #ifndef _WIN32
-    int fd[4];
+    int fd[4], num_fd;
 
-    if (spice_marshaller_get_fds(priv->send_data.marshaller, fd)) {
-        if (red_stream_send_msgfd(priv->stream, fd[0]) < 0) {
+    num_fd = spice_marshaller_get_fds(priv->send_data.marshaller, fd);
+    if (num_fd) {
+        int ret = red_stream_send_msgfds(priv->stream, fd, num_fd);
+        if (ret < 0) {
             perror("sendfd");
             disconnect();
-            if (fd[0] != -1)
-                close(fd[0]);
-            return;
         }
-        if (fd[0] != -1)
-            close(fd[0]);
+
+        for (int i = 0; i < num_fd; i++) {
+            if (fd[i] >= 0)
+                close(fd[i]);
+        }
+
+        if (ret < 0)
+            return;
     }
 #endif
 
