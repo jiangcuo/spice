@@ -196,8 +196,8 @@ static void red_record_path(FILE *fd, RedMemSlotInfo *slots, int group_id,
 
     qxl = (QXLPath *)memslot_get_virt(slots, addr, sizeof(*qxl), group_id);
     red_record_data_chunks_ptr(fd, "path", slots, group_id,
-                                   memslot_get_id(slots, addr),
-                                   &qxl->chunk);
+                               memslot_get_id(slots, addr),
+                               &qxl->chunk);
 }
 
 static void red_record_clip_rects(FILE *fd, RedMemSlotInfo *slots, int group_id,
@@ -208,8 +208,8 @@ static void red_record_clip_rects(FILE *fd, RedMemSlotInfo *slots, int group_id,
     qxl = (QXLClipRects *)memslot_get_virt(slots, addr, sizeof(*qxl), group_id);
     fprintf(fd, "num_rects %d\n", qxl->num_rects);
     red_record_data_chunks_ptr(fd, "clip_rects", slots, group_id,
-                                   memslot_get_id(slots, addr),
-                                   &qxl->chunk);
+                               memslot_get_id(slots, addr),
+                               &qxl->chunk);
 }
 
 static void red_record_virt_data_flat(FILE *fd, const char *prefix,
@@ -234,7 +234,7 @@ static void red_record_transform(FILE *fd, RedMemSlotInfo *slots, int group_id,
 }
 
 static void red_record_image(FILE *fd, RedMemSlotInfo *slots, int group_id,
-                                 QXLPHYSICAL addr, uint32_t flags)
+                             QXLPHYSICAL addr, uint32_t flags)
 {
     QXLImage *qxl;
     size_t bitmap_size, size;
@@ -269,8 +269,8 @@ static void red_record_image(FILE *fd, RedMemSlotInfo *slots, int group_id,
             num_ents = qp->num_ents;
             fprintf(fd, "qp.num_ents %d\n", qp->num_ents);
             memslot_validate_virt(slots, (intptr_t)qp->ents,
-                          memslot_get_id(slots, qxl->bitmap.palette),
-                          num_ents * sizeof(qp->ents[0]), group_id);
+                                  memslot_get_id(slots, qxl->bitmap.palette),
+                                  num_ents * sizeof(qp->ents[0]), group_id);
             fprintf(fd, "unique %" PRIu64 "\n", qp->unique);
             for (i = 0; i < num_ents; i++) {
                 fprintf(fd, "ents %d\n", qp->ents[i]);
@@ -279,8 +279,7 @@ static void red_record_image(FILE *fd, RedMemSlotInfo *slots, int group_id,
         bitmap_size = qxl->bitmap.y * qxl->bitmap.stride;
         if (qxl_flags & QXL_BITMAP_DIRECT) {
             red_record_image_data_flat(fd, slots, group_id,
-                                                         qxl->bitmap.data,
-                                                         bitmap_size);
+                                       qxl->bitmap.data, bitmap_size);
         } else {
             size = red_record_data_chunks(fd, "bitmap.data", slots, group_id,
                                           qxl->bitmap.data);
@@ -293,8 +292,8 @@ static void red_record_image(FILE *fd, RedMemSlotInfo *slots, int group_id,
     case SPICE_IMAGE_TYPE_QUIC:
         fprintf(fd, "quic.data_size %d\n", qxl->quic.data_size);
         size = red_record_data_chunks_ptr(fd, "quic.data", slots, group_id,
-                                       memslot_get_id(slots, addr),
-                                       (QXLDataChunk *)qxl->quic.data);
+                                          memslot_get_id(slots, addr),
+                                          (QXLDataChunk *)qxl->quic.data);
         spice_assert(size == qxl->quic.data_size);
         break;
     default:
@@ -355,7 +354,7 @@ static void red_record_copy_ptr(FILE *fd, RedMemSlotInfo *slots, int group_id,
 }
 
 static void red_record_blend_ptr(FILE *fd, RedMemSlotInfo *slots, int group_id,
-                             QXLBlend *qxl, uint32_t flags)
+                                 QXLBlend *qxl, uint32_t flags)
 {
    red_record_image(fd, slots, group_id, qxl->src_bitmap, flags);
    red_record_rect_ptr(fd, "src_area", &qxl->src_area);
@@ -365,8 +364,7 @@ static void red_record_blend_ptr(FILE *fd, RedMemSlotInfo *slots, int group_id,
 }
 
 static void red_record_transparent_ptr(FILE *fd, RedMemSlotInfo *slots, int group_id,
-                                    QXLTransparent *qxl,
-                                    uint32_t flags)
+                                       QXLTransparent *qxl, uint32_t flags)
 {
    red_record_image(fd, slots, group_id, qxl->src_bitmap, flags);
    red_record_rect_ptr(fd, "src_area", &qxl->src_area);
@@ -375,8 +373,7 @@ static void red_record_transparent_ptr(FILE *fd, RedMemSlotInfo *slots, int grou
 }
 
 static void red_record_alpha_blend_ptr(FILE *fd, RedMemSlotInfo *slots, int group_id,
-                                    QXLAlphaBlend *qxl,
-                                    uint32_t flags)
+                                       QXLAlphaBlend *qxl, uint32_t flags)
 {
     fprintf(fd, "alpha_flags %d\n", qxl->alpha_flags);
     fprintf(fd, "alpha %d\n", qxl->alpha);
@@ -385,8 +382,7 @@ static void red_record_alpha_blend_ptr(FILE *fd, RedMemSlotInfo *slots, int grou
 }
 
 static void red_record_alpha_blend_ptr_compat(FILE *fd, RedMemSlotInfo *slots, int group_id,
-                                           QXLCompatAlphaBlend *qxl,
-                                           uint32_t flags)
+                                              QXLCompatAlphaBlend *qxl, uint32_t flags)
 {
     fprintf(fd, "alpha %d\n", qxl->alpha);
     red_record_image(fd, slots, group_id, qxl->src_bitmap, flags);
@@ -681,7 +677,7 @@ static void red_record_message(FILE *fd, RedMemSlotInfo *slots, int group_id,
 }
 
 static void red_record_surface_cmd(FILE *fd, RedMemSlotInfo *slots, int group_id,
-                            QXLPHYSICAL addr)
+                                   QXLPHYSICAL addr)
 {
     QXLSurfaceCmd *qxl;
     size_t size;
@@ -724,8 +720,8 @@ static void red_record_cursor(FILE *fd, RedMemSlotInfo *slots, int group_id,
 
     fprintf(fd, "data_size %d\n", qxl->data_size);
     red_record_data_chunks_ptr(fd, "cursor", slots, group_id,
-                                   memslot_get_id(slots, addr),
-                                   &qxl->chunk);
+                               memslot_get_id(slots, addr),
+                               &qxl->chunk);
 }
 
 static void red_record_cursor_cmd(FILE *fd, RedMemSlotInfo *slots, int group_id,
