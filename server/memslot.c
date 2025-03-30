@@ -52,6 +52,13 @@ int memslot_validate_virt(RedMemSlotInfo *info, uintptr_t virt, int slot_id,
 {
     MemSlot *slot;
 
+    /* detect host group, see comment in memslot_get_virt */
+    slot = &info->mem_slots[group_id][0];
+    if (slot->virt_end_addr == ~(uintptr_t)0 && slot->virt_start_addr == 0 &&
+        slot->address_delta == 0) {
+        return 1;
+    }
+
     slot = &info->mem_slots[group_id][slot_id];
     if ((virt + add_size) < virt) {
         spice_critical("virtual address overlap");
@@ -100,6 +107,25 @@ void *memslot_get_virt(RedMemSlotInfo *info, QXLPHYSICAL addr, uint32_t add_size
     if (group_id >= info->num_memslots_groups) {
         spice_critical("group_id too big");
         return NULL;
+    }
+
+    /* Detect host group.
+     * If the first slot covers the entire memory that group is the host
+     * group, that spans the entire memory.
+     * And if the group spans the entire memory all the virtual address is
+     * basically the host memory address with no slot encoded.
+     * When Qemu computes the QXL address from host memory it does not fill
+     * slot and generation but just converts the pointer to QXL address and
+     * expects to be able to convert back that number to a valid pointer.
+     * But in the cases of some technologies like ARM64 TBI, AMD UAI or Intel
+     * LAM that use the higher address bits to store additional information
+     * the ways QXL addresses are split and joined back causes issues.
+     * So here we ignore the slot from caller and keep the entire address.
+     */
+    slot = &info->mem_slots[group_id][0];
+    if (slot->virt_end_addr == ~(uintptr_t)0 && slot->virt_start_addr == 0 &&
+        slot->address_delta == 0) {
+        return (void *)(uintptr_t)addr;
     }
 
     slot_id = memslot_get_id(info, addr);

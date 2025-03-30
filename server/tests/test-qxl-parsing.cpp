@@ -58,8 +58,11 @@ create_chunk(size_t prefix, uint32_t size, QXLDataChunk* prev, int fill)
 
 static void init_meminfo(RedMemSlotInfo *mem_info)
 {
-    memslot_info_init(mem_info, 1 /* groups */, 1 /* slots */, 1, 1);
-    memslot_info_add_slot(mem_info, 0, 0, 0 /* delta */, 0 /* start */, UINTPTR_MAX /* end */, 0 /* generation */);
+    memslot_info_init(mem_info, 2 /* groups */, 1 /* slots */, 1, 1);
+    memslot_info_add_slot(mem_info, 0, 0, 0 /* delta */, 0 /* start */, UINTPTR_MAX /* end */,
+                          0 /* generation */);
+    memslot_info_add_slot(mem_info, 1, 0, 0 /* delta */, 0 /* start */, 0x80000000u /* end */,
+                          0 /* generation */);
 }
 
 static void init_qxl_surface(QXLSurfaceCmd *qxl)
@@ -88,7 +91,7 @@ static void test_memslot_invalid_group_id(void)
     RedMemSlotInfo mem_info;
     init_meminfo(&mem_info);
 
-    memslot_get_virt(&mem_info, 0, 16, 1);
+    memslot_get_virt(&mem_info, 0, 16, 2);
 }
 
 static void test_memslot_invalid_slot_id(void)
@@ -96,7 +99,7 @@ static void test_memslot_invalid_slot_id(void)
     RedMemSlotInfo mem_info;
     init_meminfo(&mem_info);
 
-    memslot_get_virt(&mem_info, UINT64_C(1) << mem_info.memslot_id_shift, 16, 0);
+    memslot_get_virt(&mem_info, UINT64_C(1) << mem_info.memslot_id_shift, 16, 1);
 }
 
 static void test_memslot_invalid_addresses(void)
