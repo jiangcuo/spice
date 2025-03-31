@@ -56,7 +56,7 @@ AX_CXX_COMPILE_STDCXX_11
 AX_APPEND_COMPILE_FLAGS([-fno-exceptions -fno-check-new])
 AC_LANG_POP([C++])
 
-AC_CHECK_HEADERS([sys/time.h execinfo.h linux/sockios.h pthread_np.h])
+AC_CHECK_HEADERS([sys/time.h execinfo.h linux/sockios.h pthread_np.h drm/drm_fourcc.h])
 AC_CHECK_DECL([TCP_KEEPIDLE], [have_tcp_keepidle="yes"],,
               [#include <netinet/tcp.h>])
 AS_IF([test "x$have_tcp_keepidle" = "xyes"],

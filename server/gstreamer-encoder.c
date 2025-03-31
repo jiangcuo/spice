@@ -30,6 +30,9 @@
 #include <gst/app/gstappsrc.h>
 #include <gst/app/gstappsink.h>
 #include <gst/video/video.h>
+#if defined(HAVE_DRM_DRM_FOURCC_H) && GST_CHECK_VERSION(1, 24, 0)
+#define HAVE_GSTREAMER_DMABUF_ENCODING 1
+#endif
 #ifdef HAVE_GSTREAMER_DMABUF_ENCODING
 #include <gst/video/video-info-dma.h>
 #include <gst/allocators/gstdmabuf.h>
