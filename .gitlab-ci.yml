@@ -8,7 +8,7 @@ before_script:
     glib2-devel pixman-devel alsa-lib-devel openssl-devel libjpeg-turbo-devel
     libcacard-devel cyrus-sasl-devel lz4-devel opus-devel
     gstreamer1-devel gstreamer1-plugins-base-devel
-    gcc-c++ autoconf-archive
+    gcc-c++ autoconf-archive gawk
     -y
   - &protocol >
     git clone --depth=1 ${CI_REPOSITORY_URL/spice.git/spice-protocol.git} &&
