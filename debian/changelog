@@ -1,3 +1,9 @@
+spice (0.15.2-2) unstable; urgency=medium
+
+  * add h265 test support
+
+ -- Lierfang Support Team <itsupport@lierfang.com>  Sun, 04 May 2025 16:29:47 +0800
+
 spice (0.15.2-1) unstable; urgency=medium
 
   [ Michael Tokarev ]

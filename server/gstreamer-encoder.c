@@ -908,6 +908,8 @@ static const gchar* get_gst_codec_name(const SpiceGstEncoder *encoder)
         return "x264enc";
     case SPICE_VIDEO_CODEC_TYPE_VP9:
         return "vp9enc";
+    case SPICE_VIDEO_CODEC_TYPE_H265:
+        return "nvh265enc";
     default:
         /* gstreamer_encoder_new() should have rejected this codec type */
         spice_warning("unsupported codec type %d", encoder->base.codec_type);
@@ -968,6 +970,15 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
          *   thus helping with streaming.
          */
         gstenc_opts = g_strdup("byte-stream=true aud=true qp-min=15 qp-max=35 tune=4 sliced-threads=true speed-preset=ultrafast intra-refresh=true");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H265:
+        /* H.265/HEVC参数设置，优先适配NVIDIA硬件编码器 */
+        /* - preset=ultrafast: 追求实时编码
+         * - rc-mode=1: CBR恒定码率
+         * - qp-min/qp-max: 量化参数范围
+         * - zerolatency=1: 低延迟
+         */
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
         break;
     default:
         /* gstreamer_encoder_new() should have rejected this codec type */
@@ -1749,6 +1760,7 @@ VideoEncoder *gstreamer_encoder_new(SpiceVideoCodecType codec_type,
     spice_return_val_if_fail(codec_type == SPICE_VIDEO_CODEC_TYPE_MJPEG ||
                              codec_type == SPICE_VIDEO_CODEC_TYPE_VP8 ||
                              codec_type == SPICE_VIDEO_CODEC_TYPE_VP9 ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H265 ||
                              codec_type == SPICE_VIDEO_CODEC_TYPE_H264, NULL);
 
     GError *err = NULL;
