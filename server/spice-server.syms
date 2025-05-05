@@ -184,7 +184,7 @@ global:
     spice_server_free_video_codecs;
 } SPICE_SERVER_0.14.2;
 
-SPICE_SERVER_0.15.3 {
+SPICE_SERVER_0.16 {
 global:
     spice_qxl_gl_scanout2;
 } SPICE_SERVER_0.14.3;

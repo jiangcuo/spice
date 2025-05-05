@@ -12,9 +12,9 @@ AC_PREREQ([2.69])
 #   then set age to 0.
 #
 dnl TODO see server/spice-char.h TODO comment for API breakage
-m4_define([SPICE_CURRENT], [15])
-m4_define([SPICE_REVISION], [3])
-m4_define([SPICE_AGE], [14])
+m4_define([SPICE_CURRENT], [16])
+m4_define([SPICE_REVISION], [0])
+m4_define([SPICE_AGE], [15])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
         [spice-devel@lists.freedesktop.org], spice)
