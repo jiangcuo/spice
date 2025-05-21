@@ -909,7 +909,31 @@ static const gchar* get_gst_codec_name(const SpiceGstEncoder *encoder)
     case SPICE_VIDEO_CODEC_TYPE_VP9:
         return "vp9enc";
     case SPICE_VIDEO_CODEC_TYPE_H265:
+        return "x265enc";
+    case SPICE_VIDEO_CODEC_TYPE_H264_NVENC:
+        return "nvh264enc";
+    case SPICE_VIDEO_CODEC_TYPE_H264_AMF:
+        return "amfh264enc";
+    case SPICE_VIDEO_CODEC_TYPE_H264_QSV:
+        return "qsvh264enc";
+    case SPICE_VIDEO_CODEC_TYPE_H264_VAAPI:
+        return "vah264enc";
+    case SPICE_VIDEO_CODEC_TYPE_H265_NVENC:
         return "nvh265enc";
+    case SPICE_VIDEO_CODEC_TYPE_H265_AMF:
+        return "amfh265enc";
+    case SPICE_VIDEO_CODEC_TYPE_H265_QSV:
+        return "qsvh265enc";
+    case SPICE_VIDEO_CODEC_TYPE_H265_VAAPI:
+        return "vah265enc";
+    case SPICE_VIDEO_CODEC_TYPE_AV1_NVENC:
+        return "nvav1enc";
+    case SPICE_VIDEO_CODEC_TYPE_AV1_AMF:
+        return "amfav1enc";
+    case SPICE_VIDEO_CODEC_TYPE_AV1_QSV:
+        return "qsvav1enc";
+    case SPICE_VIDEO_CODEC_TYPE_AV1_VAAPI:
+        return "vaav1enc";
     default:
         /* gstreamer_encoder_new() should have rejected this codec type */
         spice_warning("unsupported codec type %d", encoder->base.codec_type);
@@ -972,12 +996,42 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
         gstenc_opts = g_strdup("byte-stream=true aud=true qp-min=15 qp-max=35 tune=4 sliced-threads=true speed-preset=ultrafast intra-refresh=true");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H265:
-        /* H.265/HEVC参数设置，优先适配NVIDIA硬件编码器 */
-        /* - preset=ultrafast: 追求实时编码
-         * - rc-mode=1: CBR恒定码率
-         * - qp-min/qp-max: 量化参数范围
-         * - zerolatency=1: 低延迟
-         */
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_AV1_NVENC:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_AV1_AMF:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_AV1_QSV:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_AV1_VAAPI:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H265_NVENC:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H265_AMF:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H265_QSV:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H265_VAAPI:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H264_NVENC:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H264_AMF:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H264_QSV:
+        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        break;
+    case SPICE_VIDEO_CODEC_TYPE_H264_VAAPI:
         gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
         break;
     default:
@@ -1761,7 +1815,19 @@ VideoEncoder *gstreamer_encoder_new(SpiceVideoCodecType codec_type,
                              codec_type == SPICE_VIDEO_CODEC_TYPE_VP8 ||
                              codec_type == SPICE_VIDEO_CODEC_TYPE_VP9 ||
                              codec_type == SPICE_VIDEO_CODEC_TYPE_H265 ||
-                             codec_type == SPICE_VIDEO_CODEC_TYPE_H264, NULL);
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H265_NVENC ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H265_AMF ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H265_QSV ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H265_VAAPI ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H264 ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H264_NVENC ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H264_AMF ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H264_QSV ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_H264_VAAPI ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_AV1_NVENC ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_AV1_AMF ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_AV1_QSV ||
+                             codec_type == SPICE_VIDEO_CODEC_TYPE_AV1_VAAPI, NULL);
 
     GError *err = NULL;
     if (!gst_init_check(NULL, NULL, &err)) {

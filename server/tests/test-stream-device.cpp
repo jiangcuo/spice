@@ -209,6 +209,7 @@ static void test_stream_device(TestFixture *fixture, gconstpointer user_data)
 
         p = add_format(p, 640, 480, SPICE_VIDEO_CODEC_TYPE_VP9);
 
+        p = add_format(p, 640, 480, SPICE_VIDEO_CODEC_TYPE_H265_NVENC);
         // this split the second format in half
         vmc_emu_add_read_till(vmc, p - 4);
 
