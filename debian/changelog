@@ -1,3 +1,14 @@
+spice (0.16.0-1) unstable; urgency=medium
+
+  * new upstream release
+  * d/copyright: fix empty License:
+  * d/control: mention to update qemu arch list when updating spice arch list
+  * d/libspice-server1.symbols: add 2 new symbols
+  * d/control: depend on spice-protocol >= 0.14.5
+  * d/rules: DPKG_GENSYMBOLS_CHECK_LEVEL=4
+
+ -- Michael Tokarev <mjt@tls.msk.ru>  Tue, 09 Sep 2025 22:37:14 +0300
+
 spice (0.15.2-1) unstable; urgency=medium
 
   [ Michael Tokarev ]
