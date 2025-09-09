@@ -27,6 +27,16 @@
 #include "red-common.h"
 #include "jpeg-encoder.h"
 
+#ifdef JCS_EXTENSIONS
+#  ifndef WORDS_BIGENDIAN
+#    define JCS_EXT_LE_BGRX JCS_EXT_BGRX
+#    define JCS_EXT_LE_BGR JCS_EXT_BGR
+#  else
+#    define JCS_EXT_LE_BGRX JCS_EXT_XRGB
+#    define JCS_EXT_LE_BGR JCS_EXT_RGB
+#  endif
+#endif
+
 struct JpegEncoderContext {
     JpegEncoderUsrContext *usr;
 
@@ -130,6 +140,7 @@ static void convert_RGB16_to_RGB24(void *line, int width, uint8_t **out_line)
    }
 }
 
+#ifndef JCS_EXTENSIONS
 static void convert_BGR24_to_RGB24(void *in_line, int width, uint8_t **out_line)
 {
     int x;
@@ -165,7 +176,7 @@ static void convert_BGRX32_to_RGB24(void *line, int width, uint8_t **out_line)
         *out_pix++ = pixel & 0xff;
     }
 }
-
+#endif
 
 #define FILL_LINES() {                                                  \
     if (lines == lines_end) {                                           \
@@ -186,9 +197,20 @@ static void do_jpeg_encode(JpegEncoder *jpeg, uint8_t *lines, unsigned int num_l
     width = jpeg->cur_image.width;
     stride = jpeg->cur_image.stride;
 
-    RGB24_line = g_new(uint8_t, width*3);
-
     lines_end = lines + (stride * num_lines);
+
+#ifdef JCS_EXTENSIONS
+    if (jpeg->cur_image.convert_line_to_RGB24 == NULL) {
+        for (;jpeg->cinfo.next_scanline < jpeg->cinfo.image_height; lines += stride) {
+            FILL_LINES();
+            row_pointer[0] = lines;
+            jpeg_write_scanlines(&jpeg->cinfo, row_pointer, 1);
+        }
+        return;
+    }
+#endif
+
+    RGB24_line = g_new(uint8_t, width*3);
 
     for (;jpeg->cinfo.next_scanline < jpeg->cinfo.image_height; lines += stride) {
         FILL_LINES();
@@ -215,10 +237,20 @@ int jpeg_encode(JpegEncoderContext *enc, int quality, JpegEncoderImageType type,
         enc->cur_image.convert_line_to_RGB24 = convert_RGB16_to_RGB24;
         break;
     case JPEG_IMAGE_TYPE_BGR24:
+#ifdef JCS_EXTENSIONS
+        enc->cinfo.in_color_space   = JCS_EXT_LE_BGR;
+        enc->cinfo.input_components = 3;
+#else
         enc->cur_image.convert_line_to_RGB24 = convert_BGR24_to_RGB24;
+#endif
         break;
     case JPEG_IMAGE_TYPE_BGRX32:
+#ifdef JCS_EXTENSIONS
+        enc->cinfo.in_color_space = JCS_EXT_LE_BGRX;
+        enc->cinfo.input_components = 4;
+#else
         enc->cur_image.convert_line_to_RGB24 = convert_BGRX32_to_RGB24;
+#endif
         break;
     default:
         spice_error("bad image type");

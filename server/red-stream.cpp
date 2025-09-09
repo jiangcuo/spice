@@ -44,7 +44,7 @@
 #include "websocket.h"
 
 // compatibility for *BSD systems
-#if !defined(TCP_CORK) && !defined(_WIN32)
+#if !defined(TCP_CORK) && !defined(_WIN32) && !defined(__APPLE__)
 #define TCP_CORK TCP_NOPUSH
 #endif
 
@@ -106,7 +106,8 @@ struct RedStreamPrivate {
     SpiceCoreInterfaceInternal *core;
 };
 
-#ifndef _WIN32
+// TCP_NOPUSH is broken on Darwin
+#if !defined(_WIN32) && !defined(__APPLE__)
 /**
  * Set TCP_CORK on socket
  */
@@ -348,17 +349,17 @@ int red_stream_get_no_delay(RedStream *stream)
 }
 
 #ifndef _WIN32
-int red_stream_send_msgfd(RedStream *stream, int fd)
+int red_stream_send_msgfds(RedStream *stream, const int *fd, int num_fd)
 {
     struct msghdr msgh = { nullptr, };
     struct iovec iov;
     int r;
 
-    const size_t fd_size = 1 * sizeof(int);
+    const size_t fd_size = num_fd * sizeof(int);
     struct cmsghdr *cmsg;
     union {
         struct cmsghdr hdr;
-        char data[CMSG_SPACE(fd_size)];
+        char data[CMSG_SPACE(4 * sizeof(int))];
     } control;
 
     spice_return_val_if_fail(red_stream_is_plain_unix(stream), -1);
@@ -369,19 +370,21 @@ int red_stream_send_msgfd(RedStream *stream, int fd)
     msgh.msg_iovlen = 1;
     msgh.msg_iov = &iov;
 
-    if (fd != -1) {
+    if (num_fd) {
+        unsigned controllen = CMSG_SPACE(fd_size);
+
         msgh.msg_control = control.data;
-        msgh.msg_controllen = sizeof(control.data);
+        msgh.msg_controllen = controllen;
         /* CMSG_SPACE() might be larger than CMSG_LEN() as it can include some
          * padding. We set the whole control data to 0 to avoid valgrind warnings
          */
-        memset(control.data, 0, sizeof(control.data));
+        memset(control.data, 0, controllen);
 
         cmsg = CMSG_FIRSTHDR(&msgh);
         cmsg->cmsg_len = CMSG_LEN(fd_size);
         cmsg->cmsg_level = SOL_SOCKET;
         cmsg->cmsg_type = SCM_RIGHTS;
-        memcpy(CMSG_DATA(cmsg), &fd, fd_size);
+        memcpy(CMSG_DATA(cmsg), fd, fd_size);
     }
 
     do {
@@ -524,7 +527,7 @@ RedStreamSslStatus red_stream_ssl_accept(RedStream *stream)
     }
 
 #ifndef SSL_OP_NO_RENEGOTIATION
-    // With OpenSSL 1.0.2 and earlier: disable client-side renogotiation
+    // With OpenSSL 1.0.2 and earlier: disable client-side renegotiation
     stream->priv->ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
 #endif
 

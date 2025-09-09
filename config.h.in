@@ -30,18 +30,18 @@
 /* define if the compiler supports basic C++11 syntax */
 #undef HAVE_CXX11
 
-/* Define to 1 if you have the declaration of `SSL_CTX_set_ecdh_auto', and to
+/* Define to 1 if you have the declaration of 'SSL_CTX_set_ecdh_auto', and to
    0 if you don't. */
 #undef HAVE_DECL_SSL_CTX_SET_ECDH_AUTO
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
+/* Define to 1 if you have the <drm/drm_fourcc.h> header file. */
+#undef HAVE_DRM_DRM_FOURCC_H
+
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
-
-/* Define if supporting GStreamer 0.10 */
-#undef HAVE_GSTREAMER_0_10
 
 /* Define if supporting GStreamer 1.0 */
 #undef HAVE_GSTREAMER_1_0
@@ -52,7 +52,7 @@
 /* Define to 1 if you have the <linux/sockios.h> header file. */
 #undef HAVE_LINUX_SOCKIOS_H
 
-/* Define to 1 if you have the `LZ4_compress_fast_continue' function. */
+/* Define to 1 if you have the 'LZ4_compress_fast_continue' function. */
 #undef HAVE_LZ4_COMPRESS_FAST_CONTINUE
 
 /* Define if you have POSIX threads libraries and header files. */
@@ -139,7 +139,7 @@
 	STACK_DIRECTION = 0 => direction of growth unknown */
 #undef STACK_DIRECTION
 
-/* Define to 1 if all of the C90 standard headers exist (not just the ones
+/* Define to 1 if all of the C89 standard headers exist (not just the ones
    required in a freestanding environment). This macro is provided for
    backward compatibility; new code need not use it. */
 #undef STDC_HEADERS
@@ -168,5 +168,5 @@
 /* Minimal Win32 version */
 #undef _WIN32_WINNT
 
-/* Define to `unsigned int' if <sys/types.h> does not define. */
+/* Define as 'unsigned int' if <stddef.h> doesn't define. */
 #undef size_t

@@ -184,6 +184,12 @@ typedef struct SpiceHead {
     uint32_t flags;
 } SpiceHead;
 
+typedef struct SpiceGlPlaneUnix {
+    int fd;
+    uint32_t offset;
+    uint32_t stride;
+} SpiceGlPlaneUnix;
+
 typedef struct SpiceMsgcDisplayInit {
     uint8_t pixmap_cache_id;
     int64_t pixmap_cache_size;
@@ -373,6 +379,16 @@ typedef struct SpiceMsgDisplayGlDraw {
     uint32_t w;
     uint32_t h;
 } SpiceMsgDisplayGlDraw;
+
+typedef struct SpiceMsgDisplayGlScanout2Unix {
+    uint32_t width;
+    uint32_t height;
+    uint32_t fourcc;
+    uint32_t flags;
+    uint8_t num_planes;
+    uint64_t modifier;
+    SpiceGlPlaneUnix planes[0];
+} SpiceMsgDisplayGlScanout2Unix;
 
 typedef struct SpiceMsgcKeyDown {
     uint32_t code;

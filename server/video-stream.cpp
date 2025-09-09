@@ -20,6 +20,7 @@
 #include "display-channel-private.h"
 #include "main-channel-client.h"
 #include "red-client.h"
+#include "red-qxl.h"
 
 #define FPS_TEST_INTERVAL 1
 #define FOREACH_STREAMS(display, item)                  \
@@ -115,6 +116,10 @@ void video_stream_stop(DisplayChannel *display, VideoStream *stream)
         }
         dcc->pipe_add(video_stream_destroy_item_new(stream_agent));
         video_stream_agent_stats_print(stream_agent);
+
+        if (stream == display->priv->gl_draw_stream) {
+            display->priv->gl_draw_stream = nullptr;
+        }
     }
     display->priv->streams_size_total -= stream->width * stream->height;
     ring_remove(&stream->link);
@@ -366,7 +371,53 @@ static VideoStream *display_channel_stream_try_new(DisplayChannel *display)
     return stream;
 }
 
-static void display_channel_create_stream(DisplayChannel *display, Drawable *drawable)
+static void display_channel_init_stream(DisplayChannel *display,
+                                        VideoStream *stream,
+                                        Drawable *drawable,
+                                        SpiceRect* src_rect)
+{
+    SpiceBitmap *bitmap;
+    uint64_t duration;
+
+    ring_add(&display->priv->streams, &stream->link);
+    stream->current = drawable;
+    stream->last_time = drawable ? drawable->creation_time :
+                        spice_get_monotonic_time_ns();
+    stream->width = src_rect->right - src_rect->left;
+    stream->height = src_rect->bottom - src_rect->top;
+    stream->dest_area = *src_rect;
+    stream->refs = 1;
+    stream->input_fps = MAX_FPS;
+    stream->num_input_frames = 0;
+    stream->input_fps_start_time = stream->last_time;
+    display->priv->streams_size_total += stream->width * stream->height;
+    display->priv->stream_count++;
+
+    if (drawable) {
+        drawable->stream = stream;
+        stream->dest_area = drawable->red_drawable->bbox;
+        bitmap = &drawable->red_drawable->u.copy.src_bitmap->u.bitmap;
+        stream->top_down = !!(bitmap->flags & SPICE_BITMAP_FLAGS_TOP_DOWN);
+
+        /* Provide an fps estimate the video encoder can use when initializing
+         * based on the frames that lead to the creation of the stream. Round
+         * to the nearest integer, for instance 24 for 23.976.
+         */
+        duration = drawable->creation_time - drawable->first_frame_time;
+        if (duration > NSEC_PER_SEC * drawable->frames_count / MAX_FPS) {
+            stream->input_fps = (NSEC_PER_SEC * drawable->frames_count + duration / 2) / duration;
+        }
+    }
+
+    spice_debug("stream %d %dx%d (%d, %d) (%d, %d) %u fps",
+                display_channel_get_video_stream_id(display, stream), stream->width,
+                stream->height, stream->dest_area.left, stream->dest_area.top,
+                stream->dest_area.right, stream->dest_area.bottom,
+                stream->input_fps);
+}
+
+static void display_channel_create_stream(DisplayChannel *display,
+                                          Drawable *drawable)
 {
     DisplayChannelClient *dcc;
     VideoStream *stream;
@@ -381,38 +432,127 @@ static void display_channel_create_stream(DisplayChannel *display, Drawable *dra
     spice_assert(drawable->red_drawable->type == QXL_DRAW_COPY);
     src_rect = &drawable->red_drawable->u.copy.src_area;
 
-    ring_add(&display->priv->streams, &stream->link);
-    stream->current = drawable;
-    stream->last_time = drawable->creation_time;
-    stream->width = src_rect->right - src_rect->left;
-    stream->height = src_rect->bottom - src_rect->top;
-    stream->dest_area = drawable->red_drawable->bbox;
-    stream->refs = 1;
-    SpiceBitmap *bitmap = &drawable->red_drawable->u.copy.src_bitmap->u.bitmap;
-    stream->top_down = !!(bitmap->flags & SPICE_BITMAP_FLAGS_TOP_DOWN);
-    drawable->stream = stream;
-    /* Provide an fps estimate the video encoder can use when initializing
-     * based on the frames that lead to the creation of the stream. Round to
-     * the nearest integer, for instance 24 for 23.976.
-     */
-    uint64_t duration = drawable->creation_time - drawable->first_frame_time;
-    if (duration > NSEC_PER_SEC * drawable->frames_count / MAX_FPS) {
-        stream->input_fps = (NSEC_PER_SEC * drawable->frames_count + duration / 2) / duration;
-    } else {
-        stream->input_fps = MAX_FPS;
-    }
-    stream->num_input_frames = 0;
-    stream->input_fps_start_time = drawable->creation_time;
-    display->priv->streams_size_total += stream->width * stream->height;
-    display->priv->stream_count++;
+    display_channel_init_stream(display, stream, drawable, src_rect);
     FOREACH_DCC(display, dcc) {
         dcc_create_stream(dcc, stream);
     }
-    spice_debug("stream %d %dx%d (%d, %d) (%d, %d) %u fps",
-                display_channel_get_video_stream_id(display, stream), stream->width,
-                stream->height, stream->dest_area.left, stream->dest_area.top,
-                stream->dest_area.right, stream->dest_area.bottom,
-                stream->input_fps);
+}
+
+bool display_channel_create_gl_draw_stream(DisplayChannel *display)
+{
+    QXLInstance* qxl = display->priv->qxl;
+    RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
+    DisplayChannelClient *dcc;
+    VideoStream *stream;
+    bool ret = false;
+
+    if (!scanout) {
+        return false;
+    }
+    SpiceRect dest_area = {
+        .left = 0,
+        .top = 0,
+        .right = scanout->width,
+        .bottom = scanout->height
+    };
+
+    if (display->priv->surfaces[0]) {
+        display_channel_surface_id_unref(display, 0);
+    }
+    if (!display_channel_create_surface(display, 0, scanout->width,
+                                        scanout->height, scanout->stride[0],
+                                        SPICE_SURFACE_FMT_32_xRGB,
+                                        nullptr, true, true)) {
+        goto err;
+    }
+
+    display_channel_set_monitors_config_to_primary(display);
+    display_channel_push_monitors_config(display);
+    display->pipes_add_empty_msg(SPICE_MSG_DISPLAY_MARK);
+    display->push();
+
+    if (!(stream = display_channel_stream_try_new(display))) {
+        goto err;
+    }
+
+    ret = true;
+    display_channel_init_stream(display, stream, nullptr, &dest_area);
+    stream->top_down = (scanout->flags & SPICE_GL_SCANOUT_FLAGS_Y0TOP) ? 0 : 1;
+    stream->stride = scanout->stride[0];
+    /* This is the upper bound; it should be possible to stream at 60 FPS
+     * with a hardware based encoder.
+     */
+    stream->input_fps = MAX_FPS * 2;
+
+    display->priv->gl_draw_stream = stream;
+    FOREACH_DCC(display, dcc) {
+        dcc_create_stream(dcc, stream);
+    }
+err:
+    red_qxl_put_gl_scanout(qxl, scanout);
+    return ret;
+}
+
+bool is_new_stream_needed(DisplayChannel *display)
+{
+    VideoStream *stream = display->priv->gl_draw_stream;
+    if (!stream) {
+        return true;
+    }
+
+    QXLInstance* qxl = display->priv->qxl;
+    RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
+    uint32_t width, height, top_down;
+
+    if (!scanout) {
+        return true;
+    }
+
+    width = scanout->width;
+    height = scanout->height;
+    top_down = (scanout->flags & SPICE_GL_SCANOUT_FLAGS_Y0TOP) ? 0 : 1;
+    red_qxl_put_gl_scanout(qxl, scanout);
+
+    if (stream->width == width &&
+        stream->height == height &&
+        stream->top_down == top_down) {
+        return false;
+    }
+    return true;
+}
+
+bool display_channel_update_gl_draw_stream(DisplayChannelClient *dcc,
+                                           const SpiceMsgDisplayGlDraw *draw)
+{
+    DisplayChannel *display = DCC_TO_DC(dcc);
+    SpiceRect dest_area = {
+        .left = draw->x,
+        .top = draw->y,
+        .right = draw->w,
+        .bottom = draw->h
+    };
+
+    if (is_new_stream_needed(display)) {
+        if (!display_channel_create_gl_draw_stream(display)) {
+            return false;
+        }
+    }
+
+    VideoStream *stream = display->priv->gl_draw_stream;
+    int stream_id = display_channel_get_video_stream_id(display, stream);
+    VideoStreamAgent *agent = dcc_get_video_stream_agent(dcc, stream_id);
+
+    /* Just a sanity check to make sure that an encoder was created */
+    if (!agent->video_encoder) {
+        dcc_create_stream(dcc, stream);
+        if (!agent->video_encoder) {
+            return false;
+        }
+    }
+
+    stream->dest_area = dest_area;
+    stream->last_time = spice_get_monotonic_time_ns();
+    return true;
 }
 
 // returns whether a stream was created
@@ -566,32 +706,6 @@ void video_stream_maintenance(DisplayChannel *display,
     }
 }
 
-static void dcc_update_streams_max_latency(DisplayChannelClient *dcc,
-                                           VideoStreamAgent *remove_agent)
-{
-    uint32_t new_max_latency = 0;
-    int i;
-
-    if (dcc_get_max_stream_latency(dcc) != remove_agent->client_required_latency) {
-        return;
-    }
-
-    dcc_set_max_stream_latency(dcc, 0);
-    if (DCC_TO_DC(dcc)->priv->stream_count == 1) {
-        return;
-    }
-    for (i = 0; i < NUM_STREAMS; i++) {
-        VideoStreamAgent *other_agent = dcc_get_video_stream_agent(dcc, i);
-        if (other_agent == remove_agent || !other_agent->video_encoder) {
-            continue;
-        }
-        if (other_agent->client_required_latency > new_max_latency) {
-            new_max_latency = other_agent->client_required_latency;
-        }
-    }
-    dcc_set_max_stream_latency(dcc, new_max_latency);
-}
-
 static uint64_t get_initial_bit_rate(DisplayChannelClient *dcc, VideoStream *stream)
 {
     char *env_bit_rate_str;
@@ -669,19 +783,6 @@ static uint32_t get_source_fps(void *opaque)
 
 static void update_client_playback_delay(void *opaque, uint32_t delay_ms)
 {
-    auto agent = static_cast<VideoStreamAgent *>(opaque);
-    DisplayChannelClient *dcc = agent->dcc;
-    RedClient *client = dcc->get_client();
-    RedsState *reds = client->get_server();
-
-    dcc_update_streams_max_latency(dcc, agent);
-
-    agent->client_required_latency = delay_ms;
-    if (delay_ms > dcc_get_max_stream_latency(dcc)) {
-        dcc_set_max_stream_latency(dcc, delay_ms);
-    }
-    spice_debug("resetting client latency: %u", dcc_get_max_stream_latency(dcc));
-    reds_get_main_dispatcher(reds)->set_mm_time_latency(client, dcc_get_max_stream_latency(dcc));
 }
 
 static void bitmap_ref(gpointer data)
@@ -775,9 +876,6 @@ void dcc_create_stream(DisplayChannelClient *dcc, VideoStream *stream)
 
 void video_stream_agent_stop(VideoStreamAgent *agent)
 {
-    DisplayChannelClient *dcc = agent->dcc;
-
-    dcc_update_streams_max_latency(dcc, agent);
     if (agent->video_encoder) {
         agent->video_encoder->destroy(agent->video_encoder);
         agent->video_encoder = nullptr;
@@ -940,7 +1038,8 @@ void video_stream_timeout(DisplayChannel *display)
     while (item) {
         VideoStream *stream = SPICE_CONTAINEROF(item, VideoStream, link);
         item = ring_next(ring, item);
-        if (now >= (stream->last_time + RED_STREAM_TIMEOUT)) {
+        if (now >= (stream->last_time + RED_STREAM_TIMEOUT) &&
+            stream != display->priv->gl_draw_stream) {
             detach_video_stream_gracefully(display, stream, nullptr);
             video_stream_stop(display, stream);
         }

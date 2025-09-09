@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2009 Red Hat, Inc.
+   Copyright (C) 2023 Intel Corporation.
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -15,23 +15,19 @@
    License along with this library; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef SOUND_H_
-#define SOUND_H_
+#pragma once
+#include <spice/macros.h>
 
-#include "red-common.h"
+#define INTEL_VENDOR_ID 0x8086
 
-#include "push-visibility.h"
+typedef enum {
+    VENDOR_GPU_UNKNOWN,
+    VENDOR_GPU_DETECTED,
+    VENDOR_GPU_NOTDETECTED,
+} GpuVendor;
 
-struct RedClient;
+SPICE_BEGIN_DECLS
 
-void snd_attach_playback(RedsState *reds, SpicePlaybackInstance *sin);
-void snd_detach_playback(SpicePlaybackInstance *sin);
+GpuVendor spice_udev_detect_gpu(int gpu_vendor);
 
-void snd_attach_record(RedsState *reds, SpiceRecordInstance *sin);
-void snd_detach_record(SpiceRecordInstance *sin);
-
-void snd_set_playback_compression(bool on);
-
-#include "pop-visibility.h"
-
-#endif /* SOUND_H_ */
+SPICE_END_DECLS

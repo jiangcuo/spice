@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 {
     RedStream *st[2];
     int sv[2];
-    int ret, fd = -1;
+    int ret, fd = -1, stdin_fd = 0;
     char c;
 
     spice_return_val_if_fail(server_init() == 0, -1);
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
     spice_assert(red_stream_is_plain_unix(st[1]));
 
     /* send stdin, for the fun of it */
-    ret = red_stream_send_msgfd(st[0], 0);
+    ret = red_stream_send_msgfds(st[0], &stdin_fd, 1);
     spice_assert(ret == 1);
     ret = sock_fd_read(sv[1], &c, 1, &fd);
     spice_assert(c == '@');
@@ -125,8 +125,8 @@ int main(int argc, char *argv[])
     spice_assert(fd != -1);
     close(fd);
 
-    /* send invalid fd behaviour */
-    ret = red_stream_send_msgfd(st[0], -1);
+    /* send no fd behaviour */
+    ret = red_stream_send_msgfds(st[0], NULL, 0);
     spice_assert(ret == 1);
     ret = sock_fd_read(sv[1], &c, 1, &fd);
     spice_assert(c == '@');
@@ -134,9 +134,9 @@ int main(int argc, char *argv[])
     spice_assert(fd == -1);
 
     /* batch test */
-    ret = red_stream_send_msgfd(st[0], 0);
+    ret = red_stream_send_msgfds(st[0], &stdin_fd, 1);
     spice_assert(ret == 1);
-    ret = red_stream_send_msgfd(st[0], 0);
+    ret = red_stream_send_msgfds(st[0], &stdin_fd, 1);
     spice_assert(ret == 1);
     ret = sock_fd_read(sv[1], &c, 1, &fd);
     spice_assert(c == '@');

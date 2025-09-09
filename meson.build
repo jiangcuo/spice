@@ -31,9 +31,9 @@ run_command('build-aux/meson/check-spice-common', check : true)
 #   then set age to 0.
 #
 #
-spice_server_current = 15
-spice_server_revision = 3
-spice_server_age = 14
+spice_server_current = 16
+spice_server_revision = 0
+spice_server_age = 15
 spice_server_so_version = '@0@.@1@.@2@'.format(spice_server_current - spice_server_age,
                                                spice_server_age,
                                                spice_server_revision)
@@ -52,7 +52,7 @@ spice_server_include = [include_directories('.')]
 spice_server_deps = [dependency('threads')]
 spice_server_link_args = []
 spice_server_requires = ''
-spice_protocol_version='0.14.3'
+spice_protocol_version='0.14.5'
 
 #
 # Spice common subproject
@@ -72,7 +72,8 @@ spice_protocol_version = spice_common.get_variable('spice_protocol_version')
 headers = ['sys/time.h',
            'execinfo.h',
            'linux/sockios.h',
-           'pthread_np.h']
+           'pthread_np.h',
+           'drm/drm_fourcc.h']
 
 foreach header : headers
   if compiler.has_header(header)
@@ -131,18 +132,14 @@ endforeach
 spice_server_has_gstreamer = false
 spice_server_gst_version = get_option('gstreamer')
 if spice_server_gst_version != 'no'
-  gst_deps = ['gstreamer', 'gstreamer-base', 'gstreamer-app', 'gstreamer-video']
+  gst_deps = ['gstreamer', 'gstreamer-base', 'gstreamer-app', 'gstreamer-video', 'gstreamer-allocators']
   foreach dep : gst_deps
     dep = '@0@-@1@'.format(dep, spice_server_gst_version)
     spice_server_deps += dependency(dep)
   endforeach
   spice_server_deps += dependency('orc-0.4')
 
-  gst_def = 'HAVE_GSTREAMER'
-  if spice_server_gst_version == '1.0'
-    gst_def = 'HAVE_GSTREAMER_1_0'
-  endif
-
+  gst_def = 'HAVE_GSTREAMER_1_0'
   spice_server_config_data.set(gst_def, '1')
   spice_server_has_gstreamer = true
 endif

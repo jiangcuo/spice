@@ -23,6 +23,18 @@
 
 SPICE_BEGIN_DECLS
 
+struct RedGLScanout {
+    int fd[4];
+    uint32_t width;
+    uint32_t height;
+    uint32_t offset[4];
+    uint32_t stride[4];
+    uint32_t fourcc;
+    uint32_t num_planes;
+    uint32_t flags;
+    uint64_t modifier;
+};
+
 void red_qxl_init(SpiceServer *reds, QXLInstance *qxl);
 void red_qxl_destroy(QXLInstance *qxl);
 
@@ -37,8 +49,8 @@ void red_qxl_start(QXLInstance *qxl);
 uint32_t red_qxl_get_ram_size(QXLInstance *qxl);
 gboolean red_qxl_client_monitors_config(QXLInstance *qxl, VDAgentMonitorsConfig *monitors_config);
 bool red_qxl_get_allow_client_mouse(QXLInstance *qxl, int *x_res, int *y_res, int *allow_now);
-SpiceMsgDisplayGlScanoutUnix *red_qxl_get_gl_scanout(QXLInstance *qxl);
-void red_qxl_put_gl_scanout(QXLInstance *qxl, SpiceMsgDisplayGlScanoutUnix *scanout);
+RedGLScanout *red_qxl_get_gl_scanout(QXLInstance *qxl);
+void red_qxl_put_gl_scanout(QXLInstance *qxl, RedGLScanout *scanout);
 void red_qxl_gl_draw_async_complete(QXLInstance *qxl);
 int red_qxl_check_qxl_version(QXLInstance *qxl, int major, int minor);
 SpiceServer* red_qxl_get_server(QXLState *qxl);

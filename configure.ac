@@ -12,9 +12,9 @@ AC_PREREQ([2.69])
 #   then set age to 0.
 #
 dnl TODO see server/spice-char.h TODO comment for API breakage
-m4_define([SPICE_CURRENT], [15])
-m4_define([SPICE_REVISION], [3])
-m4_define([SPICE_AGE], [14])
+m4_define([SPICE_CURRENT], [16])
+m4_define([SPICE_REVISION], [0])
+m4_define([SPICE_AGE], [15])
 
 AC_INIT(spice, [m4_esyscmd(build-aux/git-version-gen .tarball-version)],
         [spice-devel@lists.freedesktop.org], spice)
@@ -56,7 +56,7 @@ AX_CXX_COMPILE_STDCXX_11
 AX_APPEND_COMPILE_FLAGS([-fno-exceptions -fno-check-new])
 AC_LANG_POP([C++])
 
-AC_CHECK_HEADERS([sys/time.h execinfo.h linux/sockios.h pthread_np.h])
+AC_CHECK_HEADERS([sys/time.h execinfo.h linux/sockios.h pthread_np.h drm/drm_fourcc.h])
 AC_CHECK_DECL([TCP_KEEPIDLE], [have_tcp_keepidle="yes"],,
               [#include <netinet/tcp.h>])
 AS_IF([test "x$have_tcp_keepidle" = "xyes"],
@@ -94,12 +94,12 @@ dnl Check optional features
 SPICE_CHECK_SMARTCARD
 
 AC_ARG_ENABLE(gstreamer,
-              AS_HELP_STRING([--enable-gstreamer=@<:@auto/0.10/1.0/yes/no@:>@],
+              AS_HELP_STRING([--enable-gstreamer=@<:@auto/1.0/yes/no@:>@],
                              [Enable GStreamer support]),,
               [enable_gstreamer="auto"])
 
 if test "x$enable_gstreamer" != "xno" && test "x$enable_gstreamer" != "x0.10"; then
-    SPICE_CHECK_GSTREAMER(GSTREAMER_1_0, 1.0, [gstreamer-1.0 gstreamer-base-1.0 gstreamer-app-1.0 gstreamer-video-1.0],
+    SPICE_CHECK_GSTREAMER(GSTREAMER_1_0, 1.0, [gstreamer-1.0 gstreamer-base-1.0 gstreamer-app-1.0 gstreamer-video-1.0 gstreamer-allocators-1.0],
         [enable_gstreamer="1.0"
          SPICE_CHECK_GSTREAMER_ELEMENTS($GST_INSPECT_1_0, [gst-plugins-base 1.0], [appsrc videoconvert appsink])
          SPICE_CHECK_GSTREAMER_ELEMENTS($GST_INSPECT_1_0, [gstreamer-libav 1.0], [avenc_mjpeg])
@@ -112,20 +112,7 @@ if test "x$enable_gstreamer" != "xno" && test "x$enable_gstreamer" != "x0.10"; t
     ])
 fi
 
-if test "x$enable_gstreamer" != "xno" && test "x$enable_gstreamer" != "x1.0"; then
-    SPICE_CHECK_GSTREAMER(GSTREAMER_0_10, 0.10, [gstreamer-0.10 gstreamer-base-0.10 gstreamer-app-0.10 gstreamer-video-0.10],
-        [enable_gstreamer="0.10"
-         SPICE_CHECK_GSTREAMER_ELEMENTS($GST_INSPECT_0_10, [gst-plugins-base 0.10], [appsrc appsink])
-         SPICE_CHECK_GSTREAMER_ELEMENTS($GST_INSPECT_0_10, [gstreamer-ffmpeg 0.10], [ffmpegcolorspace ffenc_mjpeg])
-         SPICE_CHECK_GSTREAMER_ELEMENTS($GST_INSPECT_0_10, [gst-plugins-bad 0.10], [vp8enc])
-         SPICE_CHECK_GSTREAMER_ELEMENTS($GST_INSPECT_0_10, [gst-plugins-ugly 0.10], [x264enc])
-        ],
-        [if test "x$enable_gstreamer" = "x0.10"; then
-             AC_MSG_ERROR([GStreamer 0.10 support requested but not found. You may set GSTREAMER_0_10_CFLAGS and GSTREAMER_0_10_LIBS to avoid the need to call pkg-config.])
-         fi
-    ])
-fi
-AM_CONDITIONAL(HAVE_GSTREAMER, test "x$have_gstreamer_0_10" = "xyes" || test "x$have_gstreamer_1_0" = "xyes")
+AM_CONDITIONAL(HAVE_GSTREAMER, test "x$have_gstreamer_1_0" = "xyes")
 AM_CONDITIONAL(HAVE_GSTREAMER_1_0, test "x$have_gstreamer_1_0" = "xyes")
 
 AS_IF([test "x$enable_gstreamer" = "xyes"],
@@ -137,7 +124,7 @@ AS_IF([test x"$missing_gstreamer_elements" = xyes],
     [SPICE_WARNING([The GStreamer video encoder can be built but may not work.])
 ])
 
-if test "x$have_gstreamer_0_10" = "xyes" || test "x$have_gstreamer_1_0" = "xyes"; then
+if test "x$have_gstreamer_1_0" = "xyes"; then
     PKG_CHECK_MODULES(ORC, orc-0.4)
     AC_SUBST(ORC_CFLAGS)
     AC_SUBST(ORC_LIBS)
@@ -165,7 +152,7 @@ AM_CONDITIONAL(HAVE_SASL, test "x$have_sasl" = "xyes")
 
 dnl =========================================================================
 dnl Check deps
-m4_define([SPICE_PROTOCOL_MIN_VER],[0.14.3])
+m4_define([SPICE_PROTOCOL_MIN_VER],[0.14.5])
 m4_include([subprojects/spice-common/m4/common.m4])
 
 LT_LIB_M

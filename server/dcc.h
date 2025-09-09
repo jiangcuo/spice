@@ -47,6 +47,13 @@ public:
                          spice_wan_compression_t zlib_glz_state);
     virtual void disconnect() override;
 
+    bool is_gl_client()
+    {
+        return red_stream_is_plain_unix(get_stream()) &&
+            (test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT) ||
+             test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT2));
+    }
+
 protected:
     virtual bool handle_message(uint16_t type, uint32_t size, void *msg) override;
     virtual bool config_socket() override;
@@ -151,8 +158,6 @@ VideoStreamAgent *dcc_get_video_stream_agent(DisplayChannelClient *dcc, int stre
 ImageEncoders *dcc_get_encoders(DisplayChannelClient *dcc);
 spice_wan_compression_t    dcc_get_jpeg_state                        (DisplayChannelClient *dcc);
 spice_wan_compression_t    dcc_get_zlib_glz_state                    (DisplayChannelClient *dcc);
-uint32_t dcc_get_max_stream_latency(DisplayChannelClient *dcc);
-void dcc_set_max_stream_latency(DisplayChannelClient *dcc, uint32_t latency);
 uint64_t dcc_get_max_stream_bit_rate(DisplayChannelClient *dcc);
 void dcc_set_max_stream_bit_rate(DisplayChannelClient *dcc, uint64_t rate);
 gboolean dcc_is_low_bandwidth(DisplayChannelClient *dcc);

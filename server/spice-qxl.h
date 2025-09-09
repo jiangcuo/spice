@@ -151,6 +151,14 @@ void spice_qxl_set_device_info(QXLInstance *instance,
                                uint32_t device_display_id_start,
                                uint32_t device_display_id_count);
 
+/* since spice 0.15.3 */
+void spice_qxl_gl_scanout2(QXLInstance *qxl,
+                           const int *fd,
+                           uint32_t width, uint32_t height,
+                           const uint32_t *offset, const uint32_t *stride,
+                           uint32_t num_planes, uint32_t format,
+                           uint64_t modifier, int y_0_top);
+
 typedef struct QXLDevInitInfo {
     uint32_t num_memslots_groups;
     uint32_t num_memslots;

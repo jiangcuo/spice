@@ -130,9 +130,9 @@ if spice_common_generate_client_code or spice_common_generate_server_code
   python = py_module.find_installation('python3')
 
   if get_option('python-checks')
-    foreach module : ['six', 'pyparsing']
+    foreach module : ['pyparsing']
       message('Checking for python module @0@'.format(module))
-      cmd = run_command(python, '-c', 'import @0@'.format(module))
+      cmd = run_command(python, '-c', 'import @0@'.format(module), check : false)
       if cmd.returncode() != 0
         error('Python module @0@ not found'.format(module))
       endif
@@ -145,6 +145,13 @@ smartcard_dep = dependency('libcacard', required : get_option('smartcard'), vers
 if smartcard_dep.found()
   spice_common_deps += smartcard_dep
   spice_common_config_data.set('USE_SMARTCARD', '1')
+endif
+
+# udev check
+udev_dep = dependency('libudev', required : false)
+if udev_dep.found()
+  spice_common_deps += udev_dep
+  spice_common_config_data.set('HAVE_UDEV', '1')
 endif
 
 #

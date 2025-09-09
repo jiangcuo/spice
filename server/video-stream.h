@@ -75,7 +75,6 @@ struct VideoStreamAgent {
     DisplayChannelClient *dcc;
 
     uint32_t report_id;
-    uint32_t client_required_latency;
 #ifdef STREAM_STATS
     StreamStats stats;
 #endif
@@ -113,6 +112,7 @@ struct VideoStream {
     red_time_t last_time;
     int width;
     int height;
+    uint32_t stride;
     SpiceRect dest_area;
     int top_down;
     VideoStream *next;
@@ -124,6 +124,9 @@ struct VideoStream {
 };
 
 void display_channel_init_video_streams(DisplayChannel *display);
+bool display_channel_create_gl_draw_stream(DisplayChannel *display);
+bool display_channel_update_gl_draw_stream(DisplayChannelClient *dcc,
+                                           const SpiceMsgDisplayGlDraw *draw);
 void video_stream_stop(DisplayChannel *display, VideoStream *stream);
 void video_stream_trace_update(DisplayChannel *display, Drawable *drawable);
 void video_stream_maintenance(DisplayChannel *display, Drawable *candidate,

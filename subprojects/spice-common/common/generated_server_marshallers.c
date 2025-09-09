@@ -1078,6 +1078,32 @@ void spice_marshall_msg_display_gl_draw(SPICE_GNUC_UNUSED SpiceMarshaller *m, SP
     spice_marshaller_add_uint32(m, src->h);
 }
 
+void spice_marshall_msg_display_gl_scanout2_unix(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgDisplayGlScanout2Unix *msg)
+{
+    SPICE_GNUC_UNUSED SpiceMarshaller *m2;
+    const SpiceMsgDisplayGlScanout2Unix *src;
+    const SpiceGlPlaneUnix *  planes__element;
+    uint32_t i;
+    src = (const SpiceMsgDisplayGlScanout2Unix *)msg;
+
+    spice_marshaller_add_uint32(m, src->width);
+    spice_marshaller_add_uint32(m, src->height);
+    spice_marshaller_add_uint32(m, src->fourcc);
+    spice_marshaller_add_uint32(m, src->flags);
+    spice_marshaller_add_uint8(m, src->num_planes);
+    spice_marshaller_add_uint64(m, src->modifier);
+    planes__element = src->planes;
+    for (i = 0; i < src->num_planes; i++) {
+        const SpiceGlPlaneUnix *src2;
+        src2 = (const SpiceGlPlaneUnix *)planes__element;
+
+        spice_marshaller_add_fd(m, src2->fd);
+        spice_marshaller_add_uint32(m, src2->offset);
+        spice_marshaller_add_uint32(m, src2->stride);
+        planes__element++;
+    }
+}
+
 void spice_marshall_msg_inputs_init(SPICE_GNUC_UNUSED SpiceMarshaller *m, SPICE_GNUC_UNUSED const SpiceMsgInputsInit *msg)
 {
     SPICE_GNUC_UNUSED SpiceMarshaller *m2;

@@ -109,8 +109,8 @@ struct SpiceMarshaller {
     MarshallerItem *items;
 
     MarshallerItem static_items[N_STATIC_ITEMS];
-    bool has_fd;
-    int fd;
+    int num_fd;
+    int fd[4];
 };
 
 struct SpiceMarshallerData {
@@ -137,8 +137,8 @@ static void spice_marshaller_init(SpiceMarshaller *m,
     m->n_items = 0;
     m->items_size = N_STATIC_ITEMS;
     m->items = m->static_items;
-    m->fd = -1;
-    m->has_fd = false;
+    m->fd[0] = m->fd[1] = m->fd[2] = m->fd[3] = -1;
+    m->num_fd = 0;
 }
 
 SpiceMarshaller *spice_marshaller_new(void)
@@ -187,6 +187,7 @@ void spice_marshaller_reset(SpiceMarshaller *m)
 {
     SpiceMarshaller *m2, *next;
     SpiceMarshallerData *d;
+    int i;
 
     /* Only supported for root marshaller */
     assert(m->data->marshallers == m);
@@ -205,12 +206,14 @@ void spice_marshaller_reset(SpiceMarshaller *m)
     m->next = NULL;
     m->n_items = 0;
     m->total_size = 0;
-    if (m->has_fd) {
-        m->has_fd = false;
-        if (m->fd != -1) {
-            close(m->fd);
+
+    for (i = 0; i < m->num_fd; i++) {
+        if (m->fd[i] >= 0) {
+            close(m->fd[i]);
+            m->fd[i] = -1;
         }
     }
+    m->num_fd = 0;
 
     d = m->data;
     d->last_marshaller = d->marshallers;
@@ -656,25 +659,23 @@ void *spice_marshaller_add_int8(SpiceMarshaller *m, int8_t v)
 
 void spice_marshaller_add_fd(SpiceMarshaller *m, int fd)
 {
-    spice_assert(m->has_fd == false);
+    spice_assert(m->num_fd < 4);
 
-    m->has_fd = true;
     if (fd != -1) {
-        m->fd = dup(fd);
-        if (m->fd == -1) {
+        m->fd[m->num_fd] = dup(fd);
+        if (m->fd[m->num_fd] == -1) {
             perror("dup");
         }
-    } else {
-        m->fd = -1;
+        m->num_fd++;
     }
 }
 
-bool spice_marshaller_get_fd(SpiceMarshaller *m, int *fd)
+int spice_marshaller_get_fds(SpiceMarshaller *m, int fd[4])
 {
-    bool had_fd = m->has_fd;
+    int num_fd = m->num_fd;
 
-    *fd = m->fd;
-    m->has_fd = false;
+    memcpy(fd, m->fd, sizeof(m->fd));
+    m->num_fd = 0;
 
-    return had_fd;
+    return num_fd;
 }
