@@ -52,6 +52,8 @@ libspice_common_la_SOURCES =		\
 	rop3.h				\
 	snd_codec.c			\
 	snd_codec.h			\
+	udev.c				\
+	udev.h				\
 	utils.c				\
 	utils.h				\
 	verify.h			\
@@ -108,6 +110,7 @@ AM_CPPFLAGS =				\
 
 libspice_common_la_LIBADD =				\
 	$(SPICE_COMMON_LIBS)				\
+	$(UDEV_LIBS)					\
 	$(NULL)
 
 MARSHALLERS_DEPS =					\

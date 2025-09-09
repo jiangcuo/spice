@@ -39,6 +39,8 @@ spice_common_sources = [
   'snd_codec.h',
   'utils.c',
   'utils.h',
+  'udev.c',
+  'udev.h',
   'verify.h',
   'recorder.h'
 ]

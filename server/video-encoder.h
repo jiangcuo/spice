@@ -56,6 +56,15 @@ typedef struct VideoEncoderStats {
     double avg_quality;
 } VideoEncoderStats;
 
+typedef struct VideoEncoderDmabufData {
+    int drm_dma_buf_fd;
+    uint32_t width;
+    uint32_t height;
+    uint32_t stride;
+    uint32_t drm_fourcc_format;
+    void (*free)(struct VideoEncoderDmabufData*);
+} VideoEncoderDmabufData;
+
 typedef struct VideoEncoder VideoEncoder;
 struct VideoEncoder {
     /* Releases the video encoder's resources */
@@ -83,6 +92,10 @@ struct VideoEncoder {
                                        const SpiceBitmap *bitmap,
                                        const SpiceRect *src, int top_down,
                                        gpointer bitmap_opaque, VideoBuffer** outbuf);
+
+    VideoEncodeResults (*encode_dmabuf)(VideoEncoder *encoder, uint32_t frame_mm_time,
+                                        VideoEncoderDmabufData *dmabuf_data,
+                                        VideoBuffer** outbuf);
 
     /*
      * Bit rate control methods.
@@ -200,7 +213,7 @@ VideoEncoder* mjpeg_encoder_new(SpiceVideoCodecType codec_type,
                                 VideoEncoderRateControlCbs *cbs,
                                 bitmap_ref_t bitmap_ref,
                                 bitmap_unref_t bitmap_unref);
-#if defined(HAVE_GSTREAMER_1_0) || defined(HAVE_GSTREAMER_0_10)
+#if defined(HAVE_GSTREAMER_1_0)
 VideoEncoder* gstreamer_encoder_new(SpiceVideoCodecType codec_type,
                                     uint64_t starting_bit_rate,
                                     VideoEncoderRateControlCbs *cbs,

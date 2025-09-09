@@ -1637,6 +1637,60 @@ static void red_release_video_encoder_buffer(uint8_t *data, void *opaque)
     buffer->free(buffer);
 }
 
+static void red_init_display_stream_data(DisplayChannelClient *dcc,
+                                         SpiceMarshaller *base_marshaller,
+                                         Drawable *drawable, int stream_id,
+                                         VideoBuffer *outbuf, int is_sized)
+{
+    SpiceMsgDisplayStreamData stream_data;
+    SpiceMsgDisplayStreamDataSized stream_data_sized;
+    SpiceStreamDataHeader *base;
+    SpiceCopy *copy;
+    uint32_t frame_mm_time = reds_get_mm_time();
+    uint16_t msg_type = is_sized ? SPICE_MSG_DISPLAY_STREAM_DATA_SIZED :
+                        SPICE_MSG_DISPLAY_STREAM_DATA;
+
+    dcc->init_send_data(msg_type);
+
+    base = is_sized ? &stream_data_sized.base : &stream_data.base;
+    base->id = stream_id;
+    base->multi_media_time = frame_mm_time;
+    stream_data.data_size = outbuf->size;
+
+    if (is_sized) {
+        copy = &drawable->red_drawable->u.copy;
+        frame_mm_time = drawable->red_drawable->mm_time ?
+                        drawable->red_drawable->mm_time :
+                        reds_get_mm_time();
+
+        stream_data_sized.base.multi_media_time = frame_mm_time;
+        stream_data_sized.width = copy->src_area.right - copy->src_area.left;
+        stream_data_sized.height = copy->src_area.bottom - copy->src_area.top;
+        stream_data_sized.dest = drawable->red_drawable->bbox;
+        stream_data_sized.data_size = outbuf->size;
+
+        spice_debug("stream %d: sized frame: dest ==> ",
+                    stream_data_sized.base.id);
+        rect_debug(&stream_data_sized.dest);
+        spice_marshall_msg_display_stream_data_sized(base_marshaller,
+                                                     &stream_data_sized);
+    } else {
+        spice_marshall_msg_display_stream_data(base_marshaller, &stream_data);
+    }
+
+    spice_marshaller_add_by_ref_full(base_marshaller, outbuf->data,
+                                     outbuf->size,
+                                     &red_release_video_encoder_buffer,
+                                     outbuf);
+#ifdef STREAM_STATS
+    VideoStreamAgent *agent = &dcc->priv->stream_agents[stream_id];
+
+    agent->stats.num_frames_sent++;
+    agent->stats.size_sent += outbuf->size;
+    agent->stats.end = frame_mm_time;
+#endif
+}
+
 static bool red_marshall_stream_data(DisplayChannelClient *dcc,
                                      SpiceMarshaller *base_marshaller,
                                      Drawable *drawable)
@@ -1693,41 +1747,96 @@ static bool red_marshall_stream_data(DisplayChannelClient *dcc,
         return FALSE;
     }
 
-    if (!is_sized) {
-        SpiceMsgDisplayStreamData stream_data;
-
-        dcc->init_send_data(SPICE_MSG_DISPLAY_STREAM_DATA);
-
-        stream_data.base.id = stream_id;
-        stream_data.base.multi_media_time = frame_mm_time;
-        stream_data.data_size = outbuf->size;
-
-        spice_marshall_msg_display_stream_data(base_marshaller, &stream_data);
-    } else {
-        SpiceMsgDisplayStreamDataSized stream_data;
-
-        dcc->init_send_data(SPICE_MSG_DISPLAY_STREAM_DATA_SIZED);
-
-        stream_data.base.id = stream_id;
-        stream_data.base.multi_media_time = frame_mm_time;
-        stream_data.data_size = outbuf->size;
-        stream_data.width = copy->src_area.right - copy->src_area.left;
-        stream_data.height = copy->src_area.bottom - copy->src_area.top;
-        stream_data.dest = drawable->red_drawable->bbox;
-
-        spice_debug("stream %d: sized frame: dest ==> ", stream_data.base.id);
-        rect_debug(&stream_data.dest);
-        spice_marshall_msg_display_stream_data_sized(base_marshaller, &stream_data);
-    }
-    spice_marshaller_add_by_ref_full(base_marshaller, outbuf->data, outbuf->size,
-                                     &red_release_video_encoder_buffer, outbuf);
-#ifdef STREAM_STATS
-    agent->stats.num_frames_sent++;
-    agent->stats.size_sent += outbuf->size;
-    agent->stats.end = frame_mm_time;
-#endif
-
+    red_init_display_stream_data(dcc, base_marshaller, drawable,
+                                 stream_id, outbuf, is_sized);
     return TRUE;
+}
+
+struct DmabufData: public VideoEncoderDmabufData
+{
+    DisplayChannelClient *dcc;
+};
+
+static void red_free_cb(VideoEncoderDmabufData *video_dmabuf_data)
+{
+    auto dmabuf_data = static_cast<DmabufData*>(video_dmabuf_data);
+    auto dcc = dmabuf_data->dcc;
+    DisplayChannel *display = DCC_TO_DC(dcc);
+
+    dcc->priv->gl_draw_ongoing = false;
+    display_channel_gl_draw_done(display);
+    delete dmabuf_data;
+}
+
+static void red_marshall_gl_draw_stream(DisplayChannelClient *dcc,
+                                        SpiceMarshaller *base_marshaller)
+{
+    DisplayChannel *display = DCC_TO_DC(dcc);
+    VideoStream *stream = display->priv->gl_draw_stream;
+    int stream_id = display_channel_get_video_stream_id(display, stream);
+    VideoStreamAgent *agent = &dcc->priv->stream_agents[stream_id];
+
+    if (!agent->video_encoder || !agent->video_encoder->encode_dmabuf) {
+        spice_warning("No video encoder available for this stream");
+        return;
+    }
+
+    DmabufData *dmabuf_data = new DmabufData;
+    if (!dmabuf_data) {
+        spice_warning("Cannot create memory for dmabuf data");
+        return;
+    }
+
+    QXLInstance* qxl = display->priv->qxl;
+    RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
+    if (!scanout) {
+        spice_warning("Cannot access scanout");
+        delete dmabuf_data;
+        return;
+    }
+
+    /* TODO: add support for it */
+    if (scanout->num_planes > 1) {
+        spice_warning("Video encoder Does not support multi plane");
+        red_qxl_put_gl_scanout(qxl, scanout);
+        delete dmabuf_data;
+        return;
+    }
+
+    dmabuf_data->drm_dma_buf_fd = scanout->fd[0];
+    dmabuf_data->drm_fourcc_format = scanout->fourcc;
+    dmabuf_data->width = stream->width;
+    dmabuf_data->height = stream->height;
+    dmabuf_data->stride = stream->stride;
+    dmabuf_data->dcc = dcc;
+    dmabuf_data->free = red_free_cb;
+    red_qxl_put_gl_scanout(qxl, scanout);
+
+    VideoBuffer *outbuf;
+    VideoEncodeResults ret;
+
+    ret = agent->video_encoder->encode_dmabuf(agent->video_encoder,
+                                              reds_get_mm_time(),
+                                              dmabuf_data, &outbuf);
+
+    if (ret != VIDEO_ENCODER_FRAME_ENCODE_DONE) {
+        if (ret == VIDEO_ENCODER_FRAME_DROP) {
+#ifdef STREAM_STATS
+            agent->stats.num_drops_fps++;
+#endif
+        } else {
+            spice_warning("bad ret value (%d) from VideoEncoder::encode_dmabuf",
+                          ret);
+        }
+
+        dcc->priv->gl_draw_ongoing = false;
+        display_channel_gl_draw_done(display);
+        delete dmabuf_data;
+        return;
+    }
+
+    red_init_display_stream_data(dcc, base_marshaller, nullptr,
+                                 stream_id, outbuf, false);
 }
 
 static inline void marshall_inval_palette(RedChannelClient *rcc,
@@ -2126,6 +2235,8 @@ static void marshall_stream_start(DisplayChannelClient *dcc,
     if (stream->current) {
         RedDrawable *red_drawable = stream->current->red_drawable.get();
         stream_create.clip = red_drawable->clip;
+    } else if (stream == DCC_TO_DC(dcc)->priv->gl_draw_stream){
+        stream_create.clip.type = SPICE_CLIP_TYPE_NONE;
     } else {
         stream_create.clip.type = SPICE_CLIP_TYPE_RECTS;
         clip_rects.num_rects = 0;
@@ -2267,22 +2378,66 @@ static void marshall_gl_scanout(DisplayChannelClient *dcc,
     DisplayChannel *display_channel = DCC_TO_DC(dcc);
     QXLInstance* qxl = display_channel->priv->qxl;
 
-    SpiceMsgDisplayGlScanoutUnix *scanout = red_qxl_get_gl_scanout(qxl);
+    RedGLScanout *scanout = red_qxl_get_gl_scanout(qxl);
     if (scanout != nullptr) {
-        dcc->init_send_data(SPICE_MSG_DISPLAY_GL_SCANOUT_UNIX);
-        spice_marshall_msg_display_gl_scanout_unix(m, scanout);
+        if (dcc->test_remote_cap(SPICE_DISPLAY_CAP_GL_SCANOUT2)) {
+            struct : SpiceMsgDisplayGlScanout2Unix {
+                 SpiceGlPlaneUnix _pad_planes[4];
+            } msg;
+
+            msg.width = scanout->width;
+            msg.height = scanout->height;
+            msg.fourcc = scanout->fourcc;
+            msg.flags = scanout->flags;
+            msg.modifier = scanout->modifier;
+            msg.num_planes = scanout->num_planes;
+
+            for (int i = 0; i < scanout->num_planes; i++) {
+                msg.planes[i].fd = scanout->fd[i];
+                msg.planes[i].offset = scanout->offset[i];
+                msg.planes[i].stride = scanout->stride[i];
+            }
+
+            dcc->init_send_data(SPICE_MSG_DISPLAY_GL_SCANOUT2_UNIX);
+            spice_marshall_msg_display_gl_scanout2_unix(m, &msg);
+        } else {
+            if (scanout->num_planes <= 1) {
+                SpiceMsgDisplayGlScanoutUnix msg;
+                msg.drm_dma_buf_fd = scanout->fd[0];
+                msg.width = scanout->width;
+                msg.height = scanout->height;
+                msg.stride = scanout->stride[0];
+                msg.drm_fourcc_format = scanout->fourcc;
+                msg.flags = scanout->flags;
+
+                dcc->init_send_data(SPICE_MSG_DISPLAY_GL_SCANOUT_UNIX);
+                spice_marshall_msg_display_gl_scanout_unix(m, &msg);
+            } else {
+                spice_warning("gl scanout client does not support multi plane");
+            }
+        }
     }
     red_qxl_put_gl_scanout(qxl, scanout);
 }
 
-static void marshall_gl_draw(RedChannelClient *rcc,
+static void marshall_gl_draw(DisplayChannelClient *dcc,
                              SpiceMarshaller *m,
                              RedPipeItem *item)
 {
     auto p = static_cast<RedGlDrawItem*>(item);
 
-    rcc->init_send_data(SPICE_MSG_DISPLAY_GL_DRAW);
-    spice_marshall_msg_display_gl_draw(m, &p->draw);
+    if (dcc->is_gl_client()) {
+        dcc->init_send_data(SPICE_MSG_DISPLAY_GL_DRAW);
+        spice_marshall_msg_display_gl_draw(m, &p->draw);
+    } else if (DCC_TO_DC(dcc)->priv->gl_draw_stream) {
+        red_marshall_gl_draw_stream(dcc, m);
+    } else if (dcc->priv->gl_draw_ongoing) {
+        auto display = DCC_TO_DC(dcc);
+        dcc->priv->gl_draw_ongoing = false;
+        display_channel_gl_draw_done(display);
+    } else {
+        spice_warning("nothing to send to the client");
+    }
 }
 
 

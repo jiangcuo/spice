@@ -76,6 +76,7 @@ void spice_marshall_msg_display_draw_composite(SpiceMarshaller *m, const SpiceMs
 void spice_marshall_msg_display_stream_activate_report(SpiceMarshaller *m, const SpiceMsgDisplayStreamActivateReport *msg);
 void spice_marshall_msg_display_gl_scanout_unix(SpiceMarshaller *m, const SpiceMsgDisplayGlScanoutUnix *msg);
 void spice_marshall_msg_display_gl_draw(SpiceMarshaller *m, const SpiceMsgDisplayGlDraw *msg);
+void spice_marshall_msg_display_gl_scanout2_unix(SpiceMarshaller *m, const SpiceMsgDisplayGlScanout2Unix *msg);
 void spice_marshall_msg_inputs_init(SpiceMarshaller *m, const SpiceMsgInputsInit *msg);
 void spice_marshall_msg_inputs_key_modifiers(SpiceMarshaller *m, const SpiceMsgInputsKeyModifiers *msg);
 void spice_marshall_msg_cursor_init(SpiceMarshaller *m, const SpiceMsgCursorInit *msg);

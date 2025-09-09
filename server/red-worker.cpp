@@ -364,8 +364,6 @@ handle_dev_del_memslot(RedWorker* worker, RedWorkerMessageDelMemslot* msg)
 static void
 handle_dev_destroy_surface_wait(RedWorker* worker, RedWorkerMessageDestroySurfaceWait* msg)
 {
-    spice_return_if_fail(msg->surface_id == 0);
-
     flush_all_qxl_commands(worker);
     display_channel_destroy_surface_wait(worker->display_channel, msg->surface_id);
 }
@@ -978,8 +976,7 @@ RedWorker* red_worker_new(QXLInstance *qxl)
                       init_info.num_memslots_groups,
                       init_info.num_memslots,
                       init_info.memslot_gen_bits,
-                      init_info.memslot_id_bits,
-                      init_info.internal_groupslot_id);
+                      init_info.memslot_id_bits);
 
     worker->event_timeout = INF_EVENT_WAIT;
 

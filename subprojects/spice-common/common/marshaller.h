@@ -68,7 +68,7 @@ void *spice_marshaller_add_int8(SpiceMarshaller *m, int8_t v);
 void  spice_marshaller_set_uint32(SpiceMarshaller *m, void *ref, uint32_t v);
 
 void  spice_marshaller_add_fd(SpiceMarshaller *m, int fd);
-bool  spice_marshaller_get_fd(SpiceMarshaller *m, int *fd);
+int   spice_marshaller_get_fds(SpiceMarshaller *m, int fd[4]);
 
 SPICE_END_DECLS
 

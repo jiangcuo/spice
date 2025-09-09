@@ -711,6 +711,12 @@ flags32 gl_scanout_flags {
     Y0TOP
 };
 
+struct GlPlaneUnix {
+    unix_fd fd;
+    uint32 offset;
+    uint32 stride;
+} @declare;
+
 channel DisplayChannel : BaseChannel {
  server:
     message {
@@ -973,6 +979,20 @@ channel DisplayChannel : BaseChannel {
     } @declare gl_draw;
 
     Data quality_indicator;
+
+    message {
+        uint32 width;
+        uint32 height;
+        /* pixel format, see drm_fourcc.h */
+        uint32 fourcc;
+        gl_scanout_flags flags;
+        /* max 4 planes */
+        uint8 num_planes;
+        /* pixel layout in the buffer, see drm_fourcc.h */
+        uint64 modifier;
+        GlPlaneUnix planes[num_planes] @end;
+    } @declare gl_scanout2_unix;
+
  client:
     message {
         uint8 pixmap_cache_id;

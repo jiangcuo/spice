@@ -1,5 +1,4 @@
 
-import six
 from io import StringIO
 
 def camel_to_underscores(s, upper = False):
@@ -123,10 +122,7 @@ class CodeWriter:
 
     def write(self, s):
         # Ensure its a unicode string
-        if six.PY3:
-            s = str(s)
-        else:
-            s = unicode(s)
+        s = str(s)
 
         if len(s) == 0:
             return

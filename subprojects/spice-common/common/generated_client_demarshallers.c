@@ -6397,6 +6397,79 @@ static uint8_t * parse_msg_display_gl_draw(uint8_t *message_start, uint8_t *mess
     return NULL;
 }
 
+static uint8_t * parse_msg_display_gl_scanout2_unix(uint8_t *message_start, uint8_t *message_end, size_t *size, message_destructor_t *free_message)
+{
+    SPICE_GNUC_UNUSED uint8_t *pos;
+    uint8_t *start = message_start;
+    uint8_t *data = NULL;
+    uint64_t nw_size;
+    uint64_t mem_size;
+    uint8_t *in, *end;
+    uint64_t planes__nw_size, planes__mem_size;
+    uint64_t planes__nelements;
+    SpiceMsgDisplayGlScanout2Unix *out;
+    uint32_t i;
+
+    { /* planes */
+        uint8_t num_planes__value;
+        pos = start + 16;
+        if (SPICE_UNLIKELY(pos + 1 > message_end)) {
+            goto error;
+        }
+        num_planes__value = read_uint8(pos);
+        planes__nelements = num_planes__value;
+
+        planes__nw_size = (8) * planes__nelements;
+        planes__mem_size = sizeof(SpiceGlPlaneUnix) * planes__nelements;
+    }
+
+    nw_size = 25 + planes__nw_size;
+    mem_size = sizeof(SpiceMsgDisplayGlScanout2Unix) + planes__mem_size;
+
+    /* Check if message fits in reported side */
+    if (nw_size > (uintptr_t) (message_end - start)) {
+        return NULL;
+    }
+
+    /* Validated extents and calculated size */
+    data = (uint8_t *)(mem_size > UINT32_MAX ? NULL : malloc(mem_size));
+    if (SPICE_UNLIKELY(data == NULL)) {
+        goto error;
+    }
+    end = data + sizeof(SpiceMsgDisplayGlScanout2Unix);
+    in = start;
+
+    out = (SpiceMsgDisplayGlScanout2Unix *)data;
+
+    out->width = consume_uint32(&in);
+    out->height = consume_uint32(&in);
+    out->fourcc = consume_uint32(&in);
+    out->flags = consume_uint32(&in);
+    out->num_planes = consume_uint8(&in);
+    out->modifier = consume_uint64(&in);
+    verify(sizeof(out->planes) == 0);
+    for (i = 0; i < planes__nelements; i++) {
+        SpiceGlPlaneUnix *out2;
+        out2 = (SpiceGlPlaneUnix *)end;
+        end += sizeof(SpiceGlPlaneUnix);
+
+        out2->fd = consume_fd(&in);
+        out2->offset = consume_uint32(&in);
+        out2->stride = consume_uint32(&in);
+    }
+
+    assert(in <= message_end);
+    assert(end <= data + mem_size);
+
+    *size = end - data;
+    *free_message = (message_destructor_t) free;
+    return data;
+
+   error:
+    free(data);
+    return NULL;
+}
+
 static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *message_end, uint16_t message_type, SPICE_GNUC_UNUSED int minor, size_t *size_out, message_destructor_t *free_message)
 {
     static parse_msg_func_t funcs1[8] =  {
@@ -6427,7 +6500,7 @@ static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *messa
         parse_msg_display_stream_destroy,
         parse_SpiceMsgEmpty
     };
-    static parse_msg_func_t funcs4[21] =  {
+    static parse_msg_func_t funcs4[22] =  {
         parse_msg_display_draw_fill,
         parse_msg_display_draw_opaque,
         parse_msg_display_draw_copy,
@@ -6448,7 +6521,8 @@ static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *messa
         parse_msg_display_stream_activate_report,
         parse_msg_display_gl_scanout_unix,
         parse_msg_display_gl_draw,
-        parse_SpiceMsgData
+        parse_SpiceMsgData,
+        parse_msg_display_gl_scanout2_unix
     };
     if (message_type >= 1 && message_type < 9) {
         return funcs1[message_type-1](message_start, message_end, size_out, free_message);
@@ -6456,7 +6530,7 @@ static uint8_t * parse_DisplayChannel_msg(uint8_t *message_start, uint8_t *messa
         return funcs2[message_type-100](message_start, message_end, size_out, free_message);
     } else if (message_type >= 122 && message_type < 127) {
         return funcs3[message_type-122](message_start, message_end, size_out, free_message);
-    } else if (message_type >= 302 && message_type < 323) {
+    } else if (message_type >= 302 && message_type < 324) {
         return funcs4[message_type-302](message_start, message_end, size_out, free_message);
     }
     return NULL;
@@ -7769,7 +7843,7 @@ spice_parse_channel_func_t spice_get_server_channel_parser(uint32_t channel, uns
     static struct {spice_parse_channel_func_t func; unsigned int max_messages; } channels[12] =  {
         { NULL, 0 },
         { parse_MainChannel_msg, 118},
-        { parse_DisplayChannel_msg, 322},
+        { parse_DisplayChannel_msg, 323},
         { parse_InputsChannel_msg, 111},
         { parse_CursorChannel_msg, 108},
         { parse_PlaybackChannel_msg, 107},

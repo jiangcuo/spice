@@ -1,11 +1,9 @@
-import six
-
 try:
     from pyparsing import Literal, CaselessLiteral, Word, OneOrMore, ZeroOrMore, \
             Forward, delimitedList, Group, Optional, Combine, alphas, nums, restOfLine, cStyleComment, \
             alphanums, ParseException, ParseResults, Keyword, StringEnd, replaceWith
 except ImportError:
-    six.print_("Module pyparsing not found.")
+    print("Module pyparsing not found.")
     exit(1)
 
 
@@ -149,9 +147,9 @@ def parse(filename):
         bnf = SPICE_BNF()
         types = bnf.parseFile(filename)
     except ParseException as err:
-        six.print_(err.line, file=sys.stderr)
-        six.print_(" "*(err.column-1) + "^", file=sys.stderr)
-        six.print_(err, file=sys.stderr)
+        print(err.line, file=sys.stderr)
+        print(" "*(err.column-1) + "^", file=sys.stderr)
+        print(err, file=sys.stderr)
         return None
 
     for t in types:

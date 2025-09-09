@@ -139,7 +139,7 @@ generated_test_marshallers.c: $(srcdir)/test-marshallers.proto $(MARSHALLERS_DEP
 generated_test_marshallers.h: $(srcdir)/test-marshallers.proto $(MARSHALLERS_DEPS)
 	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --suffix=_test \
 	--generate-marshallers --server --include test-marshallers.h -H $< $@ >/dev/null
-generated_test_demarshallers.c: $(srcdir)/test-marshallers.proto $(MARSHALLERS_DEPS)
+generated_test_demarshallers.c generated_test_messages.h &: $(srcdir)/test-marshallers.proto $(MARSHALLERS_DEPS)
 	$(AM_V_GEN)$(PYTHON) $(top_srcdir)/spice_codegen.py --suffix=_test \
 	--generate-demarshallers --client --include test-marshallers.h \
 	--generated-declaration-file generated_test_messages.h $< $@ >/dev/null

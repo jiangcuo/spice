@@ -39,6 +39,13 @@
 
 #include "red-qxl.h"
 
+#ifdef HAVE_DRM_DRM_FOURCC_H
+#include <drm/drm_fourcc.h>
+#endif
+
+#ifndef DRM_FORMAT_MOD_INVALID
+#define DRM_FORMAT_MOD_INVALID ((1ULL << 56) - 1)
+#endif
 
 #define MAX_MONITORS_COUNT 16
 
@@ -61,7 +68,7 @@ struct QXLState {
     bool running;
 
     pthread_mutex_t scanout_mutex;
-    SpiceMsgDisplayGlScanoutUnix scanout;
+    RedGLScanout scanout;
     uint64_t gl_draw_cookie;
 
     template <typename T>
@@ -267,6 +274,11 @@ void spice_qxl_destroy_surface_wait(QXLInstance *instance, uint32_t surface_id)
 {
     RedWorkerMessageDestroySurfaceWait payload;
 
+    if (surface_id != 0) {
+        spice_warning("Invalid surface_id != 0: %u", surface_id);
+        return;
+    }
+
     payload.surface_id = surface_id;
     instance->st->send_message(payload);
 }
@@ -404,17 +416,17 @@ void spice_qxl_set_max_monitors(QXLInstance *instance, unsigned int max_monitors
     instance->st->max_monitors = MAX(1U, max_monitors);
 }
 
-SpiceMsgDisplayGlScanoutUnix *red_qxl_get_gl_scanout(QXLInstance *qxl)
+RedGLScanout *red_qxl_get_gl_scanout(QXLInstance *qxl)
 {
     pthread_mutex_lock(&qxl->st->scanout_mutex);
-    if (qxl->st->scanout.drm_dma_buf_fd >= 0) {
+    if (qxl->st->scanout.fd[0] >= 0) {
         return &qxl->st->scanout;
     }
     pthread_mutex_unlock(&qxl->st->scanout_mutex);
     return nullptr;
 }
 
-void red_qxl_put_gl_scanout(QXLInstance *qxl, SpiceMsgDisplayGlScanoutUnix *scanout)
+void red_qxl_put_gl_scanout(QXLInstance *qxl, RedGLScanout *scanout)
 {
     if (scanout) {
         pthread_mutex_unlock(&qxl->st->scanout_mutex);
@@ -428,26 +440,49 @@ void spice_qxl_gl_scanout(QXLInstance *qxl,
                           uint32_t stride, uint32_t format,
                           int y_0_top)
 {
+    uint32_t offset = 0;
+    spice_qxl_gl_scanout2(qxl, &fd, width, height, &offset, &stride, 1,
+			  format, DRM_FORMAT_MOD_INVALID, y_0_top);
+}
+
+SPICE_GNUC_VISIBLE
+void spice_qxl_gl_scanout2(QXLInstance *qxl,
+			   const int *fd,
+			   uint32_t width, uint32_t height,
+			   const uint32_t *offset, const uint32_t *stride,
+			   uint32_t num_planes, uint32_t format,
+			   uint64_t modifier, int y_0_top)
+{
     RedWorkerMessageGlScanout payload = { /* empty */ };
     spice_return_if_fail(qxl != nullptr);
+    spice_return_if_fail(num_planes <= 4);
 
     QXLState *qxl_state = qxl->st;
-    spice_return_if_fail(qxl_state->gl_draw_cookie == GL_DRAW_COOKIE_INVALID);
 
     pthread_mutex_lock(&qxl_state->scanout_mutex);
 
-    if (qxl_state->scanout.drm_dma_buf_fd >= 0) {
-        close(qxl_state->scanout.drm_dma_buf_fd);
+    RedGLScanout *scanout = &qxl_state->scanout;
+    for (int i = 0; i < scanout->num_planes; i++) {
+        if (scanout->fd[i] >= 0) {
+            close(scanout->fd[i]);
+            scanout->fd[i] = -1;
+        }
+	scanout->offset[i] = 0;
+	scanout->stride[i] = 0;
     }
 
-    qxl_state->scanout = (SpiceMsgDisplayGlScanoutUnix) {
-        .drm_dma_buf_fd = fd,
-        .width = width,
-        .height = height,
-        .stride = stride,
-        .drm_fourcc_format = format,
-        .flags = y_0_top ? SPICE_GL_SCANOUT_FLAGS_Y0TOP : 0,
-    };
+    scanout->width = width;
+    scanout->height = height;
+    scanout->fourcc = format;
+    scanout->modifier = modifier;
+    scanout->flags = y_0_top ? SPICE_GL_SCANOUT_FLAGS_Y0TOP : 0;
+    scanout->num_planes = num_planes;
+
+    for (int i = 0; i < num_planes; i++) {
+        scanout->fd[i] = fd[i];
+        scanout->offset[i] = offset[i];
+        scanout->stride[i] = stride[i];
+    }
 
     pthread_mutex_unlock(&qxl_state->scanout_mutex);
 
@@ -474,7 +509,7 @@ void spice_qxl_gl_draw_async(QXLInstance *qxl,
 
     spice_return_if_fail(qxl != nullptr);
     qxl_state = qxl->st;
-    if (qxl_state->scanout.drm_dma_buf_fd < 0) {
+    if (qxl_state->scanout.fd[0] < 0) {
         spice_warning("called spice_qxl_gl_draw_async without a buffer");
         red_qxl_async_complete(qxl, cookie);
         return;
@@ -572,9 +607,11 @@ void red_qxl_init(RedsState *reds, QXLInstance *qxl)
     qxl_state->reds = reds;
     qxl_state->qxl = qxl;
     pthread_mutex_init(&qxl_state->scanout_mutex, nullptr);
-    qxl_state->scanout.drm_dma_buf_fd = -1;
     qxl_state->gl_draw_cookie = GL_DRAW_COOKIE_INVALID;
     qxl_state->dispatcher = red::make_shared<Dispatcher>(RED_WORKER_MESSAGE_COUNT);
+    for (auto& fd : qxl_state->scanout.fd) {
+        fd = -1;
+    }
 
     qxl_state->max_monitors = UINT_MAX;
     qxl->st = qxl_state;
@@ -615,7 +652,7 @@ void red_qxl_clear_pending(QXLState *qxl_state, int pending)
 bool red_qxl_get_allow_client_mouse(QXLInstance *qxl, int *x_res, int *y_res, int *allow_now)
 {
     // try to get resolution when 3D enabled, since qemu did not create QXL primary surface
-    SpiceMsgDisplayGlScanoutUnix *gl;
+    RedGLScanout *gl;
     if ((gl = red_qxl_get_gl_scanout(qxl))) {
         *x_res = gl->width;
         *y_res = gl->height;
