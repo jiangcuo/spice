@@ -263,6 +263,8 @@ static const EncoderInfo encoder_infos[] = {
       "caps=video/x-vp9", "vp9dec" },
     { "gstreamer:h264",  gstreamer_encoder_new, SPICE_VIDEO_CODEC_TYPE_H264,
       "", "h264parse ! avdec_h264" },
+    { "gstreamer:h265",  gstreamer_encoder_new, SPICE_VIDEO_CODEC_TYPE_H265,
+      "caps=video/x-h265", "h265parse ! avdec_h265" },
     { NULL, NULL, SPICE_VIDEO_CODEC_TYPE_ENUM_END, NULL, NULL }
 };
 

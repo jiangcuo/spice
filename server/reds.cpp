@@ -3461,11 +3461,11 @@ err:
 
 static const char default_renderer[] = "sw";
 #if defined(HAVE_GSTREAMER_1_0)
-#define GSTREAMER_CODECS "gstreamer:mjpeg;gstreamer:h264;gstreamer:vp8;gstreamer:vp9;"
+#define GSTREAMER_CODECS "gstreamer:h264;gstreamer:mjpeg;gstreamer:h265;gstreamer:vp8;gstreamer:vp9;"
 #else
 #define GSTREAMER_CODECS ""
 #endif
-static const char default_video_codecs[] = "spice:mjpeg;" GSTREAMER_CODECS;
+static const char default_video_codecs[] = "gstreamer:h264;" GSTREAMER_CODECS;
 
 /* new interface */
 SPICE_GNUC_VISIBLE SpiceServer *spice_server_new(void)
@@ -3582,7 +3582,20 @@ static const EnumNames video_codec_names[] = {
     {SPICE_VIDEO_CODEC_TYPE_MJPEG, "mjpeg"},
     {SPICE_VIDEO_CODEC_TYPE_VP8, "vp8"},
     {SPICE_VIDEO_CODEC_TYPE_H264, "h264"},
+    {SPICE_VIDEO_CODEC_TYPE_H264_NVENC, "h264nvenc"},
+    {SPICE_VIDEO_CODEC_TYPE_H264_AMF, "h264amf"},
+    {SPICE_VIDEO_CODEC_TYPE_H264_QSV, "h264qsv"},
+    {SPICE_VIDEO_CODEC_TYPE_H264_VAAPI, "h264vaapi"},
     {SPICE_VIDEO_CODEC_TYPE_VP9, "vp9"},
+    {SPICE_VIDEO_CODEC_TYPE_H265, "h265"},
+    {SPICE_VIDEO_CODEC_TYPE_H265_NVENC, "h265nvenc"},
+    {SPICE_VIDEO_CODEC_TYPE_H265_AMF, "h265amf"},
+    {SPICE_VIDEO_CODEC_TYPE_H265_QSV, "h265qsv"},
+    {SPICE_VIDEO_CODEC_TYPE_H265_VAAPI, "h265vaapi"},
+    {SPICE_VIDEO_CODEC_TYPE_AV1_NVENC, "av1nvenc"},
+    {SPICE_VIDEO_CODEC_TYPE_AV1_AMF, "av1amf"},
+    {SPICE_VIDEO_CODEC_TYPE_AV1_QSV, "av1qsv"},
+    {SPICE_VIDEO_CODEC_TYPE_AV1_VAAPI, "av1vaapi"},
     {0, nullptr},
 };
 
@@ -3590,6 +3603,19 @@ static const int video_codec_caps[] = {
     SPICE_DISPLAY_CAP_CODEC_MJPEG,
     SPICE_DISPLAY_CAP_CODEC_VP8,
     SPICE_DISPLAY_CAP_CODEC_H264,
+    SPICE_DISPLAY_CAP_CODEC_H264_NVENC,
+    SPICE_DISPLAY_CAP_CODEC_H264_AMF,
+    SPICE_DISPLAY_CAP_CODEC_H264_QSV,
+    SPICE_DISPLAY_CAP_CODEC_H264_VAAPI,
+    SPICE_DISPLAY_CAP_CODEC_H265,
+    SPICE_DISPLAY_CAP_CODEC_H265_NVENC,
+    SPICE_DISPLAY_CAP_CODEC_H265_AMF,
+    SPICE_DISPLAY_CAP_CODEC_H265_QSV,
+    SPICE_DISPLAY_CAP_CODEC_H265_VAAPI,
+    SPICE_DISPLAY_CAP_CODEC_AV1_NVENC,
+    SPICE_DISPLAY_CAP_CODEC_AV1_AMF,
+    SPICE_DISPLAY_CAP_CODEC_AV1_QSV,
+    SPICE_DISPLAY_CAP_CODEC_AV1_VAAPI,
     SPICE_DISPLAY_CAP_CODEC_VP9,
 };
 
