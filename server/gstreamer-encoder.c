@@ -993,46 +993,46 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
          * - Set intra-refresh to get more uniform compressed frame sizes,
          *   thus helping with streaming.
          */
-        gstenc_opts = g_strdup("byte-stream=true aud=true qp-min=15 qp-max=35 tune=4 sliced-threads=true speed-preset=ultrafast intra-refresh=true");
+        gstenc_opts = g_strdup("speed-preset=ultrafast tune=zerolatency pass=vbr bframes=0 ");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H265:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_AV1_NVENC:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_AV1_AMF:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_AV1_QSV:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_AV1_VAAPI:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H265_NVENC:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H265_AMF:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H265_QSV:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H265_VAAPI:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H264_NVENC:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("preset=p4 rc-mode=cbr b-frames=0 zerolatency=true");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H264_AMF:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("usage=ultra-low-latency rate-control=cbr b-frames=0 preset=speed");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H264_QSV:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("rate-control=cbr b-frames=0");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H264_VAAPI:
-        gstenc_opts = g_strdup("preset=ultrafast rc-mode=1 qp-min=15 qp-max=35 zerolatency=1");
+        gstenc_opts = g_strdup("rate-control=cbr b-frames=0 qos=false");
         break;
     default:
         /* gstreamer_encoder_new() should have rejected this codec type */
