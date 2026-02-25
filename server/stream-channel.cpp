@@ -440,7 +440,7 @@ StreamChannel::change_format(const StreamMsgFormat *fmt)
     auto item = red::make_shared<StreamCreateItem>();
     item->stream_create.id = stream_id;
     item->stream_create.flags = SPICE_STREAM_FLAGS_TOP_DOWN;
-    item->stream_create.codec_type = fmt->codec;
+    item->stream_create.codec_type = spice_video_codec_base_type((SpiceVideoCodecType)fmt->codec);
     item->stream_create.stream_width = fmt->width;
     item->stream_create.stream_height = fmt->height;
     item->stream_create.src_width = fmt->width;

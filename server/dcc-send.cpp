@@ -2115,7 +2115,7 @@ static void marshall_stream_start(DisplayChannelClient *dcc,
     stream_create.surface_id = 0;
     stream_create.id = display_channel_get_video_stream_id(DCC_TO_DC(dcc), stream);
     stream_create.flags = stream->top_down ? SPICE_STREAM_FLAGS_TOP_DOWN : 0;
-    stream_create.codec_type = agent->video_encoder->codec_type;
+    stream_create.codec_type = spice_video_codec_base_type(agent->video_encoder->codec_type);
 
     stream_create.src_width = stream->width;
     stream_create.src_height = stream->height;

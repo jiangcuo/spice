@@ -43,7 +43,7 @@
 #define RED_STREAM_CLIENT_REPORT_TIMEOUT MSEC_PER_SEC
 #define RED_STREAM_DEFAULT_HIGH_START_BIT_RATE (10 * 1024 * 1024) // 10Mbps
 #define RED_STREAM_DEFAULT_LOW_START_BIT_RATE (2.5 * 1024 * 1024) // 2.5Mbps
-#define MAX_FPS 30
+#define MAX_FPS 60
 
 struct VideoStream;
 
@@ -138,6 +138,31 @@ GArray *video_stream_parse_preferred_codecs(SpiceMsgcDisplayPreferredVideoCodecT
 void video_stream_agent_stop(VideoStreamAgent *agent);
 
 void video_stream_detach_drawable(VideoStream *stream);
+
+/* Map hardware encoder variant codec types to their standard base type
+ * for wire protocol compatibility with standard SPICE clients.
+ * E.g. H264_NVENC -> H264, H265_VAAPI -> H265, etc. */
+static inline SpiceVideoCodecType
+spice_video_codec_base_type(SpiceVideoCodecType type)
+{
+    switch (type) {
+    case SPICE_VIDEO_CODEC_TYPE_MJPEG_NVJPG:
+    case SPICE_VIDEO_CODEC_TYPE_MJPEG_VAAPI:
+        return SPICE_VIDEO_CODEC_TYPE_MJPEG;
+    case SPICE_VIDEO_CODEC_TYPE_H264_NVENC:
+    case SPICE_VIDEO_CODEC_TYPE_H264_AMF:
+    case SPICE_VIDEO_CODEC_TYPE_H264_QSV:
+    case SPICE_VIDEO_CODEC_TYPE_H264_VAAPI:
+        return SPICE_VIDEO_CODEC_TYPE_H264;
+    case SPICE_VIDEO_CODEC_TYPE_H265_NVENC:
+    case SPICE_VIDEO_CODEC_TYPE_H265_AMF:
+    case SPICE_VIDEO_CODEC_TYPE_H265_QSV:
+    case SPICE_VIDEO_CODEC_TYPE_H265_VAAPI:
+        return SPICE_VIDEO_CODEC_TYPE_H265;
+    default:
+        return type;
+    }
+}
 
 #include "pop-visibility.h"
 

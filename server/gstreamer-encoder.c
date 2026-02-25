@@ -209,6 +209,7 @@ typedef struct SpiceGstEncoder {
      * while vbuffer_size holds the limit in bytes for the current bit rate.
      */
 #   define SPICE_GST_VBUFFER_SIZE 300
+#   define SPICE_GST_VBUFFER_SIZE_STREAMING 2000
 
     int32_t vbuffer_size;
     int32_t vbuffer_free;
@@ -604,10 +605,23 @@ static void update_next_frame_mm_time(SpiceGstEncoder *encoder)
  * This is based on a 10x compression ratio which should be more than enough
  * for even MJPEG to provide good quality.
  */
+static gboolean is_streaming_codec(SpiceVideoCodecType type)
+{
+    switch (type) {
+    case SPICE_VIDEO_CODEC_TYPE_MJPEG:
+    case SPICE_VIDEO_CODEC_TYPE_MJPEG_NVJPG:
+    case SPICE_VIDEO_CODEC_TYPE_MJPEG_VAAPI:
+        return FALSE;
+    default:
+        return TRUE;
+    }
+}
+
 static uint64_t get_bit_rate_cap(const SpiceGstEncoder *encoder)
 {
     uint32_t raw_frame_bits = encoder->width * encoder->height * encoder->format->bpp;
-    return raw_frame_bits * get_source_fps(encoder) / 10;
+    uint32_t divisor = is_streaming_codec(encoder->base.codec_type) ? 2 : 10;
+    return raw_frame_bits * get_source_fps(encoder) / divisor;
 }
 
 static void set_bit_rate(SpiceGstEncoder *encoder, uint64_t bit_rate)
@@ -668,7 +682,9 @@ static void set_bit_rate(SpiceGstEncoder *encoder, uint64_t bit_rate)
     /* Adjust the vbuffer size without ever increasing vbuffer_free to avoid
      * sudden bit rate increases.
      */
-    int32_t new_size = bit_rate * SPICE_GST_VBUFFER_SIZE / MSEC_PER_SEC / 8;
+    int32_t vbuf_ms = is_streaming_codec(encoder->base.codec_type)
+                     ? SPICE_GST_VBUFFER_SIZE_STREAMING : SPICE_GST_VBUFFER_SIZE;
+    int32_t new_size = bit_rate * vbuf_ms / MSEC_PER_SEC / 8;
     if (new_size < encoder->vbuffer_size && encoder->vbuffer_free > 0) {
         encoder->vbuffer_free = MAX(0, encoder->vbuffer_free + new_size - encoder->vbuffer_size);
     }
@@ -984,16 +1000,12 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
         break;
         }
     case SPICE_VIDEO_CODEC_TYPE_H264:
-        /* - Set tune and sliced-threads to ensure a zero-frame latency
-         * - qp-min ensures the bitrate does not get needlessly high.
-         * - qp-max ensures the compression does not go so high that the video
-         *   is unrecognizable. When that threshold is reached it is better to
-         *   drop frames to lower the bit rate further.
-         * - Set speed-preset to get realtime speed.
-         * - Set intra-refresh to get more uniform compressed frame sizes,
-         *   thus helping with streaming.
+        /* - speed-preset=ultrafast + tune=zerolatency for lowest latency
+         * - threads + sliced-threads for parallel encoding of 1080p+
+         * - bframes=0 to avoid B-frame latency
+         * - key-int-max=60 for periodic keyframes
          */
-        gstenc_opts = g_strdup("speed-preset=ultrafast tune=zerolatency pass=vbr bframes=0 ");
+        gstenc_opts = g_strdup("speed-preset=ultrafast tune=zerolatency threads=0 bframes=0 key-int-max=60");
         break;
     case SPICE_VIDEO_CODEC_TYPE_H265:
         gstenc_opts = g_strdup("");
@@ -1041,9 +1053,15 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
     }
 
     GError *err = NULL;
+    /* For software x264enc, force I420 (4:2:0) instead of Y444 (4:4:4).
+     * Y444 is 50% more data and much slower to encode. */
+    const gchar *caps_filter = "";
+    if (encoder->base.codec_type == SPICE_VIDEO_CODEC_TYPE_H264) {
+        caps_filter = " ! video/x-raw,format=I420";
+    }
     gchar *desc = g_strdup_printf("appsrc is-live=true format=time do-timestamp=true name=src !"
-                                  " %s ! %s name=encoder %s ! appsink name=sink",
-                                  converter, gstenc_name, gstenc_opts);
+                                  " %s%s ! queue max-size-buffers=1 ! %s name=encoder %s ! appsink name=sink",
+                                  converter, caps_filter, gstenc_name, gstenc_opts);
     spice_debug("GStreamer pipeline: %s", desc);
     encoder->pipeline = gst_parse_launch_full(desc, NULL, GST_PARSE_FLAG_FATAL_ERRORS, &err);
     g_free(gstenc_opts);
@@ -1077,7 +1095,9 @@ static gboolean create_pipeline(SpiceGstEncoder *encoder)
 #endif
     gst_object_unref(bus);
 
-    if (encoder->base.codec_type == SPICE_VIDEO_CODEC_TYPE_MJPEG) {
+    if (encoder->base.codec_type == SPICE_VIDEO_CODEC_TYPE_MJPEG ||
+        encoder->base.codec_type == SPICE_VIDEO_CODEC_TYPE_MJPEG_NVJPG ||
+        encoder->base.codec_type == SPICE_VIDEO_CODEC_TYPE_MJPEG_VAAPI) {
         /* See https://bugzilla.gnome.org/show_bug.cgi?id=753257 */
         spice_debug("removing the pipeline clock");
         gst_pipeline_use_clock(GST_PIPELINE(encoder->pipeline), NULL);
@@ -1576,7 +1596,8 @@ spice_gst_encoder_encode_frame(VideoEncoder *video_encoder,
             encoder->min_bit_rate = SPICE_GST_MIN_BITRATE;
             encoder->status = SPICE_GST_BITRATE_DECREASING;
             set_bit_rate(encoder, encoder->starting_bit_rate);
-            encoder->vbuffer_free = 0; /* Slow start */
+            encoder->vbuffer_free = is_streaming_codec(encoder->base.codec_type)
+                                  ? encoder->starting_bit_rate : 0;
         } else if (encoder->pipeline) {
             set_pipeline_changes(encoder, SPICE_GST_VIDEO_PIPELINE_CAPS);
         }
