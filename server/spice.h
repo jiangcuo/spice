@@ -24,6 +24,7 @@
 #include "spice-core.h"
 #include "spice-server.h"
 #include "spice-qxl.h"
+#include "spice-scanout.h"
 #include "spice-input.h"
 #include "spice-audio.h"
 #include "spice-char.h"

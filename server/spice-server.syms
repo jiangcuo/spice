@@ -1,6 +1,8 @@
 SPICE_SERVER_0.6.0 {
 global:
     spice_server_add_interface;
+    spice_scanout_submit_frame;
+    spice_scanout_reset;
     spice_server_add_renderer;
     spice_server_char_device_recognized_subtypes;
     spice_server_char_device_wakeup;

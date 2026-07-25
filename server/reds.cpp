@@ -23,6 +23,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <limits>
+#include <memory>
+#include <mutex>
 
 #include <pthread.h>
 #include <unistd.h>
@@ -75,6 +77,13 @@
 #include "red-client.h"
 
 #include "reds-private.h"
+#include "scanout-aggregator.h"
+#include "spice-scanout.h"
+
+#include <unordered_map>
+
+static std::mutex scanout_instances_lock;
+static std::unordered_map<SpiceScanoutInstance *, std::unique_ptr<ScanoutAggregator>> scanout_instances;
 #include "video-encoder.h"
 #include "red-channel-client.h"
 #include "main-channel-client.h"
@@ -86,6 +95,32 @@
 
 static void reds_client_monitors_config(RedsState *reds, VDAgentMonitorsConfig *monitors_config);
 static gboolean reds_use_client_monitors_config(RedsState *reds);
+
+SPICE_GNUC_VISIBLE int spice_scanout_submit_frame(SpiceScanoutInstance *instance,
+                                                  const SpiceScanoutFrame *frame)
+{
+    if (!instance || !frame) {
+        return -1;
+    }
+    std::lock_guard<std::mutex> guard(scanout_instances_lock);
+    auto it = scanout_instances.find(instance);
+    if (it == scanout_instances.end()) {
+        return -1;
+    }
+    return it->second->submit(frame);
+}
+
+SPICE_GNUC_VISIBLE void spice_scanout_reset(SpiceScanoutInstance *instance)
+{
+    if (!instance) {
+        return;
+    }
+    std::lock_guard<std::mutex> guard(scanout_instances_lock);
+    auto it = scanout_instances.find(instance);
+    if (it != scanout_instances.end()) {
+        it->second->reset();
+    }
+}
 static void reds_set_video_codecs(RedsState *reds, GArray *video_codecs);
 
 /* Debugging only variable: allow multiple client connections to the spice
@@ -3279,6 +3314,23 @@ SPICE_GNUC_VISIBLE int spice_server_add_interface(SpiceServer *reds,
         if (reds->inputs_channel->set_mouse(SPICE_UPCAST(SpiceMouseInstance, sin)) != 0) {
             return -1;
         }
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_SCANOUT) == 0) {
+        SpiceScanoutInstance *scanout = SPICE_UPCAST(SpiceScanoutInstance, sin);
+        if (base_interface->major_version != SPICE_INTERFACE_SCANOUT_MAJOR ||
+            base_interface->minor_version > SPICE_INTERFACE_SCANOUT_MINOR) {
+            spice_warning("unsupported scanout interface");
+            return -1;
+        }
+        std::lock_guard<std::mutex> guard(scanout_instances_lock);
+        if (scanout_instances.count(scanout)) {
+            return -1;
+        }
+        scanout->opaque = reds;
+        scanout_instances.emplace(scanout,
+                                  std::make_unique<ScanoutAggregator>(
+                                      scanout->head,
+                                      reds_get_streaming_video(reds) == SPICE_STREAM_VIDEO_ALL));
+        spice_debug("SPICE_INTERFACE_SCANOUT head %u", scanout->head);
     } else if (strcmp(base_interface->type, SPICE_INTERFACE_QXL) == 0) {
         QXLInstance *qxl;
 
@@ -3396,6 +3448,14 @@ SPICE_GNUC_VISIBLE int spice_server_remove_interface(SpiceBaseInstance *sin)
         g_return_val_if_fail(char_device->st != nullptr, -1);
         reds = char_device->st->get_server();
         return spice_server_char_device_remove_interface(reds, sin);
+    } else if (strcmp(base_interface->type, SPICE_INTERFACE_SCANOUT) == 0) {
+        std::lock_guard<std::mutex> guard(scanout_instances_lock);
+        auto it = scanout_instances.find(SPICE_UPCAST(SpiceScanoutInstance, sin));
+        if (it == scanout_instances.end()) {
+            return -1;
+        }
+        it->second->reset();
+        scanout_instances.erase(it);
     } else if (strcmp(base_interface->type, SPICE_INTERFACE_QXL) == 0) {
         QXLInstance *qxl;
 
